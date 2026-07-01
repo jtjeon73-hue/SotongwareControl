@@ -25,6 +25,15 @@
 - 유튜브/콘텐츠
 - 전자책
 
+### 앱개발 사업부 관리 앱
+
+- **소통여행** — 여행 정보·일정 관리
+- **소통사주** — 사주·운세 콘텐츠
+- **팜지기** — 농촌 직거래
+- **소통건강** — AI 건강코치
+- **소통AI** — AI 활용 플랫폼
+- **소통사매앱 / SotongSamae** — 지역 생활정보, 마을 소식, 관광지, 생활 편의 정보를 담는 지역 밀착형 앱
+
 ## 지원 부서
 
 - 세무·회계·예산·재테크
@@ -101,6 +110,30 @@ release_apk/SotongWareControl_0.2.0_release.apk
 
 내부 관제센터에서 **PRIVATE 사이트**와 **PUBLIC 사업 총괄 홍보사이트**를 구분해 관리합니다.
 
+## Public 사업 총괄 사이트 연결 구조
+
+| 저장소 | 역할 |
+|--------|------|
+| SotongwareControl | private 내부 관제센터 |
+| SotongAutomationPromo | 산업자동화 public 홍보사이트 |
+| SotongAppsPromo | 앱개발 public 홍보사이트 |
+| SotongContentsPromo | 콘텐츠 public 홍보사이트 |
+| SotongEbookPromo | 전자책 public 홍보사이트 |
+
+### 연결 URL
+
+- https://jtjeon73-hue.github.io/SotongAutomationPromo/
+- https://jtjeon73-hue.github.io/SotongAppsPromo/
+- https://jtjeon73-hue.github.io/SotongContentsPromo/
+- https://jtjeon73-hue.github.io/SotongEbookPromo/
+
+### GitHub Pages 확인 방법
+
+- 각 promo 저장소에서 `docs` 폴더가 있는지 확인
+- GitHub Desktop에서 Commit / Push 되었는지 확인
+- GitHub 저장소 **Settings → Pages → main / docs** 설정 확인
+- 배포 주소 접속 시 404가 없는지 확인
+
 ### PRIVATE (내부)
 
 | 저장소 | 사이트 | 용도 |
@@ -118,7 +151,20 @@ release_apk/SotongWareControl_0.2.0_release.apk
 
 ### SotongAppsPromo 하위 링크 예정
 
-- SotongTravelPromo, SotongSajuPromo, FarmjigiPromo, SotongHealthPromo, SotongAIPromo
+- SotongTravelPromo, SotongSajuPromo, FarmjigiPromo, SotongHealthPromo, SotongAIPromo, SotongSamaePromo
+
+## 앱개발부 개별 프로모 연결 구조
+
+| 앱 | 프로모 URL |
+|----|------------|
+| 소통여행 | https://jtjeon73-hue.github.io/SotongTravelPromo/ |
+| 소통사주 | https://jtjeon73-hue.github.io/SotongSajuPromo/ |
+| 팜지기 | https://jtjeon73-hue.github.io/FarmjigiPromo/ |
+| 소통건강 | https://jtjeon73-hue.github.io/SotongHealthPromo/ |
+| 소통AI | https://jtjeon73-hue.github.io/SotongAIPromo/ |
+| 소통사매앱 | https://jtjeon73-hue.github.io/SotongSamaePromo/ |
+
+각 개별 프로모 저장소가 아직 생성·배포되지 않은 경우 해당 URL은 **404**가 날 수 있습니다. 저장소 생성 후 GitHub Pages를 **main / docs** 기준으로 설정하면 연결됩니다.
 
 ### URL 관리
 

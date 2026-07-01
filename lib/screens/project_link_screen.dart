@@ -5,6 +5,7 @@ import '../models/promo_site_link.dart';
 import '../state/control_scope.dart';
 import '../theme/control_theme.dart';
 import '../widgets/control_section_title.dart';
+import '../widgets/private_public_notice.dart';
 import '../widgets/promo_site_card.dart';
 
 class ProjectLinkScreen extends StatelessWidget {
@@ -23,6 +24,8 @@ class ProjectLinkScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _Header(),
+              const SizedBox(height: 16),
+              const PrivatePublicNotice(),
               const SizedBox(height: 24),
               _VisibilityLegend(),
               const SizedBox(height: 28),
@@ -39,15 +42,15 @@ class ProjectLinkScreen extends StatelessWidget {
               const SizedBox(height: 28),
               const ControlSectionTitle(
                 title: 'PUBLIC · 사업 총괄 홍보사이트',
-                subtitle: '4개 사업부 공개 홍보 허브 (제작 예정)',
+                subtitle: '4개 사업부 공개 홍보 허브 · URL 연결·사이트 열기',
               ),
               _BusinessHubGrid(sites: PromoSitesData.businessHubSites),
               const SizedBox(height: 28),
               _LinkMapDiagram(),
               const SizedBox(height: 28),
               const ControlSectionTitle(
-                title: '앱개발 하위 프로모 사이트',
-                subtitle: 'SotongAppsPromo에서 연결 예정',
+                title: '앱별 개별 프로모 사이트',
+                subtitle: 'SotongAppsPromo 하위 · 6개 앱 프로모 URL 연결',
               ),
               _ChildSitesGrid(sites: PromoSitesData.appChildSites),
               const SizedBox(height: 28),
@@ -121,15 +124,15 @@ class _VisibilityLegend extends StatelessWidget {
         ),
         _legendItem(
           Icons.public_outlined,
-          'PUBLIC 예정',
-          '향후 GitHub Pages 공개',
-          ControlColors.accentWarm,
+          'PUBLIC',
+          'GitHub Pages 공개 홍보',
+          ControlColors.sandBeige,
         ),
         _legendItem(
-          Icons.link,
-          'URL 등록됨',
-          'GitHub Pages URL 연결 완료',
-          ControlColors.sandBeige,
+          Icons.check_circle_outline,
+          '연결됨',
+          '내부 관제센터 URL 연결 완료',
+          ControlColors.teal,
         ),
       ],
     );
@@ -190,7 +193,7 @@ class _BusinessHubGrid extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            mainAxisExtent: 320,
+            mainAxisExtent: 420,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
@@ -224,7 +227,7 @@ class _ChildSitesGrid extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            mainAxisExtent: 260,
+            mainAxisExtent: 400,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
@@ -301,6 +304,7 @@ class _LinkMapDiagram extends StatelessWidget {
                         'FarmjigiPromo',
                         'SotongHealthPromo',
                         'SotongAIPromo',
+                        'SotongSamaePromo',
                       ]
                       .map(
                         (name) => _DiagramNode(

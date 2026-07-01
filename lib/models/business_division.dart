@@ -26,12 +26,28 @@ class DivisionProject {
     required this.purpose,
     required this.currentStage,
     required this.nextTask,
-    this.promoSitePlaceholder = '프로모 사이트 링크 예정',
+    this.englishName,
+    this.promoRepositoryName,
+    this.promoUrl,
+    this.promoStatus,
+    this.isPromoLinked = false,
+    this.promoSiteId,
   });
 
   final String name;
+  final String? englishName;
   final String purpose;
   final String currentStage;
   final String nextTask;
-  final String promoSitePlaceholder;
+  final String? promoRepositoryName;
+  final String? promoUrl;
+  final String? promoStatus;
+  final bool isPromoLinked;
+  final String? promoSiteId;
+
+  bool get hasPromoLink =>
+      isPromoLinked && (promoUrl?.trim().isNotEmpty ?? false);
+
+  bool get needsDeploymentNotice =>
+      promoStatus != null && !promoStatus!.contains('운영');
 }

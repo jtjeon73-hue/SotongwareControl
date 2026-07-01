@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../data/promo_sites_data.dart';
 import '../data/sample_operational_data.dart';
 import '../models/action_item.dart';
 import '../models/business_issue.dart';
@@ -49,7 +50,11 @@ class ControlState extends ChangeNotifier {
   Map<String, String> get promoUrls => Map.unmodifiable(_promoUrls);
   bool get isInitialized => _initialized;
 
-  String promoUrlFor(String siteId) => _promoUrls[siteId] ?? '';
+  String promoUrlFor(String siteId) {
+    final override = _promoUrls[siteId]?.trim();
+    if (override != null && override.isNotEmpty) return override;
+    return PromoSitesData.byId(siteId)?.defaultUrl?.trim() ?? '';
+  }
 
   String promoUrlDisplay(String siteId) {
     final url = promoUrlFor(siteId).trim();

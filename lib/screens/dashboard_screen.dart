@@ -15,7 +15,9 @@ import '../widgets/business_status_card.dart';
 import '../widgets/control_section_title.dart';
 import '../widgets/department_status_card.dart';
 import '../widgets/operational_metric_card.dart';
+import '../widgets/private_public_notice.dart';
 import '../widgets/promo_site_card.dart';
+import '../widgets/public_promo_summary_card.dart';
 import '../widgets/sidebar_navigation.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -62,6 +64,12 @@ class DashboardScreen extends StatelessWidget {
                 subtitle: 'ActionItem · BusinessIssue 기반 실시간 집계',
               ),
               _OperationalMetricsGrid(stats: stats, onNavigate: onNavigate),
+              const SizedBox(height: 32),
+              PublicPromoSummaryCard(
+                onViewAll: () => onNavigate(ControlDestination.projectLinks),
+              ),
+              const SizedBox(height: 16),
+              const PrivatePublicNotice(compact: true),
               const SizedBox(height: 32),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -120,7 +128,7 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 32),
               ControlSectionTitle(
                 title: '사업 홍보사이트 링크맵',
-                subtitle: 'PUBLIC 사업 총괄 4개 · URL 등록 가능',
+                subtitle: 'PUBLIC 4개 연결됨 · 사이트 열기 가능',
                 trailing: TextButton.icon(
                   onPressed: () => onNavigate(ControlDestination.projectLinks),
                   icon: const Icon(Icons.arrow_forward, size: 16),
@@ -128,7 +136,9 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               _PromoHubPreview(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              const PrivatePublicNotice(),
+              const SizedBox(height: 16),
               const _PrivacyBanner(),
             ],
           ),
@@ -420,7 +430,7 @@ class _BusinessGrid extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            mainAxisExtent: 280,
+            mainAxisExtent: 375,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
@@ -429,6 +439,7 @@ class _BusinessGrid extends StatelessWidget {
             final division = divisions[index];
             return BusinessStatusCard(
               division: division,
+              promoSite: PromoSitesData.promoForDivision(division.id),
               onTap: () {
                 final route = _routes[division.id];
                 if (route != null) onNavigate(route);
@@ -504,7 +515,7 @@ class _PromoHubPreview extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                mainAxisExtent: 300,
+                mainAxisExtent: 380,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),

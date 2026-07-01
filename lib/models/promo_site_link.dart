@@ -25,8 +25,12 @@ class PromoSiteLink {
     required this.visibility,
     required this.productionStatus,
     required this.nextTask,
+    this.businessName,
+    this.defaultUrl,
+    this.internalConnectionStatus,
     this.parentId,
     this.isBusinessHub = false,
+    this.divisionId,
   });
 
   final String id;
@@ -36,6 +40,14 @@ class PromoSiteLink {
   final SiteVisibility visibility;
   final String productionStatus;
   final String nextTask;
+  final String? businessName;
+  final String? defaultUrl;
+  final String? internalConnectionStatus;
   final String? parentId;
   final bool isBusinessHub;
+  final String? divisionId;
+
+  String get displayName => businessName ?? title;
+
+  bool get hasDefaultUrl => defaultUrl != null && defaultUrl!.trim().isNotEmpty;
 }

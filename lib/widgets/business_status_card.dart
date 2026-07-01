@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import '../data/promo_sites_data.dart';
 import '../models/business_division.dart';
+import '../models/promo_site_link.dart';
+import '../state/control_scope.dart';
 import '../theme/control_theme.dart';
+import '../utils/external_url.dart';
 
 class BusinessStatusCard extends StatelessWidget {
-  const BusinessStatusCard({super.key, required this.division, this.onTap});
+  const BusinessStatusCard({
+    super.key,
+    required this.division,
+    this.onTap,
+    this.promoSite,
+  });
 
   final BusinessDivision division;
   final VoidCallback? onTap;
+  final PromoSiteLink? promoSite;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +69,7 @@ class BusinessStatusCard extends StatelessWidget {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: division.items.take(4).map((item) {
+                children: division.items.take(6).map((item) {
                   return Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -101,10 +111,54 @@ class BusinessStatusCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (promoSite != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openPromo(context, promoSite!),
+                    icon: const Icon(Icons.open_in_new, size: 14),
+                    label: Text('${promoSite!.repoName} 열기'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ControlColors.sandBeige,
+                      side: BorderSide(
+                        color: ControlColors.sandBeige.withValues(alpha: 0.5),
+                      ),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
+              if (division.id == 'app_development') ...[
+                const SizedBox(height: 8),
+                Text(
+                  '개별 프로모 ${PromoSitesData.linkedAppPromoUrlCount}/${PromoSitesData.appPromoCount} URL 연결',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 11,
+                    color: ControlColors.textMuted,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _openPromo(BuildContext context, PromoSiteLink site) async {
+    final url = ControlScope.of(context).promoUrlFor(site.id);
+    if (url.isEmpty) return;
+
+    final ok = await ExternalUrl.open(url);
+    if (!context.mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${site.repoName} 사이트를 열 수 없습니다.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }
