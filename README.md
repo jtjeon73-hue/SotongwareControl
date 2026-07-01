@@ -35,10 +35,67 @@
 
 ## 실행 방법
 
+### 웹 (개발·확인)
+
 ```bash
 flutter pub get
 flutter run -d chrome
 ```
+
+### Android (휴대폰 테스트용 APK)
+
+이 APK는 **개인용 테스트 APK**입니다. Play Store 등록용이 아니며, **GitHub 저장소에 APK 파일을 직접 업로드하지 마세요.**
+
+#### 빌드 전 점검
+
+```bash
+flutter clean
+flutter pub get
+flutter analyze
+```
+
+#### 테스트용 debug APK 빌드
+
+```bash
+flutter build apk --debug
+```
+
+#### APK 생성 위치
+
+```
+build/app/outputs/flutter-apk/app-debug.apk
+```
+
+#### 복사 위치 (권장)
+
+프로젝트 루트 `release_apk` 폴더에 아래 이름으로 복사합니다.
+
+```
+release_apk/SotongWareControl_0.2.0_debug.apk
+```
+
+release 빌드가 성공한 경우:
+
+```
+release_apk/SotongWareControl_0.2.0_release.apk
+```
+
+#### 휴대폰 설치 방법
+
+1. APK 파일을 휴대폰으로 전송 (USB, 클라우드, 메신저 등)
+2. 파일 관리자에서 APK 파일 열기
+3. **출처를 알 수 없는 앱** 설치 허용
+4. 설치 진행
+5. **소통웨어 디지털랩** 실행
+
+#### 앱 정보
+
+| 항목 | 값 |
+|------|-----|
+| 표시 이름 | 소통웨어 디지털랩 |
+| 영문명 | SotongWare Control |
+| 버전 | 0.2.0+1 |
+| 패키지명 | com.sotongware.control |
 
 ## 사업 홍보사이트 링크맵
 
