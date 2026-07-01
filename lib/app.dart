@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'data/sample_business_data.dart';
+import 'screens/action_items_screen.dart';
 import 'screens/ai_agent_room_screen.dart';
 import 'screens/business_division_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -10,19 +11,26 @@ import 'screens/issues_dashboard_screen.dart';
 import 'screens/project_link_screen.dart';
 import 'screens/promotion_dashboard_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
+import 'state/control_scope.dart';
+import 'state/control_state.dart';
 import 'theme/control_theme.dart';
 import 'widgets/sidebar_navigation.dart';
 
 class SotongWareControlApp extends StatelessWidget {
-  const SotongWareControlApp({super.key});
+  const SotongWareControlApp({super.key, required this.controlState});
+
+  final ControlState controlState;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: SampleBusinessData.siteEnglishName,
-      debugShowCheckedModeBanner: false,
-      theme: ControlTheme.darkTheme,
-      home: const ControlCenterShell(),
+    return ControlScope(
+      notifier: controlState,
+      child: MaterialApp(
+        title: SampleBusinessData.siteEnglishName,
+        debugShowCheckedModeBanner: false,
+        theme: ControlTheme.darkTheme,
+        home: const ControlCenterShell(),
+      ),
     );
   }
 }
@@ -48,6 +56,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
     switch (_selected) {
       case ControlDestination.dashboard:
         return DashboardScreen(onNavigate: _onDestinationSelected);
+      case ControlDestination.actions:
+        return const ActionItemsScreen();
       case ControlDestination.issues:
         return const IssuesDashboardScreen();
       case ControlDestination.revenue:

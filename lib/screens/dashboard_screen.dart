@@ -4,8 +4,10 @@ import '../data/sample_operational_data.dart';
 import '../models/action_item.dart';
 import '../models/business_division.dart';
 import '../models/department.dart';
-import '../models/finance_item.dart';
-import '../models/project_item.dart';
+import '../state/control_scope.dart';
+import '../state/control_state.dart';
+import '../utils/due_text_helper.dart';
+import '../data/promo_sites_data.dart';
 import '../theme/control_theme.dart';
 import '../widgets/action_item_card.dart';
 import '../widgets/ai_daily_summary_panel.dart';
@@ -13,7 +15,7 @@ import '../widgets/business_status_card.dart';
 import '../widgets/control_section_title.dart';
 import '../widgets/department_status_card.dart';
 import '../widgets/operational_metric_card.dart';
-import '../widgets/project_link_card.dart';
+import '../widgets/promo_site_card.dart';
 import '../widgets/sidebar_navigation.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -23,116 +25,127 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final overview = SampleOperationalData.operationalOverview;
-    final divisions = SampleBusinessData.divisions;
-    final departments = SampleBusinessData.departments
-        .where((d) => d.id != 'ai_agent_room')
-        .toList();
-    final todayFocus = SampleOperationalData.todayFocusItems.take(3).toList();
-    final weeklyPriorities = SampleOperationalData.weeklyPriorities
-        .take(3)
-        .toList();
+    final state = ControlScope.of(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CommandHero(overview: overview),
-          const SizedBox(height: 24),
-          AiDailySummaryPanel(
-            summary: SampleOperationalData.aiDailySummary,
-            onViewAiRoom: () => onNavigate(ControlDestination.aiAgentRoom),
+    return ListenableBuilder(
+      listenable: state,
+      builder: (context, _) {
+        final stats = state.dashboardStats;
+        final divisions = SampleBusinessData.divisions;
+        final departments = SampleBusinessData.departments
+            .where((d) => d.id != 'ai_agent_room')
+            .toList();
+        final allActions = state.actionsWithEffectiveStatus;
+        final todayFocus = allActions
+            .where((a) => !a.isDone && a.dueText.contains('오늘'))
+            .take(3)
+            .toList();
+        final weeklyPriorities = allActions
+            .where((a) => !a.isDone && a.dueText.contains('이번 주'))
+            .take(3)
+            .toList();
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _CommandHero(stats: stats),
+              const SizedBox(height: 24),
+              AiDailySummaryPanel(
+                summary: SampleOperationalData.aiDailySummary,
+                onViewAiRoom: () => onNavigate(ControlDestination.aiAgentRoom),
+              ),
+              const SizedBox(height: 32),
+              const ControlSectionTitle(
+                title: '사업 관제 현황',
+                subtitle: 'ActionItem · BusinessIssue 기반 실시간 집계',
+              ),
+              _OperationalMetricsGrid(stats: stats, onNavigate: onNavigate),
+              const SizedBox(height: 32),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 900;
+                  return isWide
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _FocusSection(
+                                title: '오늘 집중해야 할 일',
+                                items: todayFocus,
+                                onViewAll: () =>
+                                    onNavigate(ControlDestination.actions),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _FocusSection(
+                                title: '이번 주 우선순위',
+                                items: weeklyPriorities,
+                                onViewAll: () =>
+                                    onNavigate(ControlDestination.actions),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _FocusSection(
+                              title: '오늘 집중해야 할 일',
+                              items: todayFocus,
+                              onViewAll: () =>
+                                  onNavigate(ControlDestination.actions),
+                            ),
+                            const SizedBox(height: 16),
+                            _FocusSection(
+                              title: '이번 주 우선순위',
+                              items: weeklyPriorities,
+                              onViewAll: () =>
+                                  onNavigate(ControlDestination.actions),
+                            ),
+                          ],
+                        );
+                },
+              ),
+              const SizedBox(height: 32),
+              const ControlSectionTitle(
+                title: '사업부 운영 현황',
+                subtitle: '클릭 시 상세 · 문제 · 수익 흐름 확인',
+              ),
+              _BusinessGrid(divisions: divisions, onNavigate: onNavigate),
+              const SizedBox(height: 32),
+              const ControlSectionTitle(title: '부서 현황'),
+              _DepartmentGrid(departments: departments, onNavigate: onNavigate),
+              const SizedBox(height: 32),
+              ControlSectionTitle(
+                title: '사업 홍보사이트 링크맵',
+                subtitle: 'PUBLIC 사업 총괄 4개 · URL 등록 가능',
+                trailing: TextButton.icon(
+                  onPressed: () => onNavigate(ControlDestination.projectLinks),
+                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  label: const Text('전체'),
+                ),
+              ),
+              _PromoHubPreview(),
+              const SizedBox(height: 24),
+              const _PrivacyBanner(),
+            ],
           ),
-          const SizedBox(height: 32),
-          const ControlSectionTitle(
-            title: '사업 관제 현황',
-            subtitle: '운영자 판단용 핵심 지표',
-          ),
-          _OperationalMetricsGrid(overview: overview, onNavigate: onNavigate),
-          const SizedBox(height: 32),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth > 900;
-              return isWide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _FocusSection(
-                            title: '오늘 집중해야 할 일',
-                            items: todayFocus,
-                            onViewAll: () =>
-                                onNavigate(ControlDestination.issues),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _FocusSection(
-                            title: '이번 주 우선순위',
-                            items: weeklyPriorities,
-                            onViewAll: () =>
-                                onNavigate(ControlDestination.expansion),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _FocusSection(
-                          title: '오늘 집중해야 할 일',
-                          items: todayFocus,
-                          onViewAll: () =>
-                              onNavigate(ControlDestination.issues),
-                        ),
-                        const SizedBox(height: 16),
-                        _FocusSection(
-                          title: '이번 주 우선순위',
-                          items: weeklyPriorities,
-                          onViewAll: () =>
-                              onNavigate(ControlDestination.expansion),
-                        ),
-                      ],
-                    );
-            },
-          ),
-          const SizedBox(height: 32),
-          const ControlSectionTitle(
-            title: '사업부 운영 현황',
-            subtitle: '클릭 시 상세 · 문제 · 수익 흐름 확인',
-          ),
-          _BusinessGrid(divisions: divisions, onNavigate: onNavigate),
-          const SizedBox(height: 32),
-          const ControlSectionTitle(title: '부서 현황'),
-          _DepartmentGrid(departments: departments, onNavigate: onNavigate),
-          const SizedBox(height: 32),
-          ControlSectionTitle(
-            title: '프로젝트 링크맵',
-            trailing: TextButton.icon(
-              onPressed: () => onNavigate(ControlDestination.projectLinks),
-              icon: const Icon(Icons.arrow_forward, size: 16),
-              label: const Text('전체'),
-            ),
-          ),
-          _ProjectLinkPreview(
-            links: SampleBusinessData.projectLinks.take(4).toList(),
-          ),
-          const SizedBox(height: 24),
-          const _PrivacyBanner(),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
 class _CommandHero extends StatelessWidget {
-  const _CommandHero({required this.overview});
+  const _CommandHero({required this.stats});
 
-  final OperationalOverview overview;
+  final DashboardStats stats;
 
   @override
   Widget build(BuildContext context) {
-    final healthColor = overview.overallHealthScore < 75
+    final healthColor = stats.healthScore < 75
         ? ControlColors.accentWarm
         : ControlColors.teal;
 
@@ -205,7 +218,7 @@ class _CommandHero extends StatelessWidget {
                 child: Column(
                   children: [
                     Text(
-                      '${overview.overallHealthScore}',
+                      '${stats.healthScore}',
                       style: Theme.of(context).textTheme.headlineLarge
                           ?.copyWith(
                             color: healthColor,
@@ -228,14 +241,14 @@ class _CommandHero extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      overview.overallHealthLabel,
+                      stats.healthLabel,
                       style: Theme.of(
                         context,
                       ).textTheme.titleMedium?.copyWith(color: healthColor),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      overview.overallHealthDetail,
+                      stats.healthDetail,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -251,81 +264,66 @@ class _CommandHero extends StatelessWidget {
 
 class _OperationalMetricsGrid extends StatelessWidget {
   const _OperationalMetricsGrid({
-    required this.overview,
+    required this.stats,
     required this.onNavigate,
   });
 
-  final OperationalOverview overview;
+  final DashboardStats stats;
   final ValueChanged<ControlDestination> onNavigate;
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      (
-        '${overview.overallHealthScore}%',
-        '전체 사업 건강도',
-        Icons.monitor_heart_outlined,
-        overview.overallHealthLabel,
-        null,
-        false,
-      ),
-      (
-        '${overview.todayFocusCount}건',
-        '오늘 집중해야 할 일',
-        Icons.today_outlined,
-        null,
-        ControlDestination.issues,
-        false,
-      ),
-      (
-        '${overview.delayedProjectCount}건',
-        '진행 지연 프로젝트',
-        Icons.schedule_outlined,
-        null,
-        ControlDestination.issues,
-        true,
-      ),
-      (
-        '${overview.revenueReadyCount}건',
-        '수익 연결 가능',
-        Icons.trending_up,
-        null,
-        ControlDestination.revenue,
-        false,
-      ),
-      (
-        '${overview.promotionNeededCount}건',
-        '홍보 필요 프로젝트',
-        Icons.campaign_outlined,
-        null,
-        ControlDestination.promotion,
-        true,
-      ),
-      (
-        '${overview.taxCheckCount}건',
-        '세금/회계 확인',
-        Icons.receipt_long_outlined,
-        null,
-        ControlDestination.finance,
-        true,
-      ),
-      (
-        '${overview.aiReportPendingCount}건',
-        'AI 보고 대기',
-        Icons.smart_toy_outlined,
-        null,
-        ControlDestination.aiAgentRoom,
-        false,
-      ),
-      (
-        '${overview.weeklyPriorityCount}건',
-        '이번 주 우선순위',
-        Icons.flag_outlined,
-        null,
-        ControlDestination.expansion,
-        false,
-      ),
-    ];
+    final items =
+        <(String, String, IconData, String?, ControlDestination, bool)>[
+          (
+            '${stats.inProgressCount}건',
+            '진행 중 작업',
+            Icons.play_circle_outline,
+            null,
+            ControlDestination.actions,
+            false,
+          ),
+          (
+            '${stats.doneCount}건',
+            '완료 작업',
+            Icons.check_circle_outline,
+            null,
+            ControlDestination.actions,
+            false,
+          ),
+          (
+            '${stats.delayedCount}건',
+            '지연 작업',
+            Icons.schedule_outlined,
+            null,
+            ControlDestination.actions,
+            true,
+          ),
+          (
+            '${stats.unresolvedIssueCount}건',
+            '미해결 문제',
+            Icons.warning_amber_outlined,
+            null,
+            ControlDestination.issues,
+            true,
+          ),
+          (
+            '${stats.urgentIssueCount}건',
+            '긴급 문제',
+            Icons.priority_high,
+            null,
+            ControlDestination.issues,
+            true,
+          ),
+          (
+            '${stats.aiReportNeededCount}건',
+            'AI 보고 필요',
+            Icons.smart_toy_outlined,
+            null,
+            ControlDestination.aiAgentRoom,
+            false,
+          ),
+        ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -347,13 +345,14 @@ class _OperationalMetricsGrid extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (context, index) {
             final item = items[index];
+            final dest = item.$5;
             return OperationalMetricCard(
               value: item.$1,
               label: item.$2,
               icon: item.$3,
               subtitle: item.$4,
               alert: item.$6,
-              onTap: item.$5 != null ? () => onNavigate(item.$5!) : null,
+              onTap: () => onNavigate(dest),
             );
           },
         );
@@ -383,9 +382,13 @@ class _FocusSection extends StatelessWidget {
           trailing: TextButton(onPressed: onViewAll, child: const Text('전체')),
         ),
         ...items.map(
-          (item) => Padding(
+          (action) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: ActionItemCard(item: item),
+            child: ActionItemCard(
+              item: action.copyWith(
+                status: DueTextHelper.resolveEffectiveStatus(action),
+              ),
+            ),
           ),
         ),
       ],
@@ -483,29 +486,33 @@ class _DepartmentGrid extends StatelessWidget {
   }
 }
 
-class _ProjectLinkPreview extends StatelessWidget {
-  const _ProjectLinkPreview({required this.links});
-
-  final List<ProjectLinkItem> links;
-
+class _PromoHubPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 900 ? 4 : 2;
+    final state = ControlScope.of(context);
+    final sites = PromoSitesData.businessHubSites;
 
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisExtent: 230,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemCount: links.length,
-          itemBuilder: (context, index) {
-            return ProjectLinkCard(item: links[index]);
+    return ListenableBuilder(
+      listenable: state,
+      builder: (context, _) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final crossAxisCount = constraints.maxWidth > 1100 ? 2 : 1;
+
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisExtent: 300,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: sites.length,
+              itemBuilder: (context, index) {
+                return PromoSiteCard(site: sites[index], compact: true);
+              },
+            );
           },
         );
       },

@@ -3,6 +3,7 @@ import '../theme/control_theme.dart';
 
 enum ControlDestination {
   dashboard,
+  actions,
   issues,
   revenue,
   promotion,
@@ -24,6 +25,8 @@ extension ControlDestinationX on ControlDestination {
     switch (this) {
       case ControlDestination.dashboard:
         return '전체 사업 관제';
+      case ControlDestination.actions:
+        return '작업 관리';
       case ControlDestination.issues:
         return '문제점 파악·대응';
       case ControlDestination.revenue:
@@ -51,7 +54,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.sales:
         return '판매·고객대응';
       case ControlDestination.projectLinks:
-        return '프로젝트 링크맵';
+        return '홍보사이트 링크맵';
     }
   }
 
@@ -59,6 +62,8 @@ extension ControlDestinationX on ControlDestination {
     switch (this) {
       case ControlDestination.dashboard:
         return Icons.radar_outlined;
+      case ControlDestination.actions:
+        return Icons.task_alt_outlined;
       case ControlDestination.issues:
         return Icons.warning_amber_outlined;
       case ControlDestination.revenue:
@@ -143,6 +148,7 @@ class SidebarNavigation extends StatelessWidget {
 
   static const _operational = [
     ControlDestination.dashboard,
+    ControlDestination.actions,
     ControlDestination.issues,
     ControlDestination.revenue,
     ControlDestination.promotion,

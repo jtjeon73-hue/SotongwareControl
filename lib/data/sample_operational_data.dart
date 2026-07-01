@@ -38,7 +38,7 @@ class SampleOperationalData {
       id: 'focus_1',
       title: '소통여행 프로모 사이트 구조 확정',
       department: '앱개발',
-      priority: ActionPriority.critical,
+      priority: ActionPriority.high,
       dueText: '오늘',
       expectedResult: 'APK 다운로드·설치 안내 페이지 골격 완성',
       status: ActionStatus.inProgress,
@@ -82,7 +82,7 @@ class SampleOperationalData {
       id: 'week_1',
       title: '소통여행 APK 테스트 및 배포 흐름 완성',
       department: '앱개발',
-      priority: ActionPriority.critical,
+      priority: ActionPriority.high,
       dueText: '이번 주',
       expectedResult: 'GitHub Releases + 프로모 사이트 연결',
     ),
@@ -107,8 +107,9 @@ class SampleOperationalData {
       title: '부가세 관련 자료 정리',
       department: '세무·회계',
       priority: ActionPriority.medium,
-      dueText: '이번 주',
+      dueText: '지연 · 이번 주',
       expectedResult: '확인 필요 항목 리스트업',
+      status: ActionStatus.delayed,
     ),
     ActionItem(
       id: 'week_5',
@@ -118,6 +119,11 @@ class SampleOperationalData {
       dueText: '이번 주',
       expectedResult: '부서별 표준 지시문 샘플',
     ),
+  ];
+
+  static List<ActionItem> get defaultActions => [
+    ...todayFocusItems,
+    ...weeklyPriorities,
   ];
 
   static const businessIssues = <BusinessIssue>[
@@ -132,7 +138,7 @@ class SampleOperationalData {
       responsePlan: '프로모 사이트, APK 안내, GitHub Releases 준비',
       assignedAiRole: '앱개발 AI, 홍보마케팅 AI',
       nextAction: '소통여행 프로모 사이트 완성',
-      status: IssueStatus.inProgress,
+      status: IssueStatus.responding,
     ),
     BusinessIssue(
       id: 'issue_automation',

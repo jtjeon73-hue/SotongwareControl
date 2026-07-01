@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
 import '../models/ai_agent_role.dart';
 import '../theme/control_theme.dart';
 
@@ -6,6 +8,9 @@ class AiAgentCard extends StatelessWidget {
   const AiAgentCard({super.key, required this.agent});
 
   final AiAgentRole agent;
+
+  String get instructionText =>
+      agent.sampleCommand ?? '${agent.title}에게 지시: ${agent.nextRecommendation}';
 
   @override
   Widget build(BuildContext context) {
@@ -78,15 +83,33 @@ class AiAgentCard extends StatelessWidget {
               ),
             ),
             _Section(
-              title: '오늘 시킬 수 있는 작업',
-              child: Column(
-                children: agent.todayTasks.map((task) {
-                  return _Bullet(text: task);
-                }).toList(),
+              title: '추천 지시문',
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: ControlColors.slate.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: ControlColors.border),
+                ),
+                child: SelectableText(
+                  instructionText,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                ),
               ),
             ),
             _Section(
-              title: '최근 보고',
+              title: '오늘 시킬 수 있는 작업',
+              child: Column(
+                children: agent.todayTasks
+                    .map((t) => _Bullet(text: t))
+                    .toList(),
+              ),
+            ),
+            _Section(
+              title: '최근 보고 (샘플)',
               child: Text(
                 agent.recentReport,
                 style: Theme.of(
@@ -137,14 +160,10 @@ class AiAgentCard extends StatelessWidget {
                   ],
                 ),
               ),
-            const Spacer(),
             OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.send_outlined, size: 16),
-              label: Text(
-                agent.sampleCommand ?? '작업 지시 (샘플)',
-                overflow: TextOverflow.ellipsis,
-              ),
+              onPressed: () => _copyInstruction(context),
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('지시문 복사'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: ControlColors.teal,
                 side: const BorderSide(color: ControlColors.teal),
@@ -155,6 +174,18 @@ class AiAgentCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _copyInstruction(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: instructionText));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${agent.title} 지시문이 복사되었습니다.'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }
 

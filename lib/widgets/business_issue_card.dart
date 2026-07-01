@@ -52,7 +52,7 @@ class BusinessIssueCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 _LevelBadge(
-                  label: '긴급 ${issue.urgencyLevel.label}',
+                  label: '긴급도 ${issue.urgencyLevel.label}',
                   color: issue.urgencyLevel == UrgencyLevel.high
                       ? ControlColors.accentWarm
                       : ControlColors.textMuted,

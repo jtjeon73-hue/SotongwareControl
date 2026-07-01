@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../models/action_item.dart';
 import '../theme/control_theme.dart';
+import '../utils/due_text_helper.dart';
 
 class ActionItemCard extends StatelessWidget {
   const ActionItemCard({super.key, required this.item});
@@ -9,10 +11,8 @@ class ActionItemCard extends StatelessWidget {
 
   Color get _priorityColor {
     switch (item.priority) {
-      case ActionPriority.critical:
-        return ControlColors.accentWarm;
       case ActionPriority.high:
-        return ControlColors.sandBeige;
+        return ControlColors.accentWarm;
       case ActionPriority.medium:
         return ControlColors.teal;
       case ActionPriority.low:
@@ -20,8 +20,24 @@ class ActionItemCard extends StatelessWidget {
     }
   }
 
+  Color get _statusColor {
+    final status = DueTextHelper.resolveEffectiveStatus(item);
+    switch (status) {
+      case ActionStatus.done:
+        return ControlColors.textMuted;
+      case ActionStatus.delayed:
+        return ControlColors.accentWarm;
+      case ActionStatus.inProgress:
+        return ControlColors.teal;
+      case ActionStatus.scheduled:
+        return ControlColors.sandBeige;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final effective = DueTextHelper.resolveEffectiveStatus(item);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -46,10 +62,17 @@ class ActionItemCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item.title,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                decoration: item.isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
                         ),
                       ),
                       _Badge(label: item.priority.label, color: _priorityColor),
+                      const SizedBox(width: 6),
+                      _Badge(label: effective.label, color: _statusColor),
                     ],
                   ),
                   const SizedBox(height: 6),
