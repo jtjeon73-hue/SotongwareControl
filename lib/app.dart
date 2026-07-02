@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'data/sample_business_data.dart';
 import 'screens/action_items_screen.dart';
 import 'screens/ai_agent_room_screen.dart';
-import 'screens/ai_representative_screen.dart';
+import 'screens/ai_ceo_control_screens.dart';
 import 'screens/business_division_screen.dart';
 import 'screens/department_screen.dart';
 import 'screens/expansion_dashboard_screen.dart';
@@ -44,7 +44,7 @@ class ControlCenterShell extends StatefulWidget {
 }
 
 class _ControlCenterShellState extends State<ControlCenterShell> {
-  ControlDestination _selected = ControlDestination.dashboard;
+  ControlDestination _selected = ControlDestination.aiRepresentative;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   void _onDestinationSelected(ControlDestination destination) {
@@ -58,7 +58,59 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.dashboard:
         return OverallCommandScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.aiRepresentative:
-        return const AiRepresentativeScreen();
+        return const AiCeoOfficeScreen();
+      case ControlDestination.aiStrategyMeeting:
+        return const AiStrategyMeetingScreen();
+      case ControlDestination.aiIdeaMeeting:
+        return const AiIdeaMeetingScreen();
+      case ControlDestination.aiWorkOrder:
+        return const AiExecutiveWorkspaceScreen(
+          title: 'AI업무지시',
+          description:
+              'AI대표가 각 AI부서에 내려야 할 다음 작업, 실행 조건, 보류 기준을 정리하는 업무지시 화면입니다.',
+          icon: Icons.assignment_outlined,
+        );
+      case ControlDestination.aiProgressReport:
+        return const AiExecutiveWorkspaceScreen(
+          title: 'AI진행보고',
+          description:
+              '각 사업부와 관리부서의 진행률, 자동 보고 대기, 실행 완료, 실패/주의 항목을 대표에게 보고합니다.',
+          icon: Icons.summarize_outlined,
+        );
+      case ControlDestination.aiDecisionProposal:
+        return const AiExecutiveWorkspaceScreen(
+          title: 'AI의사결정제안',
+          description: '대표 승인, 보류, 재검토 요청이 필요한 안건을 AI대표가 판단 근거와 함께 제안합니다.',
+          icon: Icons.rule_outlined,
+        );
+      case ControlDestination.aiRiskAnalysis:
+        return const AiExecutiveWorkspaceScreen(
+          title: 'AI리스크분석',
+          description: '개발 지연, 광고비 손실, 고객 문의 증가, 세무 일정 누락, 시스템 오류 가능성을 점검합니다.',
+          icon: Icons.health_and_safety_outlined,
+        );
+      case ControlDestination.aiFutureStrategy:
+        return const AiExecutiveWorkspaceScreen(
+          title: 'AI미래전략',
+          description: '신규 사업, 투자/재테크, 앱·전자책·산업자동화 확장 방향을 장기 전략 후보로 정리합니다.',
+          icon: Icons.auto_graph_outlined,
+        );
+      case ControlDestination.aiNotifications:
+        return const AiNotificationCenterScreen();
+      case ControlDestination.aiProductDevelopmentDept:
+        return const AiDepartmentControlScreen(departmentId: 'product');
+      case ControlDestination.aiMarketingDept:
+        return const AiDepartmentControlScreen(departmentId: 'marketing');
+      case ControlDestination.aiSalesDept:
+        return const AiDepartmentControlScreen(departmentId: 'sales');
+      case ControlDestination.aiCustomerSupportDept:
+        return const AiDepartmentControlScreen(departmentId: 'support');
+      case ControlDestination.aiTaxAccountingDept:
+        return const AiDepartmentControlScreen(departmentId: 'tax');
+      case ControlDestination.aiInvestmentDept:
+        return const AiDepartmentControlScreen(departmentId: 'investment');
+      case ControlDestination.aiOperationsDept:
+        return const AiDepartmentControlScreen(departmentId: 'operations');
       case ControlDestination.actions:
         return const ActionItemsScreen();
       case ControlDestination.issues:
@@ -166,6 +218,10 @@ class _ControlHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final showStatusBadge = screenWidth >= 420;
+    final showSiteName = screenWidth >= 560;
+
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -183,38 +239,48 @@ class _ControlHeader extends StatelessWidget {
               onPressed: onMenuPressed,
               visualDensity: VisualDensity.compact,
             ),
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: ControlColors.tealSoft,
-              borderRadius: BorderRadius.circular(20),
+          Expanded(
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleLarge,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.circle, size: 6, color: ControlColors.teal),
-                SizedBox(width: 6),
-                Text(
-                  '데모 · 프로모',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: ControlColors.teal,
-                    fontWeight: FontWeight.w600,
+          ),
+          if (showStatusBadge) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: ControlColors.tealSoft,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.circle, size: 6, color: ControlColors.teal),
+                  SizedBox(width: 6),
+                  Text(
+                    '비공개 본사 관제',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: ControlColors.teal,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            SampleBusinessData.siteEnglishName,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontSize: 12,
-              color: ControlColors.textMuted,
+          ],
+          if (showSiteName) ...[
+            const SizedBox(width: 12),
+            Text(
+              SampleBusinessData.siteEnglishName,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 12,
+                color: ControlColors.textMuted,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -25,4 +25,51 @@ void main() {
     expect(find.text('소통웨어 디지털랩'), findsWidgets);
     expect(find.text('전체사업관리관제'), findsWidgets);
   });
+
+  testWidgets('AI CEO screens navigate on wide web without layout errors', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final controlState = ControlState();
+    await controlState.initialize();
+
+    await tester.pumpWidget(SotongWareControlApp(controlState: controlState));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('AI대표실'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    for (final label in ['AI전략회의실', 'AI아이디어회의실', '알림센터', 'AI운영관리부']) {
+      await tester.tap(find.text(label).first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.text(label), findsWidgets);
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  testWidgets('AI CEO office fits mobile width without layout errors', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final controlState = ControlState();
+    await controlState.initialize();
+
+    await tester.pumpWidget(SotongWareControlApp(controlState: controlState));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('AI대표실'), findsWidgets);
+    expect(find.text('24시간 운영 상태'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

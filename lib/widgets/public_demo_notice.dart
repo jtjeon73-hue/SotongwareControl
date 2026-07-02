@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/promo_sites_data.dart';
 import '../theme/control_theme.dart';
 
-/// 공개 프로모 사이트임을 안내하는 배너 (데모·샘플 데이터).
+/// 비공개 관제 시스템 컨셉 데모임을 안내하는 배너 (샘플 데이터).
 class PublicDemoNotice extends StatelessWidget {
   const PublicDemoNotice({super.key, this.compact = false});
 

@@ -2,9 +2,9 @@ import '../models/promo_site_link.dart';
 
 class PromoSitesData {
   static const publicDemoNotice =
-      '본 사이트는 소통웨어 통합 컨트롤센터·AI대표·관리부서·사업부 운영 비전을 소개하는 '
-      '공개형 프로모 / 데모 사이트입니다. 표시되는 수치·진행률·재무 항목은 모두 샘플·예시이며, '
-      '실제 개인정보·세무·매출·인증·API Key 등 민감 정보는 포함하지 않습니다.';
+      '본 사이트는 대표 1명이 전체 사업을 관제하는 비공개 본사 시스템 컨셉 데모입니다. '
+      '표시되는 수치·진행률·재무 항목은 모두 샘플·예시이며, 실제 개인정보·세무·매출·인증·API Key 등 '
+      '민감 정보는 포함하지 않습니다.';
 
   static const appPromoNotDeployedNotice =
       '프로모 저장소 또는 GitHub Pages 배포 전이면 404가 표시될 수 있습니다.';
@@ -22,10 +22,10 @@ class PromoSitesData {
       id: 'control_center',
       repoName: 'SotongwareControl',
       title: 'SotongWare Control — 소통컨트롤총괄프로모',
-      purpose: '통합 컨트롤센터 · AI대표 · 관리부서 · 사업부 비전 공개 소개 (현재 사이트)',
+      purpose: '24시간 AI 경영 관제 · AI대표 · 관리부서 · 사업부 운영 본사 시스템 데모 (현재 사이트)',
       visibility: SiteVisibility.publicLive,
-      productionStatus: '공개 운영 중',
-      nextTask: 'AI대표 실행 승인 UI · 부서별 세부 확장',
+      productionStatus: '비공개 관제 데모',
+      nextTask: 'AI대표 승인 UI · Firebase/OpenAI/매출 데이터 연동',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongwareControl/',
       internalConnectionStatus: '허브 연결',
     ),

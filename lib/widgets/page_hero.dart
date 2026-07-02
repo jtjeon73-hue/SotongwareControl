@@ -53,27 +53,42 @@ class PageHero extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final textContent = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+                ],
+              );
+
+              if (trailing == null) return textContent;
+
+              if (constraints.maxWidth < 560) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
+                    textContent,
+                    const SizedBox(height: 16),
+                    Align(alignment: Alignment.centerLeft, child: trailing!),
                   ],
-                ),
-              ),
-              ?trailing,
-            ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: textContent),
+                  const SizedBox(width: 16),
+                  trailing!,
+                ],
+              );
+            },
           ),
         ],
       ),
