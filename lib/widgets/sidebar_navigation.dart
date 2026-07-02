@@ -4,6 +4,21 @@ import '../theme/control_theme.dart';
 enum ControlDestination {
   dashboard,
   aiRepresentative,
+  aiStrategyMeeting,
+  aiIdeaMeeting,
+  aiWorkOrder,
+  aiProgressReport,
+  aiDecisionProposal,
+  aiRiskAnalysis,
+  aiFutureStrategy,
+  aiNotifications,
+  aiProductDevelopmentDept,
+  aiMarketingDept,
+  aiSalesDept,
+  aiCustomerSupportDept,
+  aiTaxAccountingDept,
+  aiInvestmentDept,
+  aiOperationsDept,
   actions,
   issues,
   revenue,
@@ -27,7 +42,37 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.dashboard:
         return '전체사업관리관제';
       case ControlDestination.aiRepresentative:
-        return 'AI대표';
+        return 'AI대표실';
+      case ControlDestination.aiStrategyMeeting:
+        return 'AI전략회의실';
+      case ControlDestination.aiIdeaMeeting:
+        return 'AI아이디어회의실';
+      case ControlDestination.aiWorkOrder:
+        return 'AI업무지시';
+      case ControlDestination.aiProgressReport:
+        return 'AI진행보고';
+      case ControlDestination.aiDecisionProposal:
+        return 'AI의사결정제안';
+      case ControlDestination.aiRiskAnalysis:
+        return 'AI리스크분석';
+      case ControlDestination.aiFutureStrategy:
+        return 'AI미래전략';
+      case ControlDestination.aiNotifications:
+        return '알림센터';
+      case ControlDestination.aiProductDevelopmentDept:
+        return 'AI상품개발부';
+      case ControlDestination.aiMarketingDept:
+        return 'AI마케팅부';
+      case ControlDestination.aiSalesDept:
+        return 'AI영업부';
+      case ControlDestination.aiCustomerSupportDept:
+        return 'AI고객지원부';
+      case ControlDestination.aiTaxAccountingDept:
+        return 'AI세무회계부';
+      case ControlDestination.aiInvestmentDept:
+        return 'AI투자관리부';
+      case ControlDestination.aiOperationsDept:
+        return 'AI운영관리부';
       case ControlDestination.actions:
         return '작업 관리';
       case ControlDestination.issues:
@@ -67,6 +112,36 @@ extension ControlDestinationX on ControlDestination {
         return Icons.dashboard_outlined;
       case ControlDestination.aiRepresentative:
         return Icons.psychology_outlined;
+      case ControlDestination.aiStrategyMeeting:
+        return Icons.groups_2_outlined;
+      case ControlDestination.aiIdeaMeeting:
+        return Icons.tips_and_updates_outlined;
+      case ControlDestination.aiWorkOrder:
+        return Icons.assignment_outlined;
+      case ControlDestination.aiProgressReport:
+        return Icons.summarize_outlined;
+      case ControlDestination.aiDecisionProposal:
+        return Icons.rule_outlined;
+      case ControlDestination.aiRiskAnalysis:
+        return Icons.health_and_safety_outlined;
+      case ControlDestination.aiFutureStrategy:
+        return Icons.auto_graph_outlined;
+      case ControlDestination.aiNotifications:
+        return Icons.notifications_active_outlined;
+      case ControlDestination.aiProductDevelopmentDept:
+        return Icons.inventory_2_outlined;
+      case ControlDestination.aiMarketingDept:
+        return Icons.campaign_outlined;
+      case ControlDestination.aiSalesDept:
+        return Icons.handshake_outlined;
+      case ControlDestination.aiCustomerSupportDept:
+        return Icons.support_agent_outlined;
+      case ControlDestination.aiTaxAccountingDept:
+        return Icons.receipt_long_outlined;
+      case ControlDestination.aiInvestmentDept:
+        return Icons.trending_up_outlined;
+      case ControlDestination.aiOperationsDept:
+        return Icons.settings_suggest_outlined;
       case ControlDestination.actions:
         return Icons.task_alt_outlined;
       case ControlDestination.issues:
@@ -143,9 +218,28 @@ class SidebarNavigation extends StatelessWidget {
   final ValueChanged<ControlDestination> onDestinationSelected;
   final VoidCallback? onClose;
 
-  static const _aiCommand = [
-    ControlDestination.dashboard,
+  static const _aiCommand = [ControlDestination.dashboard];
+
+  static const _aiExecutiveRooms = [
     ControlDestination.aiRepresentative,
+    ControlDestination.aiStrategyMeeting,
+    ControlDestination.aiIdeaMeeting,
+    ControlDestination.aiWorkOrder,
+    ControlDestination.aiProgressReport,
+    ControlDestination.aiDecisionProposal,
+    ControlDestination.aiRiskAnalysis,
+    ControlDestination.aiFutureStrategy,
+    ControlDestination.aiNotifications,
+  ];
+
+  static const _aiDepartments = [
+    ControlDestination.aiProductDevelopmentDept,
+    ControlDestination.aiMarketingDept,
+    ControlDestination.aiSalesDept,
+    ControlDestination.aiCustomerSupportDept,
+    ControlDestination.aiTaxAccountingDept,
+    ControlDestination.aiInvestmentDept,
+    ControlDestination.aiOperationsDept,
   ];
 
   static const _divisions = [
@@ -213,7 +307,7 @@ class SidebarNavigation extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'AI 기반 통합 사업 컨트롤 · 공개 프로모',
+                  '24시간 AI 경영 관제 · 비공개 본사 시스템',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontSize: 11,
                     color: ControlColors.textMuted,
@@ -239,7 +333,31 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const _SectionLabel(label: '사업부'),
+                const _SectionLabel(label: 'AI대표'),
+                ..._aiExecutiveRooms.map(
+                  (d) => _NavItem(
+                    destination: d,
+                    isSelected: d == selected,
+                    onTap: () {
+                      onDestinationSelected(d);
+                      onClose?.call();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const _SectionLabel(label: 'AI부서'),
+                ..._aiDepartments.map(
+                  (d) => _NavItem(
+                    destination: d,
+                    isSelected: d == selected,
+                    onTap: () {
+                      onDestinationSelected(d);
+                      onClose?.call();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const _SectionLabel(label: '기존 사업부'),
                 ..._divisions.map(
                   (d) => _NavItem(
                     destination: d,
@@ -251,7 +369,7 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const _SectionLabel(label: '관리부서'),
+                const _SectionLabel(label: '기존 관리부서'),
                 ..._managementDepts.map(
                   (d) => _NavItem(
                     destination: d,
@@ -278,7 +396,7 @@ class SidebarNavigation extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'PUBLIC · 공개 프로모',
+                    'PRIVATE · 본사 AI 관제',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontSize: 10,
                       color: ControlColors.textMuted,
