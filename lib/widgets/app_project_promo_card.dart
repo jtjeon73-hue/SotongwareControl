@@ -140,7 +140,7 @@ class AppProjectPromoCard extends StatelessWidget {
                 label: const Text('프로모 열기'),
                 style: FilledButton.styleFrom(
                   backgroundColor: ControlColors.teal,
-                  foregroundColor: ControlColors.deepNavy,
+                  foregroundColor: Colors.white,
                   disabledBackgroundColor: ControlColors.slate,
                   textStyle: const TextStyle(fontSize: 12),
                 ),

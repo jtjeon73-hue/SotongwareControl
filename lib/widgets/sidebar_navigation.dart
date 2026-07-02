@@ -3,6 +3,7 @@ import '../theme/control_theme.dart';
 
 enum ControlDestination {
   dashboard,
+  aiRepresentative,
   actions,
   issues,
   revenue,
@@ -15,8 +16,8 @@ enum ControlDestination {
   youtubeContent,
   ebook,
   planning,
-  onlineSales,
-  sales,
+  marketing,
+  onlineCustomer,
   projectLinks,
 }
 
@@ -24,7 +25,9 @@ extension ControlDestinationX on ControlDestination {
   String get label {
     switch (this) {
       case ControlDestination.dashboard:
-        return '전체 사업 관제';
+        return '전체사업관리관제';
+      case ControlDestination.aiRepresentative:
+        return 'AI대표';
       case ControlDestination.actions:
         return '작업 관리';
       case ControlDestination.issues:
@@ -34,7 +37,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.promotion:
         return '영업·홍보 관리';
       case ControlDestination.finance:
-        return '재무·세금 관리';
+        return '재무·세금';
       case ControlDestination.expansion:
         return '사업 확장 로드맵';
       case ControlDestination.aiAgentRoom:
@@ -49,10 +52,10 @@ extension ControlDestinationX on ControlDestination {
         return '전자책 사업부';
       case ControlDestination.planning:
         return '기획·아이디어';
-      case ControlDestination.onlineSales:
-        return '온라인영업·고객대응';
-      case ControlDestination.sales:
-        return '판매·고객대응';
+      case ControlDestination.marketing:
+        return '홍보·마케팅';
+      case ControlDestination.onlineCustomer:
+        return '온라인 고객대응';
       case ControlDestination.projectLinks:
         return '홍보사이트 링크맵';
     }
@@ -61,7 +64,9 @@ extension ControlDestinationX on ControlDestination {
   IconData get icon {
     switch (this) {
       case ControlDestination.dashboard:
-        return Icons.radar_outlined;
+        return Icons.dashboard_outlined;
+      case ControlDestination.aiRepresentative:
+        return Icons.psychology_outlined;
       case ControlDestination.actions:
         return Icons.task_alt_outlined;
       case ControlDestination.issues:
@@ -86,23 +91,13 @@ extension ControlDestinationX on ControlDestination {
         return Icons.menu_book_outlined;
       case ControlDestination.planning:
         return Icons.lightbulb_outline;
-      case ControlDestination.onlineSales:
-        return Icons.handshake_outlined;
-      case ControlDestination.sales:
-        return Icons.shopping_bag_outlined;
+      case ControlDestination.marketing:
+        return Icons.campaign_outlined;
+      case ControlDestination.onlineCustomer:
+        return Icons.support_agent_outlined;
       case ControlDestination.projectLinks:
         return Icons.hub_outlined;
     }
-  }
-
-  bool get isOperational {
-    return this == ControlDestination.dashboard ||
-        this == ControlDestination.issues ||
-        this == ControlDestination.revenue ||
-        this == ControlDestination.promotion ||
-        this == ControlDestination.finance ||
-        this == ControlDestination.expansion ||
-        this == ControlDestination.aiAgentRoom;
   }
 
   String? get divisionId {
@@ -124,10 +119,12 @@ extension ControlDestinationX on ControlDestination {
     switch (this) {
       case ControlDestination.planning:
         return 'planning';
-      case ControlDestination.onlineSales:
-        return 'online_sales';
-      case ControlDestination.sales:
-        return 'sales';
+      case ControlDestination.marketing:
+        return 'marketing';
+      case ControlDestination.finance:
+        return 'finance';
+      case ControlDestination.onlineCustomer:
+        return 'online_customer';
       default:
         return null;
     }
@@ -146,15 +143,9 @@ class SidebarNavigation extends StatelessWidget {
   final ValueChanged<ControlDestination> onDestinationSelected;
   final VoidCallback? onClose;
 
-  static const _operational = [
+  static const _aiCommand = [
     ControlDestination.dashboard,
-    ControlDestination.actions,
-    ControlDestination.issues,
-    ControlDestination.revenue,
-    ControlDestination.promotion,
-    ControlDestination.finance,
-    ControlDestination.expansion,
-    ControlDestination.aiAgentRoom,
+    ControlDestination.aiRepresentative,
   ];
 
   static const _divisions = [
@@ -164,21 +155,21 @@ class SidebarNavigation extends StatelessWidget {
     ControlDestination.ebook,
   ];
 
-  static const _departments = [
+  static const _managementDepts = [
     ControlDestination.planning,
-    ControlDestination.onlineSales,
-    ControlDestination.sales,
-    ControlDestination.projectLinks,
+    ControlDestination.marketing,
+    ControlDestination.finance,
+    ControlDestination.onlineCustomer,
   ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
+      width: 268,
       decoration: const BoxDecoration(
-        color: ControlColors.charcoal,
+        color: ControlColors.surface,
         border: Border(
-          right: BorderSide(color: ControlColors.border, width: 0.5),
+          right: BorderSide(color: ControlColors.border, width: 1),
         ),
       ),
       child: Column(
@@ -194,8 +185,8 @@ class SidebarNavigation extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: ControlColors.teal.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        color: ControlColors.tealSoft,
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
                         Icons.radar,
@@ -222,7 +213,7 @@ class SidebarNavigation extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '사업 운영 관제센터',
+                  'AI 기반 통합 사업 관제센터',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontSize: 11,
                     color: ControlColors.textMuted,
@@ -236,8 +227,8 @@ class SidebarNavigation extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
               children: [
-                _SectionLabel(label: '관제 · 운영'),
-                ..._operational.map(
+                const _SectionLabel(label: '관제 · AI대표'),
+                ..._aiCommand.map(
                   (d) => _NavItem(
                     destination: d,
                     isSelected: d == selected,
@@ -248,7 +239,7 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _SectionLabel(label: '사업부'),
+                const _SectionLabel(label: '사업부'),
                 ..._divisions.map(
                   (d) => _NavItem(
                     destination: d,
@@ -260,8 +251,8 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _SectionLabel(label: '부서 · 링크'),
-                ..._departments.map(
+                const _SectionLabel(label: '관리부서'),
+                ..._managementDepts.map(
                   (d) => _NavItem(
                     destination: d,
                     isSelected: d == selected,
@@ -318,8 +309,8 @@ class _SectionLabel extends StatelessWidget {
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
           fontSize: 10,
           color: ControlColors.textMuted,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.8,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
         ),
       ),
     );
@@ -340,15 +331,13 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
-        color: isSelected
-            ? ControlColors.teal.withValues(alpha: 0.12)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        color: isSelected ? ControlColors.tealSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(

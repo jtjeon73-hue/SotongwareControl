@@ -231,7 +231,7 @@ class PromoSiteCard extends StatelessWidget {
                       label: const Text('사이트 열기'),
                       style: FilledButton.styleFrom(
                         backgroundColor: ControlColors.teal,
-                        foregroundColor: ControlColors.deepNavy,
+                        foregroundColor: Colors.white,
                         textStyle: const TextStyle(fontSize: 12),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),

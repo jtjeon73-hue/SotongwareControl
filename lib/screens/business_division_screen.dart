@@ -134,7 +134,7 @@ class _Header extends StatelessWidget {
               label: Text('${promoSite.displayName} 총괄 홍보사이트 열기'),
               style: FilledButton.styleFrom(
                 backgroundColor: ControlColors.teal,
-                foregroundColor: ControlColors.deepNavy,
+                foregroundColor: Colors.white,
               ),
             ),
           ],

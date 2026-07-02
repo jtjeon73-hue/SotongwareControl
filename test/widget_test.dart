@@ -23,6 +23,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('소통웨어 디지털랩'), findsWidgets);
-    expect(find.text('오늘의 AI 종합 보고'), findsOneWidget);
+    expect(find.text('전체사업관리관제'), findsWidgets);
   });
 }

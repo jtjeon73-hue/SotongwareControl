@@ -459,10 +459,10 @@ class _DepartmentGrid extends StatelessWidget {
   final ValueChanged<ControlDestination> onNavigate;
 
   static const _routes = {
-    'tax_accounting': ControlDestination.finance,
     'planning': ControlDestination.planning,
-    'online_sales': ControlDestination.onlineSales,
-    'sales': ControlDestination.sales,
+    'marketing': ControlDestination.marketing,
+    'finance': ControlDestination.finance,
+    'online_customer': ControlDestination.onlineCustomer,
   };
 
   @override

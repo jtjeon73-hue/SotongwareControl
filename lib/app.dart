@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'data/sample_business_data.dart';
 import 'screens/action_items_screen.dart';
 import 'screens/ai_agent_room_screen.dart';
+import 'screens/ai_representative_screen.dart';
 import 'screens/business_division_screen.dart';
-import 'screens/dashboard_screen.dart';
 import 'screens/department_screen.dart';
 import 'screens/expansion_dashboard_screen.dart';
 import 'screens/finance_dashboard_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
+import 'screens/overall_command_screen.dart';
 import 'screens/project_link_screen.dart';
 import 'screens/promotion_dashboard_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
@@ -28,7 +29,7 @@ class SotongWareControlApp extends StatelessWidget {
       child: MaterialApp(
         title: SampleBusinessData.siteEnglishName,
         debugShowCheckedModeBanner: false,
-        theme: ControlTheme.darkTheme,
+        theme: ControlTheme.lightTheme,
         home: const ControlCenterShell(),
       ),
     );
@@ -55,7 +56,9 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   Widget _buildContent() {
     switch (_selected) {
       case ControlDestination.dashboard:
-        return DashboardScreen(onNavigate: _onDestinationSelected);
+        return OverallCommandScreen(onNavigate: _onDestinationSelected);
+      case ControlDestination.aiRepresentative:
+        return const AiRepresentativeScreen();
       case ControlDestination.actions:
         return const ActionItemsScreen();
       case ControlDestination.issues:
@@ -65,6 +68,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.promotion:
         return const PromotionDashboardScreen();
       case ControlDestination.finance:
+        final dept = SampleBusinessData.departmentById('finance');
+        if (dept != null) return DepartmentScreen(department: dept);
         return const FinanceDashboardScreen();
       case ControlDestination.expansion:
         return const ExpansionDashboardScreen();
@@ -92,7 +97,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       }
     }
 
-    return DashboardScreen(onNavigate: _onDestinationSelected);
+    return OverallCommandScreen(onNavigate: _onDestinationSelected);
   }
 
   @override
@@ -125,7 +130,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return Scaffold(
           key: _scaffoldKey,
           drawer: Drawer(
-            backgroundColor: ControlColors.charcoal,
+            backgroundColor: ControlColors.surface,
             child: SidebarNavigation(
               selected: _selected,
               onDestinationSelected: _onDestinationSelected,
@@ -162,12 +167,12 @@ class _ControlHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 56,
+      height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: const BoxDecoration(
-        color: ControlColors.charcoal,
+        color: ControlColors.surface,
         border: Border(
-          bottom: BorderSide(color: ControlColors.border, width: 0.5),
+          bottom: BorderSide(color: ControlColors.border, width: 1),
         ),
       ),
       child: Row(
@@ -183,19 +188,20 @@ class _ControlHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: ControlColors.teal.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
+              color: ControlColors.tealSoft,
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Row(
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.circle, size: 6, color: ControlColors.teal),
-                const SizedBox(width: 6),
+                Icon(Icons.circle, size: 6, color: ControlColors.teal),
+                SizedBox(width: 6),
                 Text(
                   '관제 중',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: TextStyle(
                     fontSize: 12,
                     color: ControlColors.teal,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],

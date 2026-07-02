@@ -32,7 +32,7 @@ class SampleBusinessData {
 
   static const metrics = DashboardMetrics(
     activeBusinesses: 4,
-    operatingDepartments: 5,
+    operatingDepartments: 4,
     managedProjects: 13,
     upcomingSites: 9,
     monthlyFocusTasks: 5,
@@ -263,104 +263,98 @@ class SampleBusinessData {
 
   static const departments = <Department>[
     Department(
-      id: 'tax_accounting',
-      title: '세무·회계·예산·재테크',
-      role: '매출, 비용, 부가세, 세금계산서, 예산, 연금, ETF, 재테크, 사업자 관리',
-      taskCards: [
-        DepartmentTaskCard(
-          title: '매출 관리',
-          description: '사업부별 매출 현황 추적 및 월별 집계',
-        ),
-        DepartmentTaskCard(
-          title: '비용 관리',
-          description: '운영비, 개발비, 마케팅비 분류 및 기록',
-        ),
-        DepartmentTaskCard(
-          title: '부가세/세금계산서',
-          description: '부가세 신고 준비 및 세금계산서 발행 관리',
-        ),
-        DepartmentTaskCard(title: '사업자 관리', description: '사업자 등록 정보 및 업종 관리'),
-        DepartmentTaskCard(
-          title: '연금/ETF/재테크',
-          description: '개인 재테크 포트폴리오 및 연금 계획',
-        ),
-        DepartmentTaskCard(
-          title: '월별 예산표 예정',
-          description: '사업부별 월간 예산 계획 및 실적 비교',
-        ),
-      ],
-    ),
-    Department(
       id: 'planning',
       title: '기획·아이디어',
-      role: '앱 아이디어, 콘텐츠 아이디어, 전자책 주제, 자동화 시스템 기획, 사업 우선순위 정리',
+      headline: '성장 전략 · 실행 로드맵 · 우선순위 본부',
+      progressPercent: 65,
+      role: '신규 사업 아이디어, 프로젝트 기획, 실행 로드맵, 우선순위 정리, 성장·확장 구상',
+      futureVision: 'AI대표와 연동해 분기 로드맵·신규 아이디어·우선순위를 자동 제안',
       taskCards: [
         DepartmentTaskCard(
-          title: '앱 아이디어',
-          description: '신규 앱 컨셉 및 기능 아이디어 수집',
+          title: '신규 사업 아이디어',
+          description: '앱·자동화·콘텐츠·전자책 신규 컨셉 수집',
         ),
         DepartmentTaskCard(
-          title: '자동화 시스템 아이디어',
-          description: '산업자동화 확장 및 신규 시스템 기획',
+          title: '프로젝트 기획',
+          description: '사업부·앱별 MVP·기능 범위 정의',
         ),
         DepartmentTaskCard(
-          title: '유튜브 콘텐츠 아이디어',
-          description: '채널 콘텐츠 주제 및 시리즈 기획',
+          title: '실행 로드맵',
+          description: '월·분기 단위 실행 계획 및 마일스톤',
+        ),
+        DepartmentTaskCard(title: '우선순위 정리', description: '리소스 대비 임팩트 매트릭스'),
+        DepartmentTaskCard(title: '성장·확장 구상', description: '세계 수준 기업 성장 시나리오'),
+      ],
+    ),
+    Department(
+      id: 'marketing',
+      title: '홍보·마케팅',
+      headline: '웹·앱·콘텐츠·전자책 통합 홍보 본부',
+      progressPercent: 52,
+      role: '웹 홍보, 앱/전자책/콘텐츠 홍보, 유입 전략, 브랜딩, 홍보 일정·채널·성과',
+      futureVision: 'PUBLIC 총괄·개별 프로모 URL과 AI대표 홍보 우선순위 연동',
+      taskCards: [
+        DepartmentTaskCard(
+          title: '웹 홍보',
+          description: '4개 총괄·6개 앱 프로모 GitHub Pages',
         ),
         DepartmentTaskCard(
-          title: '전자책 주제',
-          description: '전자책 출판 주제 선정 및 목차 구상',
+          title: '앱·전자책·콘텐츠 홍보',
+          description: '사업부별 홍보 메시지·랜딩 연결',
+        ),
+        DepartmentTaskCard(title: '유입 전략', description: '검색·SNS·카카오 공유·채널별 유입'),
+        DepartmentTaskCard(title: '브랜딩 방향', description: '소통웨어 통합 브랜드 톤·비주얼'),
+        DepartmentTaskCard(title: '홍보 일정·성과', description: '캠페인 일정·클릭·전환 포인트'),
+      ],
+    ),
+    Department(
+      id: 'finance',
+      title: '재무·세금',
+      headline: '세계 수준 기업 성장을 위한 재무·세무 전략 본부',
+      progressPercent: 40,
+      role: '세금·비용·예산·수익·절세·자금 흐름·재투자·재테크 — 홈택스 연동 지향',
+      futureVision:
+          '향후 홈택스 연동 · 세무 점검 · 재무 리포트 자동화 · 투자·재테크 AI 보조. '
+          'AI가 전문가 수준으로 재무·세금 관리를 보좌하는 구조로 확장',
+      taskCards: [
+        DepartmentTaskCard(
+          title: '홈택스 연동 로드맵',
+          description: '매출·비용·세금 신고 데이터 연동 방향 (향후)',
         ),
         DepartmentTaskCard(
-          title: '수익자동화 아이디어',
-          description: '패시브 인컴 및 자동화 수익 모델 검토',
+          title: '세금·비용·예산',
+          description: '부가세·세금계산서·월간 예산·비용 분류',
+        ),
+        DepartmentTaskCard(title: '수익·자금 흐름', description: '사업부별 매출·순이익·현금 흐름'),
+        DepartmentTaskCard(title: '절세·재테크', description: '절세 전략·연금·ETF·재투자 검토'),
+        DepartmentTaskCard(
+          title: '재무 리포트 자동화',
+          description: '월·분기 재무 요약 AI 리포트 (향후)',
         ),
         DepartmentTaskCard(
-          title: '우선순위 결정',
-          description: '사업부·프로젝트 우선순위 매트릭스 관리',
+          title: 'AI 재무 보조',
+          description: '세무 리스크·비용 이상·투자 타이밍 점검',
         ),
       ],
     ),
     Department(
-      id: 'online_sales',
-      title: '온라인영업·고객대응',
-      role: '홈페이지, 제안서, 고객 문의, 계약 전 상담, 온라인 홍보, B2B 영업 관리',
+      id: 'online_customer',
+      title: '온라인 고객대응',
+      headline: '고객 문의·응대·만족도 향상 본부',
+      progressPercent: 45,
+      role: '고객문의 관리, 온라인 응대, 니즈 파악, 응답 우선순위, AI 응대 보조',
+      futureVision: 'AI대표와 연동해 긴급 문의·반복 질문·SLA를 자동 분류',
       taskCards: [
-        DepartmentTaskCard(title: '제안서', description: 'B2B 고객 대상 제안서 작성 및 관리'),
-        DepartmentTaskCard(title: '상담 기록', description: '고객 상담 이력 및 후속 조치 관리'),
-        DepartmentTaskCard(title: '고객 문의', description: '온라인 문의 접수 및 응대 현황'),
+        DepartmentTaskCard(title: '고객문의 관리', description: '접수·분류·처리 상태 추적'),
+        DepartmentTaskCard(title: '온라인 응대 흐름', description: '채널별 응대 프로세스·템플릿'),
+        DepartmentTaskCard(title: '고객 니즈 파악', description: '문의 패턴·개선 요청 수집'),
+        DepartmentTaskCard(title: '응답 우선순위', description: '긴급도·매출 영향 기준 SLA'),
+        DepartmentTaskCard(title: '반복 질문 대응', description: 'FAQ·자동 응답 후보'),
         DepartmentTaskCard(
-          title: '홈페이지/홍보사이트',
-          description: '공개 홍보사이트 기획 및 운영 관리',
-        ),
-        DepartmentTaskCard(title: 'B2B 영업', description: '기업 고객 영업 파이프라인 관리'),
-        DepartmentTaskCard(title: '견적 관리', description: '프로젝트 견적 산출 및 이력 관리'),
-      ],
-    ),
-    Department(
-      id: 'sales',
-      title: '판매·고객대응',
-      role: '소통창고, 스마트스토어, 상품 등록, 주문 관리, 배송/고객 응대, 리뷰 관리',
-      taskCards: [
-        DepartmentTaskCard(title: '소통창고', description: '자체 쇼핑몰 운영 및 상품 관리'),
-        DepartmentTaskCard(
-          title: '스마트스토어 연결',
-          description: '네이버 스마트스토어 연동 및 운영',
-        ),
-        DepartmentTaskCard(title: '상품 등록', description: '신규 상품 등록 및 정보 관리'),
-        DepartmentTaskCard(title: '주문 관리', description: '주문 접수·처리·배송 현황 추적'),
-        DepartmentTaskCard(title: '배송 관리', description: '배송 업체 연동 및 배송 상태 관리'),
-        DepartmentTaskCard(
-          title: '리뷰/고객 응대',
-          description: '고객 리뷰 모니터링 및 응대 기록',
+          title: 'AI 응대 보조',
+          description: '초안 작성·감정·에스컬레이션 판단',
         ),
       ],
-    ),
-    Department(
-      id: 'ai_agent_room',
-      title: 'AI 직원실',
-      role: '각 부서별 AI 역할을 정의하고, AI가 업무를 어떻게 도와줄지 관리',
-      taskCards: [],
     ),
   ];
 
