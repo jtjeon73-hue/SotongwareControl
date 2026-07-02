@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../data/promo_sites_data.dart';
 import '../theme/control_theme.dart';
 
-class PrivatePublicNotice extends StatelessWidget {
-  const PrivatePublicNotice({super.key, this.compact = false});
+/// 공개 프로모 사이트임을 안내하는 배너 (데모·샘플 데이터).
+class PublicDemoNotice extends StatelessWidget {
+  const PublicDemoNotice({super.key, this.compact = false});
 
   final bool compact;
 
@@ -14,7 +15,7 @@ class PrivatePublicNotice extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(compact ? 12 : 14),
       decoration: BoxDecoration(
-        color: ControlColors.warningBg,
+        color: ControlColors.tealSoft.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: ControlColors.border),
       ),
@@ -22,14 +23,14 @@ class PrivatePublicNotice extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            compact ? Icons.info_outline : Icons.shield_outlined,
+            compact ? Icons.info_outline : Icons.public_outlined,
             size: compact ? 14 : 16,
-            color: ControlColors.accentWarm,
+            color: ControlColors.teal,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              PromoSitesData.privatePublicNotice,
+              PromoSitesData.publicDemoNotice,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: compact ? 11 : 12,
                 color: ControlColors.textSecondary,

@@ -15,7 +15,7 @@ import '../widgets/business_status_card.dart';
 import '../widgets/control_section_title.dart';
 import '../widgets/department_status_card.dart';
 import '../widgets/operational_metric_card.dart';
-import '../widgets/private_public_notice.dart';
+import '../widgets/public_demo_notice.dart';
 import '../widgets/promo_site_card.dart';
 import '../widgets/public_promo_summary_card.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -69,7 +69,7 @@ class DashboardScreen extends StatelessWidget {
                 onViewAll: () => onNavigate(ControlDestination.projectLinks),
               ),
               const SizedBox(height: 16),
-              const PrivatePublicNotice(compact: true),
+              const PublicDemoNotice(compact: true),
               const SizedBox(height: 32),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -137,7 +137,7 @@ class DashboardScreen extends StatelessWidget {
               ),
               _PromoHubPreview(),
               const SizedBox(height: 16),
-              const PrivatePublicNotice(),
+              const PublicDemoNotice(),
               const SizedBox(height: 16),
               const _PrivacyBanner(),
             ],
@@ -187,19 +187,23 @@ class _CommandHero extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: ControlColors.accentWarm.withValues(alpha: 0.1),
+                  color: ControlColors.teal.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.lock, size: 10, color: ControlColors.accentWarm),
-                    SizedBox(width: 4),
+                    const Icon(
+                      Icons.public,
+                      size: 10,
+                      color: ControlColors.teal,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      'PRIVATE',
+                      'PUBLIC · 데모',
                       style: TextStyle(
                         fontSize: 10,
-                        color: ControlColors.accentWarm,
+                        color: ControlColors.teal,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -210,7 +214,7 @@ class _CommandHero extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '사업 운영 관제센터 — 판단 · 지시 · 대응 · 수익 연결',
+            '통합 컨트롤센터 · AI대표 · 사업부 비전 데모',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: ControlColors.teal),
@@ -555,7 +559,7 @@ class _PrivacyBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              SampleBusinessData.privacyNotice,
+              SampleBusinessData.demoDisclaimer,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 11,
                 color: ControlColors.textMuted,

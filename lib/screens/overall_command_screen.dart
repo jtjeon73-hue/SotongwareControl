@@ -7,7 +7,7 @@ import '../theme/control_theme.dart';
 import '../widgets/control_section_title.dart';
 import '../widgets/hub_status_card.dart';
 import '../widgets/page_hero.dart';
-import '../widgets/private_public_notice.dart';
+import '../widgets/public_demo_notice.dart';
 import '../widgets/sidebar_navigation.dart';
 
 class OverallCommandScreen extends StatelessWidget {
@@ -32,13 +32,13 @@ class OverallCommandScreen extends StatelessWidget {
               PageHero(
                 title: '전체사업관리관제',
                 subtitle:
-                    '소통웨어 4개 사업부·4개 관리부서의 진행 상태, 우선순위, '
-                    '수익·발전 포인트를 한 화면에서 통합 관리합니다.',
-                badge: '통합 관제 대시보드',
+                    '소통웨어 4개 사업부·4개 관리부서의 운영 비전, 우선순위, '
+                    '수익·발전 포인트를 한 화면에서 체험할 수 있는 데모 대시보드입니다.',
+                badge: '통합 컨트롤 · 데모',
                 trailing: _HealthBadge(stats: stats),
               ),
               const SizedBox(height: 16),
-              const PrivatePublicNotice(compact: true),
+              const PublicDemoNotice(compact: true),
               const SizedBox(height: 24),
               _QuickMetrics(stats: stats, onNavigate: onNavigate),
               const SizedBox(height: 28),

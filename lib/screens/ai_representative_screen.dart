@@ -18,8 +18,8 @@ class AiRepresentativeScreen extends StatelessWidget {
           const PageHero(
             title: 'AI대표',
             subtitle:
-                '각 사업부·관리부서의 현황을 종합해 전략·수익·리스크·실행을 제안하는 '
-                '소통웨어 총괄 AI 보좌 허브입니다.',
+                '각 사업부·관리부서의 운영 비전을 종합해 전략·수익·리스크·실행을 제안하는 '
+                '소통웨어 AI대표 컨셉 데모입니다. (모든 데이터는 샘플·예시)',
             badge: '대표 보좌 · 총괄 관제 · 전략 제안',
           ),
           const SizedBox(height: 24),

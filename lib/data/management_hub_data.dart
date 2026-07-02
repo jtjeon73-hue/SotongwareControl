@@ -80,7 +80,8 @@ class ManagementHubData {
   static const visionNote =
       '향후 AI대표는 각 부서·사업부 데이터를 종합해 '
       '「진행 / 보류 / 우선순위」를 사용자가 체크하고 실행 흐름으로 연결하는 '
-      '의사결정 보조 허브로 확장됩니다.';
+      '의사결정 보조 허브로 확장됩니다. '
+      '현재 화면은 공개 프로모·비전 소개용 데모이며 실제 운영 데이터는 포함하지 않습니다.';
 
   static const divisionStatuses = <HubStatusItem>[
     HubStatusItem(
@@ -216,7 +217,7 @@ class ManagementHubData {
     ),
     AiDivisionBrief(
       divisionName: '앱개발',
-      currentStatus: '6개 앱·6개 프로모 URL 내부 연결',
+      currentStatus: '6개 앱·6개 프로모 URL 연결',
       progressSummary: '소통여행 배포·소통사매 고도화가 핵심',
       revenueDirection: 'Play Store·프로모 유입·APK 배포',
       growthDirection: '앱 포트폴리오 + AI 기능 확장',

@@ -1,10 +1,10 @@
 import '../models/promo_site_link.dart';
 
 class PromoSitesData {
-  static const privatePublicNotice =
-      'SotongWare Control Center는 private 내부 관제센터입니다. '
-      '4개 사업 총괄 홍보사이트는 public 홍보용 사이트이며, '
-      '내부 전략·세무·고객정보는 공개 사이트에 포함하지 않습니다.';
+  static const publicDemoNotice =
+      '본 사이트는 소통웨어 통합 컨트롤센터·AI대표·관리부서·사업부 운영 비전을 소개하는 '
+      '공개형 프로모 / 데모 사이트입니다. 표시되는 수치·진행률·재무 항목은 모두 샘플·예시이며, '
+      '실제 개인정보·세무·매출·인증·API Key 등 민감 정보는 포함하지 않습니다.';
 
   static const appPromoNotDeployedNotice =
       '프로모 저장소 또는 GitHub Pages 배포 전이면 404가 표시될 수 있습니다.';
@@ -17,15 +17,17 @@ class PromoSitesData {
     '소통사매앱',
   ];
 
-  static const privateSites = <PromoSiteLink>[
+  static const centralHubSites = <PromoSiteLink>[
     PromoSiteLink(
       id: 'control_center',
       repoName: 'SotongwareControl',
-      title: 'SotongWare Control Center',
-      purpose: '개인용 내부 사업 총괄 관제센터 (현재 사이트)',
-      visibility: SiteVisibility.private,
-      productionStatus: '운영 중',
-      nextTask: '업무 상태 관리·AI 지시 구조 고도화',
+      title: 'SotongWare Control — 소통컨트롤총괄프로모',
+      purpose: '통합 컨트롤센터 · AI대표 · 관리부서 · 사업부 비전 공개 소개 (현재 사이트)',
+      visibility: SiteVisibility.publicLive,
+      productionStatus: '공개 운영 중',
+      nextTask: 'AI대표 실행 승인 UI · 부서별 세부 확장',
+      defaultUrl: 'https://jtjeon73-hue.github.io/SotongwareControl/',
+      internalConnectionStatus: '허브 연결',
     ),
   ];
 
@@ -40,7 +42,7 @@ class PromoSitesData {
       productionStatus: '제작 완료 / 배포 확인 필요',
       nextTask: 'GitHub Pages 배포 주소 404 여부 확인',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongAutomationPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       isBusinessHub: true,
       divisionId: 'industrial_automation',
     ),
@@ -54,7 +56,7 @@ class PromoSitesData {
       productionStatus: '제작 완료 / 배포 확인 필요',
       nextTask: '하위 앱 프로모 링크 연결 상태 점검',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongAppsPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       isBusinessHub: true,
       divisionId: 'app_development',
     ),
@@ -68,7 +70,7 @@ class PromoSitesData {
       productionStatus: '제작 완료 / 배포 확인 필요',
       nextTask: 'GitHub Pages 배포 주소 404 여부 확인',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongContentsPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       isBusinessHub: true,
       divisionId: 'youtube_content',
     ),
@@ -82,7 +84,7 @@ class PromoSitesData {
       productionStatus: '제작 완료 / 배포 확인 필요',
       nextTask: 'GitHub Pages 배포 주소 404 여부 확인',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongEbookPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       isBusinessHub: true,
       divisionId: 'ebook',
     ),
@@ -99,7 +101,7 @@ class PromoSitesData {
       productionStatus: '운영중 / 연결됨',
       nextTask: 'APK 다운로드 페이지·배포 흐름 점검',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongTravelPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       parentId: 'apps_promo',
     ),
     PromoSiteLink(
@@ -112,7 +114,7 @@ class PromoSitesData {
       productionStatus: '제작 예정 / 배포 확인 필요',
       nextTask: 'GitHub Pages 배포 및 소개 페이지 기획',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongSajuPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       parentId: 'apps_promo',
     ),
     PromoSiteLink(
@@ -125,7 +127,7 @@ class PromoSitesData {
       productionStatus: '제작 예정 / 배포 확인 필요',
       nextTask: '저장소·Pages 배포 후 컨셉 페이지 연결',
       defaultUrl: 'https://jtjeon73-hue.github.io/FarmjigiPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       parentId: 'apps_promo',
     ),
     PromoSiteLink(
@@ -138,7 +140,7 @@ class PromoSitesData {
       productionStatus: '제작 예정 / 배포 확인 필요',
       nextTask: '앱 컨셉·기능 정의 후 프로모 연결',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongHealthPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       parentId: 'apps_promo',
     ),
     PromoSiteLink(
@@ -151,7 +153,7 @@ class PromoSitesData {
       productionStatus: '제작 예정 / 배포 확인 필요',
       nextTask: '서비스 범위·MVP 정의 후 프로모 연결',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongAIPromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       parentId: 'apps_promo',
     ),
     PromoSiteLink(
@@ -164,7 +166,7 @@ class PromoSitesData {
       productionStatus: '제작 예정 / 배포 확인 필요',
       nextTask: 'GitHub Pages 배포 확인·앱 화면 고도화 연동',
       defaultUrl: 'https://jtjeon73-hue.github.io/SotongSamaePromo/',
-      internalConnectionStatus: '연결됨',
+      internalConnectionStatus: '프로모 연결',
       parentId: 'apps_promo',
     ),
   ];
@@ -198,7 +200,7 @@ class PromoSitesData {
   };
 
   static List<PromoSiteLink> get allSites => [
-    ...privateSites,
+    ...centralHubSites,
     ...businessHubSites,
     ...appChildSites,
     ...commerceSites,

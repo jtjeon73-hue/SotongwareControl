@@ -1,5 +1,5 @@
 name: sotong_ware_control
-description: "소통웨어 디지털랩 — SotongWare Control 개인용 사업 관제센터"
+description: "소통웨어 디지털랩 — SotongWare Control 공개 프로모 / 데모 컨트롤센터"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

@@ -26,8 +26,8 @@ class FinanceDashboardScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const ControlSectionTitle(
-                title: '재무 및 세금 관리',
-                subtitle: '기초 입력 · 로컬 저장 · 내부 점검용 (샘플)',
+                title: '재무 및 세금 (데모)',
+                subtitle: '샘플 입력 · 브라우저 저장 · 비전 소개용',
               ),
               Container(
                 width: double.infinity,
@@ -41,8 +41,8 @@ class FinanceDashboardScreen extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  '실제 세무 판단은 세무사 또는 전문가 확인이 필요합니다. '
-                  '이 화면은 내부 점검용이며 민감한 세무 데이터는 저장하지 않습니다.',
+                  '표시·입력 값은 모두 데모용 샘플입니다. 실제 세무 판단은 전문가 확인이 필요하며, '
+                  '홈택스 로그인·실제 세무·매출 데이터는 저장하지 않습니다.',
                   style: TextStyle(
                     fontSize: 12,
                     color: ControlColors.accentWarm,

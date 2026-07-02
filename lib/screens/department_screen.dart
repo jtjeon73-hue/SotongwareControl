@@ -3,6 +3,7 @@ import '../models/department.dart';
 import '../theme/control_theme.dart';
 import '../widgets/control_section_title.dart';
 import '../widgets/page_hero.dart';
+import '../widgets/public_demo_notice.dart';
 
 class DepartmentScreen extends StatelessWidget {
   const DepartmentScreen({super.key, required this.department});
@@ -43,6 +44,8 @@ class DepartmentScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          const PublicDemoNotice(compact: true),
           if (_isFinance) ...[
             const SizedBox(height: 16),
             _FinanceVisionCard(vision: department.futureVision ?? ''),

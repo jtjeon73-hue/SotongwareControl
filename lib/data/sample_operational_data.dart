@@ -390,7 +390,7 @@ class SampleOperationalData {
     FinanceItem(
       id: 'fin_investment',
       title: '연금/ETF/재테크 기록',
-      description: '개인 재테크 포트폴리오 추적',
+      description: '재테크 포트폴리오 추적 (샘플)',
       category: FinanceCategory.investment,
       statusText: '기록 구조 미정',
       actionNeeded: '재테크 기록 템플릿 설계',

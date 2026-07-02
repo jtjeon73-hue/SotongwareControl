@@ -22,13 +22,16 @@ class DashboardMetrics {
 
 class SampleBusinessData {
   static const siteTitle = '소통웨어 디지털랩';
-  static const siteSubtitle = '사업 운영 관제센터';
+  static const siteSubtitle = '통합 컨트롤센터 · AI대표';
   static const siteEnglishName = 'SotongWare Control Center';
   static const siteDescription =
-      '전체 사업 현황 파악, 문제 대응, 수익 연결, 영업·홍보, 재무·세무, AI 업무 지시를 한곳에서 관리하는 개인용 운영 대시보드입니다.';
+      '소통웨어 4개 사업부·4개 관리부서·AI대표 운영 비전을 한눈에 소개하는 '
+      '공개형 프로모 / 데모 컨트롤센터입니다.';
 
-  static const privacyNotice =
-      '이 사이트는 개인 사업 관리를 위한 내부용 대시보드입니다. 공개 홍보사이트가 아니며 실제 고객정보, 비밀번호, 세무 상세자료는 저장하지 않습니다.';
+  static const demoDisclaimer =
+      '본 사이트는 비전·구조·운영 컨셉을 보여주는 데모입니다. '
+      '모든 수치·진행률·재무 항목은 샘플·예시이며, '
+      '실제 고객정보·세무·매출·인증·API Key는 저장·표시하지 않습니다.';
 
   static const metrics = DashboardMetrics(
     activeBusinesses: 4,
@@ -362,7 +365,7 @@ class SampleBusinessData {
     ProjectLinkItem(
       id: 'control_center',
       name: 'SotongWare Control Center',
-      description: 'private 내부 총괄 관제센터 (현재 사이트)',
+      description: '소통웨어 통합 컨트롤센터 공개 프로모 (현재 사이트)',
       type: ProjectLinkType.internal,
     ),
     ProjectLinkItem(

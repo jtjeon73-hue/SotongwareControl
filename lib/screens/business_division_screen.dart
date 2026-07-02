@@ -7,7 +7,7 @@ import '../utils/external_url.dart';
 import '../widgets/app_development_promo_summary.dart';
 import '../widgets/app_project_promo_card.dart';
 import '../widgets/control_section_title.dart';
-import '../widgets/private_public_notice.dart';
+import '../widgets/public_demo_notice.dart';
 
 class BusinessDivisionScreen extends StatelessWidget {
   const BusinessDivisionScreen({super.key, required this.division});
@@ -28,7 +28,7 @@ class BusinessDivisionScreen extends StatelessWidget {
             children: [
               _Header(division: division),
               const SizedBox(height: 16),
-              const PrivatePublicNotice(compact: true),
+              const PublicDemoNotice(compact: true),
               const SizedBox(height: 24),
               if (_isAppDevelopment) ...[
                 const AppDevelopmentPromoSummary(),

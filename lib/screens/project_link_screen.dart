@@ -5,7 +5,7 @@ import '../models/promo_site_link.dart';
 import '../state/control_scope.dart';
 import '../theme/control_theme.dart';
 import '../widgets/control_section_title.dart';
-import '../widgets/private_public_notice.dart';
+import '../widgets/public_demo_notice.dart';
 import '../widgets/promo_site_card.dart';
 
 class ProjectLinkScreen extends StatelessWidget {
@@ -25,15 +25,15 @@ class ProjectLinkScreen extends StatelessWidget {
             children: [
               _Header(),
               const SizedBox(height: 16),
-              const PrivatePublicNotice(),
+              const PublicDemoNotice(),
               const SizedBox(height: 24),
               _VisibilityLegend(),
               const SizedBox(height: 28),
               const ControlSectionTitle(
-                title: 'PRIVATE · 내부 관제센터',
-                subtitle: '외부 공개하지 않는 개인용 사이트',
+                title: '통합 컨트롤 허브',
+                subtitle: '소통컨트롤총괄프로모 · 공개 운영 중',
               ),
-              ...PromoSitesData.privateSites.map(
+              ...PromoSitesData.centralHubSites.map(
                 (site) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: PromoSiteCard(site: site),
@@ -92,12 +92,12 @@ class _Header extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'PRIVATE 내부 관제센터와 PUBLIC 사업 총괄 홍보사이트의 관계·상태·URL을 관리합니다.',
+            '소통웨어 사업·프로모 사이트 생태계를 한눈에 보여주는 공개 링크맵입니다.',
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 12),
           Text(
-            'URL은 GitHub Pages 배포 후 등록할 수 있으며, 로컬에 저장됩니다.',
+            'URL은 GitHub Pages 배포 주소 예시이며, 데모 체험용 설정은 브라우저에만 저장됩니다.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontSize: 12,
               color: ControlColors.textMuted,
@@ -117,21 +117,21 @@ class _VisibilityLegend extends StatelessWidget {
       runSpacing: 8,
       children: [
         _legendItem(
-          Icons.lock_outline,
-          'PRIVATE',
-          '내부 관제·비공개',
+          Icons.hub_outlined,
+          '허브',
+          '통합 컨트롤·AI대표',
           ControlColors.teal,
         ),
         _legendItem(
           Icons.public_outlined,
           'PUBLIC',
-          'GitHub Pages 공개 홍보',
+          'GitHub Pages 공개 프로모',
           ControlColors.sandBeige,
         ),
         _legendItem(
           Icons.check_circle_outline,
           '연결됨',
-          '내부 관제센터 URL 연결 완료',
+          '프로모 URL 연결 완료',
           ControlColors.teal,
         ),
       ],
@@ -255,7 +255,7 @@ class _LinkMapDiagram extends StatelessWidget {
             Center(
               child: _DiagramNode(
                 label: 'SotongWare Control Center',
-                subtitle: 'PRIVATE',
+                subtitle: 'PUBLIC · 허브',
                 color: ControlColors.teal,
                 isCenter: true,
               ),

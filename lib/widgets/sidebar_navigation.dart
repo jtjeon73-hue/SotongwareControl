@@ -213,7 +213,7 @@ class SidebarNavigation extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'AI 기반 통합 사업 관제센터',
+                  'AI 기반 통합 사업 컨트롤 · 공개 프로모',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontSize: 11,
                     color: ControlColors.textMuted,
@@ -271,14 +271,14 @@ class SidebarNavigation extends StatelessWidget {
             child: Row(
               children: [
                 const Icon(
-                  Icons.lock_outline,
+                  Icons.public_outlined,
                   size: 12,
                   color: ControlColors.textMuted,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'PRIVATE · 내부 운영용',
+                    'PUBLIC · 공개 프로모',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontSize: 10,
                       color: ControlColors.textMuted,

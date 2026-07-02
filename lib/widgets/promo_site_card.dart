@@ -128,7 +128,7 @@ class PromoSiteCard extends StatelessWidget {
             if (site.isBusinessHub && !compact) ...[
               const SizedBox(height: 10),
               _InfoRow(
-                label: '내부 연결',
+                label: '허브 연결',
                 value: site.internalConnectionStatus ?? '—',
                 highlight: true,
               ),

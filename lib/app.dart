@@ -197,7 +197,7 @@ class _ControlHeader extends StatelessWidget {
                 Icon(Icons.circle, size: 6, color: ControlColors.teal),
                 SizedBox(width: 6),
                 Text(
-                  '관제 중',
+                  '데모 · 프로모',
                   style: TextStyle(
                     fontSize: 12,
                     color: ControlColors.teal,
