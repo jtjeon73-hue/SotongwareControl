@@ -218,6 +218,10 @@ class _ControlHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final showStatusBadge = screenWidth >= 420;
+    final showSiteName = screenWidth >= 560;
+
     return Container(
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -243,36 +247,40 @@ class _ControlHeader extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: ControlColors.tealSoft,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.circle, size: 6, color: ControlColors.teal),
-                SizedBox(width: 6),
-                Text(
-                  '비공개 본사 관제',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: ControlColors.teal,
-                    fontWeight: FontWeight.w600,
+          if (showStatusBadge) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: ControlColors.tealSoft,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.circle, size: 6, color: ControlColors.teal),
+                  SizedBox(width: 6),
+                  Text(
+                    '비공개 본사 관제',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: ControlColors.teal,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            SampleBusinessData.siteEnglishName,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontSize: 12,
-              color: ControlColors.textMuted,
+          ],
+          if (showSiteName) ...[
+            const SizedBox(width: 12),
+            Text(
+              SampleBusinessData.siteEnglishName,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 12,
+                color: ControlColors.textMuted,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

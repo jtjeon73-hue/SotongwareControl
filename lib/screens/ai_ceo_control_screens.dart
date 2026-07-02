@@ -167,7 +167,7 @@ class AiIdeaMeetingScreen extends StatelessWidget {
           ),
           _AdaptiveGrid(
             maxCrossAxisExtent: 430,
-            mainAxisExtent: 390,
+            mainAxisExtent: 430,
             children: AiControlCenterData.ideaProposals
                 .map((proposal) => _IdeaProposalCard(proposal: proposal))
                 .toList(),
