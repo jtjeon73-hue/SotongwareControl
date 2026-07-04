@@ -50,7 +50,7 @@ class OverallCommandScreen extends StatelessWidget {
               const SizedBox(height: 28),
               ControlSectionTitle(
                 title: 'AI부서 역할 요약',
-                subtitle: '소통AI대표부 6개 부서',
+                subtitle: '소통AI대표부 7개 부서',
               ),
               _AiRoleGrid(onNavigate: onNavigate),
               const SizedBox(height: 28),

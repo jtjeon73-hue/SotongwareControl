@@ -62,6 +62,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return const ActionItemsScreen();
       case ControlDestination.aiRepresentative:
         return const AiCeoOfficeScreen();
+      case ControlDestination.aiProductDevDept:
+        return const AiDepartmentControlScreen(departmentId: 'productdev');
       case ControlDestination.aiWorkOrderDept:
         return const AiDepartmentControlScreen(departmentId: 'workorder');
       case ControlDestination.aiStrategyDept:

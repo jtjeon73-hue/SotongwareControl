@@ -43,7 +43,7 @@ void main() {
     expect(find.text('소통총괄관제'), findsWidgets);
     expect(tester.takeException(), isNull);
 
-    for (final label in ['AI대표', 'AI지시진행부', 'AI전략부', 'AI홍보.마케팅부']) {
+    for (final label in ['AI대표', 'AI상품개발부', 'AI지시진행부', 'AI전략부', 'AI홍보.마케팅부']) {
       await tester.tap(find.text(label).first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));

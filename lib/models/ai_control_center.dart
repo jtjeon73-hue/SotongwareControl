@@ -299,3 +299,133 @@ class AiOfficeDashboardCard {
   final AiSystemStatus status;
   final String department;
 }
+
+class ProductTechRecommendation {
+  const ProductTechRecommendation({
+    required this.aiOrTech,
+    required this.category,
+    required this.feature,
+    required this.utility,
+    required this.application,
+  });
+
+  final String aiOrTech;
+  final String category;
+  final String feature;
+  final String utility;
+  final String application;
+}
+
+class DivisionProductDevGuide {
+  const DivisionProductDevGuide({
+    required this.divisionName,
+    required this.currentProducts,
+    required this.developmentFocus,
+    required this.recommendations,
+    required this.productEnhancements,
+    required this.nextProductAction,
+  });
+
+  final String divisionName;
+  final String currentProducts;
+  final String developmentFocus;
+  final List<ProductTechRecommendation> recommendations;
+  final List<String> productEnhancements;
+  final String nextProductAction;
+}
+
+enum ProductRegistrationStage {
+  planning,
+  development,
+  review,
+  registration,
+  deployment,
+  operation,
+}
+
+extension ProductRegistrationStageX on ProductRegistrationStage {
+  String get label {
+    switch (this) {
+      case ProductRegistrationStage.planning:
+        return '기획·구성';
+      case ProductRegistrationStage.development:
+        return '개발';
+      case ProductRegistrationStage.review:
+        return '검수';
+      case ProductRegistrationStage.registration:
+        return '등록';
+      case ProductRegistrationStage.deployment:
+        return '배포';
+      case ProductRegistrationStage.operation:
+        return '운영';
+    }
+  }
+
+  int get order => index + 1;
+}
+
+class ProductRegistrationItem {
+  const ProductRegistrationItem({
+    required this.productName,
+    required this.divisionName,
+    required this.currentStage,
+    required this.summary,
+    required this.checklist,
+    required this.owner,
+    required this.updatedAt,
+  });
+
+  final String productName;
+  final String divisionName;
+  final ProductRegistrationStage currentStage;
+  final String summary;
+  final List<String> checklist;
+  final String owner;
+  final String updatedAt;
+}
+
+class RegisteredProduct {
+  const RegisteredProduct({
+    required this.name,
+    required this.divisionName,
+    required this.version,
+    required this.registeredAt,
+    required this.productType,
+    required this.channels,
+    required this.status,
+    required this.catalogId,
+  });
+
+  final String name;
+  final String divisionName;
+  final String version;
+  final String registeredAt;
+  final String productType;
+  final List<String> channels;
+  final AiSystemStatus status;
+  final String catalogId;
+}
+
+class ProductMaintenanceRecord {
+  const ProductMaintenanceRecord({
+    required this.productName,
+    required this.divisionName,
+    required this.currentVersion,
+    required this.healthScore,
+    required this.lastCheckedAt,
+    required this.maintenanceTasks,
+    required this.scheduledUpdates,
+    required this.knownIssues,
+    required this.nextMaintenanceAction,
+  });
+
+  final String productName;
+  final String divisionName;
+  final String currentVersion;
+  final int healthScore;
+  final String lastCheckedAt;
+  final List<String> maintenanceTasks;
+  final List<String> scheduledUpdates;
+  final List<String> knownIssues;
+  final String nextMaintenanceAction;
+}

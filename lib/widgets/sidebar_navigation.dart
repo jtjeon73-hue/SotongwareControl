@@ -9,6 +9,7 @@ enum ControlDestination {
   issuesCheck,
   nextPriority,
   aiRepresentative,
+  aiProductDevDept,
   aiWorkOrderDept,
   aiStrategyDept,
   aiIdeaPlanningDept,
@@ -36,6 +37,8 @@ extension ControlDestinationX on ControlDestination {
         return '다음 실행 우선순위';
       case ControlDestination.aiRepresentative:
         return 'AI대표';
+      case ControlDestination.aiProductDevDept:
+        return 'AI상품개발부';
       case ControlDestination.aiWorkOrderDept:
         return 'AI지시진행부';
       case ControlDestination.aiStrategyDept:
@@ -73,6 +76,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.playlist_add_check_outlined;
       case ControlDestination.aiRepresentative:
         return Icons.psychology_outlined;
+      case ControlDestination.aiProductDevDept:
+        return Icons.inventory_2_outlined;
       case ControlDestination.aiWorkOrderDept:
         return Icons.assignment_outlined;
       case ControlDestination.aiStrategyDept:
@@ -117,6 +122,8 @@ extension ControlDestinationX on ControlDestination {
     switch (this) {
       case ControlDestination.aiRepresentative:
         return 'ceo';
+      case ControlDestination.aiProductDevDept:
+        return 'productdev';
       case ControlDestination.aiWorkOrderDept:
         return 'workorder';
       case ControlDestination.aiStrategyDept:
@@ -155,6 +162,7 @@ class SidebarNavigation extends StatelessWidget {
 
   static const _aiDepartments = [
     ControlDestination.aiRepresentative,
+    ControlDestination.aiProductDevDept,
     ControlDestination.aiWorkOrderDept,
     ControlDestination.aiStrategyDept,
     ControlDestination.aiIdeaPlanningDept,

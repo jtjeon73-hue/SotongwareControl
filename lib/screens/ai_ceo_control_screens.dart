@@ -354,7 +354,7 @@ class AiDepartmentControlScreen extends StatelessWidget {
           ),
           _AdaptiveGrid(
             maxCrossAxisExtent: 360,
-            mainAxisExtent: 150,
+            mainAxisExtent: 165,
             children: department.monitoredWorks
                 .map(
                   (work) => Card(
@@ -410,6 +410,94 @@ class AiDepartmentControlScreen extends StatelessWidget {
     AiDepartment department,
   ) {
     switch (departmentId) {
+      case 'productdev':
+        return [
+          const ControlSectionTitle(
+            title: '상품 등록 프로세스',
+            subtitle: '기획·구성 → 개발 → 검수 → 등록 → 배포 → 운영',
+          ),
+          const _ProductRegistrationFlowBar(),
+          const SizedBox(height: 16),
+          ...AiControlCenterData.productRegistrationPipeline.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _ProductRegistrationCard(item: item),
+            ),
+          ),
+          const SizedBox(height: 20),
+          ControlSectionTitle(
+            title: '등록 완료 상품 카탈로그',
+            subtitle:
+                '${AiControlCenterData.registeredProducts.length}개 등록 · 버전·채널·상태 관리',
+          ),
+          ...AiControlCenterData.registeredProducts.map(
+            (p) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _RegisteredProductCard(product: p),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const ControlSectionTitle(
+            title: '유지보수 관리',
+            subtitle: '버전 · 건강도 · 이슈 · 예정 업데이트 · 점검 일정',
+          ),
+          ...AiControlCenterData.productMaintenanceRegistry.map(
+            (record) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _ProductMaintenanceCard(record: record),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const ControlSectionTitle(
+            title: '사업부별 상품·AI·기술 구성',
+            subtitle: '각 소통사업부 진행 상품에 활용 가능한 AI·기술과 추가 구성안',
+          ),
+          ...AiControlCenterData.divisionProductGuides.map(
+            (guide) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _DivisionProductDevCard(guide: guide),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            color: ControlColors.tealSoft.withValues(alpha: 0.35),
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.sync_alt,
+                        color: ControlColors.teal,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '상품 구성 → 실행 연결',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const _InfoLine(
+                    label: '→ AI지시진행부',
+                    value: '등록·유지보수 작업을 개발·배포·실행 지시로 전달',
+                  ),
+                  const _InfoLine(
+                    label: '→ AI전략부',
+                    value: '상품 확장 방향·수익 연결 전략 반영',
+                  ),
+                  const _InfoLine(
+                    label: '→ AI기획.아이디어부',
+                    value: '신규 상품 아이디어·우선순위 피드백',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ];
       case 'workorder':
         return [
           _TaskStatusSection(
@@ -669,6 +757,418 @@ class _MarketingRoleCard extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductRegistrationFlowBar extends StatelessWidget {
+  const _ProductRegistrationFlowBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final stages = AiControlCenterData.productRegistrationStages;
+    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontSize: 10,
+      fontWeight: FontWeight.w600,
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Row(
+          children: [
+            for (var i = 0; i < stages.length; i++) ...[
+              if (i > 0)
+                Expanded(
+                  child: Container(
+                    height: 2,
+                    color: ControlColors.border,
+                  ),
+                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: ControlColors.tealSoft,
+                    child: Text(
+                      '${stages[i].order}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: ControlColors.teal,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(stages[i].label, style: labelStyle),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductRegistrationCard extends StatelessWidget {
+  const _ProductRegistrationCard({required this.item});
+
+  final ProductRegistrationItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final stages = AiControlCenterData.productRegistrationStages;
+    final stageIndex = stages.indexOf(item.currentStage);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.productName,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.divisionName,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: ControlColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _SoftChip(label: item.currentStage.label),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              item.summary,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: 6,
+                value: (stageIndex + 1) / stages.length,
+                backgroundColor: ControlColors.slate,
+                color: ControlColors.teal,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '등록 체크리스트',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            ...item.checklist.asMap().entries.map(
+              (entry) {
+                final done = entry.key < stageIndex;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        done
+                            ? Icons.check_circle_outline
+                            : Icons.radio_button_unchecked,
+                        size: 14,
+                        color: done
+                            ? ControlColors.teal
+                            : ControlColors.textMuted,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          entry.value,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            _InfoLine(label: '담당', value: item.owner),
+            _InfoLine(label: '갱신', value: item.updatedAt),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RegisteredProductCard extends StatelessWidget {
+  const _RegisteredProductCard({required this.product});
+
+  final RegisteredProduct product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    product.name,
+                    style: Theme.of(context).textTheme.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                AiStatusBadge(status: product.status, compact: true),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _InfoLine(label: '카탈로그 ID', value: product.catalogId),
+            _InfoLine(label: '버전', value: product.version),
+            _InfoLine(label: '사업부', value: product.divisionName),
+            _InfoLine(label: '유형', value: product.productType),
+            _InfoLine(label: '등록일', value: product.registeredAt),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: product.channels
+                  .map((c) => _SoftChip(label: c))
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductMaintenanceCard extends StatelessWidget {
+  const _ProductMaintenanceCard({required this.record});
+
+  final ProductMaintenanceRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(fontSize: 12);
+
+    Color healthColor;
+    if (record.healthScore >= 85) {
+      healthColor = ControlColors.teal;
+    } else if (record.healthScore >= 70) {
+      healthColor = ControlColors.accentWarm;
+    } else {
+      healthColor = ControlColors.accentRose;
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    record.productName,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: healthColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '건강도 ${record.healthScore}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: healthColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _InfoLine(label: '버전', value: record.currentVersion),
+            _InfoLine(label: '사업부', value: record.divisionName),
+            _InfoLine(label: '최근 점검', value: record.lastCheckedAt),
+            const SizedBox(height: 10),
+            Text('유지보수 작업', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            ...record.maintenanceTasks.map(
+              (t) => Text('• $t', style: bodyStyle),
+            ),
+            const SizedBox(height: 8),
+            Text('예정 업데이트', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            ...record.scheduledUpdates.map(
+              (u) => Text('• $u', style: bodyStyle),
+            ),
+            if (record.knownIssues.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                '알려진 이슈',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: ControlColors.accentRose,
+                ),
+              ),
+              const SizedBox(height: 4),
+              ...record.knownIssues.map(
+                (issue) => Text(
+                  '• $issue',
+                  style: bodyStyle?.copyWith(color: ControlColors.accentRose),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            _InfoLine(label: '다음 유지보수', value: record.nextMaintenanceAction),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DivisionProductDevCard extends StatelessWidget {
+  const _DivisionProductDevCard({required this.guide});
+
+  final DivisionProductDevGuide guide;
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(fontSize: 12, height: 1.4);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.business_outlined,
+                  color: ControlColors.teal,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    guide.divisionName,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _InfoLine(label: '현재 상품', value: guide.currentProducts),
+            _InfoLine(label: '개발 초점', value: guide.developmentFocus),
+            const SizedBox(height: 12),
+            Text(
+              '활용 AI · 기술',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...guide.recommendations.map(
+              (rec) => Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: rec.category == 'AI'
+                      ? ControlColors.tealSoft.withValues(alpha: 0.4)
+                      : ControlColors.slate.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _SoftChip(label: rec.category),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            rec.aiOrTech,
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                        _SoftChip(label: '활용 ${rec.utility}'),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(rec.feature, style: bodyStyle),
+                    Text(
+                      rec.application,
+                      style: bodyStyle?.copyWith(
+                        color: ControlColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '추가 상품 구성',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...guide.productEnhancements.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '• ',
+                      style: TextStyle(color: ControlColors.teal),
+                    ),
+                    Expanded(child: Text(item, style: bodyStyle)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _InfoLine(label: '다음 액션', value: guide.nextProductAction),
           ],
         ),
       ),

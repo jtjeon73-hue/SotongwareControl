@@ -102,6 +102,12 @@ class ManagementHubData {
       icon: Icons.psychology_outlined,
     ),
     AiDepartmentRoleSummary(
+      name: 'AI상품개발부',
+      summary: '사업부별 AI·기술 활용 · 추가 상품 구성 · 등록 · 유지보수',
+      destination: ControlDestination.aiProductDevDept,
+      icon: Icons.inventory_2_outlined,
+    ),
+    AiDepartmentRoleSummary(
       name: 'AI지시진행부',
       summary: '해야 할 일·진행 체크·실행 명령·작업 흐름',
       destination: ControlDestination.aiWorkOrderDept,
@@ -234,6 +240,17 @@ class ManagementHubData {
   ];
 
   static const aiDepartmentBriefs = <AiDepartmentBrief>[
+    AiDepartmentBrief(
+      departmentName: 'AI상품개발부',
+      currentStatus: '5개 사업부 구성안 · 등록 파이프라인 · 유지보수 관리',
+      keyProposal: '상품 기획→등록→운영 전 주기와 사업부별 AI·기술 카탈로그',
+      riskOrGap: '등록·유지보수 체계 없이 개발만 하면 상품 자산 관리 불가',
+      recommendedActions: [
+        '견적도우미 검수 완료 → 상품 등록',
+        '등록 상품 버전·이슈 주간 점검',
+        '유지보수 계획 → AI지시진행부 실행 연결',
+      ],
+    ),
     AiDepartmentBrief(
       departmentName: 'AI기획.아이디어부',
       currentStatus: '신규 아이디어·우선순위 정리',
