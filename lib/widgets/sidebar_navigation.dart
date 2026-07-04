@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/control_theme.dart';
+import 'sotong_brand_icon.dart';
 
 enum ControlDestination {
   dashboardOverview,
@@ -188,43 +189,38 @@ class SidebarNavigation extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: ControlColors.tealSoft,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.radar,
-                        color: ControlColors.teal,
-                        size: 20,
+                    const SotongBrandIcon(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '소통총관제',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'AI 총괄 관제 · 디지털 프로모',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  fontSize: 11,
+                                  color: ControlColors.textMuted,
+                                ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (onClose != null) ...[
-                      const Spacer(),
+                    if (onClose != null)
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: onClose,
                         visualDensity: VisualDensity.compact,
                       ),
-                    ],
                   ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '소통총관제',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'AI 총괄 관제 · 디지털 프로모',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 11,
-                    color: ControlColors.textMuted,
-                  ),
                 ),
               ],
             ),

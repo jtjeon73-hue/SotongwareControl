@@ -10,6 +10,7 @@ import 'state/control_scope.dart';
 import 'state/control_state.dart';
 import 'theme/control_theme.dart';
 import 'widgets/sidebar_navigation.dart';
+import 'widgets/sotong_brand_icon.dart';
 
 class SotongWareControlApp extends StatelessWidget {
   const SotongWareControlApp({super.key, required this.controlState});
@@ -188,10 +189,10 @@ class _ControlHeader extends StatelessWidget {
                 color: ControlColors.tealSoft,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.circle, size: 6, color: ControlColors.teal),
+                children: const [
+                  SotongBrandIcon(compact: true, size: 14, padding: 5),
                   SizedBox(width: 6),
                   Text(
                     '소통총관제',
