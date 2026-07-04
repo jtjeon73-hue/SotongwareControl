@@ -44,14 +44,14 @@ class AiControlCenterData {
       value: '3건',
       summary: '다운로드센터 경로 점검, 고객 문의 지연, 광고비 증액 승인 요청이 감지되었습니다.',
       status: AiSystemStatus.warning,
-      department: 'AI운영관리부',
+      department: 'AI지시진행부',
     ),
     AiOfficeDashboardCard(
       title: '승인 대기 업무',
       value: '5건',
       summary: '일본 여행 기능 우선 개발, 전자책 신규 등록, 광고비 증액 등 대표 판단이 필요합니다.',
       status: AiSystemStatus.approvalRequired,
-      department: 'AI대표실',
+      department: 'AI대표',
     ),
     AiOfficeDashboardCard(
       title: '오늘의 매출 요약',
@@ -65,28 +65,28 @@ class AiControlCenterData {
       value: '43회',
       summary: '소통AI여행 안내 자료 다운로드가 가장 많고, 전환 문의가 함께 늘었습니다.',
       status: AiSystemStatus.notificationPending,
-      department: 'AI마케팅부',
+      department: 'AI홍보.마케팅부',
     ),
     AiOfficeDashboardCard(
       title: '고객 문의 요약',
       value: '미응답 6건',
       summary: '앱 기능 문의와 산업자동화 견적 문의가 집중되어 고객지원 우선순위 조정이 필요합니다.',
       status: AiSystemStatus.warning,
-      department: 'AI고객지원부',
+      department: 'AI지시진행부',
     ),
     AiOfficeDashboardCard(
       title: '개발 진행 상황',
       value: '68%',
       summary: '소통AI여행 일본 여행 기능 설계와 다운로드센터 개선안이 병행 검토 중입니다.',
       status: AiSystemStatus.monitoring,
-      department: 'AI상품개발부',
+      department: 'AI지시진행부',
     ),
     AiOfficeDashboardCard(
       title: '홍보/마케팅 진행 상황',
       value: '캠페인 4개',
       summary: '앱 홍보 영상, 전자책 티저, 다운로드센터 개선 안내 문구가 대기 중입니다.',
       status: AiSystemStatus.automaticReportPending,
-      department: 'AI마케팅부',
+      department: 'AI홍보.마케팅부',
     ),
     AiOfficeDashboardCard(
       title: '세무회계 체크사항',
@@ -100,45 +100,45 @@ class AiControlCenterData {
       value: '보수적 운용',
       summary: '단기 운영자금은 유지하고 홍보비 증액은 성과 조건부 승인으로 제안합니다.',
       status: AiSystemStatus.monitoring,
-      department: 'AI투자관리부',
+      department: 'AI세무회계부',
     ),
     AiOfficeDashboardCard(
       title: 'AI전략회의 결과 요약',
       value: '조건부 추진',
       summary: '소통AI여행 일본 여행 기능은 MVP 범위를 축소해 우선 개발하는 안이 우세합니다.',
       status: AiSystemStatus.approvalRequired,
-      department: 'AI전략회의실',
+      department: 'AI전략부',
     ),
     AiOfficeDashboardCard(
       title: 'AI아이디어회의 신규 제안',
       value: '6건',
       summary: '소통AI여행, AI전자책 제작도우미, AI산업자동화 견적도우미가 상위 후보로 평가되었습니다.',
       status: AiSystemStatus.notificationPending,
-      department: 'AI아이디어회의실',
+      department: 'AI기획.아이디어부',
     ),
   ];
 
   static const approvalTasks = <AiApprovalTask>[
     AiApprovalTask(
       title: '소통AI여행 일본 여행 기능 우선 개발',
-      department: 'AI상품개발부',
-      requestedBy: 'AI전략회의실',
+      department: 'AI지시진행부',
+      requestedBy: 'AI전략부',
       reason: '다운로드 증가와 문의 전환이 동시에 감지되어 MVP 개발 승인 필요',
       dueLabel: '오늘 오전',
       status: AiSystemStatus.approvalRequired,
     ),
     AiApprovalTask(
       title: '전자책 신규 등록 및 티저 페이지 공개',
-      department: 'AI마케팅부',
-      requestedBy: 'AI아이디어회의실',
+      department: 'AI홍보.마케팅부',
+      requestedBy: 'AI기획.아이디어부',
       reason: '앱 홍보와 교차 판매가 가능한 신규 전자책 후보 등록 요청',
       dueLabel: '오늘 오후',
       status: AiSystemStatus.approvalRequired,
     ),
     AiApprovalTask(
       title: '다운로드센터 개선안 적용',
-      department: 'AI운영관리부',
-      requestedBy: 'AI고객지원부',
+      department: 'AI지시진행부',
+      requestedBy: 'AI지시진행부',
       reason: '다운로드 이후 문의가 늘어 안내 구조 개선 필요',
       dueLabel: '24시간 내',
       status: AiSystemStatus.approvalRequired,
@@ -147,28 +147,28 @@ class AiControlCenterData {
 
   static const divisionStatuses = <BusinessDivisionStatus>[
     BusinessDivisionStatus(
-      name: '앱개발 사업부',
+      name: '소통앱개발사업부',
       healthScore: 82,
       status: '소통AI여행 기능 우선순위 판단 대기',
       revenueSignal: '다운로드 증가와 문의 전환이 발생',
       nextAction: '일본 여행 기능 MVP 승인',
     ),
     BusinessDivisionStatus(
-      name: '전자책 사업부',
+      name: '소통전자책사업부',
       healthScore: 74,
       status: '신규 등록 후보 2건 검토 중',
       revenueSignal: '사전 문의와 묶음 판매 가능성 확인',
       nextAction: '첫 등록 주제와 판매 채널 결정',
     ),
     BusinessDivisionStatus(
-      name: '산업자동화 사업부',
+      name: '소통자동화사업부',
       healthScore: 69,
       status: '견적도우미 아이디어 평가 중',
       revenueSignal: 'B2B 상담 예약 1건 발생',
       nextAction: '견적 질문 템플릿 정리',
     ),
     BusinessDivisionStatus(
-      name: '콘텐츠/마케팅 사업부',
+      name: '소통콘텐츠사업부',
       healthScore: 77,
       status: '앱 홍보 영상 제작 승인 대기',
       revenueSignal: '영상 공개 후 다운로드 전환 기대',
@@ -178,74 +178,107 @@ class AiControlCenterData {
 
   static const departments = <AiDepartment>[
     AiDepartment(
-      id: 'product',
-      name: 'AI상품개발부',
-      leaderRole: 'AI상품개발부장',
-      summary: '앱 기능, 전자책 상품, 자동화 견적도우미의 개발 우선순위와 MVP 범위를 관리합니다.',
+      id: 'ceo',
+      name: 'AI대표',
+      leaderRole: 'AI 대표 · 최종 판단',
+      summary:
+          '전체 사업을 총괄 판단합니다. 각 사업부와 AI부서 보고를 종합해 '
+          '수익성·진행·문제·다음 행동을 판단하고 대표에게 최종 보고합니다.',
+      status: AiSystemStatus.monitoring,
+      progressPercent: 85,
+      monitoredWorks: [
+        '사업부·AI부서 종합 브리핑',
+        '승인 대기 5건 검토',
+        '수익·지연·리스크 판단',
+        '대표 확인 필요 항목 정리',
+      ],
+      nextAction: '오늘의 최종 보고서 작성',
+    ),
+    AiDepartment(
+      id: 'workorder',
+      name: 'AI지시진행부',
+      leaderRole: 'AI 실행·진행 관리',
+      summary:
+          '오늘 해야 할 일, 진행 중·지연 작업, Cursor/GitHub/Flutter/홍보/앱개발 '
+          '실행 지시와 완료·보류·재검토 상태를 관리합니다.',
+      status: AiSystemStatus.automaticReportPending,
+      progressPercent: 74,
+      monitoredWorks: [
+        '오늘: PUBLIC Pages 404 점검',
+        '진행: 소통여행 APK·프로모 연결',
+        '지연: 소통사매앱 데이터 구조',
+        'Cursor/GitHub 배포 파이프라인',
+        'Flutter 앱 빌드·테스트',
+      ],
+      nextAction: '지연 작업 2건 우선순위 재배치',
+    ),
+    AiDepartment(
+      id: 'strategy',
+      name: 'AI전략부',
+      leaderRole: 'AI 전략·성장 로드맵',
+      summary:
+          '장기 성장 전략, 월 수익 목표, 사업 확장 로드맵, 소통웨어 전체 방향, '
+          '1인 기업에서 AI 기반 기업 시스템으로 성장하는 구조를 설계합니다.',
       status: AiSystemStatus.monitoring,
       progressPercent: 68,
-      monitoredWorks: ['소통AI여행 일본 여행 기능', '다운로드센터 개선', 'AI전자책 제작도우미 기획'],
-      nextAction: '일본 여행 기능 MVP 개발 승인 요청',
+      monitoredWorks: [
+        '2026 분기 성장 로드맵',
+        '월 수익 목표 ₩500만 샘플',
+        '앱·자동화·콘텐츠·전자책 확장',
+        'AI 기업 시스템 전환 구조',
+      ],
+      nextAction: '일본 여행 MVP 전략안 대표 보고',
+    ),
+    AiDepartment(
+      id: 'idea',
+      name: 'AI기획.아이디어부',
+      leaderRole: 'AI 기획·아이디어',
+      summary:
+          '신규 앱·농촌·자동화·AI·건강·콘텐츠·전자책 아이디어의 우선순위, '
+          '개발 가능성, 수익화 가능성을 평가합니다.',
+      status: AiSystemStatus.notificationPending,
+      progressPercent: 71,
+      monitoredWorks: [
+        '소통AI여행 — 지금 실행',
+        'AI전자책 제작도우미 — 지금 실행',
+        'AI귀농도우미 — 3개월 후 검토',
+        '소통건강 — 보류·법적 검토',
+      ],
+      nextAction: '아이디어 TOP 3 우선순위 확정',
     ),
     AiDepartment(
       id: 'marketing',
-      name: 'AI마케팅부',
-      leaderRole: 'AI마케팅부장',
-      summary: '홍보 영상, 광고비, 다운로드 전환, 전자책 티저 공개를 통합 관리합니다.',
+      name: 'AI홍보.마케팅부',
+      leaderRole: 'AI 홍보·마케팅',
+      summary:
+          '각 앱·사업부별 홍보 전략, 프로모 사이트, 유튜브·블로그·카카오·검색 노출, '
+          '다운로드·홍보·배포 링크를 관리합니다.',
       status: AiSystemStatus.automaticReportPending,
       progressPercent: 72,
-      monitoredWorks: ['앱 홍보 영상 제작', '전자책 티저 문구', '다운로드센터 개선 홍보'],
-      nextAction: '광고비 증액 조건부 승인 요청',
-    ),
-    AiDepartment(
-      id: 'sales',
-      name: 'AI영업부',
-      leaderRole: 'AI영업부장',
-      summary: 'B2B 상담, 전자책 판매 전환, 앱 유입 후 문의 전환을 매출 파이프라인으로 정리합니다.',
-      status: AiSystemStatus.notificationPending,
-      progressPercent: 61,
-      monitoredWorks: ['산업자동화 상담 예약', '전자책 판매 채널', '앱 다운로드 후 상담 전환'],
-      nextAction: 'B2B 상담 질문지와 제안서 템플릿 준비',
-    ),
-    AiDepartment(
-      id: 'support',
-      name: 'AI고객지원부',
-      leaderRole: 'AI고객지원부장',
-      summary: '고객 문의, 답변 지연, 기능 요청, 다운로드 오류 신고를 우선순위별로 분류합니다.',
-      status: AiSystemStatus.warning,
-      progressPercent: 58,
-      monitoredWorks: ['미응답 문의 6건', '다운로드 안내 문의', '일본 여행 기능 요청'],
-      nextAction: '긴급 문의 2건 우선 응대 승인',
+      monitoredWorks: [
+        '앱 홍보 영상 30초 시나리오',
+        'GitHub Pages 4개 총괄 점검',
+        '6개 앱 프로모 URL 연결',
+        '카카오·검색 유입 전략',
+      ],
+      nextAction: '프로모 사이트 404 일괄 점검',
     ),
     AiDepartment(
       id: 'tax',
       name: 'AI세무회계부',
-      leaderRole: 'AI세무회계부장',
-      summary: '매출, 비용, 세무 일정, 증빙 누락 가능성을 더미데이터 기준으로 점검합니다.',
+      leaderRole: 'AI 세무·회계',
+      summary:
+          '개인사업자·스마트스토어·앱·전자책·광고 수익 분류, 부가세·종합소득세, '
+          '비용·예산·투자·세금 체크, 홈택스 신고 준비를 돕습니다.',
       status: AiSystemStatus.approvalRequired,
       progressPercent: 64,
-      monitoredWorks: ['오늘 매출 요약', '비용 분류 샘플', '부가세 일정 알림'],
+      monitoredWorks: [
+        '오늘 매출 ₩428,000 샘플',
+        '앱·전자책·광고 수익 분류',
+        '부가세 일정 알림',
+        '비용·예산·투자 체크',
+      ],
       nextAction: '비용 분류 기준 승인',
-    ),
-    AiDepartment(
-      id: 'investment',
-      name: 'AI투자관리부',
-      leaderRole: 'AI투자관리부장',
-      summary: '운영자금, 광고비, 개발비, 재테크 제안을 보수적 기준으로 점검합니다.',
-      status: AiSystemStatus.monitoring,
-      progressPercent: 57,
-      monitoredWorks: ['운영자금 유지', '광고비 증액 조건', '단기 재테크 리스크'],
-      nextAction: '광고비 증액 시 손익 기준 설정',
-    ),
-    AiDepartment(
-      id: 'operations',
-      name: 'AI운영관리부',
-      leaderRole: 'AI운영관리부장',
-      summary: '24시간 자동 점검, 알림 큐, 실패/주의 상태, 실행 완료 로그를 관리합니다.',
-      status: AiSystemStatus.monitoring,
-      progressPercent: 79,
-      monitoredWorks: ['자동 점검 스케줄', '알림 대기 10건', '실행 완료 18건'],
-      nextAction: '다음 자동 점검 결과를 대표실에 보고',
     ),
   ];
 
@@ -416,7 +449,7 @@ class AiControlCenterData {
   static const notifications = <AiNotification>[
     AiNotification(
       title: '다운로드센터 경로 점검 필요',
-      department: 'AI운영관리부',
+      department: 'AI지시진행부',
       type: AiNotificationType.urgent,
       importance: '긴급',
       occurredAt: '오늘 06:04',
@@ -425,7 +458,7 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '일본 여행 기능 개발 승인 요청',
-      department: 'AI상품개발부',
+      department: 'AI지시진행부',
       type: AiNotificationType.approvalRequired,
       importance: '높음',
       occurredAt: '오늘 05:52',
@@ -434,7 +467,7 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '다운로드센터 개선안 1차 완료',
-      department: 'AI운영관리부',
+      department: 'AI지시진행부',
       type: AiNotificationType.developmentDone,
       importance: '보통',
       occurredAt: '오늘 05:40',
@@ -443,7 +476,7 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '고객 문의 6건 미응답',
-      department: 'AI고객지원부',
+      department: 'AI지시진행부',
       type: AiNotificationType.customerInquiry,
       importance: '높음',
       occurredAt: '오늘 05:35',
@@ -461,7 +494,7 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '소통AI여행 자료 다운로드 증가',
-      department: 'AI마케팅부',
+      department: 'AI홍보.마케팅부',
       type: AiNotificationType.downloadGenerated,
       importance: '보통',
       occurredAt: '오늘 05:10',
@@ -470,7 +503,7 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '앱 홍보 영상 기획안 완료',
-      department: 'AI마케팅부',
+      department: 'AI홍보.마케팅부',
       type: AiNotificationType.marketingDone,
       importance: '보통',
       occurredAt: '오늘 04:48',
@@ -488,7 +521,7 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '광고비 증액 전 투자 점검',
-      department: 'AI투자관리부',
+      department: 'AI세무회계부',
       type: AiNotificationType.investmentCheck,
       importance: '높음',
       occurredAt: '오늘 04:15',
@@ -497,7 +530,7 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '자동 점검 시뮬레이션 실패 1건',
-      department: 'AI운영관리부',
+      department: 'AI지시진행부',
       type: AiNotificationType.systemError,
       importance: '긴급',
       occurredAt: '오늘 03:58',

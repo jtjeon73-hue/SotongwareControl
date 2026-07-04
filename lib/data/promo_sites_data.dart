@@ -22,7 +22,7 @@ class PromoSitesData {
       id: 'control_center',
       repoName: 'SotongwareControl',
       title: 'SotongWare Control — 소통컨트롤총괄프로모',
-      purpose: '24시간 AI 경영 관제 · AI대표 · 관리부서 · 사업부 운영 본사 시스템 데모 (현재 사이트)',
+      purpose: '소통총관제 · AI 총괄 관제 · 사업부·AI부서 디지털 프로모 (현재 사이트)',
       visibility: SiteVisibility.publicLive,
       productionStatus: '비공개 관제 데모',
       nextTask: 'AI대표 승인 UI · Firebase/OpenAI/매출 데이터 연동',

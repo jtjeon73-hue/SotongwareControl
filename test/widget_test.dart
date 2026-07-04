@@ -18,15 +18,14 @@ void main() {
     await controlState.initialize();
 
     await tester.pumpWidget(SotongWareControlApp(controlState: controlState));
-    // pumpAndSettle은 일부 환경에서 프레임이 끝나지 않아 10분 타임아웃 발생 가능
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('소통웨어 디지털랩'), findsWidgets);
-    expect(find.text('전체사업관리관제'), findsWidgets);
+    expect(find.text('소통총관제'), findsWidgets);
+    expect(find.text('전체 사업 현황'), findsWidgets);
   });
 
-  testWidgets('AI CEO screens navigate on wide web without layout errors', (
+  testWidgets('AI departments navigate on wide web without layout errors', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -41,10 +40,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('AI대표실'), findsWidgets);
+    expect(find.text('소통총괄관제'), findsWidgets);
     expect(tester.takeException(), isNull);
 
-    for (final label in ['AI전략회의실', 'AI아이디어회의실', '알림센터', 'AI운영관리부']) {
+    for (final label in ['AI대표', 'AI지시진행부', 'AI전략부', 'AI홍보.마케팅부']) {
       await tester.tap(find.text(label).first);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
@@ -53,7 +52,7 @@ void main() {
     }
   });
 
-  testWidgets('AI CEO office fits mobile width without layout errors', (
+  testWidgets('Dashboard fits mobile width without layout errors', (
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
@@ -68,8 +67,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('AI대표실'), findsWidgets);
-    expect(find.text('24시간 운영 상태'), findsOneWidget);
+    expect(find.text('소통총괄관제'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

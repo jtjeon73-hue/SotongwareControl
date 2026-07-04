@@ -3,7 +3,7 @@ import '../data/promo_sites_data.dart';
 import '../models/business_division.dart';
 import '../state/control_scope.dart';
 import '../theme/control_theme.dart';
-import '../utils/external_url.dart';
+import '../widgets/result_link_button.dart';
 import '../widgets/app_development_promo_summary.dart';
 import '../widgets/app_project_promo_card.dart';
 import '../widgets/control_section_title.dart';
@@ -118,24 +118,10 @@ class _Header extends StatelessWidget {
           ),
           if (promoSite != null && promoUrl.isNotEmpty) ...[
             const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: () async {
-                final ok = await ExternalUrl.open(promoUrl);
-                if (!context.mounted) return;
-                if (!ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${promoSite.repoName} 사이트를 열 수 없습니다.'),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.open_in_new, size: 16),
-              label: Text('${promoSite.displayName} 총괄 홍보사이트 열기'),
-              style: FilledButton.styleFrom(
-                backgroundColor: ControlColors.teal,
-                foregroundColor: Colors.white,
-              ),
+            ResultLinkButton(
+              url: promoUrl,
+              label: '배포 결과 확인',
+              fullWidth: false,
             ),
           ],
         ],

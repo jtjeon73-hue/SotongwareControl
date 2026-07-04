@@ -17,11 +17,12 @@ class AiCeoOfficeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const PageHero(
-            title: 'AI대표실',
+            title: 'AI대표',
             subtitle:
-                '대표 1명이 전체 사업을 24시간 관제하는 비공개 본사 시스템 컨셉입니다. '
-                'AI대표가 사업부·관리부서·매출·다운로드·고객문의·승인 업무를 요약합니다.',
-            badge: '24시간 AI 경영 관제 · 대표 메인 화면',
+                '전체 사업을 총괄 판단하는 AI 대표입니다. '
+                '각 사업부·AI부서 보고를 종합해 수익성·진행·문제·다음 행동을 판단하고 '
+                '대표에게 최종 보고합니다.',
+            badge: '소통AI대표부 · 24시간 관제',
             trailing: _LiveStatusBadge(),
           ),
           const SizedBox(height: 20),
@@ -30,8 +31,8 @@ class AiCeoOfficeScreen extends StatelessWidget {
           const _SummaryStrip(),
           const SizedBox(height: 28),
           const ControlSectionTitle(
-            title: 'AI대표실 핵심 카드',
-            subtitle: '오늘의 브리핑 · 알림 · 승인 · 매출 · 고객문의 · 개발/마케팅/재무/투자 상태',
+            title: 'AI대표 핵심 카드',
+            subtitle: '브리핑 · 승인 · 매출 · 다운로드 · 개발 · 홍보 · 세무 · 전략',
           ),
           _AdaptiveGrid(
             maxCrossAxisExtent: 360,
@@ -321,7 +322,7 @@ class AiDepartmentControlScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          '24시간 부서 관제 상태',
+                          '소통총관제 내 역할',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
@@ -345,10 +346,11 @@ class AiDepartmentControlScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
+          ..._buildDepartmentSections(context, department),
+          const SizedBox(height: 28),
           ControlSectionTitle(
-            title: 'AI가 감시 중인 업무 목록',
-            subtitle:
-                '${department.monitoredWorks.length}개 업무 · 자동 보고 대기 상태 포함',
+            title: 'AI가 감시 중인 업무',
+            subtitle: '${department.monitoredWorks.length}개 · 자동 보고 대기 포함',
           ),
           _AdaptiveGrid(
             maxCrossAxisExtent: 360,
@@ -384,18 +386,9 @@ class AiDepartmentControlScreen extends StatelessWidget {
                 )
                 .toList(),
           ),
-          const SizedBox(height: 28),
-          ControlSectionTitle(
-            title: '관련 알림',
-            subtitle: notifications.isEmpty
-                ? '현재 표시할 전용 알림은 없습니다.'
-                : '부서별 알림 큐',
-          ),
-          if (notifications.isEmpty)
-            const _EmptyCard(
-              message: '현재 이 부서의 긴급 알림은 없습니다. 다음 자동 점검을 기다리는 중입니다.',
-            )
-          else
+          if (notifications.isNotEmpty) ...[
+            const SizedBox(height: 28),
+            ControlSectionTitle(title: '관련 알림', subtitle: '부서별 알림 큐'),
             _AdaptiveGrid(
               maxCrossAxisExtent: 520,
               mainAxisExtent: 245,
@@ -406,7 +399,187 @@ class AiDepartmentControlScreen extends StatelessWidget {
                   )
                   .toList(),
             ),
+          ],
         ],
+      ),
+    );
+  }
+
+  List<Widget> _buildDepartmentSections(
+    BuildContext context,
+    AiDepartment department,
+  ) {
+    switch (departmentId) {
+      case 'workorder':
+        return [
+          _TaskStatusSection(
+            title: '오늘 해야 할 일',
+            items: department.monitoredWorks.take(2).toList(),
+            status: AiSystemStatus.approvalRequired,
+          ),
+          const SizedBox(height: 16),
+          _TaskStatusSection(
+            title: '진행 중 작업',
+            items: ['소통여행 APK·프로모 연결', 'GitHub Pages 배포 파이프라인'],
+            status: AiSystemStatus.monitoring,
+          ),
+          const SizedBox(height: 16),
+          _TaskStatusSection(
+            title: '지연 작업',
+            items: ['소통사매앱 데이터 구조', '다운로드센터 경로 점검'],
+            status: AiSystemStatus.warning,
+          ),
+        ];
+      case 'strategy':
+        final meeting = AiControlCenterData.strategyMeeting;
+        return [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '장기 성장 전략',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 10),
+                  _InfoLine(label: '핵심 안건', value: meeting.coreAgenda),
+                  _InfoLine(label: '예상 효과', value: meeting.expectedEffect),
+                  _InfoLine(label: 'AI대표 제안', value: meeting.finalProposal),
+                ],
+              ),
+            ),
+          ),
+        ];
+      case 'idea':
+        return [
+          ControlSectionTitle(
+            title: '신규 아이디어 평가',
+            subtitle: '우선순위 · 개발 가능성 · 수익화 가능성',
+          ),
+          _AdaptiveGrid(
+            maxCrossAxisExtent: 430,
+            mainAxisExtent: 380,
+            children: AiControlCenterData.ideaProposals
+                .take(4)
+                .map((p) => _IdeaProposalCard(proposal: p))
+                .toList(),
+          ),
+        ];
+      case 'marketing':
+        return [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '홍보·배포 링크 관리',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  const _InfoLine(
+                    label: '프로모',
+                    value: '4개 총괄 + 6개 앱 GitHub Pages',
+                  ),
+                  const _InfoLine(
+                    label: '채널',
+                    value: '유튜브 · 블로그 · 카카오 · 검색 노출',
+                  ),
+                  const _InfoLine(label: '다음', value: '404 점검 · 다운로드·홍보 링크 정리'),
+                ],
+              ),
+            ),
+          ),
+        ];
+      case 'tax':
+        return [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '수익·세무 관리',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  const _InfoLine(
+                    label: '수익 분류',
+                    value: '앱 · 전자책 · 광고 · 스마트스토어 · B2B',
+                  ),
+                  const _InfoLine(label: '세금', value: '부가세 · 종합소득세 · 사업자별 매출'),
+                  const _InfoLine(
+                    label: '준비',
+                    value: '비용·예산·투자 체크 → 홈택스 신고 보조',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ];
+      default:
+        return [];
+    }
+  }
+}
+
+class _TaskStatusSection extends StatelessWidget {
+  const _TaskStatusSection({
+    required this.title,
+    required this.items,
+    required this.status,
+  });
+
+  final String title;
+  final List<String> items;
+  final AiSystemStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                AiStatusBadge(status: status, compact: true),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '• ',
+                      style: TextStyle(color: ControlColors.teal),
+                    ),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1149,8 +1322,8 @@ class _NotificationCard extends StatelessWidget {
               children: [
                 TextButton.icon(
                   onPressed: () {},
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: const Text('상세보기'),
+                  icon: const Icon(Icons.travel_explore_rounded, size: 16),
+                  label: const Text('결과 링크 열기'),
                 ),
                 FilledButton.tonal(onPressed: () {}, child: const Text('승인')),
                 OutlinedButton(onPressed: () {}, child: const Text('보류')),

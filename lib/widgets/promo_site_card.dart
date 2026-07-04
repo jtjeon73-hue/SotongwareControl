@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/promo_site_link.dart';
 import '../state/control_scope.dart';
 import '../theme/control_theme.dart';
-import '../utils/external_url.dart';
+import 'result_link_button.dart';
 
 class PromoSiteCard extends StatelessWidget {
   const PromoSiteCard({super.key, required this.site, this.compact = false});
@@ -225,16 +225,9 @@ class PromoSiteCard extends StatelessWidget {
               children: [
                 if (hasUrl)
                   Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _openSite(context, url),
-                      icon: const Icon(Icons.open_in_new, size: 16),
-                      label: const Text('사이트 열기'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: ControlColors.teal,
-                        foregroundColor: Colors.white,
-                        textStyle: const TextStyle(fontSize: 12),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
+                    child: ResultLinkButton.pages(
+                      url: url,
+                      label: 'GitHub Pages 열기',
                     ),
                   ),
                 if (hasUrl) const SizedBox(width: 8),
@@ -254,19 +247,6 @@ class PromoSiteCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _openSite(BuildContext context, String url) async {
-    final ok = await ExternalUrl.open(url);
-    if (!context.mounted) return;
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('사이트를 열 수 없습니다. URL을 확인해 주세요.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
   Future<void> _copyUrl(BuildContext context, String url) async {

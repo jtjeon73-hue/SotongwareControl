@@ -2,160 +2,86 @@ import 'package:flutter/material.dart';
 import '../theme/control_theme.dart';
 
 enum ControlDestination {
-  dashboard,
+  dashboardOverview,
+  divisionProgress,
+  revenueProgress,
+  issuesCheck,
+  nextPriority,
   aiRepresentative,
-  aiStrategyMeeting,
-  aiIdeaMeeting,
-  aiWorkOrder,
-  aiProgressReport,
-  aiDecisionProposal,
-  aiRiskAnalysis,
-  aiFutureStrategy,
-  aiNotifications,
-  aiProductDevelopmentDept,
+  aiWorkOrderDept,
+  aiStrategyDept,
+  aiIdeaPlanningDept,
   aiMarketingDept,
-  aiSalesDept,
-  aiCustomerSupportDept,
   aiTaxAccountingDept,
-  aiInvestmentDept,
-  aiOperationsDept,
-  actions,
-  issues,
-  revenue,
-  promotion,
-  finance,
-  expansion,
-  aiAgentRoom,
   industrialAutomation,
   appDevelopment,
   youtubeContent,
   ebook,
-  planning,
-  marketing,
-  onlineCustomer,
-  projectLinks,
+  onlineExpansion,
 }
 
 extension ControlDestinationX on ControlDestination {
   String get label {
     switch (this) {
-      case ControlDestination.dashboard:
-        return '전체사업관리관제';
+      case ControlDestination.dashboardOverview:
+        return '전체 사업 현황';
+      case ControlDestination.divisionProgress:
+        return '사업부별 진행상태';
+      case ControlDestination.revenueProgress:
+        return '수익화 진행상태';
+      case ControlDestination.issuesCheck:
+        return '문제/지연/체크사항';
+      case ControlDestination.nextPriority:
+        return '다음 실행 우선순위';
       case ControlDestination.aiRepresentative:
-        return 'AI대표실';
-      case ControlDestination.aiStrategyMeeting:
-        return 'AI전략회의실';
-      case ControlDestination.aiIdeaMeeting:
-        return 'AI아이디어회의실';
-      case ControlDestination.aiWorkOrder:
-        return 'AI업무지시';
-      case ControlDestination.aiProgressReport:
-        return 'AI진행보고';
-      case ControlDestination.aiDecisionProposal:
-        return 'AI의사결정제안';
-      case ControlDestination.aiRiskAnalysis:
-        return 'AI리스크분석';
-      case ControlDestination.aiFutureStrategy:
-        return 'AI미래전략';
-      case ControlDestination.aiNotifications:
-        return '알림센터';
-      case ControlDestination.aiProductDevelopmentDept:
-        return 'AI상품개발부';
+        return 'AI대표';
+      case ControlDestination.aiWorkOrderDept:
+        return 'AI지시진행부';
+      case ControlDestination.aiStrategyDept:
+        return 'AI전략부';
+      case ControlDestination.aiIdeaPlanningDept:
+        return 'AI기획.아이디어부';
       case ControlDestination.aiMarketingDept:
-        return 'AI마케팅부';
-      case ControlDestination.aiSalesDept:
-        return 'AI영업부';
-      case ControlDestination.aiCustomerSupportDept:
-        return 'AI고객지원부';
+        return 'AI홍보.마케팅부';
       case ControlDestination.aiTaxAccountingDept:
         return 'AI세무회계부';
-      case ControlDestination.aiInvestmentDept:
-        return 'AI투자관리부';
-      case ControlDestination.aiOperationsDept:
-        return 'AI운영관리부';
-      case ControlDestination.actions:
-        return '작업 관리';
-      case ControlDestination.issues:
-        return '문제점 파악·대응';
-      case ControlDestination.revenue:
-        return '수익화 흐름';
-      case ControlDestination.promotion:
-        return '영업·홍보 관리';
-      case ControlDestination.finance:
-        return '재무·세금';
-      case ControlDestination.expansion:
-        return '사업 확장 로드맵';
-      case ControlDestination.aiAgentRoom:
-        return 'AI 직원실';
       case ControlDestination.industrialAutomation:
-        return '산업자동화 사업부';
+        return '소통자동화사업부';
       case ControlDestination.appDevelopment:
-        return '앱개발 사업부';
+        return '소통앱개발사업부';
       case ControlDestination.youtubeContent:
-        return '유튜브/콘텐츠 사업부';
+        return '소통콘텐츠사업부';
       case ControlDestination.ebook:
-        return '전자책 사업부';
-      case ControlDestination.planning:
-        return '기획·아이디어';
-      case ControlDestination.marketing:
-        return '홍보·마케팅';
-      case ControlDestination.onlineCustomer:
-        return '온라인 고객대응';
-      case ControlDestination.projectLinks:
-        return '홍보사이트 링크맵';
+        return '소통전자책사업부';
+      case ControlDestination.onlineExpansion:
+        return '소통온라인판매/확장사업부';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case ControlDestination.dashboard:
+      case ControlDestination.dashboardOverview:
         return Icons.dashboard_outlined;
+      case ControlDestination.divisionProgress:
+        return Icons.business_outlined;
+      case ControlDestination.revenueProgress:
+        return Icons.paid_outlined;
+      case ControlDestination.issuesCheck:
+        return Icons.warning_amber_outlined;
+      case ControlDestination.nextPriority:
+        return Icons.playlist_add_check_outlined;
       case ControlDestination.aiRepresentative:
         return Icons.psychology_outlined;
-      case ControlDestination.aiStrategyMeeting:
-        return Icons.groups_2_outlined;
-      case ControlDestination.aiIdeaMeeting:
-        return Icons.tips_and_updates_outlined;
-      case ControlDestination.aiWorkOrder:
+      case ControlDestination.aiWorkOrderDept:
         return Icons.assignment_outlined;
-      case ControlDestination.aiProgressReport:
-        return Icons.summarize_outlined;
-      case ControlDestination.aiDecisionProposal:
-        return Icons.rule_outlined;
-      case ControlDestination.aiRiskAnalysis:
-        return Icons.health_and_safety_outlined;
-      case ControlDestination.aiFutureStrategy:
+      case ControlDestination.aiStrategyDept:
         return Icons.auto_graph_outlined;
-      case ControlDestination.aiNotifications:
-        return Icons.notifications_active_outlined;
-      case ControlDestination.aiProductDevelopmentDept:
-        return Icons.inventory_2_outlined;
+      case ControlDestination.aiIdeaPlanningDept:
+        return Icons.tips_and_updates_outlined;
       case ControlDestination.aiMarketingDept:
         return Icons.campaign_outlined;
-      case ControlDestination.aiSalesDept:
-        return Icons.handshake_outlined;
-      case ControlDestination.aiCustomerSupportDept:
-        return Icons.support_agent_outlined;
       case ControlDestination.aiTaxAccountingDept:
         return Icons.receipt_long_outlined;
-      case ControlDestination.aiInvestmentDept:
-        return Icons.trending_up_outlined;
-      case ControlDestination.aiOperationsDept:
-        return Icons.settings_suggest_outlined;
-      case ControlDestination.actions:
-        return Icons.task_alt_outlined;
-      case ControlDestination.issues:
-        return Icons.warning_amber_outlined;
-      case ControlDestination.revenue:
-        return Icons.paid_outlined;
-      case ControlDestination.promotion:
-        return Icons.campaign_outlined;
-      case ControlDestination.finance:
-        return Icons.account_balance_wallet_outlined;
-      case ControlDestination.expansion:
-        return Icons.rocket_launch_outlined;
-      case ControlDestination.aiAgentRoom:
-        return Icons.smart_toy_outlined;
       case ControlDestination.industrialAutomation:
         return Icons.precision_manufacturing_outlined;
       case ControlDestination.appDevelopment:
@@ -164,14 +90,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.play_circle_outline;
       case ControlDestination.ebook:
         return Icons.menu_book_outlined;
-      case ControlDestination.planning:
-        return Icons.lightbulb_outline;
-      case ControlDestination.marketing:
-        return Icons.campaign_outlined;
-      case ControlDestination.onlineCustomer:
-        return Icons.support_agent_outlined;
-      case ControlDestination.projectLinks:
-        return Icons.hub_outlined;
+      case ControlDestination.onlineExpansion:
+        return Icons.storefront_outlined;
     }
   }
 
@@ -185,21 +105,27 @@ extension ControlDestinationX on ControlDestination {
         return 'youtube_content';
       case ControlDestination.ebook:
         return 'ebook';
+      case ControlDestination.onlineExpansion:
+        return 'online_expansion';
       default:
         return null;
     }
   }
 
-  String? get departmentId {
+  String? get aiDepartmentId {
     switch (this) {
-      case ControlDestination.planning:
-        return 'planning';
-      case ControlDestination.marketing:
+      case ControlDestination.aiRepresentative:
+        return 'ceo';
+      case ControlDestination.aiWorkOrderDept:
+        return 'workorder';
+      case ControlDestination.aiStrategyDept:
+        return 'strategy';
+      case ControlDestination.aiIdeaPlanningDept:
+        return 'idea';
+      case ControlDestination.aiMarketingDept:
         return 'marketing';
-      case ControlDestination.finance:
-        return 'finance';
-      case ControlDestination.onlineCustomer:
-        return 'online_customer';
+      case ControlDestination.aiTaxAccountingDept:
+        return 'tax';
       default:
         return null;
     }
@@ -218,28 +144,21 @@ class SidebarNavigation extends StatelessWidget {
   final ValueChanged<ControlDestination> onDestinationSelected;
   final VoidCallback? onClose;
 
-  static const _aiCommand = [ControlDestination.dashboard];
-
-  static const _aiExecutiveRooms = [
-    ControlDestination.aiRepresentative,
-    ControlDestination.aiStrategyMeeting,
-    ControlDestination.aiIdeaMeeting,
-    ControlDestination.aiWorkOrder,
-    ControlDestination.aiProgressReport,
-    ControlDestination.aiDecisionProposal,
-    ControlDestination.aiRiskAnalysis,
-    ControlDestination.aiFutureStrategy,
-    ControlDestination.aiNotifications,
+  static const _commandHub = [
+    ControlDestination.dashboardOverview,
+    ControlDestination.divisionProgress,
+    ControlDestination.revenueProgress,
+    ControlDestination.issuesCheck,
+    ControlDestination.nextPriority,
   ];
 
   static const _aiDepartments = [
-    ControlDestination.aiProductDevelopmentDept,
+    ControlDestination.aiRepresentative,
+    ControlDestination.aiWorkOrderDept,
+    ControlDestination.aiStrategyDept,
+    ControlDestination.aiIdeaPlanningDept,
     ControlDestination.aiMarketingDept,
-    ControlDestination.aiSalesDept,
-    ControlDestination.aiCustomerSupportDept,
     ControlDestination.aiTaxAccountingDept,
-    ControlDestination.aiInvestmentDept,
-    ControlDestination.aiOperationsDept,
   ];
 
   static const _divisions = [
@@ -247,13 +166,7 @@ class SidebarNavigation extends StatelessWidget {
     ControlDestination.appDevelopment,
     ControlDestination.youtubeContent,
     ControlDestination.ebook,
-  ];
-
-  static const _managementDepts = [
-    ControlDestination.planning,
-    ControlDestination.marketing,
-    ControlDestination.finance,
-    ControlDestination.onlineCustomer,
+    ControlDestination.onlineExpansion,
   ];
 
   @override
@@ -300,14 +213,14 @@ class SidebarNavigation extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '소통웨어 디지털랩',
+                  '소통총관제',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '24시간 AI 경영 관제 · 비공개 본사 시스템',
+                  'AI 총괄 관제 · 디지털 프로모',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontSize: 11,
                     color: ControlColors.textMuted,
@@ -321,8 +234,8 @@ class SidebarNavigation extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
               children: [
-                const _SectionLabel(label: '관제 · AI대표'),
-                ..._aiCommand.map(
+                const _SectionLabel(label: '소통총괄관제'),
+                ..._commandHub.map(
                   (d) => _NavItem(
                     destination: d,
                     isSelected: d == selected,
@@ -333,19 +246,7 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const _SectionLabel(label: 'AI대표'),
-                ..._aiExecutiveRooms.map(
-                  (d) => _NavItem(
-                    destination: d,
-                    isSelected: d == selected,
-                    onTap: () {
-                      onDestinationSelected(d);
-                      onClose?.call();
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const _SectionLabel(label: 'AI부서'),
+                const _SectionLabel(label: '소통AI대표부'),
                 ..._aiDepartments.map(
                   (d) => _NavItem(
                     destination: d,
@@ -357,20 +258,8 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const _SectionLabel(label: '기존 사업부'),
+                const _SectionLabel(label: '소통사업부'),
                 ..._divisions.map(
-                  (d) => _NavItem(
-                    destination: d,
-                    isSelected: d == selected,
-                    onTap: () {
-                      onDestinationSelected(d);
-                      onClose?.call();
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const _SectionLabel(label: '기존 관리부서'),
-                ..._managementDepts.map(
                   (d) => _NavItem(
                     destination: d,
                     isSelected: d == selected,
@@ -389,14 +278,14 @@ class SidebarNavigation extends StatelessWidget {
             child: Row(
               children: [
                 const Icon(
-                  Icons.public_outlined,
+                  Icons.auto_awesome_rounded,
                   size: 12,
                   color: ControlColors.textMuted,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'PRIVATE · 본사 AI 관제',
+                    'Sotong Control · AI 관제',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontSize: 10,
                       color: ControlColors.textMuted,

@@ -4,7 +4,7 @@ import '../data/promo_sites_data.dart';
 import '../models/business_division.dart';
 import '../state/control_scope.dart';
 import '../theme/control_theme.dart';
-import '../utils/external_url.dart';
+import 'result_link_button.dart';
 
 class AppProjectPromoCard extends StatelessWidget {
   const AppProjectPromoCard({super.key, required this.project});
@@ -120,31 +120,9 @@ class AppProjectPromoCard extends StatelessWidget {
               ),
             ],
             const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: hasUrl
-                    ? () async {
-                        final ok = await ExternalUrl.open(url);
-                        if (!context.mounted) return;
-                        if (!ok) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${project.name} 프로모를 열 수 없습니다.'),
-                            ),
-                          );
-                        }
-                      }
-                    : null,
-                icon: const Icon(Icons.open_in_new, size: 16),
-                label: const Text('프로모 열기'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: ControlColors.teal,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: ControlColors.slate,
-                  textStyle: const TextStyle(fontSize: 12),
-                ),
-              ),
+            ResultLinkButton.explore(
+              url: url,
+              label: hasUrl ? '프로모 사이트 보기' : '프로모 URL 미등록',
             ),
           ],
         ),

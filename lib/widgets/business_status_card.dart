@@ -4,7 +4,7 @@ import '../models/business_division.dart';
 import '../models/promo_site_link.dart';
 import '../state/control_scope.dart';
 import '../theme/control_theme.dart';
-import '../utils/external_url.dart';
+import 'result_link_button.dart';
 
 class BusinessStatusCard extends StatelessWidget {
   const BusinessStatusCard({
@@ -115,17 +115,11 @@ class BusinessStatusCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openPromo(context, promoSite!),
-                    icon: const Icon(Icons.open_in_new, size: 14),
-                    label: Text('${promoSite!.repoName} 열기'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: ControlColors.sandBeige,
-                      side: BorderSide(
-                        color: ControlColors.sandBeige.withValues(alpha: 0.5),
-                      ),
-                      textStyle: const TextStyle(fontSize: 12),
-                    ),
+                  child: ResultLinkButton(
+                    url: ControlScope.of(context).promoUrlFor(promoSite!.id),
+                    label: '프로모 사이트 보기',
+                    style: ResultLinkStyle.outlined,
+                    fullWidth: true,
                   ),
                 ),
               ],
@@ -144,21 +138,5 @@ class BusinessStatusCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _openPromo(BuildContext context, PromoSiteLink site) async {
-    final url = ControlScope.of(context).promoUrlFor(site.id);
-    if (url.isEmpty) return;
-
-    final ok = await ExternalUrl.open(url);
-    if (!context.mounted) return;
-    if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${site.repoName} 사이트를 열 수 없습니다.'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
   }
 }

@@ -30,61 +30,66 @@ class OverallCommandScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PageHero(
-                title: '전체사업관리관제',
+                title: '소통총괄관제',
                 subtitle:
-                    '소통웨어 4개 사업부·4개 관리부서의 운영 비전, 우선순위, '
-                    '수익·발전 포인트를 한 화면에서 체험할 수 있는 데모 대시보드입니다.',
-                badge: '통합 컨트롤 · 데모',
+                    '소통웨어 전체 사업을 AI가 총괄 관제합니다. '
+                    '대표·사업부·수익화·실행 우선순위를 한눈에 확인하세요.',
+                badge: 'AI 총괄 관제 · 대시보드',
                 trailing: _HealthBadge(stats: stats),
               ),
               const SizedBox(height: 16),
               const PublicDemoNotice(compact: true),
               const SizedBox(height: 24),
-              _QuickMetrics(stats: stats, onNavigate: onNavigate),
+              _SummaryCards(stats: stats, onNavigate: onNavigate),
               const SizedBox(height: 28),
               ControlSectionTitle(
-                title: '사업부 진행현황',
-                subtitle: '4개 사업부 · 진행률 · 다음 액션',
+                title: '소통사업부 진행상태',
+                subtitle: '5개 사업부 · 진행률 · 다음 액션',
               ),
               _StatusGrid(items: ManagementHubData.divisionStatuses),
               const SizedBox(height: 28),
               ControlSectionTitle(
-                title: '관리부서 진행현황',
-                subtitle: '기획 · 홍보 · 재무 · 고객대응',
+                title: 'AI부서 역할 요약',
+                subtitle: '소통AI대표부 6개 부서',
               ),
-              _StatusGrid(items: ManagementHubData.departmentStatuses),
+              _AiRoleGrid(onNavigate: onNavigate),
               const SizedBox(height: 28),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth > 1000;
                   final left = [
-                    HubListSection(
-                      title: '최근 체크포인트',
-                      items: ManagementHubData.checkPoints
-                          .map((c) => '[${c.area}] ${c.title}')
-                          .toList(),
+                    _DashboardPanel(
+                      title: '현재 수익화 단계',
+                      icon: Icons.paid_outlined,
+                      iconColor: ControlColors.accentGreen,
+                      items: ManagementHubData.revenueStageItems,
+                      onMore: () =>
+                          onNavigate(ControlDestination.revenueProgress),
                     ),
                     const SizedBox(height: 16),
-                    HubListSection(
-                      title: '우선 처리 필요',
-                      items: ManagementHubData.priorityItems,
-                      icon: Icons.priority_high,
-                      iconColor: ControlColors.accentRose,
+                    _DashboardPanel(
+                      title: '해야 할 일 TOP 5',
+                      icon: Icons.task_alt_outlined,
+                      iconColor: ControlColors.teal,
+                      items: ManagementHubData.topTasks,
+                      onMore: () => onNavigate(ControlDestination.nextPriority),
                     ),
                   ];
                   final right = [
-                    HubListSection(
-                      title: '수익 연결 가능',
-                      items: ManagementHubData.revenueItems,
-                      icon: Icons.trending_up,
-                      iconColor: ControlColors.accentGreen,
+                    _DashboardPanel(
+                      title: '지연/문제/검토 필요',
+                      icon: Icons.warning_amber_outlined,
+                      iconColor: ControlColors.accentRose,
+                      items: ManagementHubData.priorityItems,
+                      onMore: () => onNavigate(ControlDestination.issuesCheck),
                     ),
                     const SizedBox(height: 16),
-                    HubListSection(
-                      title: '발전 가능 항목',
-                      items: ManagementHubData.growthItems,
-                      icon: Icons.rocket_launch_outlined,
+                    _DashboardPanel(
+                      title: '다음 실행 추천',
+                      icon: Icons.rocket_launch_rounded,
                       iconColor: ControlColors.sandBeige,
+                      items: ManagementHubData.nextActions,
+                      onMore: () => onNavigate(ControlDestination.nextPriority),
                     ),
                   ];
 
@@ -103,11 +108,13 @@ class OverallCommandScreen extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 16),
-              HubListSection(
-                title: '다음 액션 제안',
-                items: ManagementHubData.nextActions,
-                icon: Icons.play_arrow_rounded,
+              const SizedBox(height: 28),
+              _DashboardPanel(
+                title: '대표 확인 필요 항목',
+                icon: Icons.approval_outlined,
+                iconColor: ControlColors.accentWarm,
+                items: ManagementHubData.ceoReviewItems,
+                onMore: () => onNavigate(ControlDestination.aiRepresentative),
               ),
               const SizedBox(height: 20),
               _AiLinkBanner(onNavigate: onNavigate),
@@ -115,6 +122,286 @@ class OverallCommandScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class DivisionProgressScreen extends StatelessWidget {
+  const DivisionProgressScreen({super.key, required this.onNavigate});
+
+  final ValueChanged<ControlDestination> onNavigate;
+
+  static const _divisionLinks = [
+    (ControlDestination.industrialAutomation, '소통자동화'),
+    (ControlDestination.appDevelopment, '소통앱개발'),
+    (ControlDestination.youtubeContent, '소통콘텐츠'),
+    (ControlDestination.ebook, '소통전자책'),
+    (ControlDestination.onlineExpansion, '온라인판매/확장'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const PageHero(
+            title: '사업부별 진행상태',
+            subtitle: '소통사업부 5개 영역의 진행률, 우선순위, 다음 액션을 확인합니다.',
+            badge: '소통총괄관제',
+          ),
+          const SizedBox(height: 24),
+          _StatusGrid(items: ManagementHubData.divisionStatuses),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _divisionLinks
+                .map(
+                  (link) => ActionChip(
+                    avatar: const Icon(Icons.arrow_forward, size: 16),
+                    label: Text('${link.$2} 상세'),
+                    onPressed: () => onNavigate(link.$1),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryCards extends StatelessWidget {
+  const _SummaryCards({required this.stats, required this.onNavigate});
+
+  final DashboardStats stats;
+  final ValueChanged<ControlDestination> onNavigate;
+
+  @override
+  Widget build(BuildContext context) {
+    final tiles = [
+      ('진행 작업', '${stats.inProgressCount}건', ControlDestination.nextPriority),
+      (
+        '미해결 문제',
+        '${stats.unresolvedIssueCount}건',
+        ControlDestination.issuesCheck,
+      ),
+      ('지연', '${stats.delayedCount}건', ControlDestination.issuesCheck),
+      (
+        'AI 보고',
+        '${stats.aiReportNeededCount}건',
+        ControlDestination.aiRepresentative,
+      ),
+    ];
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: tiles.map((t) {
+        return InkWell(
+          onTap: () => onNavigate(t.$3),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 150,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: ControlColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ControlColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.$2,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: ControlColors.teal,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  t.$1,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 12,
+                    color: ControlColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _StatusGrid extends StatelessWidget {
+  const _StatusGrid({required this.items});
+
+  final List<HubStatusItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cross = constraints.maxWidth > 700 ? 2 : 1;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cross,
+            mainAxisExtent: 210,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+          ),
+          itemCount: items.length,
+          itemBuilder: (context, index) => HubStatusCard(item: items[index]),
+        );
+      },
+    );
+  }
+}
+
+class _AiRoleGrid extends StatelessWidget {
+  const _AiRoleGrid({required this.onNavigate});
+
+  final ValueChanged<ControlDestination> onNavigate;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cross = constraints.maxWidth > 900
+            ? 3
+            : constraints.maxWidth > 600
+            ? 2
+            : 1;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cross,
+            mainAxisExtent: 130,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: ManagementHubData.aiDepartmentRoles.length,
+          itemBuilder: (context, index) {
+            final role = ManagementHubData.aiDepartmentRoles[index];
+            return InkWell(
+              onTap: () => onNavigate(role.destination),
+              borderRadius: BorderRadius.circular(14),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(role.icon, size: 18, color: ControlColors.teal),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              role.name,
+                              style: Theme.of(context).textTheme.titleMedium,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Text(
+                          role.summary,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _DashboardPanel extends StatelessWidget {
+  const _DashboardPanel({
+    required this.title,
+    required this.icon,
+    required this.iconColor,
+    required this.items,
+    this.onMore,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color iconColor;
+  final List<String> items;
+  final VoidCallback? onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: iconColor, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (onMore != null)
+                  TextButton(onPressed: onMore, child: const Text('더보기')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '• ',
+                      style: TextStyle(color: ControlColors.teal),
+                    ),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -154,98 +441,6 @@ class _HealthBadge extends StatelessWidget {
   }
 }
 
-class _QuickMetrics extends StatelessWidget {
-  const _QuickMetrics({required this.stats, required this.onNavigate});
-
-  final DashboardStats stats;
-  final ValueChanged<ControlDestination> onNavigate;
-
-  @override
-  Widget build(BuildContext context) {
-    final tiles = [
-      ('진행 작업', '${stats.inProgressCount}건', ControlDestination.actions),
-      ('미해결 문제', '${stats.unresolvedIssueCount}건', ControlDestination.issues),
-      ('지연', '${stats.delayedCount}건', ControlDestination.actions),
-      (
-        'AI 보고',
-        '${stats.aiReportNeededCount}건',
-        ControlDestination.aiRepresentative,
-      ),
-    ];
-
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: tiles.map((t) {
-        return InkWell(
-          onTap: () => onNavigate(t.$3),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 150,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: ControlColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: ControlColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  t.$2,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(color: ControlColors.teal),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  t.$1,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 12,
-                    color: ControlColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _StatusGrid extends StatelessWidget {
-  const _StatusGrid({required this.items});
-
-  final List<HubStatusItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cross = constraints.maxWidth > 1100
-            ? 2
-            : constraints.maxWidth > 700
-            ? 2
-            : 1;
-
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cross,
-            mainAxisExtent: 210,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-          ),
-          itemCount: items.length,
-          itemBuilder: (context, index) => HubStatusCard(item: items[index]),
-        );
-      },
-    );
-  }
-}
-
 class _AiLinkBanner extends StatelessWidget {
   const _AiLinkBanner({required this.onNavigate});
 
@@ -257,15 +452,27 @@ class _AiLinkBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: ControlColors.tealSoft,
+        gradient: const LinearGradient(
+          colors: [
+            ControlColors.heroGradientStart,
+            ControlColors.heroGradientEnd,
+          ],
+        ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: ControlColors.teal.withValues(alpha: 0.2)),
       ),
-      child: Row(
+      child: Wrap(
+        spacing: 14,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Icon(Icons.auto_awesome, color: ControlColors.teal),
-          const SizedBox(width: 14),
-          Expanded(
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: ControlColors.teal,
+            size: 28,
+          ),
+          SizedBox(
+            width: 420,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -283,9 +490,10 @@ class _AiLinkBanner extends StatelessWidget {
               ],
             ),
           ),
-          FilledButton(
+          FilledButton.icon(
             onPressed: () => onNavigate(ControlDestination.aiRepresentative),
-            child: const Text('AI대표 보기'),
+            icon: const Icon(Icons.psychology_outlined, size: 18),
+            label: const Text('AI대표 보기'),
           ),
         ],
       ),

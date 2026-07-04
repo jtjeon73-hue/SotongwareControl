@@ -21,12 +21,12 @@ class DashboardMetrics {
 }
 
 class SampleBusinessData {
-  static const siteTitle = '소통웨어 디지털랩';
-  static const siteSubtitle = '통합 컨트롤센터 · AI대표';
-  static const siteEnglishName = 'SotongWare Control Center';
+  static const siteTitle = '소통총관제';
+  static const siteSubtitle = 'AI 총괄 관제 · 디지털 프로모';
+  static const siteEnglishName = 'Sotong Control Center';
   static const siteDescription =
-      '소통웨어 4개 사업부·4개 관리부서·AI대표 운영 비전을 한눈에 소개하는 '
-      '공개형 프로모 / 데모 컨트롤센터입니다.';
+      '소통웨어 전체 사업을 AI가 총괄 관제하고, '
+      '대표·사업부·수익화·진행상태를 한눈에 보여주는 디지털 총괄 관제 프로모 사이트입니다.';
 
   static const demoDisclaimer =
       '본 사이트는 비전·구조·운영 컨셉을 보여주는 데모입니다. '
@@ -34,8 +34,8 @@ class SampleBusinessData {
       '실제 고객정보·세무·매출·인증·API Key는 저장·표시하지 않습니다.';
 
   static const metrics = DashboardMetrics(
-    activeBusinesses: 4,
-    operatingDepartments: 4,
+    activeBusinesses: 5,
+    operatingDepartments: 6,
     managedProjects: 13,
     upcomingSites: 9,
     monthlyFocusTasks: 5,
@@ -45,7 +45,7 @@ class SampleBusinessData {
   static const divisions = <BusinessDivision>[
     BusinessDivision(
       id: 'industrial_automation',
-      title: '산업자동화 모니터링 시스템',
+      title: '소통자동화사업부',
       description:
           '제조 생산라인의 작업순서, 작업리스트, 바코드, PLC, MES, 작업자 Tool, CSV, 그래프, 데이터 관리, 공정 모니터링을 담당합니다.',
       items: [
@@ -111,7 +111,7 @@ class SampleBusinessData {
     ),
     BusinessDivision(
       id: 'app_development',
-      title: '앱개발 사업부',
+      title: '소통앱개발사업부',
       description:
           'Flutter 기반 앱과 AI 서비스 앱을 기획, 개발, APK 테스트, 프로모 사이트, Play Store 등록까지 관리합니다.',
       items: ['소통여행', '소통사주', '팜지기', '소통건강', '소통AI', '소통사매앱'],
@@ -212,7 +212,7 @@ class SampleBusinessData {
     ),
     BusinessDivision(
       id: 'youtube_content',
-      title: '유튜브/콘텐츠 사업부',
+      title: '소통콘텐츠사업부',
       description:
           'AI 유튜브 음악, 지역 생활밀착 영상, 시골 생활 콘텐츠, 음악과 영상 결합 콘텐츠를 기획하고 제작합니다.',
       items: [
@@ -235,7 +235,7 @@ class SampleBusinessData {
     ),
     BusinessDivision(
       id: 'ebook',
-      title: '전자책 개발 사업부',
+      title: '소통전자책사업부',
       description:
           '경험, 기술, 농촌생활, 앱개발, 자동화 시스템, AI 활용 노하우를 전자책으로 기획하고 판매하는 사업부입니다.',
       items: [
@@ -262,104 +262,29 @@ class SampleBusinessData {
         '판매 채널 후보': ['자체 판매 페이지', '스마트스토어', '크몽 / 탈잉', '전자책 플랫폼'],
       },
     ),
+    BusinessDivision(
+      id: 'online_expansion',
+      title: '소통온라인판매/확장사업부',
+      description:
+          '스마트스토어, 온라인 판매, 향후 확장 사업을 기획하고 '
+          '앱·전자책·콘텐츠와 연결하는 온라인 수익 채널을 관리합니다.',
+      items: [
+        '스마트스토어 연결',
+        '소통창고/온라인 판매',
+        '크몽·탈잉 확장',
+        '앱·전자책 교차 판매',
+        '향후 신규 사업 확장',
+      ],
+      status: '판매 채널·확장 로드맵 검토 단계',
+      detailSections: {
+        '온라인 판매': ['스마트스토어 상품 등록', '전자책·굿즈 연계 판매', '앱 유입 → 구매 전환'],
+        '확장 사업': ['지역 밀착형 서비스 확장', 'B2B·B2C 채널 다각화', 'AI 기반 자동화 판매'],
+        '다음 작업': ['판매 채널 우선순위 선정', 'SotongWarehouse 연결 검토', '확장 로드맵 초안 작성'],
+      },
+    ),
   ];
 
-  static const departments = <Department>[
-    Department(
-      id: 'planning',
-      title: '기획·아이디어',
-      headline: '성장 전략 · 실행 로드맵 · 우선순위 본부',
-      progressPercent: 65,
-      role: '신규 사업 아이디어, 프로젝트 기획, 실행 로드맵, 우선순위 정리, 성장·확장 구상',
-      futureVision: 'AI대표와 연동해 분기 로드맵·신규 아이디어·우선순위를 자동 제안',
-      taskCards: [
-        DepartmentTaskCard(
-          title: '신규 사업 아이디어',
-          description: '앱·자동화·콘텐츠·전자책 신규 컨셉 수집',
-        ),
-        DepartmentTaskCard(
-          title: '프로젝트 기획',
-          description: '사업부·앱별 MVP·기능 범위 정의',
-        ),
-        DepartmentTaskCard(
-          title: '실행 로드맵',
-          description: '월·분기 단위 실행 계획 및 마일스톤',
-        ),
-        DepartmentTaskCard(title: '우선순위 정리', description: '리소스 대비 임팩트 매트릭스'),
-        DepartmentTaskCard(title: '성장·확장 구상', description: '세계 수준 기업 성장 시나리오'),
-      ],
-    ),
-    Department(
-      id: 'marketing',
-      title: '홍보·마케팅',
-      headline: '웹·앱·콘텐츠·전자책 통합 홍보 본부',
-      progressPercent: 52,
-      role: '웹 홍보, 앱/전자책/콘텐츠 홍보, 유입 전략, 브랜딩, 홍보 일정·채널·성과',
-      futureVision: 'PUBLIC 총괄·개별 프로모 URL과 AI대표 홍보 우선순위 연동',
-      taskCards: [
-        DepartmentTaskCard(
-          title: '웹 홍보',
-          description: '4개 총괄·6개 앱 프로모 GitHub Pages',
-        ),
-        DepartmentTaskCard(
-          title: '앱·전자책·콘텐츠 홍보',
-          description: '사업부별 홍보 메시지·랜딩 연결',
-        ),
-        DepartmentTaskCard(title: '유입 전략', description: '검색·SNS·카카오 공유·채널별 유입'),
-        DepartmentTaskCard(title: '브랜딩 방향', description: '소통웨어 통합 브랜드 톤·비주얼'),
-        DepartmentTaskCard(title: '홍보 일정·성과', description: '캠페인 일정·클릭·전환 포인트'),
-      ],
-    ),
-    Department(
-      id: 'finance',
-      title: '재무·세금',
-      headline: '세계 수준 기업 성장을 위한 재무·세무 전략 본부',
-      progressPercent: 40,
-      role: '세금·비용·예산·수익·절세·자금 흐름·재투자·재테크 — 홈택스 연동 지향',
-      futureVision:
-          '향후 홈택스 연동 · 세무 점검 · 재무 리포트 자동화 · 투자·재테크 AI 보조. '
-          'AI가 전문가 수준으로 재무·세금 관리를 보좌하는 구조로 확장',
-      taskCards: [
-        DepartmentTaskCard(
-          title: '홈택스 연동 로드맵',
-          description: '매출·비용·세금 신고 데이터 연동 방향 (향후)',
-        ),
-        DepartmentTaskCard(
-          title: '세금·비용·예산',
-          description: '부가세·세금계산서·월간 예산·비용 분류',
-        ),
-        DepartmentTaskCard(title: '수익·자금 흐름', description: '사업부별 매출·순이익·현금 흐름'),
-        DepartmentTaskCard(title: '절세·재테크', description: '절세 전략·연금·ETF·재투자 검토'),
-        DepartmentTaskCard(
-          title: '재무 리포트 자동화',
-          description: '월·분기 재무 요약 AI 리포트 (향후)',
-        ),
-        DepartmentTaskCard(
-          title: 'AI 재무 보조',
-          description: '세무 리스크·비용 이상·투자 타이밍 점검',
-        ),
-      ],
-    ),
-    Department(
-      id: 'online_customer',
-      title: '온라인 고객대응',
-      headline: '고객 문의·응대·만족도 향상 본부',
-      progressPercent: 45,
-      role: '고객문의 관리, 온라인 응대, 니즈 파악, 응답 우선순위, AI 응대 보조',
-      futureVision: 'AI대표와 연동해 긴급 문의·반복 질문·SLA를 자동 분류',
-      taskCards: [
-        DepartmentTaskCard(title: '고객문의 관리', description: '접수·분류·처리 상태 추적'),
-        DepartmentTaskCard(title: '온라인 응대 흐름', description: '채널별 응대 프로세스·템플릿'),
-        DepartmentTaskCard(title: '고객 니즈 파악', description: '문의 패턴·개선 요청 수집'),
-        DepartmentTaskCard(title: '응답 우선순위', description: '긴급도·매출 영향 기준 SLA'),
-        DepartmentTaskCard(title: '반복 질문 대응', description: 'FAQ·자동 응답 후보'),
-        DepartmentTaskCard(
-          title: 'AI 응대 보조',
-          description: '초안 작성·감정·에스컬레이션 판단',
-        ),
-      ],
-    ),
-  ];
+  static const departments = <Department>[];
 
   static const projectLinks = <ProjectLinkItem>[
     ProjectLinkItem(

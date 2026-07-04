@@ -56,7 +56,8 @@ class DashboardScreen extends StatelessWidget {
               const SizedBox(height: 24),
               AiDailySummaryPanel(
                 summary: SampleOperationalData.aiDailySummary,
-                onViewAiRoom: () => onNavigate(ControlDestination.aiAgentRoom),
+                onViewAiRoom: () =>
+                    onNavigate(ControlDestination.aiRepresentative),
               ),
               const SizedBox(height: 32),
               const ControlSectionTitle(
@@ -66,7 +67,7 @@ class DashboardScreen extends StatelessWidget {
               _OperationalMetricsGrid(stats: stats, onNavigate: onNavigate),
               const SizedBox(height: 32),
               PublicPromoSummaryCard(
-                onViewAll: () => onNavigate(ControlDestination.projectLinks),
+                onViewAll: () => onNavigate(ControlDestination.aiMarketingDept),
               ),
               const SizedBox(height: 16),
               const PublicDemoNotice(compact: true),
@@ -83,7 +84,7 @@ class DashboardScreen extends StatelessWidget {
                                 title: '오늘 집중해야 할 일',
                                 items: todayFocus,
                                 onViewAll: () =>
-                                    onNavigate(ControlDestination.actions),
+                                    onNavigate(ControlDestination.nextPriority),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -92,7 +93,7 @@ class DashboardScreen extends StatelessWidget {
                                 title: '이번 주 우선순위',
                                 items: weeklyPriorities,
                                 onViewAll: () =>
-                                    onNavigate(ControlDestination.actions),
+                                    onNavigate(ControlDestination.nextPriority),
                               ),
                             ),
                           ],
@@ -103,14 +104,14 @@ class DashboardScreen extends StatelessWidget {
                               title: '오늘 집중해야 할 일',
                               items: todayFocus,
                               onViewAll: () =>
-                                  onNavigate(ControlDestination.actions),
+                                  onNavigate(ControlDestination.nextPriority),
                             ),
                             const SizedBox(height: 16),
                             _FocusSection(
                               title: '이번 주 우선순위',
                               items: weeklyPriorities,
                               onViewAll: () =>
-                                  onNavigate(ControlDestination.actions),
+                                  onNavigate(ControlDestination.nextPriority),
                             ),
                           ],
                         );
@@ -130,7 +131,8 @@ class DashboardScreen extends StatelessWidget {
                 title: '사업 홍보사이트 링크맵',
                 subtitle: 'PUBLIC 4개 연결됨 · 사이트 열기 가능',
                 trailing: TextButton.icon(
-                  onPressed: () => onNavigate(ControlDestination.projectLinks),
+                  onPressed: () =>
+                      onNavigate(ControlDestination.aiMarketingDept),
                   icon: const Icon(Icons.arrow_forward, size: 16),
                   label: const Text('전체'),
                 ),
@@ -294,7 +296,7 @@ class _OperationalMetricsGrid extends StatelessWidget {
             '진행 중 작업',
             Icons.play_circle_outline,
             null,
-            ControlDestination.actions,
+            ControlDestination.nextPriority,
             false,
           ),
           (
@@ -302,7 +304,7 @@ class _OperationalMetricsGrid extends StatelessWidget {
             '완료 작업',
             Icons.check_circle_outline,
             null,
-            ControlDestination.actions,
+            ControlDestination.nextPriority,
             false,
           ),
           (
@@ -310,7 +312,7 @@ class _OperationalMetricsGrid extends StatelessWidget {
             '지연 작업',
             Icons.schedule_outlined,
             null,
-            ControlDestination.actions,
+            ControlDestination.nextPriority,
             true,
           ),
           (
@@ -318,7 +320,7 @@ class _OperationalMetricsGrid extends StatelessWidget {
             '미해결 문제',
             Icons.warning_amber_outlined,
             null,
-            ControlDestination.issues,
+            ControlDestination.issuesCheck,
             true,
           ),
           (
@@ -326,7 +328,7 @@ class _OperationalMetricsGrid extends StatelessWidget {
             '긴급 문제',
             Icons.priority_high,
             null,
-            ControlDestination.issues,
+            ControlDestination.issuesCheck,
             true,
           ),
           (
@@ -334,7 +336,7 @@ class _OperationalMetricsGrid extends StatelessWidget {
             'AI 보고 필요',
             Icons.smart_toy_outlined,
             null,
-            ControlDestination.aiAgentRoom,
+            ControlDestination.aiRepresentative,
             false,
           ),
         ];
@@ -463,10 +465,10 @@ class _DepartmentGrid extends StatelessWidget {
   final ValueChanged<ControlDestination> onNavigate;
 
   static const _routes = {
-    'planning': ControlDestination.planning,
-    'marketing': ControlDestination.marketing,
-    'finance': ControlDestination.finance,
-    'online_customer': ControlDestination.onlineCustomer,
+    'planning': ControlDestination.aiIdeaPlanningDept,
+    'marketing': ControlDestination.aiMarketingDept,
+    'finance': ControlDestination.aiTaxAccountingDept,
+    'online_customer': ControlDestination.aiWorkOrderDept,
   };
 
   @override
