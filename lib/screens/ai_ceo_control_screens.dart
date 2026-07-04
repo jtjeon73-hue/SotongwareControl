@@ -20,8 +20,8 @@ class AiCeoOfficeScreen extends StatelessWidget {
             title: 'AI대표',
             subtitle:
                 '전체 사업을 총괄 판단하는 AI 대표입니다. '
-                '각 사업부·AI부서 보고를 종합해 수익성·진행·문제·다음 행동을 판단하고 '
-                '대표에게 최종 보고합니다.',
+                'AI홍보.마케팅부 등 각 AI부서 피드백을 종합해 수익성·진행·문제·다음 행동을 판단하고 '
+                '소통총괄관제에 종합 보고합니다.',
             badge: '소통AI대표부 · 24시간 관제',
             trailing: _LiveStatusBadge(),
           ),
@@ -67,6 +67,28 @@ class AiCeoOfficeScreen extends StatelessWidget {
                 children: [approval, const SizedBox(height: 16), divisions],
               );
             },
+          ),
+          const SizedBox(height: 28),
+          const ControlSectionTitle(
+            title: 'AI홍보.마케팅부 피드백 수신',
+            subtitle: '홍보·마케팅 분석 → AI대표 판단 입력',
+          ),
+          ...AiControlCenterData.marketingCeoFeedbacks.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _MarketingCeoFeedbackCard(feedback: item),
+            ),
+          ),
+          const SizedBox(height: 28),
+          const ControlSectionTitle(
+            title: '소통총괄관제 보고',
+            subtitle: 'AI대표 → 메인 총괄관제 종합 보고',
+          ),
+          ...AiControlCenterData.ceoHubReports.map(
+            (report) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _CeoHubReportCard(report: report),
+            ),
           ),
         ],
       ),
@@ -558,80 +580,24 @@ class AiDepartmentControlScreen extends StatelessWidget {
       case 'marketing':
         return [
           const ControlSectionTitle(
-            title: 'AI홍보.마케팅부 업무',
-            subtitle: '홍보 · 마케팅 · 온라인 고객대응 관리',
+            title: '사업부별 홍보·마케팅 구성',
+            subtitle: '각 소통사업부 홍보·마케팅 실행 구성 리스트',
           ),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isWide = constraints.maxWidth >= 720;
-              final promo = _MarketingRoleCard(
-                title: '홍보 · 마케팅',
-                icon: Icons.campaign_outlined,
-                items: const [
-                  '각 앱·사업부별 홍보 전략',
-                  '프로모 사이트 · GitHub Pages 관리',
-                  '유튜브 · 블로그 · 카카오 · 검색 노출',
-                  '다운로드 · 홍보 · 배포 링크 정리',
-                ],
-              );
-              final customer = _MarketingRoleCard(
-                title: '온라인 고객 대응',
-                icon: Icons.support_agent_outlined,
-                items: const [
-                  '온라인 고객 문의 대응',
-                  '고객 상담 내용 정리',
-                  '요청 · 불만 · 개선 의견 관리',
-                  '반복 문의 FAQ 정리',
-                  '고객 반응 분석',
-                ],
-              );
-
-              if (isWide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: promo),
-                    const SizedBox(width: 14),
-                    Expanded(child: customer),
-                  ],
-                );
-              }
-              return Column(
-                children: [promo, const SizedBox(height: 14), customer],
-              );
-            },
+          ...AiControlCenterData.divisionMarketingConfigs.map(
+            (config) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _DivisionMarketingConfigCard(config: config),
+            ),
           ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '고객 대응 채널',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: const [
-                      _SoftChip(label: '스마트스토어'),
-                      _SoftChip(label: '앱 사용자'),
-                      _SoftChip(label: '콘텐츠 구매자'),
-                      _SoftChip(label: '전자책 구매자'),
-                      _SoftChip(label: '자동화 사업 문의'),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const _InfoLine(label: '미응답', value: '6건 · 긴급 2건 우선 응대'),
-                  const _InfoLine(
-                    label: '상담 정리',
-                    value: '앱 기능 · 견적 · 구매 후기 · 개선 요청 분류 중',
-                  ),
-                ],
-              ),
+          const SizedBox(height: 20),
+          const ControlSectionTitle(
+            title: 'AI대표 피드백',
+            subtitle: '홍보·마케팅 분석 결과 → AI대표 전달',
+          ),
+          ...AiControlCenterData.marketingCeoFeedbacks.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _MarketingCeoFeedbackCard(feedback: item),
             ),
           ),
           const SizedBox(height: 16),
@@ -651,19 +617,56 @@ class AiDepartmentControlScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        '고객 피드백 전달',
+                        '보고 흐름',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   const _InfoLine(
-                    label: '→ AI전략부',
-                    value: '고객 반응·시장 신호·수익 전환 인사이트',
+                    label: '① AI홍보.마케팅부',
+                    value: '사업부별 홍보·마케팅 구성 리스트 관리 · 고객 반응 분석',
                   ),
                   const _InfoLine(
-                    label: '→ AI기획.아이디어부',
-                    value: '개선 의견·신규 요청·아이디어 후보',
+                    label: '② → AI대표',
+                    value: '피드백·권고안 전달 · 승인·우선순위 판단 요청',
+                  ),
+                  const _InfoLine(
+                    label: '③ → 소통총괄관제',
+                    value: 'AI대표 종합 보고 · 대표 확인 항목·실행 우선순위 반영',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '온라인 고객 대응',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: const [
+                      _SoftChip(label: '스마트스토어'),
+                      _SoftChip(label: '앱 사용자'),
+                      _SoftChip(label: '콘텐츠 구매자'),
+                      _SoftChip(label: '전자책 구매자'),
+                      _SoftChip(label: '자동화 사업 문의'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const _InfoLine(label: '미응답', value: '6건 · 긴급 2건 우선 대응'),
+                  const _InfoLine(
+                    label: 'AI대표 전달',
+                    value: '문의·반응·홍보 이슈를 피드백에 포함해 보고',
                   ),
                 ],
               ),
@@ -703,19 +706,17 @@ class AiDepartmentControlScreen extends StatelessWidget {
   }
 }
 
-class _MarketingRoleCard extends StatelessWidget {
-  const _MarketingRoleCard({
-    required this.title,
-    required this.icon,
-    required this.items,
-  });
+class _DivisionMarketingConfigCard extends StatelessWidget {
+  const _DivisionMarketingConfigCard({required this.config});
 
-  final String title;
-  final IconData icon;
-  final List<String> items;
+  final DivisionMarketingConfig config;
 
   @override
   Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(fontSize: 12);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -724,20 +725,35 @@ class _MarketingRoleCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: ControlColors.teal, size: 20),
+                const Icon(
+                  Icons.campaign_outlined,
+                  color: ControlColors.teal,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    title,
+                    config.divisionName,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                _SoftChip(label: config.status),
               ],
             ),
-            const SizedBox(height: 14),
-            ...items.map(
+            const SizedBox(height: 10),
+            _InfoLine(label: '프로모', value: config.promoSite),
+            _InfoLine(label: '목표', value: config.primaryGoal),
+            const SizedBox(height: 10),
+            Text(
+              '홍보·마케팅 구성',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ...config.marketingConfig.map(
               (item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -745,17 +761,125 @@ class _MarketingRoleCard extends StatelessWidget {
                       '• ',
                       style: TextStyle(color: ControlColors.teal),
                     ),
-                    Expanded(
-                      child: Text(
-                        item,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(fontSize: 13),
-                      ),
-                    ),
+                    Expanded(child: Text(item, style: bodyStyle)),
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: config.channels
+                  .map((c) => _SoftChip(label: c))
+                  .toList(),
+            ),
+            const SizedBox(height: 10),
+            _InfoLine(label: '콘텐츠', value: config.contentPlan),
+            _InfoLine(label: '전환', value: config.conversionPlan),
+            _InfoLine(label: '갱신', value: config.updatedAt),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarketingCeoFeedbackCard extends StatelessWidget {
+  const _MarketingCeoFeedbackCard({required this.feedback});
+
+  final MarketingCeoFeedback feedback;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: ControlColors.tealSoft.withValues(alpha: 0.25),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    feedback.subject,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                _SoftChip(label: feedback.priority),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              feedback.divisionName,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ControlColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _InfoLine(label: '피드백', value: feedback.feedback),
+            _InfoLine(label: 'AI대표 권고', value: feedback.recommendation),
+            _InfoLine(label: '전달', value: feedback.submittedAt),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CeoHubReportCard extends StatelessWidget {
+  const _CeoHubReportCard({required this.report});
+
+  final CeoHubReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(fontSize: 13);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    report.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                AiStatusBadge(status: report.status, compact: true),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${report.sourceDepartment} · ${report.reportedAt}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: ControlColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(report.summary, style: bodyStyle),
+            const SizedBox(height: 10),
+            Text(
+              '핵심 포인트',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            ...report.keyPoints.map((p) => Text('• $p', style: bodyStyle)),
+            const SizedBox(height: 8),
+            Text(
+              '소통총괄관제 실행 항목',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            ...report.actionsRequired.map(
+              (a) => Text('• $a', style: bodyStyle),
             ),
           ],
         ),

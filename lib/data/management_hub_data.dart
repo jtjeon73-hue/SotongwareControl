@@ -127,7 +127,7 @@ class ManagementHubData {
     ),
     AiDepartmentRoleSummary(
       name: 'AI홍보.마케팅부',
-      summary: '홍보 · 마케팅 · 온라인 고객대응 관리',
+      summary: '사업부별 홍보·마케팅 구성 · AI대표 피드백',
       destination: ControlDestination.aiMarketingDept,
       icon: Icons.campaign_outlined,
     ),
@@ -260,10 +260,14 @@ class ManagementHubData {
     ),
     AiDepartmentBrief(
       departmentName: 'AI홍보.마케팅부',
-      currentStatus: '홍보·프로모 연결 + 온라인 고객 문의 응대',
-      keyProposal: '홍보·마케팅·온라인 고객대응 통합 관리',
-      riskOrGap: '문의 지연 시 신뢰도·유입 전환 동시 하락',
-      recommendedActions: ['미응답 문의 우선 응대', 'FAQ 정리', '피드백 → AI전략부·기획부 전달'],
+      currentStatus: '5개 사업부 홍보·마케팅 구성 리스트 · AI대표 피드백 전달',
+      keyProposal: '사업부별 홍보 구성 관리 → AI대표 → 소통총괄관제 보고',
+      riskOrGap: '홍보 구성과 실행이 분리되면 전환·문의 대응이 지연',
+      recommendedActions: [
+        '사업부별 홍보 구성 리스트 주간 갱신',
+        'AI대표 피드백 4건 판단 반영',
+        '긴급 문의 2건 응대 확인',
+      ],
     ),
     AiDepartmentBrief(
       departmentName: 'AI세무회계부',

@@ -429,3 +429,65 @@ class ProductMaintenanceRecord {
   final List<String> knownIssues;
   final String nextMaintenanceAction;
 }
+
+class DivisionMarketingConfig {
+  const DivisionMarketingConfig({
+    required this.divisionName,
+    required this.promoSite,
+    required this.primaryGoal,
+    required this.marketingConfig,
+    required this.channels,
+    required this.contentPlan,
+    required this.conversionPlan,
+    required this.status,
+    required this.updatedAt,
+  });
+
+  final String divisionName;
+  final String promoSite;
+  final String primaryGoal;
+  final List<String> marketingConfig;
+  final List<String> channels;
+  final String contentPlan;
+  final String conversionPlan;
+  final String status;
+  final String updatedAt;
+}
+
+class MarketingCeoFeedback {
+  const MarketingCeoFeedback({
+    required this.divisionName,
+    required this.subject,
+    required this.feedback,
+    required this.recommendation,
+    required this.priority,
+    required this.submittedAt,
+  });
+
+  final String divisionName;
+  final String subject;
+  final String feedback;
+  final String recommendation;
+  final String priority;
+  final String submittedAt;
+}
+
+class CeoHubReport {
+  const CeoHubReport({
+    required this.title,
+    required this.sourceDepartment,
+    required this.summary,
+    required this.keyPoints,
+    required this.actionsRequired,
+    required this.reportedAt,
+    required this.status,
+  });
+
+  final String title;
+  final String sourceDepartment;
+  final String summary;
+  final List<String> keyPoints;
+  final List<String> actionsRequired;
+  final String reportedAt;
+  final AiSystemStatus status;
+}

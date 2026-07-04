@@ -28,7 +28,7 @@ class AiControlCenterData {
     unansweredCount: 6,
     urgentCount: 2,
     topCategory: '앱 기능 / 스마트스토어 / 자동화 견적 문의',
-    summary: 'AI홍보.마케팅부가 응대·정리 후 AI전략부·기획부에 피드백 전달',
+    summary: 'AI홍보.마케팅부가 사업부별 홍보 구성을 정리해 AI대표에 피드백하고, AI대표가 소통총괄관제에 보고합니다.',
   );
 
   static const officeCards = <AiOfficeDashboardCard>[
@@ -279,19 +279,20 @@ class AiControlCenterData {
       name: 'AI홍보.마케팅부',
       leaderRole: '홍보·마케팅·온라인 고객대응',
       summary:
-          '각 앱·사업부별 홍보 전략, 프로모 사이트, 유튜브·블로그·카카오·검색 노출, '
-          '배포 링크 관리와 함께 온라인 고객 문의·상담·피드백을 통합 대응합니다.',
+          '각 소통사업부별 홍보·마케팅 구성 리스트를 관리하고, 채널·콘텐츠·전환 전략을 정리해 '
+          'AI대표에 피드백합니다. 온라인 고객 문의·상담·반응도 함께 분석하여 '
+          'AI대표가 소통총괄관제에 종합 보고할 수 있도록 지원합니다.',
       status: AiSystemStatus.automaticReportPending,
       progressPercent: 72,
       monitoredWorks: [
-        '앱 홍보 영상 30초 시나리오',
-        'GitHub Pages 4개 총괄 점검',
+        '5개 사업부 홍보·마케팅 구성 리스트',
+        'AI대표 피드백 4건 전달',
         '미응답 고객 문의 6건 우선 대응',
-        '스마트스토어·앱·전자책 구매자 문의 분류',
-        '반복 문의 FAQ 초안 정리',
-        '고객 피드백 → AI전략부·AI기획.아이디어부 전달',
+        'PUBLIC 프로모 4개 Pages 점검',
+        '앱 홍보 영상 30초 시나리오',
+        'FAQ·고객 반응 → AI대표 보고',
       ],
-      nextAction: '긴급 문의 2건 응대 · 프로모 404 점검',
+      nextAction: '사업부별 홍보 구성 갱신 · AI대표 피드백 전달',
     ),
     AiDepartment(
       id: 'tax',
@@ -1002,6 +1003,178 @@ class AiControlCenterData {
       scheduledUpdates: ['견적도우미 v0.1 등록 (검수 중)'],
       knownIssues: ['영업 자료·포트폴리오 보강 필요'],
       nextMaintenanceAction: '견적도우미 등록 완료 시 데모 패키지 번들 업데이트',
+    ),
+  ];
+
+  static const divisionMarketingConfigs = <DivisionMarketingConfig>[
+    DivisionMarketingConfig(
+      divisionName: '소통자동화사업부',
+      promoSite: 'SotongAutomationPromo',
+      primaryGoal: 'B2B 제조·현장 모니터링 고객 유입',
+      marketingConfig: [
+        '제조업·조립라인·검사라인 타깃 랜딩 구성',
+        '핵심 경험 중심 제안서·포트폴리오 연결',
+        '데모 영상 + 견적 문의 CTA 배치',
+        '바코드·PLC·MES 키워드 SEO',
+        'LinkedIn·업계 커뮤니티 B2B 노출',
+      ],
+      channels: ['프로모 사이트', '제안서', 'B2B 이메일', '검색'],
+      contentPlan: '현장 모니터링 사례·견적도우미 소개 콘텐츠',
+      conversionPlan: '문의 폼 → 상담 예약 → 견적 제안',
+      status: '제안서·홍보 강화 단계',
+      updatedAt: '오늘 05:40',
+    ),
+    DivisionMarketingConfig(
+      divisionName: '소통앱개발사업부',
+      promoSite: 'SotongAppsPromo',
+      primaryGoal: '6개 앱 다운로드·프로모 유입 증가',
+      marketingConfig: [
+        '앱별 소개 카드 + APK·Play Store 링크',
+        '소통AI여행 일본 여행 키워드 홍보',
+        '30초 앱 홍보 영상 + 쇼츠 교차 배포',
+        '다운로드센터 → 문의 전환 랜딩',
+        '카카오·블로그 앱 사용법 공유',
+      ],
+      channels: ['프로모 사이트', '유튜브', '쇼츠', '다운로드센터', '카카오'],
+      contentPlan: '앱 기능 소개·튜토리얼·출시 알림 영상',
+      conversionPlan: '다운로드 → 온보딩 FAQ → 전자책·상담 연결',
+      status: '소통AI여행 배포 홍보 집중',
+      updatedAt: '오늘 06:00',
+    ),
+    DivisionMarketingConfig(
+      divisionName: '소통콘텐츠사업부',
+      promoSite: 'SotongContentsPromo',
+      primaryGoal: '콘텐츠 유입 → 앱·사업부 교차 홍보',
+      marketingConfig: [
+        '지역 생활·시골 생활 시리즈 주간 편성',
+        'AI 음악·쇼츠 → 앱 랜딩 링크 삽입',
+        '앱 홍보 영상 제작·업로드 일정',
+        '유튜브·블로그·카카오 채널 통합 소개',
+        '콘텐츠 구매자 → 전자책 번들 제안',
+      ],
+      channels: ['유튜브', '쇼츠', '블로그', '프로모 사이트'],
+      contentPlan: '주간 2~3편 · 앱·여행·지역생활 교차',
+      conversionPlan: '조회수 → 프로모 링크 → 다운로드·구매',
+      status: '콘텐츠 캘린더 확정 필요',
+      updatedAt: '오늘 04:30',
+    ),
+    DivisionMarketingConfig(
+      divisionName: '소통전자책사업부',
+      promoSite: 'SotongEbookPromo',
+      primaryGoal: '첫 전자책 출간·사전 문의 전환',
+      marketingConfig: [
+        '출간 예정 티저 페이지·목차 공개',
+        '앱·여행 콘텐츠와 교차 판매 문구',
+        '스마트스토어·리디 연동 안내',
+        '제작 사례·샘플 목차 블로그 포스팅',
+        '사전 문의 → 출간 알림 수집',
+      ],
+      channels: ['프로모 사이트', '스마트스토어', '블로그', '카카오'],
+      contentPlan: '첫 전자책 주제 티저 + 제작 과정 콘텐츠',
+      conversionPlan: '사전 문의 → 출간 알림 → 구매 전환',
+      status: '첫 등록 주제 선정 대기',
+      updatedAt: '어제 20:10',
+    ),
+    DivisionMarketingConfig(
+      divisionName: '소통온라인판매/확장사업부',
+      promoSite: '스마트스토어·확장 채널',
+      primaryGoal: '앱·전자책·상담 상품 통합 판매',
+      marketingConfig: [
+        '앱·전자책·상담 번들 상품카드 구성',
+        '스마트스토어 SEO·키워드 최적화',
+        '구매 후 AI 온보딩·이용 안내',
+        '리뷰·후기 → 상품 개선 피드백 수집',
+        '다운로드센터·프로모 교차 랜딩',
+      ],
+      channels: ['스마트스토어', '프로모 연결', '카카오', '검색'],
+      contentPlan: '번들 상품 소개·구매 가이드',
+      conversionPlan: '방문 → 장바구니 → 구매 → 앱 설치 안내',
+      status: '판매 채널 로드맵 검토 중',
+      updatedAt: '어제 17:45',
+    ),
+  ];
+
+  static const marketingCeoFeedbacks = <MarketingCeoFeedback>[
+    MarketingCeoFeedback(
+      divisionName: '소통앱개발사업부',
+      subject: '소통AI여행 일본 여행 홍보 집행',
+      feedback:
+          '다운로드가 증가 중이나 배포·홍보 흐름이 끊겨 전환율이 낮습니다. '
+          '일본 여행 키워드를 영상·다운로드센터에 묶어 홍보할 때 전환 구조가 필요합니다.',
+      recommendation: 'MVP 공개와 동시에 FAQ·문의 응대 흐름을 준비하고, 전자책·상담 랜딩을 연결하세요.',
+      priority: '높음',
+      submittedAt: '오늘 05:55',
+    ),
+    MarketingCeoFeedback(
+      divisionName: '소통자동화사업부',
+      subject: 'B2B 홍보 자료 부족',
+      feedback:
+          '핵심 경험은 충분하나 제안서·포트폴리오·홍보사이트가 미비해 신규 문의 유입이 제한됩니다.',
+      recommendation: '산업자동화 프로모와 견적도우미를 묶은 B2B 패키지 홍보를 우선 추진하세요.',
+      priority: '높음',
+      submittedAt: '오늘 05:20',
+    ),
+    MarketingCeoFeedback(
+      divisionName: '소통콘텐츠사업부',
+      subject: '콘텐츠·앱 홍보 교차 편성',
+      feedback:
+          '콘텐츠 업로드 일정이 없어 앱 홍보 영상과 연결이 지연되고 있습니다.',
+      recommendation: '주간 캘린더를 확정하고 앱 홍보 30초 영상을 1차 업로드 목표로 잡으세요.',
+      priority: '중간',
+      submittedAt: '오늘 04:45',
+    ),
+    MarketingCeoFeedback(
+      divisionName: '소통전자책사업부',
+      subject: '첫 전자책 티저·교차 판매',
+      feedback:
+          '앱·여행 관심 고객에게 전자책 사전 문의 전환이 가능하나 티저 페이지가 없습니다.',
+      recommendation: '첫 등록 주제 확정 후 티저 공개와 앱 프로모 교차 링크를 동시에 적용하세요.',
+      priority: '중간',
+      submittedAt: '어제 21:00',
+    ),
+  ];
+
+  static const ceoHubReports = <CeoHubReport>[
+    CeoHubReport(
+      title: 'AI홍보.마케팅부 종합 피드백',
+      sourceDepartment: 'AI홍보.마케팅부',
+      summary:
+          '5개 사업부 홍보·마케팅 구성을 점검했습니다. 앱개발·자동화는 우선 홍보 강화가 필요하고, '
+          '콘텐츠·전자책은 일정·티저 확정이 시급합니다. 고객 문의 6건 미응답 중 긴급 2건이 있습니다.',
+      keyPoints: [
+        '소통AI여행: 다운로드↑ 전환↓ → 배포·랜딩·FAQ 동시 준비',
+        '소통자동화: B2B 제안서·프로모 보강 필요',
+        'PUBLIC 프로모 4개 Pages 404 점검 필요',
+        '미응답 문의 6건 · 긴급 2건',
+      ],
+      actionsRequired: [
+        '일본 여행 MVP 홍보 조건부 승인',
+        'B2B 제안서·포트폴리오 1차 착수',
+        'PUBLIC Pages 404 점검 지시',
+        '긴급 문의 2건 응대 확인',
+      ],
+      reportedAt: '오늘 06:12',
+      status: AiSystemStatus.automaticReportPending,
+    ),
+    CeoHubReport(
+      title: '오늘의 AI대표 종합 브리핑',
+      sourceDepartment: 'AI대표',
+      summary:
+          '앱개발·전자책·홍보가 동시에 움직이고 있어 우선순위 승인과 실행 순서 확정이 필요합니다. '
+          '단기 수익은 소통여행 배포와 산업자동화 B2B, 중기는 6개 앱 포트폴리오입니다.',
+      keyPoints: [
+        '승인 대기 5건 · 긴급 알림 3건',
+        '오늘 매출 샘플 ₩428,000',
+        '다운로드 43회 · 전환 문의 6건',
+        'AI홍보.마케팅부 피드백 4건 반영',
+      ],
+      actionsRequired: [
+        '일본 여행 MVP 개발 승인',
+        '광고비 증액 조건부 검토',
+        '비용 분류 기준 승인',
+      ],
+      reportedAt: '오늘 06:10',
+      status: AiSystemStatus.monitoring,
     ),
   ];
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../data/ai_control_center_data.dart';
 import '../data/management_hub_data.dart';
+import '../models/ai_control_center.dart';
 import '../state/control_scope.dart';
 import '../state/control_state.dart';
 import '../theme/control_theme.dart';
@@ -107,6 +109,22 @@ class OverallCommandScreen extends StatelessWidget {
                     children: [...left, const SizedBox(height: 8), ...right],
                   );
                 },
+              ),
+              const SizedBox(height: 28),
+              ControlSectionTitle(
+                title: 'AI대표 종합 보고',
+                subtitle:
+                    'AI홍보.마케팅부 피드백 반영 · 소통총괄관제 수신 보고 ${AiControlCenterData.ceoHubReports.length}건',
+              ),
+              ...AiControlCenterData.ceoHubReports.map(
+                (report) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _CeoHubReportPanel(
+                    report: report,
+                    onDetail: () =>
+                        onNavigate(ControlDestination.aiRepresentative),
+                  ),
+                ),
               ),
               const SizedBox(height: 28),
               _DashboardPanel(
@@ -436,6 +454,124 @@ class _HealthBadge extends StatelessWidget {
           ),
           Text(stats.healthLabel, style: TextStyle(fontSize: 11, color: color)),
         ],
+      ),
+    );
+  }
+}
+
+class _CeoHubReportPanel extends StatelessWidget {
+  const _CeoHubReportPanel({required this.report, required this.onDetail});
+
+  final CeoHubReport report;
+  final VoidCallback onDetail;
+
+  @override
+  Widget build(BuildContext context) {
+    final bodyStyle = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(fontSize: 13);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.summarize_outlined,
+                  color: ControlColors.teal,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        report.title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${report.sourceDepartment} · ${report.reportedAt}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: ControlColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _ReportStatusChip(status: report.status),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(report.summary, style: bodyStyle),
+            const SizedBox(height: 12),
+            Text(
+              '핵심 포인트',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...report.keyPoints.map((p) => Text('• $p', style: bodyStyle)),
+            const SizedBox(height: 10),
+            Text(
+              '대표 확인·실행 항목',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...report.actionsRequired.map(
+              (a) => Text('• $a', style: bodyStyle),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onDetail,
+                icon: const Icon(Icons.psychology_outlined, size: 16),
+                label: const Text('AI대표 상세 보기'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportStatusChip extends StatelessWidget {
+  const _ReportStatusChip({required this.status});
+
+  final AiSystemStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      AiSystemStatus.monitoring => ('관제 중', ControlColors.teal),
+      AiSystemStatus.automaticReportPending => ('보고 대기', ControlColors.accentWarm),
+      AiSystemStatus.approvalRequired => ('승인 필요', ControlColors.accentRose),
+      _ => (status.label, ControlColors.textMuted),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
