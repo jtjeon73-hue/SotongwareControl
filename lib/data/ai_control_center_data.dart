@@ -27,8 +27,8 @@ class AiControlCenterData {
   static const customerInquirySummary = CustomerInquirySummary(
     unansweredCount: 6,
     urgentCount: 2,
-    topCategory: '앱 기능 문의 / 산업자동화 견적 문의',
-    summary: '답변 지연 문의 2건은 대표 승인 후 우선 응대 권장',
+    topCategory: '앱 기능 / 스마트스토어 / 자동화 견적 문의',
+    summary: 'AI홍보.마케팅부가 응대·정리 후 AI전략부·기획부에 피드백 전달',
   );
 
   static const officeCards = <AiOfficeDashboardCard>[
@@ -70,9 +70,9 @@ class AiControlCenterData {
     AiOfficeDashboardCard(
       title: '고객 문의 요약',
       value: '미응답 6건',
-      summary: '앱 기능 문의와 산업자동화 견적 문의가 집중되어 고객지원 우선순위 조정이 필요합니다.',
+      summary: '앱·스마트스토어·자동화 견적 문의가 집중되어 AI홍보.마케팅부가 우선 응대·정리 중입니다.',
       status: AiSystemStatus.warning,
-      department: 'AI지시진행부',
+      department: 'AI홍보.마케팅부',
     ),
     AiOfficeDashboardCard(
       title: '개발 진행 상황',
@@ -82,9 +82,9 @@ class AiControlCenterData {
       department: 'AI지시진행부',
     ),
     AiOfficeDashboardCard(
-      title: '홍보/마케팅 진행 상황',
-      value: '캠페인 4개',
-      summary: '앱 홍보 영상, 전자책 티저, 다운로드센터 개선 안내 문구가 대기 중입니다.',
+      title: '홍보·고객대응 진행',
+      value: '캠페인 4개 · 문의 6건',
+      summary: '앱 홍보 영상, 전자책 티저, FAQ 정리, 고객 피드백 전달이 병행 진행 중입니다.',
       status: AiSystemStatus.automaticReportPending,
       department: 'AI홍보.마케팅부',
     ),
@@ -249,19 +249,21 @@ class AiControlCenterData {
     AiDepartment(
       id: 'marketing',
       name: 'AI홍보.마케팅부',
-      leaderRole: 'AI 홍보·마케팅',
+      leaderRole: '홍보·마케팅·온라인 고객대응',
       summary:
           '각 앱·사업부별 홍보 전략, 프로모 사이트, 유튜브·블로그·카카오·검색 노출, '
-          '다운로드·홍보·배포 링크를 관리합니다.',
+          '배포 링크 관리와 함께 온라인 고객 문의·상담·피드백을 통합 대응합니다.',
       status: AiSystemStatus.automaticReportPending,
       progressPercent: 72,
       monitoredWorks: [
         '앱 홍보 영상 30초 시나리오',
         'GitHub Pages 4개 총괄 점검',
-        '6개 앱 프로모 URL 연결',
-        '카카오·검색 유입 전략',
+        '미응답 고객 문의 6건 우선 대응',
+        '스마트스토어·앱·전자책 구매자 문의 분류',
+        '반복 문의 FAQ 초안 정리',
+        '고객 피드백 → AI전략부·AI기획.아이디어부 전달',
       ],
-      nextAction: '프로모 사이트 404 일괄 점검',
+      nextAction: '긴급 문의 2건 응대 · 프로모 404 점검',
     ),
     AiDepartment(
       id: 'tax',
@@ -308,8 +310,8 @@ class AiControlCenterData {
         reason: '핵심 기능을 좁히면 개발 난이도와 테스트 비용이 낮아집니다.',
       ),
       AiStrategyOpinion(
-        department: 'AI마케팅부장',
-        role: '홍보 전략',
+        department: 'AI홍보.마케팅부',
+        role: '홍보·고객대응',
         stance: AiOpinionStance.approve,
         opinion: '일본 여행 키워드는 영상과 다운로드센터 개선을 함께 묶어 홍보하기 좋습니다.',
         reason: '명확한 사용 장면이 있어 유입 문구를 만들기 쉽습니다.',
@@ -322,11 +324,11 @@ class AiControlCenterData {
         reason: '전환 구조 없이 개발하면 운영 부담만 늘어날 수 있습니다.',
       ),
       AiStrategyOpinion(
-        department: 'AI고객지원부장',
-        role: '문의 대응',
+        department: 'AI홍보.마케팅부',
+        role: '온라인 고객대응',
         stance: AiOpinionStance.caution,
-        opinion: '일본 여행 기능 공개 전 FAQ와 오류 접수 흐름을 먼저 준비해야 합니다.',
-        reason: '문의 폭증 시 대표 승인 대기 업무가 늘어날 수 있습니다.',
+        opinion: '일본 여행 기능 공개 전 FAQ·문의 응대 흐름을 먼저 준비해야 합니다.',
+        reason: '문의 폭증 시 응대 지연과 피드백 누락이 발생할 수 있습니다.',
       ),
       AiStrategyOpinion(
         department: 'AI세무회계부장',
@@ -476,12 +478,12 @@ class AiControlCenterData {
     ),
     AiNotification(
       title: '고객 문의 6건 미응답',
-      department: 'AI지시진행부',
+      department: 'AI홍보.마케팅부',
       type: AiNotificationType.customerInquiry,
       importance: '높음',
       occurredAt: '오늘 05:35',
       status: AiSystemStatus.warning,
-      detail: '긴급 문의 2건은 대표 승인 후 우선 응대 권장입니다.',
+      detail: '앱·스마트스토어·자동화 견적 문의. 긴급 2건 우선 응대 후 AI전략부·기획부에 피드백 전달.',
     ),
     AiNotification(
       title: '오늘 매출 샘플 데이터 갱신',
@@ -500,6 +502,15 @@ class AiControlCenterData {
       occurredAt: '오늘 05:10',
       status: AiSystemStatus.notificationPending,
       detail: '전일 대비 다운로드가 증가했습니다. 홍보 영상 제작과 연결 권장입니다.',
+    ),
+    AiNotification(
+      title: '고객 개선 의견 3건 수집',
+      department: 'AI홍보.마케팅부',
+      type: AiNotificationType.customerInquiry,
+      importance: '보통',
+      occurredAt: '오늘 04:55',
+      status: AiSystemStatus.notificationPending,
+      detail: '앱 기능·전자책 구매 후기·콘텐츠 요청. AI기획.아이디어부 전달 대기.',
     ),
     AiNotification(
       title: '앱 홍보 영상 기획안 완료',

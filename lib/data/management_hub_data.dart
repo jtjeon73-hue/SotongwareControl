@@ -121,7 +121,7 @@ class ManagementHubData {
     ),
     AiDepartmentRoleSummary(
       name: 'AI홍보.마케팅부',
-      summary: '홍보 전략·프로모·유튜브·검색 노출·배포 링크',
+      summary: '홍보 · 마케팅 · 온라인 고객대응 관리',
       destination: ControlDestination.aiMarketingDept,
       icon: Icons.campaign_outlined,
     ),
@@ -243,10 +243,10 @@ class ManagementHubData {
     ),
     AiDepartmentBrief(
       departmentName: 'AI홍보.마케팅부',
-      currentStatus: '총괄·개별 프로모 URL 연결',
-      keyProposal: '웹·앱·콘텐츠·전자책 통합 브랜딩',
-      riskOrGap: 'Pages 미배포 시 404로 유입 손실',
-      recommendedActions: ['404 점검', '카카오 공유 문구', '채널별 일정'],
+      currentStatus: '홍보·프로모 연결 + 온라인 고객 문의 응대',
+      keyProposal: '홍보·마케팅·온라인 고객대응 통합 관리',
+      riskOrGap: '문의 지연 시 신뢰도·유입 전환 동시 하락',
+      recommendedActions: ['미응답 문의 우선 응대', 'FAQ 정리', '피드백 → AI전략부·기획부 전달'],
     ),
     AiDepartmentBrief(
       departmentName: 'AI세무회계부',

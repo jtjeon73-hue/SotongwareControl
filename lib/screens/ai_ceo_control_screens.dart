@@ -32,7 +32,7 @@ class AiCeoOfficeScreen extends StatelessWidget {
           const SizedBox(height: 28),
           const ControlSectionTitle(
             title: 'AI대표 핵심 카드',
-            subtitle: '브리핑 · 승인 · 매출 · 다운로드 · 개발 · 홍보 · 세무 · 전략',
+            subtitle: '브리핑 · 승인 · 매출 · 고객대응 · 홍보 · 세무 · 전략',
           ),
           _AdaptiveGrid(
             maxCrossAxisExtent: 360,
@@ -469,6 +469,51 @@ class AiDepartmentControlScreen extends StatelessWidget {
         ];
       case 'marketing':
         return [
+          const ControlSectionTitle(
+            title: 'AI홍보.마케팅부 업무',
+            subtitle: '홍보 · 마케팅 · 온라인 고객대응 관리',
+          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 720;
+              final promo = _MarketingRoleCard(
+                title: '홍보 · 마케팅',
+                icon: Icons.campaign_outlined,
+                items: const [
+                  '각 앱·사업부별 홍보 전략',
+                  '프로모 사이트 · GitHub Pages 관리',
+                  '유튜브 · 블로그 · 카카오 · 검색 노출',
+                  '다운로드 · 홍보 · 배포 링크 정리',
+                ],
+              );
+              final customer = _MarketingRoleCard(
+                title: '온라인 고객 대응',
+                icon: Icons.support_agent_outlined,
+                items: const [
+                  '온라인 고객 문의 대응',
+                  '고객 상담 내용 정리',
+                  '요청 · 불만 · 개선 의견 관리',
+                  '반복 문의 FAQ 정리',
+                  '고객 반응 분석',
+                ],
+              );
+
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: promo),
+                    const SizedBox(width: 14),
+                    Expanded(child: customer),
+                  ],
+                );
+              }
+              return Column(
+                children: [promo, const SizedBox(height: 14), customer],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(22),
@@ -476,19 +521,62 @@ class AiDepartmentControlScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '홍보·배포 링크 관리',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    '고객 대응 채널',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: const [
+                      _SoftChip(label: '스마트스토어'),
+                      _SoftChip(label: '앱 사용자'),
+                      _SoftChip(label: '콘텐츠 구매자'),
+                      _SoftChip(label: '전자책 구매자'),
+                      _SoftChip(label: '자동화 사업 문의'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const _InfoLine(label: '미응답', value: '6건 · 긴급 2건 우선 응대'),
+                  const _InfoLine(
+                    label: '상담 정리',
+                    value: '앱 기능 · 견적 · 구매 후기 · 개선 요청 분류 중',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            color: ControlColors.tealSoft.withValues(alpha: 0.35),
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.sync_alt,
+                        color: ControlColors.teal,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '고객 피드백 전달',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   const _InfoLine(
-                    label: '프로모',
-                    value: '4개 총괄 + 6개 앱 GitHub Pages',
+                    label: '→ AI전략부',
+                    value: '고객 반응·시장 신호·수익 전환 인사이트',
                   ),
                   const _InfoLine(
-                    label: '채널',
-                    value: '유튜브 · 블로그 · 카카오 · 검색 노출',
+                    label: '→ AI기획.아이디어부',
+                    value: '개선 의견·신규 요청·아이디어 후보',
                   ),
-                  const _InfoLine(label: '다음', value: '404 점검 · 다운로드·홍보 링크 정리'),
                 ],
               ),
             ),
@@ -524,6 +612,67 @@ class AiDepartmentControlScreen extends StatelessWidget {
       default:
         return [];
     }
+  }
+}
+
+class _MarketingRoleCard extends StatelessWidget {
+  const _MarketingRoleCard({
+    required this.title,
+    required this.icon,
+    required this.items,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<String> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: ControlColors.teal, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '• ',
+                      style: TextStyle(color: ControlColors.teal),
+                    ),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
