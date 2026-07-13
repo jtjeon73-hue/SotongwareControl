@@ -53,3 +53,6 @@ build/
 .firebase/
 firebase-debug.log
 firebase-debug.*.log
+
+# Local deploy secrets (email/UID only — never commit)
+tool/deploy_control.local.ps1
