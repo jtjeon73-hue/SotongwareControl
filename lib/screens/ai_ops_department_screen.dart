@@ -260,38 +260,42 @@ class _DepartmentExtras extends StatelessWidget {
                     )
                     .toList(),
         );
-      case 'strategy':
-        return _Block(
-          title: '전략 검토 (근거 있는 항목만)',
-          items: units.isEmpty
-              ? ['사업부 데이터 없음']
-              : units
-                    .map(
-                      (u) =>
-                          '근거: ${u.name} 상태=${u.status}\n'
-                          '제안: ${u.nextAction.isEmpty ? '다음 작업 등록 필요' : u.nextAction}\n'
-                          '예상 효과: 미등록 (임의 추정 금지)\n'
-                          '필요 작업: ${u.currentFocus.isEmpty ? '확인 필요' : u.currentFocus}\n'
-                          '검토 상태: 미승인',
-                    )
-                    .toList(),
-        );
       case 'idea':
-        return const _Block(
-          title: '아이디어 관리',
-          items: [
-            '등록된 아이디어가 없습니다.',
-            '상태는 아이디어 / 검토 중 / 채택 / 보류 / 폐기 / 개발 진행 으로만 관리합니다.',
-            '아이디어를 진행 중인 프로젝트처럼 표시하지 않습니다.',
-          ],
-        );
+        return _IdeaPanel(repo: OpsRepository());
       case 'marketing':
         return _Block(
           title: '홍보·고객 대응',
           items: [
-            '프로모 URL이 등록된 앱: ${projects.where((p) => p.promoUrl.isNotEmpty).length}건',
-            '홍보 완료로 단정하지 않습니다. 실제 캠페인·문의는 미등록 상태입니다.',
-            '고객 문의·응답 대기: 미등록',
+            '프로모 있는 프로젝트: ${projects.where((p) => p.promoUrl.isNotEmpty).length}건',
+            '프로모 없는 프로젝트: ${projects.where((p) => p.promoUrl.isEmpty && p.projectType.contains('app')).length}건',
+            '홍보 완료로 단정하지 않습니다. 고객 문의·후속 연락: 미등록',
+          ],
+        );
+      case 'strategy':
+        final near = projects
+            .where(
+              (p) =>
+                  (p.computedProgress ?? 0) >= 70 ||
+                  p.status == ProjectStatus.testing,
+            )
+            .map((p) => '출시 근접 후보: ${p.name}')
+            .toList();
+        final stale = projects
+            .where((p) => p.isStale)
+            .map((p) => '장기 정체(30일+): ${p.name}')
+            .toList();
+        final unknown = projects
+            .where((p) => p.computedProgress == null)
+            .map((p) => '데이터 부족으로 판단 불가: ${p.name}')
+            .toList();
+        return _Block(
+          title: '전략 검토 (근거 있는 항목만)',
+          items: [
+            ...near,
+            ...stale,
+            ...unknown,
+            if (near.isEmpty && stale.isEmpty && unknown.isEmpty)
+              '판단 가능한 등록 데이터가 부족합니다. 임의 시장 전망은 생성하지 않습니다.',
           ],
         );
       case 'tax':
@@ -333,5 +337,147 @@ class _DepartmentExtras extends StatelessWidget {
                     .toList(),
         );
     }
+  }
+}
+
+class _IdeaPanel extends StatefulWidget {
+  const _IdeaPanel({required this.repo});
+
+  final OpsRepository repo;
+
+  @override
+  State<_IdeaPanel> createState() => _IdeaPanelState();
+}
+
+class _IdeaPanelState extends State<_IdeaPanel> {
+  Future<void> _add() async {
+    final title = TextEditingController();
+    final summary = TextEditingController();
+    var status = IdeaStatus.idea;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('아이디어 등록'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: title,
+                decoration: const InputDecoration(labelText: '제목'),
+              ),
+              TextField(
+                controller: summary,
+                decoration: const InputDecoration(labelText: '요약'),
+                maxLines: 3,
+              ),
+              DropdownButtonFormField<String>(
+                initialValue: status,
+                items: [
+                  IdeaStatus.idea,
+                  IdeaStatus.reviewing,
+                  IdeaStatus.selected,
+                  IdeaStatus.onHold,
+                  IdeaStatus.rejected,
+                  IdeaStatus.inDevelopment,
+                ]
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e,
+                        child: Text(IdeaStatus.labelKo(e)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => setLocal(() => status = v ?? IdeaStatus.idea),
+                decoration: const InputDecoration(labelText: '상태'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('저장'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || title.text.trim().isEmpty) return;
+    await widget.repo.upsertIdea(
+      IdeaDoc(
+        id: '',
+        title: title.text.trim(),
+        summary: summary.text.trim(),
+        status: status,
+      ),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('아이디어를 등록했습니다.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '아이디어 관리',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                FilledButton.tonal(
+                  onPressed: _add,
+                  child: const Text('아이디어 등록'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '아이디어를 진행 중인 프로젝트처럼 표시하지 않습니다.',
+              style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
+            ),
+            StreamBuilder<List<IdeaDoc>>(
+              stream: widget.repo.watchIdeas(),
+              builder: (context, snap) {
+                final ideas = snap.data ?? const [];
+                if (ideas.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('등록된 아이디어가 없습니다.'),
+                  );
+                }
+                return Column(
+                  children: ideas
+                      .map(
+                        (i) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(i.title),
+                          subtitle: Text(
+                            '${IdeaStatus.labelKo(i.status)}'
+                            '${i.summary.isEmpty ? '' : ' · ${i.summary}'}',
+                          ),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

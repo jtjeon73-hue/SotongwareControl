@@ -175,7 +175,7 @@ class OpsSeedService {
     ];
 
     for (final p in knownApps) {
-      await _repo.upsertProject(p);
+      await _repo.upsertProject(p, isNew: true);
     }
 
     // 전자책 권장 절차 = 할 일(완료 아님)

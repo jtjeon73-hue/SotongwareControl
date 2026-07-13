@@ -82,3 +82,63 @@ class WorkLogSource {
     }
   }
 }
+
+/// 배포 단계 상태
+class DeployStepStatus {
+  static const notChecked = 'not_checked';
+  static const success = 'success';
+  static const failed = 'failed';
+  static const notRequired = 'not_required';
+
+  static const values = [notChecked, success, failed, notRequired];
+
+  static String labelKo(String code) {
+    switch (code) {
+      case notChecked:
+        return '미확인';
+      case success:
+        return '성공';
+      case failed:
+        return '실패';
+      case notRequired:
+        return '해당 없음';
+      default:
+        return '확인 필요';
+    }
+  }
+
+  /// 구 bool 필드 호환
+  static String fromBool(bool? v, {bool required = true}) {
+    if (v == true) return success;
+    if (v == false) return required ? notChecked : notRequired;
+    return notChecked;
+  }
+}
+
+class IdeaStatus {
+  static const idea = 'idea';
+  static const reviewing = 'reviewing';
+  static const selected = 'selected';
+  static const onHold = 'on_hold';
+  static const rejected = 'rejected';
+  static const inDevelopment = 'in_development';
+
+  static String labelKo(String code) {
+    switch (code) {
+      case idea:
+        return '아이디어';
+      case reviewing:
+        return '검토 중';
+      case selected:
+        return '채택';
+      case onHold:
+        return '보류';
+      case rejected:
+        return '폐기';
+      case inDevelopment:
+        return '개발 진행';
+      default:
+        return '확인 필요';
+    }
+  }
+}

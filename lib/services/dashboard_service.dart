@@ -131,7 +131,11 @@ class DashboardService {
     }
 
     for (final d in deployments.where((e) => !e.isFullyComplete)) {
-      items.add('배포 확인 미완료: ${d.projectId}');
+      if (d.deployOkSitePending) {
+        items.add('배포 성공 / 실제 반영 확인 필요: ${d.projectId}');
+      } else {
+        items.add('배포 확인 미완료: ${d.projectId}');
+      }
     }
 
     if (items.isEmpty) {

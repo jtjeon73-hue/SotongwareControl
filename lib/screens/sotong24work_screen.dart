@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/ops_enums.dart';
 import '../models/ops_models.dart';
+import '../screens/project_detail_screen.dart';
 import '../services/dashboard_service.dart';
 import '../services/firebase_ready.dart';
 import '../services/ops_repository.dart';
@@ -309,6 +310,24 @@ class _ModuleCard extends StatelessWidget {
                     color: ControlColors.textMuted,
                   ),
                 ),
+              const SizedBox(height: 8),
+              Text(
+                '대표 확인: ${module.needsCeoReview ? '필요' : '해당 없음'}',
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            ProjectDetailScreen(projectId: module.id),
+                      ),
+                    );
+                  },
+                  child: const Text('상세보기'),
+                ),
+              ),
             ],
           ),
         ),

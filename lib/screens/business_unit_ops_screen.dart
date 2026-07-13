@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/ops_enums.dart';
 import '../models/ops_models.dart';
+import '../screens/project_detail_screen.dart';
 import '../services/dashboard_service.dart';
 import '../services/firebase_ready.dart';
 import '../services/github_service.dart';
@@ -195,7 +196,18 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                                   )
                                 else
                                   ...projects.map(
-                                    (p) => _ProjectTile(project: p),
+                                    (p) => InkWell(
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => ProjectDetailScreen(
+                                              projectId: p.id,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: _ProjectTile(project: p),
+                                    ),
                                   ),
                                 const SizedBox(height: 16),
                                 _InfoCard(

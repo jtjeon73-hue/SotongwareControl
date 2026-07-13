@@ -8,6 +8,7 @@ import '../services/firebase_ready.dart';
 import '../services/ops_repository.dart';
 import '../services/ops_seed_service.dart';
 import '../theme/control_theme.dart';
+import '../widgets/deployment_checklist.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/page_hero.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -290,30 +291,21 @@ class OpsDashboardScreen extends StatelessWidget {
                                               '등록된 배포 기록이 없습니다.',
                                             )
                                           : Column(
-                                              children: deps.take(8).map((d) {
-                                                return ListTile(
-                                                  contentPadding:
-                                                      EdgeInsets.zero,
-                                                  title: Text(d.projectId),
-                                                  subtitle: Text(
-                                                    '검사 ${d.analyzePassed ? '✓' : '·'} / '
-                                                    '테스트 ${d.testPassed ? '✓' : '·'} / '
-                                                    '빌드 ${d.buildPassed ? '✓' : '·'} / '
-                                                    '커밋 ${d.gitCommitted ? '✓' : '·'} / '
-                                                    '푸시 ${d.gitPushed ? '✓' : '·'} / '
-                                                    'Firebase ${d.firebaseDeployed ? '✓' : '·'} / '
-                                                    '실확인 ${d.siteVerified ? '✓' : '·'}',
-                                                  ),
-                                                  trailing: StatusBadge(
-                                                    label: d.statusLabel,
-                                                    color: d.isFullyComplete
-                                                        ? ControlColors
-                                                              .accentGreen
-                                                        : ControlColors
-                                                              .accentWarm,
-                                                  ),
-                                                );
-                                              }).toList(),
+                                              children: deps
+                                                  .take(6)
+                                                  .map(
+                                                    (d) => Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                        bottom: 10,
+                                                      ),
+                                                      child:
+                                                          DeploymentChecklistCard(
+                                                        deployment: d,
+                                                      ),
+                                                    ),
+                                                  )
+                                                  .toList(),
                                             ),
                                     ),
                                     const SizedBox(height: 20),
