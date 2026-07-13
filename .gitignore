@@ -48,3 +48,8 @@ app.*.map.json
 *.apk
 release_apk/*.apk
 build/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log

@@ -1,12 +1,12 @@
 {
-    "name": "sotong_ware_control",
-    "short_name": "sotong_ware_control",
+    "name": "소통총관제",
+    "short_name": "소통총관제",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#F4F7FB",
+    "theme_color": "#0D9488",
+    "description": "소통웨어 전체 사업을 AI가 총괄 관제하는 관리자 전용 디지털 관제 시스템",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

@@ -914,12 +914,7 @@ class AiControlCenterData {
       version: 'v1.0',
       registeredAt: '2026-02-01',
       productType: '웹 프로모 · 사업부 허브',
-      channels: [
-        'AutomationPromo',
-        'AppsPromo',
-        'ContentsPromo',
-        'EbookPromo',
-      ],
+      channels: ['AutomationPromo', 'AppsPromo', 'ContentsPromo', 'EbookPromo'],
       status: AiSystemStatus.monitoring,
       catalogId: 'PRD-PROMO-004',
     ),
@@ -937,10 +932,7 @@ class AiControlCenterData {
         '다운로드센터 안내 문구 점검',
         'APK·프로모 URL 일치 확인',
       ],
-      scheduledUpdates: [
-        'v0.3 — 일정 추천 MVP (개발 중)',
-        'v0.4 — FAQ 챗봇 온보딩',
-      ],
+      scheduledUpdates: ['v0.3 — 일정 추천 MVP (개발 중)', 'v0.4 — FAQ 챗봇 온보딩'],
       knownIssues: ['배포 후 홍보 흐름 미완', '일부 다운로드 경로 점검 필요'],
       nextMaintenanceAction: 'MVP 배포 후 v0.3 유지보수 계획 등록',
     ),
@@ -950,11 +942,7 @@ class AiControlCenterData {
       currentVersion: 'v0.4',
       healthScore: 65,
       lastCheckedAt: '오늘 05:45',
-      maintenanceTasks: [
-        '지역 데이터 구조 고도화',
-        '카테고리·검색 UX 개선',
-        '프로모 페이지 정보 동기화',
-      ],
+      maintenanceTasks: ['지역 데이터 구조 고도화', '카테고리·검색 UX 개선', '프로모 페이지 정보 동기화'],
       scheduledUpdates: ['v0.5 — AI 생활정보 요약 (기획)'],
       knownIssues: ['데이터 구조 지연', '지역 카테고리 미정리'],
       nextMaintenanceAction: '데이터 구조 설계 → AI지시진행부 실행 요청',
@@ -1108,8 +1096,7 @@ class AiControlCenterData {
     MarketingCeoFeedback(
       divisionName: '소통자동화사업부',
       subject: 'B2B 홍보 자료 부족',
-      feedback:
-          '핵심 경험은 충분하나 제안서·포트폴리오·홍보사이트가 미비해 신규 문의 유입이 제한됩니다.',
+      feedback: '핵심 경험은 충분하나 제안서·포트폴리오·홍보사이트가 미비해 신규 문의 유입이 제한됩니다.',
       recommendation: '산업자동화 프로모와 견적도우미를 묶은 B2B 패키지 홍보를 우선 추진하세요.',
       priority: '높음',
       submittedAt: '오늘 05:20',
@@ -1117,8 +1104,7 @@ class AiControlCenterData {
     MarketingCeoFeedback(
       divisionName: '소통콘텐츠사업부',
       subject: '콘텐츠·앱 홍보 교차 편성',
-      feedback:
-          '콘텐츠 업로드 일정이 없어 앱 홍보 영상과 연결이 지연되고 있습니다.',
+      feedback: '콘텐츠 업로드 일정이 없어 앱 홍보 영상과 연결이 지연되고 있습니다.',
       recommendation: '주간 캘린더를 확정하고 앱 홍보 30초 영상을 1차 업로드 목표로 잡으세요.',
       priority: '중간',
       submittedAt: '오늘 04:45',
@@ -1126,8 +1112,7 @@ class AiControlCenterData {
     MarketingCeoFeedback(
       divisionName: '소통전자책사업부',
       subject: '첫 전자책 티저·교차 판매',
-      feedback:
-          '앱·여행 관심 고객에게 전자책 사전 문의 전환이 가능하나 티저 페이지가 없습니다.',
+      feedback: '앱·여행 관심 고객에게 전자책 사전 문의 전환이 가능하나 티저 페이지가 없습니다.',
       recommendation: '첫 등록 주제 확정 후 티저 공개와 앱 프로모 교차 링크를 동시에 적용하세요.',
       priority: '중간',
       submittedAt: '어제 21:00',
@@ -1168,11 +1153,7 @@ class AiControlCenterData {
         '다운로드 43회 · 전환 문의 6건',
         'AI홍보.마케팅부 피드백 4건 반영',
       ],
-      actionsRequired: [
-        '일본 여행 MVP 개발 승인',
-        '광고비 증액 조건부 검토',
-        '비용 분류 기준 승인',
-      ],
+      actionsRequired: ['일본 여행 MVP 개발 승인', '광고비 증액 조건부 검토', '비용 분류 기준 승인'],
       reportedAt: '오늘 06:10',
       status: AiSystemStatus.monitoring,
     ),

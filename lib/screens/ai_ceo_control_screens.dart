@@ -746,9 +746,9 @@ class _DivisionMarketingConfigCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               '홍보·마케팅 구성',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             ...config.marketingConfig.map(
@@ -813,9 +813,9 @@ class _MarketingCeoFeedbackCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               feedback.divisionName,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: ControlColors.textMuted,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: ControlColors.textMuted),
             ),
             const SizedBox(height: 10),
             _InfoLine(label: '피드백', value: feedback.feedback),
@@ -859,24 +859,18 @@ class _CeoHubReportCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               '${report.sourceDepartment} · ${report.reportedAt}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: ControlColors.textMuted,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: ControlColors.textMuted),
             ),
             const SizedBox(height: 10),
             Text(report.summary, style: bodyStyle),
             const SizedBox(height: 10),
-            Text(
-              '핵심 포인트',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text('핵심 포인트', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             ...report.keyPoints.map((p) => Text('• $p', style: bodyStyle)),
             const SizedBox(height: 8),
-            Text(
-              '소통총괄관제 실행 항목',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text('소통총괄관제 실행 항목', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             ...report.actionsRequired.map(
               (a) => Text('• $a', style: bodyStyle),
@@ -894,10 +888,9 @@ class _ProductRegistrationFlowBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stages = AiControlCenterData.productRegistrationStages;
-    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-      fontSize: 10,
-      fontWeight: FontWeight.w600,
-    );
+    final labelStyle = Theme.of(
+      context,
+    ).textTheme.bodySmall?.copyWith(fontSize: 10, fontWeight: FontWeight.w600);
 
     return Card(
       child: Padding(
@@ -907,10 +900,7 @@ class _ProductRegistrationFlowBar extends StatelessWidget {
             for (var i = 0; i < stages.length; i++) ...[
               if (i > 0)
                 Expanded(
-                  child: Container(
-                    height: 2,
-                    color: ControlColors.border,
-                  ),
+                  child: Container(height: 2, color: ControlColors.border),
                 ),
               Column(
                 mainAxisSize: MainAxisSize.min,
@@ -997,42 +987,37 @@ class _ProductRegistrationCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Text(
-              '등록 체크리스트',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            Text('등록 체크리스트', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 6),
-            ...item.checklist.asMap().entries.map(
-              (entry) {
-                final done = entry.key < stageIndex;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        done
-                            ? Icons.check_circle_outline
-                            : Icons.radio_button_unchecked,
-                        size: 14,
-                        color: done
-                            ? ControlColors.teal
-                            : ControlColors.textMuted,
+            ...item.checklist.asMap().entries.map((entry) {
+              final done = entry.key < stageIndex;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      done
+                          ? Icons.check_circle_outline
+                          : Icons.radio_button_unchecked,
+                      size: 14,
+                      color: done
+                          ? ControlColors.teal
+                          : ControlColors.textMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        entry.value,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.copyWith(fontSize: 12),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          entry.value,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.copyWith(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    ),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(height: 8),
             _InfoLine(label: '담당', value: item.owner),
             _InfoLine(label: '갱신', value: item.updatedAt),
@@ -1224,9 +1209,9 @@ class _DivisionProductDevCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               '활용 AI · 기술',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             ...guide.recommendations.map(
@@ -1271,9 +1256,9 @@ class _DivisionProductDevCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '추가 상품 구성',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             ...guide.productEnhancements.map(
@@ -2399,36 +2384,6 @@ class _DecisionAction extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: selected ? ControlColors.teal : ControlColors.textMuted,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.check_circle_outline,
-              color: ControlColors.accentGreen,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-          ],
         ),
       ),
     );

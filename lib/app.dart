@@ -6,16 +6,23 @@ import 'screens/business_division_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
 import 'screens/overall_command_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
+import 'services/auth_service.dart';
 import 'state/control_scope.dart';
 import 'state/control_state.dart';
 import 'theme/control_theme.dart';
+import 'widgets/auth_gate.dart';
 import 'widgets/sidebar_navigation.dart';
 import 'widgets/sotong_brand_icon.dart';
 
 class SotongWareControlApp extends StatelessWidget {
-  const SotongWareControlApp({super.key, required this.controlState});
+  const SotongWareControlApp({
+    super.key,
+    required this.controlState,
+    required this.authService,
+  });
 
   final ControlState controlState;
+  final AuthClient authService;
 
   @override
   Widget build(BuildContext context) {
@@ -25,14 +32,20 @@ class SotongWareControlApp extends StatelessWidget {
         title: SampleBusinessData.siteTitle,
         debugShowCheckedModeBanner: false,
         theme: ControlTheme.lightTheme,
-        home: const ControlCenterShell(),
+        home: AuthGate(
+          authService: authService,
+          authenticatedBuilder: (_) =>
+              ControlCenterShell(authService: authService),
+        ),
       ),
     );
   }
 }
 
 class ControlCenterShell extends StatefulWidget {
-  const ControlCenterShell({super.key});
+  const ControlCenterShell({super.key, required this.authService});
+
+  final AuthClient authService;
 
   @override
   State<ControlCenterShell> createState() => _ControlCenterShellState();
@@ -47,6 +60,30 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   }
 
   String get _pageTitle => _selected.label;
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('로그아웃'),
+        content: const Text('로그아웃하고 로그인 화면으로 돌아갈까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('로그아웃'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      setState(() => _selected = ControlDestination.dashboardOverview);
+      await widget.authService.signOut();
+    }
+  }
 
   Widget _buildContent() {
     switch (_selected) {
@@ -106,7 +143,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
                 Expanded(
                   child: Column(
                     children: [
-                      _ControlHeader(title: _pageTitle),
+                      _ControlHeader(
+                        title: _pageTitle,
+                        onSignOut: _confirmSignOut,
+                      ),
                       Expanded(child: _buildContent()),
                     ],
                   ),
@@ -132,6 +172,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
                 title: _pageTitle,
                 showMenuButton: true,
                 onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                onSignOut: _confirmSignOut,
               ),
               Expanded(child: _buildContent()),
             ],
@@ -145,11 +186,13 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
 class _ControlHeader extends StatelessWidget {
   const _ControlHeader({
     required this.title,
+    required this.onSignOut,
     this.showMenuButton = false,
     this.onMenuPressed,
   });
 
   final String title;
+  final VoidCallback onSignOut;
   final bool showMenuButton;
   final VoidCallback? onMenuPressed;
 
@@ -157,11 +200,11 @@ class _ControlHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final showStatusBadge = screenWidth >= 420;
-    final showSiteName = screenWidth >= 560;
+    final showSiteName = screenWidth >= 720;
 
     return Container(
       height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
         color: ControlColors.surface,
         border: Border(
@@ -191,10 +234,10 @@ class _ControlHeader extends StatelessWidget {
                 color: ControlColors.tealSoft,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  SotongBrandIcon(compact: true, size: 14, padding: 5),
+                children: [
+                  SotongBrandIcon(compact: true, size: 18, padding: 0),
                   SizedBox(width: 6),
                   Text(
                     '소통총관제',
@@ -207,17 +250,27 @@ class _ControlHeader extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(width: 8),
           ],
           if (showSiteName) ...[
-            const SizedBox(width: 12),
             Text(
-              SampleBusinessData.siteEnglishName,
+              '관리자',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 12,
                 color: ControlColors.textMuted,
               ),
             ),
+            const SizedBox(width: 4),
           ],
+          TextButton.icon(
+            onPressed: onSignOut,
+            icon: const Icon(Icons.logout, size: 16),
+            label: const Text('로그아웃'),
+            style: TextButton.styleFrom(
+              foregroundColor: ControlColors.textSecondary,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+          ),
         ],
       ),
     );

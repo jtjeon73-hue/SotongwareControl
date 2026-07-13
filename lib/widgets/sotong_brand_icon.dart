@@ -2,45 +2,49 @@ import 'package:flutter/material.dart';
 
 import '../theme/control_theme.dart';
 
-/// 소통총관제 · 소통웨어 브랜드 상징 아이콘
-/// (연결 허브 = 소통 + 총괄 관제)
+/// 소통총관제 · 소통웨어 공식 브랜드 로고
 class SotongBrandIcon extends StatelessWidget {
   const SotongBrandIcon({
     super.key,
-    this.size = 22,
-    this.padding = 9,
+    this.size = 40,
+    this.padding = 0,
     this.compact = false,
   });
+
+  static const assetPath = 'assets/images/sotong_control_logo.png';
 
   final double size;
   final double padding;
   final bool compact;
 
-  static const IconData icon = Icons.hub_rounded;
-
   @override
   Widget build(BuildContext context) {
-    final radius = compact ? 10.0 : 12.0;
-
-    return Container(
+    final box = compact ? size : size;
+    return Padding(
       padding: EdgeInsets.all(padding),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [ControlColors.tealSoft, ControlColors.sandLight],
-        ),
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: ControlColors.teal.withValues(alpha: 0.22)),
-        boxShadow: [
-          BoxShadow(
-            color: ControlColors.teal.withValues(alpha: 0.12),
-            blurRadius: compact ? 4 : 8,
-            offset: const Offset(0, 2),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(compact ? 8 : 12),
+        child: Image.asset(
+          assetPath,
+          width: box,
+          height: box,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, error, stackTrace) => Container(
+            width: box,
+            height: box,
+            decoration: BoxDecoration(
+              color: ControlColors.tealSoft,
+              borderRadius: BorderRadius.circular(compact ? 8 : 12),
+            ),
+            child: Icon(
+              Icons.hub_rounded,
+              color: ControlColors.teal,
+              size: box * 0.55,
+            ),
           ),
-        ],
+        ),
       ),
-      child: Icon(icon, color: ControlColors.teal, size: size),
     );
   }
 }

@@ -512,18 +512,18 @@ class _CeoHubReportPanel extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               '핵심 포인트',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
             ...report.keyPoints.map((p) => Text('• $p', style: bodyStyle)),
             const SizedBox(height: 10),
             Text(
               '대표 확인·실행 항목',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 4),
             ...report.actionsRequired.map(
@@ -554,7 +554,10 @@ class _ReportStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (status) {
       AiSystemStatus.monitoring => ('관제 중', ControlColors.teal),
-      AiSystemStatus.automaticReportPending => ('보고 대기', ControlColors.accentWarm),
+      AiSystemStatus.automaticReportPending => (
+        '보고 대기',
+        ControlColors.accentWarm,
+      ),
       AiSystemStatus.approvalRequired => ('승인 필요', ControlColors.accentRose),
       _ => (status.label, ControlColors.textMuted),
     };

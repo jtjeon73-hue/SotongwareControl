@@ -199,7 +199,7 @@ class SidebarNavigation extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SotongBrandIcon(),
+                    const SotongBrandIcon(size: 44),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
