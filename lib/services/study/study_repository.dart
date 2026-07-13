@@ -453,6 +453,19 @@ class StudyRepository {
       'study_quiz_attempts': await dump(_attempts),
       'study_review_items': await dump(_reviews),
       'study_goals': await dump(_goals),
+      'study_lessons': await dump(_db.collection('study_lessons')),
+      'study_course_versions': await dump(
+        _db.collection('study_course_versions'),
+      ),
+      'study_learning_runs': await dump(_db.collection('study_learning_runs')),
+      'study_lesson_progress': await dump(
+        _db.collection('study_lesson_progress'),
+      ),
+      'study_generation_jobs': await dump(
+        _db.collection('study_generation_jobs'),
+      ),
+      'study_ai_messages': await dump(_db.collection('study_ai_messages')),
+      'study_ai_usage': await dump(_db.collection('study_ai_usage')),
     };
   }
 

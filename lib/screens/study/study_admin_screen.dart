@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/study/study_enums.dart';
+import '../../models/study/study_generation_enums.dart';
 import '../../models/study/study_models.dart';
 import '../../services/firebase_ready.dart';
+import '../../services/study/study_generation_service.dart';
 import '../../services/study/study_repository.dart';
 import '../../theme/control_theme.dart';
 import '../../widgets/ops_ui.dart';
 import '../../widgets/page_hero.dart';
 import '../../widgets/study/study_widgets.dart';
+import 'study_ai_course_creator_screen.dart';
 import 'study_course_detail_screen.dart';
+import 'study_generation_job_screen.dart';
 
 class StudyAdminScreen extends StatefulWidget {
   const StudyAdminScreen({super.key});
@@ -191,8 +195,9 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
           const PageHero(
             title: '스터디 관리',
             subtitle:
-                '강의방·챕터를 자유롭게 추가합니다. 관심 분야를 코드에 고정하지 않습니다. '
-                '샘플 강의는 운영 Firestore에 자동 저장하지 않습니다.',
+                '강의방·챕터·개별 강의·AI 생성 요청을 관리합니다. '
+                '관심 분야를 코드에 고정하지 않습니다. '
+                'AI 미연결 시 가짜 본문을 자동 생성하지 않습니다.',
             badge: '관리자',
           ),
           const SizedBox(height: 16),
@@ -202,6 +207,19 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
             runSpacing: 10,
             children: [
               FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                const StudyAiCourseCreatorScreen(),
+                          ),
+                        );
+                      },
+                child: const Text('AI 강의 만들기'),
+              ),
+              FilledButton(
                 onPressed: _busy ? null : _createCourse,
                 child: const Text('강의방 생성'),
               ),
@@ -210,6 +228,53 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
                 child: const Text('스터디 JSON 내보내기'),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          StreamBuilder(
+            stream: StudyGenerationService().watchJobs(),
+            builder: (context, jobSnap) {
+              final jobs = jobSnap.data ?? const [];
+              if (jobs.isEmpty) return const SizedBox.shrink();
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '최근 생성 작업',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      ...jobs.take(5).map(
+                        (j) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            j.interestField.isEmpty
+                                ? j.id
+                                : j.interestField,
+                          ),
+                          subtitle: Text(
+                            '${StudyJobStatus.labelKo(j.status)} · '
+                            '${j.requestedLessonCount}강',
+                          ),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => StudyGenerationJobScreen(
+                                  jobId: j.id,
+                                  courseId: j.courseId,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
           StreamBuilder<List<StudyCourse>>(

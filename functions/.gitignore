@@ -1,0 +1,5 @@
+# Functions secrets — never commit
+.env
+.env.*
+*.local
+node_modules/

@@ -1,0 +1,17 @@
+{
+  "name": "sotongware-control-functions",
+  "description": "Cloud Functions for Sotongware Control study AI (no API keys in repo)",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "lint": "node -c index.js",
+    "build": "node -c index.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "private": true
+}

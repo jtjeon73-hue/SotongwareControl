@@ -1,4 +1,5 @@
 import '../../models/study/study_enums.dart';
+import '../../models/study/study_generation_models.dart';
 import '../../models/study/study_models.dart';
 
 class StudyDashboardKpis {
@@ -54,6 +55,54 @@ class StudyProgressCalculator {
         .toSet();
     return progress
         .where((p) => p.isCompleted && eligibleIds.contains(p.chapterId))
+        .length;
+  }
+
+  /// 공개·비초안 강의가 있으면 강의 기준, 없으면 챕터 기준.
+  static int? resolveCourseProgressPercent({
+    required List<StudyChapter> chapters,
+    required List<StudyProgress> chapterProgress,
+    required List<StudyLesson> lessons,
+    required List<StudyLessonProgress> lessonProgress,
+  }) {
+    final eligibleLessons =
+        lessons.where((l) => l.countsTowardProgress).toList();
+    if (eligibleLessons.isNotEmpty) {
+      return lessonProgressPercent(
+        lessons: lessons,
+        progress: lessonProgress,
+      );
+    }
+    return courseProgressPercent(
+      chapters: chapters,
+      progress: chapterProgress,
+    );
+  }
+
+  static int? lessonProgressPercent({
+    required List<StudyLesson> lessons,
+    required List<StudyLessonProgress> progress,
+  }) {
+    final eligible = lessons.where((l) => l.countsTowardProgress).toList();
+    if (eligible.isEmpty) return null;
+    final completedIds = progress
+        .where((p) => p.isCompleted)
+        .map((p) => p.lessonId)
+        .toSet();
+    final done = eligible.where((l) => completedIds.contains(l.id)).length;
+    return ((done / eligible.length) * 100).round().clamp(0, 100);
+  }
+
+  static int completedEligibleLessons({
+    required List<StudyLesson> lessons,
+    required List<StudyLessonProgress> progress,
+  }) {
+    final eligibleIds = lessons
+        .where((l) => l.countsTowardProgress)
+        .map((l) => l.id)
+        .toSet();
+    return progress
+        .where((p) => p.isCompleted && eligibleIds.contains(p.lessonId))
         .length;
   }
 }

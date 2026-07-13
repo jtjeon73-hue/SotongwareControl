@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/study/study_enums.dart';
+import '../../models/study/study_generation_models.dart';
 import '../../models/study/study_models.dart';
 import '../../services/firebase_ready.dart';
 import '../../services/study/study_dashboard_service.dart';
+import '../../services/study/study_generation_service.dart';
 import '../../services/study/study_repository.dart';
 import '../../widgets/ops_ui.dart';
 import '../../widgets/study/study_widgets.dart';
+import 'study_learning_runs_screen.dart';
+import 'study_lesson_screen.dart';
 
 class StudyCourseDetailScreen extends StatefulWidget {
   const StudyCourseDetailScreen({super.key, required this.courseId});
@@ -22,6 +26,7 @@ class StudyCourseDetailScreen extends StatefulWidget {
 class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
   StudyRepository? _repo;
   StudyRepository get repo => _repo ??= StudyRepository();
+  final _gen = StudyGenerationService();
 
   Future<void> _refreshCourseStats(
     StudyCourse course,
@@ -322,6 +327,18 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                         ),
                         actions: [
                           TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => StudyLearningRunsScreen(
+                                    courseId: course.id,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('수강 회차'),
+                          ),
+                          TextButton(
                             onPressed: () =>
                                 _addChapter(course, chapters.length),
                             child: const Text('챕터 추가'),
@@ -433,6 +450,77 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                               ),
                             ],
                             const SizedBox(height: 16),
+                            StreamBuilder<List<StudyLesson>>(
+                              stream: _gen.watchLessons(course.id),
+                              builder: (context, lesSnap) {
+                                final lessons = lesSnap.data ?? const [];
+                                if (lessons.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                final lessonPct =
+                                    StudyProgressCalculator.lessonProgressPercent(
+                                  lessons: lessons,
+                                  progress: const [],
+                                );
+                                final resolved =
+                                    StudyProgressCalculator.resolveCourseProgressPercent(
+                                  chapters: chapters,
+                                  chapterProgress: progress,
+                                  lessons: lessons,
+                                  lessonProgress: const [],
+                                );
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '개별 강의 (${lessons.length}강)',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
+                                    ),
+                                    Text(
+                                      '진도(강의 기준 표시): ${resolved ?? lessonPct ?? computed ?? '미설정'}%'
+                                      ' · 초안·비공개 강의는 분모에서 제외',
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...lessons.take(50).map(
+                                      (l) => Card(
+                                        margin: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: ListTile(
+                                          dense: true,
+                                          title: Text(
+                                            '${l.lessonNumber}. ${l.title}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          subtitle: Text(
+                                            l.isPublished ? '공개' : '비공개/초안',
+                                          ),
+                                          onTap: () {
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    StudyLessonScreen(
+                                                  courseId: course.id,
+                                                  lessonId: l.id,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    if (lessons.length > 50)
+                                      Text(
+                                        '… 외 ${lessons.length - 50}강 (전체는 목록에서 확인)',
+                                      ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                );
+                              },
+                            ),
                             Text(
                               '챕터 목록',
                               style: Theme.of(context).textTheme.titleMedium,
