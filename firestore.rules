@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 관리자 UID/이메일만 접근 (비밀번호 아님 · dart-define과 일치)
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == 'YrJNhBlxSeck5qZi5NgHWrx1CjE3'
+        && request.auth.token.email.lower() == 'sotongware@naver.com';
+    }
+
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

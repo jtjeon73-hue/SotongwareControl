@@ -8,6 +8,7 @@ enum ControlDestination {
   revenueProgress,
   issuesCheck,
   nextPriority,
+  adminData,
   aiRepresentative,
   aiProductDevDept,
   aiWorkOrderDept,
@@ -15,6 +16,7 @@ enum ControlDestination {
   aiIdeaPlanningDept,
   aiMarketingDept,
   aiTaxAccountingDept,
+  sotong24work,
   industrialAutomation,
   appDevelopment,
   youtubeContent,
@@ -35,6 +37,8 @@ extension ControlDestinationX on ControlDestination {
         return '문제/지연/체크사항';
       case ControlDestination.nextPriority:
         return '다음 실행 우선순위';
+      case ControlDestination.adminData:
+        return '데이터 관리';
       case ControlDestination.aiRepresentative:
         return 'AI대표';
       case ControlDestination.aiProductDevDept:
@@ -49,16 +53,18 @@ extension ControlDestinationX on ControlDestination {
         return 'AI홍보.마케팅부';
       case ControlDestination.aiTaxAccountingDept:
         return 'AI세무회계부';
+      case ControlDestination.sotong24work:
+        return '소통24워크';
       case ControlDestination.industrialAutomation:
-        return '소통자동화사업부';
+        return '산업자동화사업부';
       case ControlDestination.appDevelopment:
-        return '소통앱개발사업부';
+        return '앱개발사업부';
       case ControlDestination.youtubeContent:
-        return '소통콘텐츠사업부';
+        return '콘텐츠·음악사업부';
       case ControlDestination.ebook:
-        return '소통전자책사업부';
+        return '전자책사업부';
       case ControlDestination.onlineExpansion:
-        return '소통온라인판매/확장사업부';
+        return '온라인판매/확장(보관)';
     }
   }
 
@@ -74,6 +80,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.warning_amber_outlined;
       case ControlDestination.nextPriority:
         return Icons.playlist_add_check_outlined;
+      case ControlDestination.adminData:
+        return Icons.storage_outlined;
       case ControlDestination.aiRepresentative:
         return Icons.psychology_outlined;
       case ControlDestination.aiProductDevDept:
@@ -88,6 +96,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.campaign_outlined;
       case ControlDestination.aiTaxAccountingDept:
         return Icons.receipt_long_outlined;
+      case ControlDestination.sotong24work:
+        return Icons.developer_board_outlined;
       case ControlDestination.industrialAutomation:
         return Icons.precision_manufacturing_outlined;
       case ControlDestination.appDevelopment:
@@ -103,12 +113,14 @@ extension ControlDestinationX on ControlDestination {
 
   String? get divisionId {
     switch (this) {
+      case ControlDestination.sotong24work:
+        return 'sotong24work';
       case ControlDestination.industrialAutomation:
         return 'industrial_automation';
       case ControlDestination.appDevelopment:
         return 'app_development';
       case ControlDestination.youtubeContent:
-        return 'youtube_content';
+        return 'content_music';
       case ControlDestination.ebook:
         return 'ebook';
       case ControlDestination.onlineExpansion:
@@ -158,6 +170,7 @@ class SidebarNavigation extends StatelessWidget {
     ControlDestination.revenueProgress,
     ControlDestination.issuesCheck,
     ControlDestination.nextPriority,
+    ControlDestination.adminData,
   ];
 
   static const _aiDepartments = [
@@ -171,11 +184,11 @@ class SidebarNavigation extends StatelessWidget {
   ];
 
   static const _divisions = [
+    ControlDestination.sotong24work,
     ControlDestination.industrialAutomation,
     ControlDestination.appDevelopment,
     ControlDestination.youtubeContent,
     ControlDestination.ebook,
-    ControlDestination.onlineExpansion,
   ];
 
   @override
@@ -212,7 +225,7 @@ class SidebarNavigation extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'AI 총괄 관제 · 디지털 프로모',
+                            '데이터 기반 운영 관제',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(
                                   fontSize: 11,

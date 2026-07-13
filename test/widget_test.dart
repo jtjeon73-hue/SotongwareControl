@@ -191,6 +191,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('전체 사업 현황'), findsWidgets);
+    expect(find.text('소통24워크'), findsOneWidget);
+    expect(find.text('데이터 관리'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
     expect(find.text('관리자 로그인'), findsNothing);
     expect(tester.takeException(), isNull);

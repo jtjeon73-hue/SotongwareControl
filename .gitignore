@@ -56,3 +56,10 @@ firebase-debug.*.log
 
 # Local deploy secrets (email/UID only — never commit)
 tool/deploy_control.local.ps1
+
+# Secrets / local env
+.env
+.env.*
+*.local.ps1
+**/serviceAccount*.json
+**/google-services-key*.json

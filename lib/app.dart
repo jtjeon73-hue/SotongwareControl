@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'data/sample_business_data.dart';
 import 'screens/action_items_screen.dart';
-import 'screens/ai_ceo_control_screens.dart';
-import 'screens/business_division_screen.dart';
+import 'screens/admin_data_screen.dart';
+import 'screens/ai_ops_department_screen.dart';
+import 'screens/business_unit_ops_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
-import 'screens/overall_command_screen.dart';
+import 'screens/ops_dashboard_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
+import 'screens/sotong24work_screen.dart';
 import 'services/auth_service.dart';
 import 'state/control_scope.dart';
 import 'state/control_state.dart';
@@ -85,45 +87,107 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
     }
   }
 
+  static const _ebookPlan = [
+    '전자책 주제 선정',
+    '목표 독자 설정',
+    '제목 후보 작성',
+    '목차 구성',
+    '자료 수집',
+    '본문 초안 작성',
+    'AI 검토 및 보완',
+    '표지 제작',
+    'PDF 및 EPUB 제작',
+    '가격 및 판매 채널 결정',
+    '상품 소개 페이지 제작',
+    '판매 등록 및 홍보',
+  ];
+
   Widget _buildContent() {
     switch (_selected) {
       case ControlDestination.dashboardOverview:
-        return OverallCommandScreen(onNavigate: _onDestinationSelected);
+        return OpsDashboardScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.divisionProgress:
-        return DivisionProgressScreen(onNavigate: _onDestinationSelected);
+        return OpsDashboardScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.revenueProgress:
         return const RevenueDashboardScreen();
       case ControlDestination.issuesCheck:
         return const IssuesDashboardScreen();
       case ControlDestination.nextPriority:
         return const ActionItemsScreen();
+      case ControlDestination.adminData:
+        return const AdminDataScreen();
       case ControlDestination.aiRepresentative:
-        return const AiCeoOfficeScreen();
+        return const AiOpsDepartmentScreen(
+          departmentId: 'ceo',
+          title: 'AI대표',
+          roleSummary:
+              '전체 사업 현황·긴급 확인·오늘 우선 작업·승인 필요 사항을 규칙 기반으로 요약합니다.',
+        );
       case ControlDestination.aiProductDevDept:
-        return const AiDepartmentControlScreen(departmentId: 'productdev');
+        return const AiOpsDepartmentScreen(
+          departmentId: 'productdev',
+          title: 'AI상품개발부',
+          roleSummary: '등록된 프로젝트·개발 후보 상태를 사실 기준으로 정리합니다.',
+        );
       case ControlDestination.aiWorkOrderDept:
-        return const AiDepartmentControlScreen(departmentId: 'workorder');
+        return const AiOpsDepartmentScreen(
+          departmentId: 'workorder',
+          title: 'AI지시진행부',
+          roleSummary: '할 일·우선순위·승인·지연을 관리합니다. AI 제안과 수동 등록을 구분합니다.',
+        );
       case ControlDestination.aiStrategyDept:
-        return const AiDepartmentControlScreen(departmentId: 'strategy');
+        return const AiOpsDepartmentScreen(
+          departmentId: 'strategy',
+          title: 'AI전략부',
+          roleSummary: '근거 데이터 없는 매출 예측은 만들지 않습니다. 등록된 사업부 상태만 검토합니다.',
+        );
       case ControlDestination.aiIdeaPlanningDept:
-        return const AiDepartmentControlScreen(departmentId: 'idea');
+        return const AiOpsDepartmentScreen(
+          departmentId: 'idea',
+          title: 'AI기획.아이디어부',
+          roleSummary: '아이디어는 프로젝트 진행처럼 표시하지 않습니다.',
+        );
       case ControlDestination.aiMarketingDept:
-        return const AiDepartmentControlScreen(departmentId: 'marketing');
+        return const AiOpsDepartmentScreen(
+          departmentId: 'marketing',
+          title: 'AI홍보.마케팅부',
+          roleSummary: '미홍보 내용을 완료처럼 표시하지 않습니다. 프로모 URL 등록 현황만 표시합니다.',
+        );
       case ControlDestination.aiTaxAccountingDept:
-        return const AiDepartmentControlScreen(departmentId: 'tax');
-      default:
-        break;
+        return const AiOpsDepartmentScreen(
+          departmentId: 'tax',
+          title: 'AI세무회계부',
+          roleSummary: '실제 등록 금액만 표시합니다. 확정 신고 결과가 아닌 관리 참고 정보입니다.',
+        );
+      case ControlDestination.sotong24work:
+        return const Sotong24WorkScreen();
+      case ControlDestination.industrialAutomation:
+        return const BusinessUnitOpsScreen(
+          businessUnitId: 'industrial_automation',
+          fallbackTitle: '산업자동화사업부',
+        );
+      case ControlDestination.appDevelopment:
+        return const BusinessUnitOpsScreen(
+          businessUnitId: 'app_development',
+          fallbackTitle: '앱개발사업부',
+        );
+      case ControlDestination.youtubeContent:
+        return const BusinessUnitOpsScreen(
+          businessUnitId: 'content_music',
+          fallbackTitle: '콘텐츠·음악사업부',
+        );
+      case ControlDestination.ebook:
+        return const BusinessUnitOpsScreen(
+          businessUnitId: 'ebook',
+          fallbackTitle: '전자책사업부',
+          recommendedPlan: _ebookPlan,
+        );
+      case ControlDestination.onlineExpansion:
+        return const BusinessUnitOpsScreen(
+          businessUnitId: 'online_expansion',
+          fallbackTitle: '온라인판매/확장',
+        );
     }
-
-    final divisionId = _selected.divisionId;
-    if (divisionId != null) {
-      final division = SampleBusinessData.divisionById(divisionId);
-      if (division != null) {
-        return BusinessDivisionScreen(division: division);
-      }
-    }
-
-    return OverallCommandScreen(onNavigate: _onDestinationSelected);
   }
 
   @override
