@@ -2,6 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // 관리자 UID/이메일만 접근 (비밀번호 아님 · dart-define과 일치)
+    // study_* 컬렉션 포함 전체 문서에 동일 적용
     function isAdmin() {
       return request.auth != null
         && request.auth.uid == 'YrJNhBlxSeck5qZi5NgHWrx1CjE3'

@@ -8,7 +8,6 @@ enum ControlDestination {
   revenueProgress,
   issuesCheck,
   nextPriority,
-  adminData,
   aiRepresentative,
   aiProductDevDept,
   aiWorkOrderDept,
@@ -16,12 +15,21 @@ enum ControlDestination {
   aiIdeaPlanningDept,
   aiMarketingDept,
   aiTaxAccountingDept,
+  studyDashboard,
+  studyCourses,
+  studyAiTeacher,
+  studyAssignments,
+  studyQuizzes,
+  studyNotes,
+  studyHistory,
+  studyAdmin,
   sotong24work,
   industrialAutomation,
   appDevelopment,
   youtubeContent,
   ebook,
   onlineExpansion,
+  adminData,
 }
 
 extension ControlDestinationX on ControlDestination {
@@ -53,6 +61,22 @@ extension ControlDestinationX on ControlDestination {
         return 'AI홍보.마케팅부';
       case ControlDestination.aiTaxAccountingDept:
         return 'AI세무회계부';
+      case ControlDestination.studyDashboard:
+        return '학습 대시보드';
+      case ControlDestination.studyCourses:
+        return '내 강의방';
+      case ControlDestination.studyAiTeacher:
+        return 'AI선생';
+      case ControlDestination.studyAssignments:
+        return '실습·과제';
+      case ControlDestination.studyQuizzes:
+        return '복습·퀴즈';
+      case ControlDestination.studyNotes:
+        return '학습 노트';
+      case ControlDestination.studyHistory:
+        return '학습 기록';
+      case ControlDestination.studyAdmin:
+        return '스터디 관리';
       case ControlDestination.sotong24work:
         return '소통24워크';
       case ControlDestination.industrialAutomation:
@@ -96,6 +120,22 @@ extension ControlDestinationX on ControlDestination {
         return Icons.campaign_outlined;
       case ControlDestination.aiTaxAccountingDept:
         return Icons.receipt_long_outlined;
+      case ControlDestination.studyDashboard:
+        return Icons.school_outlined;
+      case ControlDestination.studyCourses:
+        return Icons.menu_book_outlined;
+      case ControlDestination.studyAiTeacher:
+        return Icons.smart_toy_outlined;
+      case ControlDestination.studyAssignments:
+        return Icons.construction_outlined;
+      case ControlDestination.studyQuizzes:
+        return Icons.quiz_outlined;
+      case ControlDestination.studyNotes:
+        return Icons.sticky_note_2_outlined;
+      case ControlDestination.studyHistory:
+        return Icons.history_outlined;
+      case ControlDestination.studyAdmin:
+        return Icons.settings_suggest_outlined;
       case ControlDestination.sotong24work:
         return Icons.developer_board_outlined;
       case ControlDestination.industrialAutomation:
@@ -105,7 +145,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.youtubeContent:
         return Icons.play_circle_outline;
       case ControlDestination.ebook:
-        return Icons.menu_book_outlined;
+        return Icons.auto_stories_outlined;
       case ControlDestination.onlineExpansion:
         return Icons.storefront_outlined;
     }
@@ -170,7 +210,6 @@ class SidebarNavigation extends StatelessWidget {
     ControlDestination.revenueProgress,
     ControlDestination.issuesCheck,
     ControlDestination.nextPriority,
-    ControlDestination.adminData,
   ];
 
   static const _aiDepartments = [
@@ -181,6 +220,17 @@ class SidebarNavigation extends StatelessWidget {
     ControlDestination.aiIdeaPlanningDept,
     ControlDestination.aiMarketingDept,
     ControlDestination.aiTaxAccountingDept,
+  ];
+
+  static const _study = [
+    ControlDestination.studyDashboard,
+    ControlDestination.studyCourses,
+    ControlDestination.studyAiTeacher,
+    ControlDestination.studyAssignments,
+    ControlDestination.studyQuizzes,
+    ControlDestination.studyNotes,
+    ControlDestination.studyHistory,
+    ControlDestination.studyAdmin,
   ];
 
   static const _divisions = [
@@ -275,6 +325,18 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
+                const _SectionLabel(label: '소통스터디부'),
+                ..._study.map(
+                  (d) => _NavItem(
+                    destination: d,
+                    isSelected: d == selected,
+                    onTap: () {
+                      onDestinationSelected(d);
+                      onClose?.call();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
                 const _SectionLabel(label: '소통사업부'),
                 ..._divisions.map(
                   (d) => _NavItem(
@@ -285,6 +347,16 @@ class SidebarNavigation extends StatelessWidget {
                       onClose?.call();
                     },
                   ),
+                ),
+                const SizedBox(height: 8),
+                const _SectionLabel(label: '데이터 관리'),
+                _NavItem(
+                  destination: ControlDestination.adminData,
+                  isSelected: selected == ControlDestination.adminData,
+                  onTap: () {
+                    onDestinationSelected(ControlDestination.adminData);
+                    onClose?.call();
+                  },
                 ),
               ],
             ),

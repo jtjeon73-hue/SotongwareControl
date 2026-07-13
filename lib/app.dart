@@ -8,6 +8,11 @@ import 'screens/issues_dashboard_screen.dart';
 import 'screens/ops_dashboard_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
 import 'screens/sotong24work_screen.dart';
+import 'screens/study/study_admin_screen.dart';
+import 'screens/study/study_ai_teacher_screen.dart';
+import 'screens/study/study_courses_screen.dart';
+import 'screens/study/study_dashboard_screen.dart';
+import 'screens/study/study_notes_and_more_screens.dart';
 import 'services/auth_service.dart';
 import 'state/control_scope.dart';
 import 'state/control_state.dart';
@@ -159,6 +164,22 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           title: 'AI세무회계부',
           roleSummary: '실제 등록 금액만 표시합니다. 확정 신고 결과가 아닌 관리 참고 정보입니다.',
         );
+      case ControlDestination.studyDashboard:
+        return StudyDashboardScreen(onNavigate: _onDestinationSelected);
+      case ControlDestination.studyCourses:
+        return const StudyCoursesScreen();
+      case ControlDestination.studyAiTeacher:
+        return const StudyAiTeacherScreen();
+      case ControlDestination.studyAssignments:
+        return const StudyAssignmentsScreen();
+      case ControlDestination.studyQuizzes:
+        return const StudyQuizzesScreen();
+      case ControlDestination.studyNotes:
+        return const StudyNotesScreen();
+      case ControlDestination.studyHistory:
+        return const StudyHistoryScreen();
+      case ControlDestination.studyAdmin:
+        return const StudyAdminScreen();
       case ControlDestination.sotong24work:
         return const Sotong24WorkScreen();
       case ControlDestination.industrialAutomation:
