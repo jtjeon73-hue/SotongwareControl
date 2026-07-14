@@ -55,9 +55,10 @@ class OpsRepository {
   }
 
   Stream<List<BusinessUnitDoc>> watchBusinessUnits() {
-    return _units.orderBy('displayOrder').snapshots().map(
-      (s) => s.docs.map(BusinessUnitDoc.fromDoc).toList(),
-    );
+    return _units
+        .orderBy('displayOrder')
+        .snapshots()
+        .map((s) => s.docs.map(BusinessUnitDoc.fromDoc).toList());
   }
 
   Stream<List<ProjectDoc>> watchProjects({String? businessUnitId}) {
@@ -65,9 +66,7 @@ class OpsRepository {
     if (businessUnitId != null && businessUnitId.isNotEmpty) {
       q = q.where('businessUnitId', isEqualTo: businessUnitId);
     }
-    return q.snapshots().map(
-      (s) => s.docs.map(ProjectDoc.fromDoc).toList(),
-    );
+    return q.snapshots().map((s) => s.docs.map(ProjectDoc.fromDoc).toList());
   }
 
   Stream<ProjectDoc?> watchProject(String id) {
@@ -88,7 +87,10 @@ class OpsRepository {
     return d.exists;
   }
 
-  Stream<List<TaskDoc>> watchTasks({String? businessUnitId, String? projectId}) {
+  Stream<List<TaskDoc>> watchTasks({
+    String? businessUnitId,
+    String? projectId,
+  }) {
     Query<Map<String, dynamic>> q = _tasks;
     if (projectId != null && projectId.isNotEmpty) {
       q = q.where('projectId', isEqualTo: projectId);
@@ -126,9 +128,7 @@ class OpsRepository {
     if (projectId != null && projectId.isNotEmpty) {
       q = q.where('projectId', isEqualTo: projectId);
     }
-    return q.snapshots().map(
-      (s) => s.docs.map(DeploymentDoc.fromDoc).toList(),
-    );
+    return q.snapshots().map((s) => s.docs.map(DeploymentDoc.fromDoc).toList());
   }
 
   Stream<List<IssueDoc>> watchIssues({String? projectId}) {
@@ -243,7 +243,9 @@ class OpsRepository {
   }
 
   Future<void> upsertAiReport(AiReportDoc report) async {
-    final ref = report.id.isEmpty ? _aiReports.doc() : _aiReports.doc(report.id);
+    final ref = report.id.isEmpty
+        ? _aiReports.doc()
+        : _aiReports.doc(report.id);
     await ref.set(report.toMap(), SetOptions(merge: true));
     await _logActivity(
       action: 'upsert',

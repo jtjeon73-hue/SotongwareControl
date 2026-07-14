@@ -34,7 +34,9 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
     try {
       final msg = await action();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
       }
     } catch (e) {
       if (mounted) {
@@ -74,9 +76,7 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
                   ),
                   TextField(
                     controller: category,
-                    decoration: const InputDecoration(
-                      labelText: '분야 (자유 입력)',
-                    ),
+                    decoration: const InputDecoration(labelText: '분야 (자유 입력)'),
                   ),
                   TextField(
                     controller: desc,
@@ -91,36 +91,38 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: difficulty,
                     decoration: const InputDecoration(labelText: '난이도'),
-                    items: [
-                      StudyDifficulty.beginner,
-                      StudyDifficulty.intermediate,
-                      StudyDifficulty.advanced,
-                    ]
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e,
-                            child: Text(StudyDifficulty.labelKo(e)),
-                          ),
-                        )
-                        .toList(),
+                    items:
+                        [
+                              StudyDifficulty.beginner,
+                              StudyDifficulty.intermediate,
+                              StudyDifficulty.advanced,
+                            ]
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e,
+                                child: Text(StudyDifficulty.labelKo(e)),
+                              ),
+                            )
+                            .toList(),
                     onChanged: (v) =>
                         setLocal(() => difficulty = v ?? difficulty),
                   ),
                   DropdownButtonFormField<String>(
                     initialValue: status,
                     decoration: const InputDecoration(labelText: '상태'),
-                    items: [
-                      StudyCourseStatus.draft,
-                      StudyCourseStatus.ready,
-                      StudyCourseStatus.inProgress,
-                    ]
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e,
-                            child: Text(StudyCourseStatus.labelKo(e)),
-                          ),
-                        )
-                        .toList(),
+                    items:
+                        [
+                              StudyCourseStatus.draft,
+                              StudyCourseStatus.ready,
+                              StudyCourseStatus.inProgress,
+                            ]
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e,
+                                child: Text(StudyCourseStatus.labelKo(e)),
+                              ),
+                            )
+                            .toList(),
                     onChanged: (v) => setLocal(() => status = v ?? status),
                   ),
                 ],
@@ -212,8 +214,7 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
                     : () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) =>
-                                const StudyAiCourseCreatorScreen(),
+                            builder: (_) => const StudyAiCourseCreatorScreen(),
                           ),
                         );
                       },
@@ -245,31 +246,33 @@ class _StudyAdminScreenState extends State<StudyAdminScreen> {
                         '최근 생성 작업',
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
-                      ...jobs.take(5).map(
-                        (j) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            j.interestField.isEmpty
-                                ? j.id
-                                : j.interestField,
-                          ),
-                          subtitle: Text(
-                            '${StudyJobStatus.labelKo(j.status)} · '
-                            '${j.requestedLessonCount}강',
-                          ),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => StudyGenerationJobScreen(
-                                  jobId: j.id,
-                                  courseId: j.courseId,
-                                ),
+                      ...jobs
+                          .take(5)
+                          .map(
+                            (j) => ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                j.interestField.isEmpty
+                                    ? j.id
+                                    : j.interestField,
                               ),
-                            );
-                          },
-                        ),
-                      ),
+                              subtitle: Text(
+                                '${StudyJobStatus.labelKo(j.status)} · '
+                                '${j.requestedLessonCount}강',
+                              ),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => StudyGenerationJobScreen(
+                                      jobId: j.id,
+                                      courseId: j.courseId,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                     ],
                   ),
                 ),

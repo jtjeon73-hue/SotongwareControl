@@ -66,7 +66,8 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                         }
 
                         BusinessUnitDoc? unit;
-                        for (final u in unitSnap.data ?? const <BusinessUnitDoc>[]) {
+                        for (final u
+                            in unitSnap.data ?? const <BusinessUnitDoc>[]) {
                           if (u.id == businessUnitId) {
                             unit = u;
                             break;
@@ -134,23 +135,12 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                                       label: '진행 중',
                                       value: '$inProgress건',
                                     ),
-                                    KpiCard(
-                                      label: '완료',
-                                      value: '$completed건',
-                                    ),
-                                    KpiCard(
-                                      label: '보류',
-                                      value: '$onHold건',
-                                    ),
-                                    KpiCard(
-                                      label: '문제',
-                                      value: '$blocked건',
-                                    ),
+                                    KpiCard(label: '완료', value: '$completed건'),
+                                    KpiCard(label: '보류', value: '$onHold건'),
+                                    KpiCard(label: '문제', value: '$blocked건'),
                                     KpiCard(
                                       label: '평균 진행률',
-                                      value: avg == null
-                                          ? '미설정'
-                                          : '$avg%',
+                                      value: avg == null ? '미설정' : '$avg%',
                                     ),
                                   ],
                                 ),
@@ -171,13 +161,9 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                                     lines: recommendedPlan
                                         .asMap()
                                         .entries
-                                        .map(
-                                          (e) =>
-                                              '${e.key + 1}. ${e.value}',
-                                        )
+                                        .map((e) => '${e.key + 1}. ${e.value}')
                                         .toList(),
-                                    note:
-                                        '이 목록은 완료된 작업이 아닙니다. 앞으로 진행할 절차입니다.',
+                                    note: '이 목록은 완료된 작업이 아닙니다. 앞으로 진행할 절차입니다.',
                                   ),
                                 if (recommendedPlan.isNotEmpty)
                                   const SizedBox(height: 12),
@@ -191,8 +177,7 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                                 if (projects.isEmpty)
                                   EmptyStatePanel(
                                     title: '아직 등록된 프로젝트가 없습니다',
-                                    message:
-                                        '첫 프로젝트를 등록하여 사업부 관리를 시작하십시오.',
+                                    message: '첫 프로젝트를 등록하여 사업부 관리를 시작하십시오.',
                                   )
                                 else
                                   ...projects.map(
@@ -226,7 +211,8 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                                 const SizedBox(height: 12),
                                 _InfoCard(
                                   title: '해결해야 할 문제',
-                                  lines: issues
+                                  lines:
+                                      issues
                                           .where((i) => i.status == 'open')
                                           .isEmpty
                                       ? ['등록된 문제 없음']
@@ -280,11 +266,7 @@ class BusinessUnitOpsScreen extends StatelessWidget {
 }
 
 class _InfoCard extends StatelessWidget {
-  const _InfoCard({
-    required this.title,
-    required this.lines,
-    this.note,
-  });
+  const _InfoCard({required this.title, required this.lines, this.note});
 
   final String title;
   final List<String> lines;
@@ -345,9 +327,7 @@ class _ProjectTile extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
-                StatusBadge(
-                  label: ProjectStatus.labelKo(project.status),
-                ),
+                StatusBadge(label: ProjectStatus.labelKo(project.status)),
               ],
             ),
             const SizedBox(height: 8),
@@ -369,11 +349,7 @@ class _ProjectTile extends StatelessWidget {
                 project.firebaseUrl.isNotEmpty ||
                 project.promoUrl.isNotEmpty)
               Text(
-                '웹사이트: ${[
-                  project.websiteUrl,
-                  project.firebaseUrl,
-                  project.promoUrl,
-                ].where((e) => e.isNotEmpty).join(' · ')}',
+                '웹사이트: ${[project.websiteUrl, project.firebaseUrl, project.promoUrl].where((e) => e.isNotEmpty).join(' · ')}',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -487,10 +463,12 @@ class _RepoSectionState extends State<_RepoSection> {
             ..._commits.map(
               (c) => ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(c.message, maxLines: 2, overflow: TextOverflow.ellipsis),
-                subtitle: Text(
-                  '${c.repo} · ${c.author} · ${c.sha}',
+                title: Text(
+                  c.message,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                subtitle: Text('${c.repo} · ${c.author} · ${c.sha}'),
                 trailing: c.url.isEmpty
                     ? null
                     : IconButton(

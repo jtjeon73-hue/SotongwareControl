@@ -185,9 +185,10 @@ class StudyChapter {
       estimatedMinutes: (d['estimatedMinutes'] as num?)?.toInt() ?? 0,
       difficulty: _str(d['difficulty'], StudyDifficulty.beginner),
       status: _str(d['status'], StudyChapterStatus.draft),
-      prerequisiteChapterIds: ((d['prerequisiteChapterIds'] as List?) ?? const [])
-          .map((e) => '$e')
-          .toList(),
+      prerequisiteChapterIds:
+          ((d['prerequisiteChapterIds'] as List?) ?? const [])
+              .map((e) => '$e')
+              .toList(),
       displayOrder: (d['displayOrder'] as num?)?.toInt() ?? 0,
       isPublished: d['isPublished'] == true,
       createdAt: _ts(d['createdAt']),
@@ -728,9 +729,7 @@ class StudyQuizAttempt {
   final bool isRetry;
   final DateTime? attemptedAt;
 
-  factory StudyQuizAttempt.fromDoc(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+  factory StudyQuizAttempt.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
     return StudyQuizAttempt(
       id: doc.id,

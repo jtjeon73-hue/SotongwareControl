@@ -143,23 +143,18 @@ class _StudyLessonScreenState extends State<StudyLessonScreen> {
       return;
     }
     if (_runId == null) await _ensureRun();
-    await _svc.markLessonComplete(
-      learningRunId: _runId!,
-      lesson: lesson,
-    );
+    await _svc.markLessonComplete(learningRunId: _runId!, lesson: lesson);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('강의를 완료 처리했습니다.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('강의를 완료 처리했습니다.')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (!isFirebaseReady()) {
-      return const Scaffold(
-        body: Center(child: Text('Firebase 미연결')),
-      );
+      return const Scaffold(body: Center(child: Text('Firebase 미연결')));
     }
 
     return StreamBuilder<StudyLesson?>(
@@ -195,9 +190,9 @@ class _StudyLessonScreenState extends State<StudyLessonScreen> {
                     );
                     final progressPct =
                         StudyProgressCalculator.lessonProgressPercent(
-                      lessons: all,
-                      progress: const [],
-                    );
+                          lessons: all,
+                          progress: const [],
+                        );
 
                     return Scaffold(
                       appBar: AppBar(
@@ -228,9 +223,7 @@ class _StudyLessonScreenState extends State<StudyLessonScreen> {
                                 ),
                               ),
                               if (active != null)
-                                Chip(
-                                  label: Text('${active.runNumber}회차'),
-                                ),
+                                Chip(label: Text('${active.runNumber}회차')),
                               Chip(
                                 label: Text(
                                   StudyDifficulty.labelKo(lesson.difficulty),
@@ -254,14 +247,16 @@ class _StudyLessonScreenState extends State<StudyLessonScreen> {
                             '학습 목표',
                             lesson.learningObjectives.isEmpty
                                 ? (lesson.description.isEmpty
-                                    ? '등록된 학습 목표가 없습니다.'
-                                    : lesson.description)
+                                      ? '등록된 학습 목표가 없습니다.'
+                                      : lesson.description)
                                 : lesson.learningObjectives.join('\n· '),
                           ),
                           _section(
                             context,
                             '도입',
-                            lesson.intro.isEmpty ? '본문이 아직 없습니다.' : lesson.intro,
+                            lesson.intro.isEmpty
+                                ? '본문이 아직 없습니다.'
+                                : lesson.intro,
                           ),
                           _section(context, '핵심 개념', lesson.coreConcept),
                           _section(context, '쉬운 설명', lesson.simpleExplanation),
@@ -323,9 +318,8 @@ class _StudyLessonScreenState extends State<StudyLessonScreen> {
                                     contentPadding: EdgeInsets.zero,
                                     title: const Text('퀴즈 응시'),
                                     value: _quizDone,
-                                    onChanged: (v) => setState(
-                                      () => _quizDone = v ?? false,
-                                    ),
+                                    onChanged: (v) =>
+                                        setState(() => _quizDone = v ?? false),
                                   ),
                                   FilledButton(
                                     onPressed: () => _complete(lesson),
@@ -384,25 +378,26 @@ class _StudyLessonScreenState extends State<StudyLessonScreen> {
                                     decoration: const InputDecoration(
                                       labelText: '수업 모드',
                                     ),
-                                    items: [
-                                      StudyAiLessonMode.basic,
-                                      StudyAiLessonMode.simple,
-                                      StudyAiLessonMode.detailed,
-                                      StudyAiLessonMode.practical,
-                                      StudyAiLessonMode.review,
-                                      StudyAiLessonMode.quiz,
-                                      StudyAiLessonMode.exam,
-                                      StudyAiLessonMode.project,
-                                    ]
-                                        .map(
-                                          (e) => DropdownMenuItem(
-                                            value: e,
-                                            child: Text(
-                                              StudyAiLessonMode.labelKo(e),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
+                                    items:
+                                        [
+                                              StudyAiLessonMode.basic,
+                                              StudyAiLessonMode.simple,
+                                              StudyAiLessonMode.detailed,
+                                              StudyAiLessonMode.practical,
+                                              StudyAiLessonMode.review,
+                                              StudyAiLessonMode.quiz,
+                                              StudyAiLessonMode.exam,
+                                              StudyAiLessonMode.project,
+                                            ]
+                                            .map(
+                                              (e) => DropdownMenuItem(
+                                                value: e,
+                                                child: Text(
+                                                  StudyAiLessonMode.labelKo(e),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
                                     onChanged: (v) =>
                                         setState(() => _mode = v ?? _mode),
                                   ),

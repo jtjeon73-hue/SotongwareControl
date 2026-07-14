@@ -55,9 +55,7 @@ class DeploymentChecklistCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: steps
-                  .map(
-                    (e) => _StepChip(label: e.$1, status: e.$2),
-                  )
+                  .map((e) => _StepChip(label: e.$1, status: e.$2))
                   .toList(),
             ),
             const SizedBox(height: 8),

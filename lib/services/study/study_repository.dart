@@ -135,18 +135,17 @@ class StudyRepository {
 
   // —— chapters ——
   Stream<List<StudyChapter>> watchChapters(String courseId) {
-    return _chapters
-        .where('courseId', isEqualTo: courseId)
-        .snapshots()
-        .map((s) {
-          final list = s.docs.map(StudyChapter.fromDoc).toList()
-            ..sort((a, b) {
-              final o = a.displayOrder.compareTo(b.displayOrder);
-              if (o != 0) return o;
-              return a.chapterNumber.compareTo(b.chapterNumber);
-            });
-          return list;
+    return _chapters.where('courseId', isEqualTo: courseId).snapshots().map((
+      s,
+    ) {
+      final list = s.docs.map(StudyChapter.fromDoc).toList()
+        ..sort((a, b) {
+          final o = a.displayOrder.compareTo(b.displayOrder);
+          if (o != 0) return o;
+          return a.chapterNumber.compareTo(b.chapterNumber);
         });
+      return list;
+    });
   }
 
   Future<List<StudyChapter>> fetchChapters(String courseId) async {
@@ -160,7 +159,9 @@ class StudyRepository {
     StudyChapter chapter, {
     bool isNew = false,
   }) async {
-    final ref = chapter.id.isEmpty ? _chapters.doc() : _chapters.doc(chapter.id);
+    final ref = chapter.id.isEmpty
+        ? _chapters.doc()
+        : _chapters.doc(chapter.id);
     await ref.set(
       chapter.toMap(includeCreated: isNew || chapter.id.isEmpty),
       SetOptions(merge: true),
@@ -213,7 +214,10 @@ class StudyRepository {
     });
   }
 
-  Future<String> upsertBlock(StudyContentBlock block, {bool isNew = false}) async {
+  Future<String> upsertBlock(
+    StudyContentBlock block, {
+    bool isNew = false,
+  }) async {
     final ref = block.id.isEmpty ? _blocks.doc() : _blocks.doc(block.id);
     await ref.set(
       block.toMap(includeCreated: isNew || block.id.isEmpty),
@@ -232,9 +236,7 @@ class StudyRepository {
     if (courseId != null && courseId.isNotEmpty) {
       q = q.where('courseId', isEqualTo: courseId);
     }
-    return q.snapshots().map(
-      (s) => s.docs.map(StudyProgress.fromDoc).toList(),
-    );
+    return q.snapshots().map((s) => s.docs.map(StudyProgress.fromDoc).toList());
   }
 
   Future<void> upsertProgress(StudyProgress progress) async {
@@ -262,7 +264,9 @@ class StudyRepository {
     StudySession session, {
     bool isNew = false,
   }) async {
-    final ref = session.id.isEmpty ? _sessions.doc() : _sessions.doc(session.id);
+    final ref = session.id.isEmpty
+        ? _sessions.doc()
+        : _sessions.doc(session.id);
     await ref.set(
       session.toMap(includeCreated: isNew || session.id.isEmpty),
       SetOptions(merge: true),
@@ -311,15 +315,10 @@ class StudyRepository {
     if (courseId != null && courseId.isNotEmpty) {
       q = q.where('courseId', isEqualTo: courseId);
     }
-    return q.snapshots().map(
-      (s) => s.docs.map(StudyQuestion.fromDoc).toList(),
-    );
+    return q.snapshots().map((s) => s.docs.map(StudyQuestion.fromDoc).toList());
   }
 
-  Future<String> upsertQuestion(
-    StudyQuestion q, {
-    bool isNew = false,
-  }) async {
+  Future<String> upsertQuestion(StudyQuestion q, {bool isNew = false}) async {
     final ref = q.id.isEmpty ? _questions.doc() : _questions.doc(q.id);
     await ref.set(
       q.toMap(includeCreated: isNew || q.id.isEmpty),
@@ -410,7 +409,10 @@ class StudyRepository {
     );
   }
 
-  Future<String> upsertReview(StudyReviewItem item, {bool isNew = false}) async {
+  Future<String> upsertReview(
+    StudyReviewItem item, {
+    bool isNew = false,
+  }) async {
     final ref = item.id.isEmpty ? _reviews.doc() : _reviews.doc(item.id);
     await ref.set(
       item.toMap(includeCreated: isNew || item.id.isEmpty),
@@ -420,7 +422,9 @@ class StudyRepository {
   }
 
   Stream<List<StudyGoal>> watchGoals() {
-    return _goals.snapshots().map((s) => s.docs.map(StudyGoal.fromDoc).toList());
+    return _goals.snapshots().map(
+      (s) => s.docs.map(StudyGoal.fromDoc).toList(),
+    );
   }
 
   Future<String> upsertGoal(StudyGoal goal, {bool isNew = false}) async {
@@ -472,10 +476,7 @@ class StudyRepository {
   Future<Map<String, dynamic>> loadStudySettings() async {
     final snap = await _settings.doc('study').get();
     return snap.data() ??
-        {
-          'reviewDaysThreshold': 14,
-          'lowQuizScoreThreshold': 60,
-        };
+        {'reviewDaysThreshold': 14, 'lowQuizScoreThreshold': 60};
   }
 
   Future<void> saveStudySettings(Map<String, dynamic> data) async {

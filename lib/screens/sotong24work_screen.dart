@@ -54,7 +54,8 @@ class Sotong24WorkScreen extends StatelessWidget {
                     }
 
                     BusinessUnitDoc? unit;
-                    for (final u in unitSnap.data ?? const <BusinessUnitDoc>[]) {
+                    for (final u
+                        in unitSnap.data ?? const <BusinessUnitDoc>[]) {
                       if (u.id == unitId) {
                         unit = u;
                         break;
@@ -147,8 +148,9 @@ class Sotong24WorkScreen extends StatelessWidget {
                                   label: '최근 작업일',
                                   value: lastWork == null
                                       ? '미등록'
-                                      : DateFormat('yyyy-MM-dd')
-                                          .format(lastWork),
+                                      : DateFormat(
+                                          'yyyy-MM-dd',
+                                        ).format(lastWork),
                                 ),
                                 KpiCard(
                                   label: '현재 작업 페이지',
@@ -311,9 +313,7 @@ class _ModuleCard extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 8),
-              Text(
-                '대표 확인: ${module.needsCeoReview ? '필요' : '해당 없음'}',
-              ),
+              Text('대표 확인: ${module.needsCeoReview ? '필요' : '해당 없음'}'),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -364,14 +364,8 @@ class _WorkLogDetail extends StatelessWidget {
           ),
           _row('테스트', log.testResult.isEmpty ? '미등록' : log.testResult),
           _row('빌드', log.buildResult.isEmpty ? '미등록' : log.buildResult),
-          _row(
-            'Git 커밋',
-            log.commitHash.isEmpty ? '미등록' : log.commitHash,
-          ),
-          _row(
-            '다음 작업',
-            log.nextAction.isEmpty ? '등록된 정보 없음' : log.nextAction,
-          ),
+          _row('Git 커밋', log.commitHash.isEmpty ? '미등록' : log.commitHash),
+          _row('다음 작업', log.nextAction.isEmpty ? '등록된 정보 없음' : log.nextAction),
           _row('기록 출처', WorkLogSource.labelKo(log.source)),
         ],
       ),

@@ -75,10 +75,7 @@ void main() {
         isTrue,
       );
       expect(
-        WorkLogUtils.isDuplicateCommit(
-          newHash: '',
-          existingHashes: ['abc'],
-        ),
+        WorkLogUtils.isDuplicateCommit(newHash: '', existingHashes: ['abc']),
         isFalse,
       );
     });

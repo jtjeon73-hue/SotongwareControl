@@ -55,9 +55,7 @@ class _StudyGenerationJobScreenState extends State<StudyGenerationJobScreen> {
   @override
   Widget build(BuildContext context) {
     if (!isFirebaseReady()) {
-      return const Scaffold(
-        body: Center(child: Text('Firebase 미연결')),
-      );
+      return const Scaffold(body: Center(child: Text('Firebase 미연결')));
     }
 
     return Scaffold(
@@ -90,15 +88,13 @@ class _StudyGenerationJobScreenState extends State<StudyGenerationJobScreen> {
               final lessons = lesSnap.data ?? const [];
               final passed = lessons
                   .where(
-                    (l) =>
-                        l.validationStatus == StudyValidationStatus.passed,
+                    (l) => l.validationStatus == StudyValidationStatus.passed,
                   )
                   .length;
               final needs = lessons
                   .where(
                     (l) =>
-                        l.validationStatus ==
-                        StudyValidationStatus.needsReview,
+                        l.validationStatus == StudyValidationStatus.needsReview,
                   )
                   .length;
               final failed = lessons
@@ -143,9 +139,7 @@ class _StudyGenerationJobScreenState extends State<StudyGenerationJobScreen> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            '상태: ${StudyJobStatus.labelKo(job.status)}',
-                          ),
+                          Text('상태: ${StudyJobStatus.labelKo(job.status)}'),
                           Text('전체 예정 강의: ${job.requestedLessonCount}강'),
                           Text('목차(골격) 강의: ${lessons.length}강'),
                           Text('본문 생성 완료: $withBody강'),
@@ -159,9 +153,7 @@ class _StudyGenerationJobScreenState extends State<StudyGenerationJobScreen> {
                             const SizedBox(height: 8),
                             Text(
                               job.lastError,
-                              style: TextStyle(
-                                color: ControlColors.accentWarm,
-                              ),
+                              style: TextStyle(color: ControlColors.accentWarm),
                             ),
                           ],
                           Text(
@@ -216,10 +208,8 @@ class _StudyGenerationJobScreenState extends State<StudyGenerationJobScreen> {
                       OutlinedButton(
                         onPressed: _busy
                             ? null
-                            : () => _act(
-                                () => _svc.cancelJob(job.id),
-                                '취소했습니다.',
-                              ),
+                            : () =>
+                                  _act(() => _svc.cancelJob(job.id), '취소했습니다.'),
                         child: const Text('취소'),
                       ),
                       OutlinedButton(

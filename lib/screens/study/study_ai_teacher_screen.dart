@@ -33,9 +33,9 @@ class _StudyAiTeacherScreenState extends State<StudyAiTeacherScreen> {
 
   Future<void> _saveQuestion() async {
     if (_courseId == null || _question.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('강의와 질문을 입력하십시오.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('강의와 질문을 입력하십시오.')));
       return;
     }
     await _repo.upsertQuestion(
@@ -109,15 +109,10 @@ class _StudyAiTeacherScreenState extends State<StudyAiTeacherScreen> {
                     initialValue: _courseId,
                     decoration: const InputDecoration(labelText: '강의 선택'),
                     items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('강의 선택'),
-                      ),
+                      const DropdownMenuItem(value: null, child: Text('강의 선택')),
                       ...courses.map(
-                        (c) => DropdownMenuItem(
-                          value: c.id,
-                          child: Text(c.title),
-                        ),
+                        (c) =>
+                            DropdownMenuItem(value: c.id, child: Text(c.title)),
                       ),
                     ],
                     onChanged: (v) => setState(() {
@@ -132,9 +127,7 @@ class _StudyAiTeacherScreenState extends State<StudyAiTeacherScreen> {
                         final chapters = chSnap.data ?? const [];
                         return DropdownButtonFormField<String?>(
                           initialValue: _chapterId,
-                          decoration: const InputDecoration(
-                            labelText: '챕터 선택',
-                          ),
+                          decoration: const InputDecoration(labelText: '챕터 선택'),
                           items: [
                             const DropdownMenuItem(
                               value: null,
@@ -180,9 +173,7 @@ class _StudyAiTeacherScreenState extends State<StudyAiTeacherScreen> {
                           } catch (_) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text(
-                                  'AI선생 자동 대화 기능은 아직 연결되지 않았습니다.',
-                                ),
+                                content: Text('AI선생 자동 대화 기능은 아직 연결되지 않았습니다.'),
                               ),
                             );
                           }
@@ -212,7 +203,10 @@ class _StudyAiTeacherScreenState extends State<StudyAiTeacherScreen> {
                             '${q.aiAnswer.isEmpty ? ' · AI 답변 없음' : ''}',
                           ),
                           trailing: q.isImportant
-                              ? const Icon(Icons.flag, color: ControlColors.accentWarm)
+                              ? const Icon(
+                                  Icons.flag,
+                                  color: ControlColors.accentWarm,
+                                )
                               : null,
                         ),
                       ),

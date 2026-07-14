@@ -71,9 +71,7 @@ class StudyCourseCard extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  StatusBadge(
-                    label: StudyCourseStatus.labelKo(course.status),
-                  ),
+                  StatusBadge(label: StudyCourseStatus.labelKo(course.status)),
                   if (course.category.isNotEmpty)
                     StatusBadge(label: course.category),
                   StatusBadge(

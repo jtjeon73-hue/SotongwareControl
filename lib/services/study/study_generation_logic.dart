@@ -50,8 +50,7 @@ class StudyOutlineScaffoldBuilder {
     int? chapterCount,
     String difficulty = StudyDifficulty.beginner,
   }) {
-    final field =
-        interestField.trim().isEmpty ? '관심 분야' : interestField.trim();
+    final field = interestField.trim().isEmpty ? '관심 분야' : interestField.trim();
     final total = requestedLessonCount < 1 ? 30 : requestedLessonCount;
     final chaptersN = chapterCount ?? _suggestChapterCount(total);
     final perChapter = _distribute(total, chaptersN);
@@ -88,8 +87,7 @@ class StudyOutlineScaffoldBuilder {
 
     return OutlineScaffoldResult(
       title: '$field 과정',
-      description:
-          '$field 관심 분야에 대한 빈 목차 골격입니다. AI 생성 본문이 아닙니다.',
+      description: '$field 관심 분야에 대한 빈 목차 골격입니다. AI 생성 본문이 아닙니다.',
       chapterCount: chaptersN,
       lessonCount: total,
       chapters: chapters,
@@ -325,17 +323,13 @@ class StudyLessonCompletionChecker {
 
 /// 중복 생성 방지 키
 class StudyGenerationDeduper {
-  static String itemKey({
-    required String jobId,
-    required int lessonNumber,
-  }) => '$jobId#$lessonNumber';
+  static String itemKey({required String jobId, required int lessonNumber}) =>
+      '$jobId#$lessonNumber';
 
   static bool alreadyCompleted({
     required Set<String> completedKeys,
     required String jobId,
     required int lessonNumber,
   }) =>
-      completedKeys.contains(
-        itemKey(jobId: jobId, lessonNumber: lessonNumber),
-      );
+      completedKeys.contains(itemKey(jobId: jobId, lessonNumber: lessonNumber));
 }

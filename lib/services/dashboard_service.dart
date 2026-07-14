@@ -62,14 +62,14 @@ class DashboardService {
     final todayTodos = tasks
         .where(
           (t) =>
-              t.status == TaskStatus.todo ||
-              t.status == TaskStatus.inProgress,
+              t.status == TaskStatus.todo || t.status == TaskStatus.inProgress,
         )
         .length;
 
     final overdue = tasks.where((t) {
       if (t.dueDate == null) return false;
-      if (t.status == TaskStatus.completed || t.status == TaskStatus.cancelled) {
+      if (t.status == TaskStatus.completed ||
+          t.status == TaskStatus.cancelled) {
         return false;
       }
       return t.dueDate!.isBefore(todayStart);

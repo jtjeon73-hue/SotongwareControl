@@ -52,19 +52,17 @@ class _StudyCoursesScreenState extends State<StudyCoursesScreen> {
         if (snap.hasError) {
           return Padding(
             padding: const EdgeInsets.all(24),
-            child: EmptyStatePanel(
-              title: '로딩 오류',
-              message: '${snap.error}',
-            ),
+            child: EmptyStatePanel(title: '로딩 오류', message: '${snap.error}'),
           );
         }
         final all = snap.data ?? const [];
-        final categories = all
-            .map((e) => e.category)
-            .where((e) => e.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
+        final categories =
+            all
+                .map((e) => e.category)
+                .where((e) => e.isNotEmpty)
+                .toSet()
+                .toList()
+              ..sort();
         final filtered = StudyCourseFilter.apply(
           courses: all,
           query: _query.text,
@@ -150,7 +148,10 @@ class _StudyCoursesScreenState extends State<StudyCoursesScreen> {
                     value: _difficulty,
                     hint: const Text('난이도'),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('전체 난이도')),
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('전체 난이도'),
+                      ),
                       ...[
                         StudyDifficulty.beginner,
                         StudyDifficulty.intermediate,

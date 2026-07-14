@@ -29,6 +29,7 @@ enum ControlDestination {
   youtubeContent,
   ebook,
   onlineExpansion,
+  publicServices,
   adminData,
 }
 
@@ -89,6 +90,8 @@ extension ControlDestinationX on ControlDestination {
         return '전자책사업부';
       case ControlDestination.onlineExpansion:
         return '온라인판매/확장(보관)';
+      case ControlDestination.publicServices:
+        return '공개 서비스';
     }
   }
 
@@ -148,6 +151,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.auto_stories_outlined;
       case ControlDestination.onlineExpansion:
         return Icons.storefront_outlined;
+      case ControlDestination.publicServices:
+        return Icons.public_outlined;
     }
   }
 
@@ -347,6 +352,16 @@ class SidebarNavigation extends StatelessWidget {
                       onClose?.call();
                     },
                   ),
+                ),
+                const SizedBox(height: 8),
+                const _SectionLabel(label: '공개 서비스 바로가기'),
+                _NavItem(
+                  destination: ControlDestination.publicServices,
+                  isSelected: selected == ControlDestination.publicServices,
+                  onTap: () {
+                    onDestinationSelected(ControlDestination.publicServices);
+                    onClose?.call();
+                  },
                 ),
                 const SizedBox(height: 8),
                 const _SectionLabel(label: '데이터 관리'),

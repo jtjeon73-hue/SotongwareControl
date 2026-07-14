@@ -426,7 +426,9 @@ class WorkLogDoc {
       gitPushed: m['gitPushed'] == true,
       firebaseDeployed: m['firebaseDeployed'] == true,
       siteVerified: m['siteVerified'] == true,
-      issuesNote: _str(m['issuesNote'] ?? ((m['errors'] as List?) ?? []).join('; ')),
+      issuesNote: _str(
+        m['issuesNote'] ?? ((m['errors'] as List?) ?? []).join('; '),
+      ),
       source: _str(m['source'], WorkLogSource.jsonImport),
       nextAction: _str(m['nextAction']),
       workedAt: _ts(m['workedAt'] ?? m['workDate']) ?? DateTime.now(),
@@ -680,7 +682,9 @@ class AiReportDoc {
       title: _str(d['title']),
       reportType: _str(d['reportType'], 'summary'),
       summary: _str(d['summary']),
-      findings: ((d['findings'] as List?) ?? const []).map((e) => '$e').toList(),
+      findings: ((d['findings'] as List?) ?? const [])
+          .map((e) => '$e')
+          .toList(),
       recommendations: ((d['recommendations'] as List?) ?? const [])
           .map((e) => '$e')
           .toList(),

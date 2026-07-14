@@ -65,8 +65,7 @@ class StudyDashboardScreen extends StatelessWidget {
                                 final courses = courseSnap.data ?? const [];
                                 final sessions = sessionSnap.data ?? const [];
                                 final progress = progressSnap.data ?? const [];
-                                final assignments =
-                                    assignSnap.data ?? const [];
+                                final assignments = assignSnap.data ?? const [];
                                 final reviews = reviewSnap.data ?? const [];
                                 final attempts = attemptSnap.data ?? const [];
                                 final goals = goalSnap.data ?? const [];
@@ -124,8 +123,7 @@ class StudyDashboardScreen extends StatelessWidget {
                                                   StudyAssignmentStatus
                                                       .completed &&
                                               a.status !=
-                                                  StudyAssignmentStatus
-                                                      .onHold,
+                                                  StudyAssignmentStatus.onHold,
                                         )
                                         .take(5)
                                         .toList();
@@ -202,8 +200,7 @@ class StudyDashboardScreen extends StatelessWidget {
                                                 ),
                                                 KpiCard(
                                                   label: '복습 필요',
-                                                  value:
-                                                      '${kpis.reviewNeeded}',
+                                                  value: '${kpis.reviewNeeded}',
                                                 ),
                                                 KpiCard(
                                                   label: '미완료 실습',
@@ -217,8 +214,8 @@ class StudyDashboardScreen extends StatelessWidget {
                                                 ),
                                                 KpiCard(
                                                   label: '이번 주 학습시간',
-                                                  value: kpis
-                                                              .studyMinutesThisWeek ==
+                                                  value:
+                                                      kpis.studyMinutesThisWeek ==
                                                           0
                                                       ? '학습 기록 없음'
                                                       : '${kpis.studyMinutesThisWeek}분',
@@ -234,9 +231,7 @@ class StudyDashboardScreen extends StatelessWidget {
                                             ),
                                             const SizedBox(height: 8),
                                             if (inProgressCourses.isEmpty)
-                                              const Text(
-                                                '수강 중 강의가 없습니다.',
-                                              )
+                                              const Text('수강 중 강의가 없습니다.')
                                             else
                                               Wrap(
                                                 spacing: 12,
@@ -271,8 +266,7 @@ class StudyDashboardScreen extends StatelessWidget {
                                                     ]
                                                   : [
                                                       ...todayGoals.map(
-                                                        (g) =>
-                                                            '목표: ${g.title}',
+                                                        (g) => '목표: ${g.title}',
                                                       ),
                                                       ...openAssign.map(
                                                         (a) =>

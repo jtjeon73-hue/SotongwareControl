@@ -145,8 +145,7 @@ class StudyAiUsageDisplay {
     }
     final inT = inputTokens ?? 0;
     final outT = outputTokens ?? 0;
-    final cost =
-        inT * (inputUnitPrice ?? 0) + outT * (outputUnitPrice ?? 0);
+    final cost = inT * (inputUnitPrice ?? 0) + outT * (outputUnitPrice ?? 0);
     if (cost <= 0 && inT == 0 && outT == 0) return '비용 미설정';
     return cost.toStringAsFixed(4);
   }

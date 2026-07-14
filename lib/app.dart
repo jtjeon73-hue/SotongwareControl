@@ -6,6 +6,7 @@ import 'screens/ai_ops_department_screen.dart';
 import 'screens/business_unit_ops_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
 import 'screens/ops_dashboard_screen.dart';
+import 'screens/public_services_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
 import 'screens/sotong24work_screen.dart';
 import 'screens/study/study_admin_screen.dart';
@@ -125,8 +126,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return const AiOpsDepartmentScreen(
           departmentId: 'ceo',
           title: 'AI대표',
-          roleSummary:
-              '전체 사업 현황·긴급 확인·오늘 우선 작업·승인 필요 사항을 규칙 기반으로 요약합니다.',
+          roleSummary: '전체 사업 현황·긴급 확인·오늘 우선 작업·승인 필요 사항을 규칙 기반으로 요약합니다.',
         );
       case ControlDestination.aiProductDevDept:
         return const AiOpsDepartmentScreen(
@@ -208,6 +208,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           businessUnitId: 'online_expansion',
           fallbackTitle: '온라인판매/확장',
         );
+      case ControlDestination.publicServices:
+        return const PublicServicesScreen();
     }
   }
 

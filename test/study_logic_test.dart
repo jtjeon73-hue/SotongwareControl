@@ -147,11 +147,8 @@ void main() {
     final ai = DisconnectedStudyAiService();
     expect(ai.isConnected, isFalse);
     expect(
-      () => ai.explainLesson(
-        courseTitle: 'a',
-        chapterTitle: 'b',
-        question: 'c',
-      ),
+      () =>
+          ai.explainLesson(courseTitle: 'a', chapterTitle: 'b', question: 'c'),
       throwsStateError,
     );
   });

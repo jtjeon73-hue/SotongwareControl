@@ -98,8 +98,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     return StreamBuilder<ProjectDoc?>(
       stream: repo.watchProject(widget.projectId),
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting &&
-            !snap.hasData) {
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return Scaffold(
             appBar: AppBar(title: const Text('프로젝트 상세')),
             body: const Center(child: CircularProgressIndicator()),
@@ -184,18 +183,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                         ? '미등록'
                                         : p.projectType,
                                   ),
-                                  _kv(
-                                    '상태',
-                                    ProjectStatus.labelKo(p.status),
-                                  ),
+                                  _kv('상태', ProjectStatus.labelKo(p.status)),
                                   _kv('우선순위', p.priority),
                                   _kv('시작일', _fmtDate(p.startedAt)),
                                   _kv('목표일', _fmtDate(p.targetDate)),
                                   _kv('최근 작업일', _fmtDate(p.lastWorkedAt)),
-                                  _kv(
-                                    '최근 업데이트',
-                                    _fmtDate(p.updatedAt),
-                                  ),
+                                  _kv('최근 업데이트', _fmtDate(p.updatedAt)),
                                 ],
                               ),
                             ),
@@ -205,9 +198,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  ProgressLabel(
-                                    progress: p.computedProgress,
-                                  ),
+                                  ProgressLabel(progress: p.computedProgress),
                                   const SizedBox(height: 8),
                                   _kv(
                                     '전체 단계',
@@ -215,10 +206,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                         ? '미등록'
                                         : '${p.totalStages}',
                                   ),
-                                  _kv(
-                                    '완료 단계',
-                                    '${p.completedStages}',
-                                  ),
+                                  _kv('완료 단계', '${p.completedStages}'),
                                   _kv(
                                     '현재 단계',
                                     p.currentStage.isEmpty
@@ -233,15 +221,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                   ),
                                   _kv(
                                     '보류 사유',
-                                    p.holdReason.isEmpty
-                                        ? '없음'
-                                        : p.holdReason,
+                                    p.holdReason.isEmpty ? '없음' : p.holdReason,
                                   ),
                                   _kv(
                                     '최근 작업',
-                                    logs.isEmpty
-                                        ? '기록 없음'
-                                        : logs.first.title,
+                                    logs.isEmpty ? '기록 없음' : logs.first.title,
                                   ),
                                 ],
                               ),
@@ -328,7 +312,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                                         onPressed: _ghLoading
                                             ? null
                                             : () =>
-                                                _loadCommits(p.repositoryUrl),
+                                                  _loadCommits(p.repositoryUrl),
                                         child: Text(
                                           _ghLoading ? '조회 중…' : '새로고침',
                                         ),

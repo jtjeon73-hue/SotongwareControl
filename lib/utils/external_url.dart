@@ -10,7 +10,11 @@ class ExternalUrl {
     if (uri == null || !uri.hasScheme) return false;
 
     try {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
     } catch (e) {
       if (kDebugMode) {
         debugPrint('ExternalUrl.open failed: $e');

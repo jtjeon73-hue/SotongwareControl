@@ -25,9 +25,9 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
 
   Future<void> _addNote(List<StudyCourse> courses) async {
     if (courses.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('먼저 강의방을 생성하십시오.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('먼저 강의방을 생성하십시오.')));
       return;
     }
     final title = TextEditingController();
@@ -49,10 +49,8 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
                   initialValue: courseId,
                   items: courses
                       .map(
-                        (c) => DropdownMenuItem(
-                          value: c.id,
-                          child: Text(c.title),
-                        ),
+                        (c) =>
+                            DropdownMenuItem(value: c.id, child: Text(c.title)),
                       )
                       .toList(),
                   onChanged: (v) => setLocal(() => courseId = v ?? courseId),
@@ -187,15 +185,14 @@ class _StudyNotesScreenState extends State<StudyNotesScreen> {
                       ),
                       FilledButton.tonal(
                         onPressed: () async {
-                          final text = const JsonEncoder.withIndent(
-                            '  ',
-                          ).convert(notes.map((e) => e.toJsonExport()).toList());
+                          final text = const JsonEncoder.withIndent('  ')
+                              .convert(
+                                notes.map((e) => e.toJsonExport()).toList(),
+                              );
                           await Clipboard.setData(ClipboardData(text: text));
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('노트 ${notes.length}건 복사'),
-                              ),
+                              SnackBar(content: Text('노트 ${notes.length}건 복사')),
                             );
                           }
                         },
@@ -413,7 +410,10 @@ class StudyQuizzesScreen extends StatelessWidget {
     );
   }
 
-  static Future<void> _addQuiz(BuildContext context, StudyRepository repo) async {
+  static Future<void> _addQuiz(
+    BuildContext context,
+    StudyRepository repo,
+  ) async {
     final question = TextEditingController();
     final answer = TextEditingController();
     final courseId = TextEditingController();
@@ -436,9 +436,7 @@ class StudyQuizzesScreen extends StatelessWidget {
             ),
             TextField(
               controller: choices,
-              decoration: const InputDecoration(
-                labelText: '선택지(쉼표, 객관식)',
-              ),
+              decoration: const InputDecoration(labelText: '선택지(쉼표, 객관식)'),
             ),
             TextField(
               controller: answer,
@@ -530,11 +528,7 @@ class StudyQuizzesScreen extends StatelessWidget {
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            correct ? '정답입니다.' : '오답입니다. 복습 필요로 표시했습니다.',
-          ),
-        ),
+        SnackBar(content: Text(correct ? '정답입니다.' : '오답입니다. 복습 필요로 표시했습니다.')),
       );
     }
   }

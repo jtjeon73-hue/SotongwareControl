@@ -108,9 +108,7 @@ void main() {
     final auth = _FakeAuthClient();
     addTearDown(auth.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp(home: LoginScreen(authService: auth)),
-    );
+    await tester.pumpWidget(MaterialApp(home: LoginScreen(authService: auth)));
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(find.text('로그인'));
@@ -136,9 +134,7 @@ void main() {
     final auth = _FakeAuthClient();
     addTearDown(auth.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp(home: LoginScreen(authService: auth)),
-    );
+    await tester.pumpWidget(MaterialApp(home: LoginScreen(authService: auth)));
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
@@ -157,9 +153,7 @@ void main() {
       ..nextFailure = AuthFailureReason.invalidCredentials;
     addTearDown(auth.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp(home: LoginScreen(authService: auth)),
-    );
+    await tester.pumpWidget(MaterialApp(home: LoginScreen(authService: auth)));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(0), 'sotongware');

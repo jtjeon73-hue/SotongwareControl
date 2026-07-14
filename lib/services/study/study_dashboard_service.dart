@@ -65,18 +65,13 @@ class StudyProgressCalculator {
     required List<StudyLesson> lessons,
     required List<StudyLessonProgress> lessonProgress,
   }) {
-    final eligibleLessons =
-        lessons.where((l) => l.countsTowardProgress).toList();
+    final eligibleLessons = lessons
+        .where((l) => l.countsTowardProgress)
+        .toList();
     if (eligibleLessons.isNotEmpty) {
-      return lessonProgressPercent(
-        lessons: lessons,
-        progress: lessonProgress,
-      );
+      return lessonProgressPercent(lessons: lessons, progress: lessonProgress);
     }
-    return courseProgressPercent(
-      chapters: chapters,
-      progress: chapterProgress,
-    );
+    return courseProgressPercent(chapters: chapters, progress: chapterProgress);
   }
 
   static int? lessonProgressPercent({
@@ -176,15 +171,12 @@ class StudyDashboardService {
         )
         .length;
 
-    var reviewCount = reviews
-        .where((r) => r.reviewStatus == 'pending')
-        .length;
+    var reviewCount = reviews.where((r) => r.reviewStatus == 'pending').length;
     reviewCount += progress.where((p) => p.needsReview).length;
     reviewCount += progress
         .where(
           (p) =>
-              p.understandingLevel == StudyUnderstanding.low &&
-              !p.needsReview,
+              p.understandingLevel == StudyUnderstanding.low && !p.needsReview,
         )
         .length;
     reviewCount += attempts
@@ -240,8 +232,7 @@ class DisconnectedStudyAiService implements StudyAiService {
   @override
   bool get isConnected => false;
 
-  Never _fail() =>
-      throw StateError('AI선생 자동 대화 기능은 아직 연결되지 않았습니다.');
+  Never _fail() => throw StateError('AI선생 자동 대화 기능은 아직 연결되지 않았습니다.');
 
   @override
   Future<String> explainLesson({
@@ -310,9 +301,7 @@ class StudyCourseFilter {
         list.sort((a, b) => a.title.compareTo(b.title));
         break;
       case 'progress':
-        list.sort(
-          (a, b) => (b.progress ?? -1).compareTo(a.progress ?? -1),
-        );
+        list.sort((a, b) => (b.progress ?? -1).compareTo(a.progress ?? -1));
         break;
       case 'favorite':
         list.sort((a, b) {

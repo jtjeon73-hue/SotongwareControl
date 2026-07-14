@@ -51,3 +51,5 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Deploy finished: https://sotongware-control.web.app"
 Write-Host "Open a secret window and verify login with id 'sotongware'."
+Write-Host ""
+Write-Host "TIP: Prefer .\scripts\deploy_control.ps1 as the standard ops deploy."

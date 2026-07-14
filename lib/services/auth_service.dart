@@ -10,6 +10,7 @@ enum AuthFailureReason {
   configMissing,
   invalidCredentials,
   unauthorized,
+  network,
   unknown,
 }
 
@@ -97,9 +98,16 @@ class AuthService implements AuthClient {
       return const AuthResult.success();
     } on FirebaseAuthException catch (e) {
       AuthConfig.debugLogAuthFailure(e.code);
+      if (e.code == 'network-request-failed') {
+        return const AuthResult.failure(AuthFailureReason.network);
+      }
       return const AuthResult.failure(AuthFailureReason.invalidCredentials);
     } catch (e) {
       AuthConfig.debugLogAuthFailure(e);
+      final text = e.toString().toLowerCase();
+      if (text.contains('network') || text.contains('socket')) {
+        return const AuthResult.failure(AuthFailureReason.network);
+      }
       return const AuthResult.failure(AuthFailureReason.unknown);
     }
   }

@@ -37,7 +37,9 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
     try {
       final msg = await action();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
       }
     } catch (e) {
       if (mounted) {
@@ -53,7 +55,10 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
     }
   }
 
-  Future<void> _confirmDelete(String label, Future<void> Function() action) async {
+  Future<void> _confirmDelete(
+    String label,
+    Future<void> Function() action,
+  ) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -163,7 +168,9 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
     final analyze = TextEditingController(text: existing?.analyzeResult ?? '');
     final test = TextEditingController(text: existing?.testResult ?? '');
     final build = TextEditingController(text: existing?.buildResult ?? '');
-    final commitMsg = TextEditingController(text: existing?.commitMessage ?? '');
+    final commitMsg = TextEditingController(
+      text: existing?.commitMessage ?? '',
+    );
     final commitHash = TextEditingController(text: existing?.commitHash ?? '');
     final issues = TextEditingController(text: existing?.issuesNote ?? '');
     var gitPushed = existing?.gitPushed ?? false;
@@ -365,9 +372,7 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
     });
   }
 
-  Future<void> _importJsonWithPreview({
-    required bool sotong24Mode,
-  }) async {
+  Future<void> _importJsonWithPreview({required bool sotong24Mode}) async {
     final controller = TextEditingController(
       text: sotong24Mode
           ? '{\n  "projectId": "",\n  "moduleId": "",\n  "workTitle": "",\n'
@@ -381,9 +386,7 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(
-          sotong24Mode ? '소통24워크 JSON 가져오기(승인형)' : '작업 로그 JSON 가져오기',
-        ),
+        title: Text(sotong24Mode ? '소통24워크 JSON 가져오기(승인형)' : '작업 로그 JSON 가져오기'),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -441,10 +444,8 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
         final mapped = Map<String, dynamic>.from(m);
         if (sotong24Mode) {
           mapped['title'] = mapped['title'] ?? mapped['workTitle'] ?? '';
-          mapped['projectId'] =
-              mapped['projectId'] ?? mapped['moduleId'] ?? '';
-          mapped['businessUnitId'] =
-              mapped['businessUnitId'] ?? 'sotong24work';
+          mapped['projectId'] = mapped['projectId'] ?? mapped['moduleId'] ?? '';
+          mapped['businessUnitId'] = mapped['businessUnitId'] ?? 'sotong24work';
           mapped['source'] = WorkLogSource.sotong24;
         }
         final errs = WorkLogUtils.validateImportItem(mapped);
@@ -453,11 +454,10 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
           continue;
         }
         final log = WorkLogDoc.fromJsonMap(mapped);
-        final dup = log.commitHash.isNotEmpty &&
+        final dup =
+            log.commitHash.isNotEmpty &&
             await repo.hasCommitHash(log.commitHash);
-        preview.add(
-          '${dup ? '[중복커밋] ' : ''}${log.title} · ${log.projectId}',
-        );
+        preview.add('${dup ? '[중복커밋] ' : ''}${log.title} · ${log.projectId}');
         if (!dup || sotong24Mode) {
           valid.add(log);
         }
@@ -866,37 +866,42 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
                       if (filtered.isEmpty)
                         const Text('Cursor 작업 기록이 없습니다.')
                       else
-                        ...filtered.take(30).map(
-                          (l) => ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(l.title),
-                            subtitle: Text(
-                              '${l.workedAt == null ? '일시 미등록' : DateFormat('yyyy-MM-dd').format(l.workedAt!)}'
-                              ' · ${l.projectId} · ${WorkLogSource.labelKo(l.source)}',
-                            ),
-                            trailing: Wrap(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined),
-                                  onPressed: _busy
-                                      ? null
-                                      : () => _workLogDialog(existing: l),
+                        ...filtered
+                            .take(30)
+                            .map(
+                              (l) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(l.title),
+                                subtitle: Text(
+                                  '${l.workedAt == null ? '일시 미등록' : DateFormat('yyyy-MM-dd').format(l.workedAt!)}'
+                                  ' · ${l.projectId} · ${WorkLogSource.labelKo(l.source)}',
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  onPressed: _busy
-                                      ? null
-                                      : () => _confirmDelete(l.title, () async {
-                                          await repo.deleteDoc(
-                                            'work_logs',
-                                            l.id,
-                                          );
-                                        }),
+                                trailing: Wrap(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined),
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _workLogDialog(existing: l),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline),
+                                      onPressed: _busy
+                                          ? null
+                                          : () => _confirmDelete(
+                                              l.title,
+                                              () async {
+                                                await repo.deleteDoc(
+                                                  'work_logs',
+                                                  l.id,
+                                                );
+                                              },
+                                            ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
                     ],
                   ),
                 ),

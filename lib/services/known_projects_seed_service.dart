@@ -91,12 +91,11 @@ class WorkLogUtils {
         return false;
       }
       return true;
-    }).toList()
-      ..sort((a, b) {
-        final aa = a.workedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bb = b.workedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return bb.compareTo(aa);
-      });
+    }).toList()..sort((a, b) {
+      final aa = a.workedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bb = b.workedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bb.compareTo(aa);
+    });
   }
 
   static List<String> validateImportItem(Map<String, dynamic> m) {

@@ -53,9 +53,9 @@ class _StudyLearningRunsScreenState extends State<StudyLearningRunsScreen> {
         totalLessonCount: published > 0 ? published : lessons.length,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('새 학습 회차를 시작했습니다. 진도 0%')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('새 학습 회차를 시작했습니다. 진도 0%')));
       }
     } catch (e) {
       if (mounted) {
@@ -74,9 +74,7 @@ class _StudyLearningRunsScreenState extends State<StudyLearningRunsScreen> {
   @override
   Widget build(BuildContext context) {
     if (!isFirebaseReady()) {
-      return const Scaffold(
-        body: Center(child: Text('Firebase 미연결')),
-      );
+      return const Scaffold(body: Center(child: Text('Firebase 미연결')));
     }
 
     return Scaffold(
@@ -144,9 +142,7 @@ class _StudyLearningRunsScreenState extends State<StudyLearningRunsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    '${c.runA}회차 vs ${c.runB}회차',
-                                  ),
+                                  Text('${c.runA}회차 vs ${c.runB}회차'),
                                   Text(
                                     '진도: ${c.progressA ?? 0}% → ${c.progressB ?? 0}%',
                                   ),
@@ -165,7 +161,9 @@ class _StudyLearningRunsScreenState extends State<StudyLearningRunsScreen> {
                                   const SizedBox(height: 8),
                                   Text(
                                     'AI 학습 개선 분석은 AI 연결 후 이용할 수 있습니다. 현재는 수치 비교만 표시합니다.',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
                                 ],
                               ),

@@ -119,10 +119,7 @@ class AiOpsDepartmentScreen extends StatelessWidget {
                               const SizedBox(height: 16),
                               _Block(title: '현재 사실', items: facts),
                               const SizedBox(height: 12),
-                              _Block(
-                                title: '문제 및 위험',
-                                items: risks,
-                              ),
+                              _Block(title: '문제 및 위험', items: risks),
                               const SizedBox(height: 12),
                               _Block(
                                 title: '추천 우선순위',
@@ -174,9 +171,7 @@ class AiOpsDepartmentScreen extends StatelessWidget {
                                                   : '${r.summary}\n(AI 자동 분석 미연결 · 수동/규칙 기반)',
                                             ),
                                             trailing: StatusBadge(
-                                              label: r.approved
-                                                  ? '승인됨'
-                                                  : '미승인',
+                                              label: r.approved ? '승인됨' : '미승인',
                                             ),
                                           ),
                                         ),
@@ -373,21 +368,22 @@ class _IdeaPanelState extends State<_IdeaPanel> {
               ),
               DropdownButtonFormField<String>(
                 initialValue: status,
-                items: [
-                  IdeaStatus.idea,
-                  IdeaStatus.reviewing,
-                  IdeaStatus.selected,
-                  IdeaStatus.onHold,
-                  IdeaStatus.rejected,
-                  IdeaStatus.inDevelopment,
-                ]
-                    .map(
-                      (e) => DropdownMenuItem(
-                        value: e,
-                        child: Text(IdeaStatus.labelKo(e)),
-                      ),
-                    )
-                    .toList(),
+                items:
+                    [
+                          IdeaStatus.idea,
+                          IdeaStatus.reviewing,
+                          IdeaStatus.selected,
+                          IdeaStatus.onHold,
+                          IdeaStatus.rejected,
+                          IdeaStatus.inDevelopment,
+                        ]
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(IdeaStatus.labelKo(e)),
+                          ),
+                        )
+                        .toList(),
                 onChanged: (v) => setLocal(() => status = v ?? IdeaStatus.idea),
                 decoration: const InputDecoration(labelText: '상태'),
               ),

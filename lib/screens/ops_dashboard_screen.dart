@@ -7,6 +7,7 @@ import '../services/dashboard_service.dart';
 import '../services/firebase_ready.dart';
 import '../services/ops_repository.dart';
 import '../services/ops_seed_service.dart';
+import '../screens/public_services_screen.dart';
 import '../theme/control_theme.dart';
 import '../widgets/deployment_checklist.dart';
 import '../widgets/ops_ui.dart';
@@ -170,7 +171,8 @@ class OpsDashboardScreen extends StatelessWidget {
                                     const SizedBox(height: 16),
                                     _Section(
                                       title: '현재 진행 중 프로젝트',
-                                      child: projects
+                                      child:
+                                          projects
                                               .where(
                                                 (p) =>
                                                     p.status ==
@@ -182,9 +184,7 @@ class OpsDashboardScreen extends StatelessWidget {
                                                         ProjectStatus.planning,
                                               )
                                               .isEmpty
-                                          ? const Text(
-                                              '등록된 진행 중 프로젝트가 없습니다.',
-                                            )
+                                          ? const Text('등록된 진행 중 프로젝트가 없습니다.')
                                           : Column(
                                               children: projects
                                                   .where(
@@ -222,7 +222,8 @@ class OpsDashboardScreen extends StatelessWidget {
                                     const SizedBox(height: 16),
                                     _Section(
                                       title: '앞으로 진행할 작업',
-                                      child: tasks
+                                      child:
+                                          tasks
                                               .where(
                                                 (t) =>
                                                     t.status ==
@@ -231,9 +232,7 @@ class OpsDashboardScreen extends StatelessWidget {
                                                         TaskStatus.inProgress,
                                               )
                                               .isEmpty
-                                          ? const Text(
-                                              '등록된 다음 작업이 없습니다.',
-                                            )
+                                          ? const Text('등록된 다음 작업이 없습니다.')
                                           : Column(
                                               children: tasks
                                                   .where(
@@ -287,9 +286,7 @@ class OpsDashboardScreen extends StatelessWidget {
                                     _Section(
                                       title: '배포 상태',
                                       child: deps.isEmpty
-                                          ? const Text(
-                                              '등록된 배포 기록이 없습니다.',
-                                            )
+                                          ? const Text('등록된 배포 기록이 없습니다.')
                                           : Column(
                                               children: deps
                                                   .take(6)
@@ -297,18 +294,24 @@ class OpsDashboardScreen extends StatelessWidget {
                                                     (d) => Padding(
                                                       padding:
                                                           const EdgeInsets.only(
-                                                        bottom: 10,
-                                                      ),
+                                                            bottom: 10,
+                                                          ),
                                                       child:
                                                           DeploymentChecklistCard(
-                                                        deployment: d,
-                                                      ),
+                                                            deployment: d,
+                                                          ),
                                                     ),
                                                   )
                                                   .toList(),
                                             ),
                                     ),
                                     const SizedBox(height: 20),
+                                    PublicServicesSummaryStrip(
+                                      onOpenHub: () => onNavigate(
+                                        ControlDestination.publicServices,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
                                     Wrap(
                                       spacing: 10,
                                       runSpacing: 10,
@@ -318,6 +321,12 @@ class OpsDashboardScreen extends StatelessWidget {
                                             ControlDestination.sotong24work,
                                           ),
                                           child: const Text('소통24워크'),
+                                        ),
+                                        FilledButton.tonal(
+                                          onPressed: () => onNavigate(
+                                            ControlDestination.publicServices,
+                                          ),
+                                          child: const Text('공개 서비스'),
                                         ),
                                         FilledButton.tonal(
                                           onPressed: () => onNavigate(
@@ -406,10 +415,7 @@ class _ErrorBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(24),
-      child: EmptyStatePanel(
-        title: '데이터 로딩 오류',
-        message: '$message\n$detail',
-      ),
+      child: EmptyStatePanel(title: '데이터 로딩 오류', message: '$message\n$detail'),
     );
   }
 }

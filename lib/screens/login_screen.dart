@@ -37,9 +37,11 @@ class _LoginScreenState extends State<LoginScreen> {
       case AuthFailureReason.emptyPassword:
         return '아이디와 비밀번호를 입력해 주세요.';
       case AuthFailureReason.configMissing:
-        return '관리자 인증 설정이 완료되지 않았습니다.';
+        return '관리자 인증 설정을 확인할 수 없습니다.';
       case AuthFailureReason.unauthorized:
         return '관리자 권한이 없는 계정입니다.';
+      case AuthFailureReason.network:
+        return '네트워크 연결을 확인한 후 다시 시도해 주세요.';
       case AuthFailureReason.invalidId:
       case AuthFailureReason.invalidCredentials:
       case AuthFailureReason.unknown:

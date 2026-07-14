@@ -18,10 +18,7 @@ void main() {
       );
       expect(o.lessonCount, 36);
       expect(o.chapters.length, greaterThanOrEqualTo(5));
-      expect(
-        o.chapters.fold<int>(0, (s, c) => s + c.lessons.length),
-        36,
-      );
+      expect(o.chapters.fold<int>(0, (s, c) => s + c.lessons.length), 36);
       expect(o.isAiGenerated, isFalse);
     });
 
@@ -432,10 +429,7 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: ListView(
-              children: [
-                SelectableText(long),
-                const Text('다음 강의'),
-              ],
+              children: [SelectableText(long), const Text('다음 강의')],
             ),
           ),
         ),

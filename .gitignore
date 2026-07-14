@@ -56,6 +56,7 @@ firebase-debug.*.log
 
 # Local deploy secrets (email/UID only — never commit)
 tool/deploy_control.local.ps1
+config/admin_auth.local.json
 
 # Secrets / local env
 .env

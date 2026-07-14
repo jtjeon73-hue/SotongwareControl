@@ -19,7 +19,8 @@ class StudyAiCourseCreatorScreen extends StatefulWidget {
       _StudyAiCourseCreatorScreenState();
 }
 
-class _StudyAiCourseCreatorScreenState extends State<StudyAiCourseCreatorScreen> {
+class _StudyAiCourseCreatorScreenState
+    extends State<StudyAiCourseCreatorScreen> {
   final _svc = StudyGenerationService();
   final _provider = DisconnectedStudyAiProvider();
 
@@ -92,9 +93,9 @@ class _StudyAiCourseCreatorScreenState extends State<StudyAiCourseCreatorScreen>
 
   Future<void> _saveRequest({bool alsoScaffold = false}) async {
     if (_interest.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('관심 분야를 입력하십시오.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('관심 분야를 입력하십시오.')));
       return;
     }
     setState(() => _busy = true);
@@ -129,10 +130,8 @@ class _StudyAiCourseCreatorScreenState extends State<StudyAiCourseCreatorScreen>
       if (courseId.isNotEmpty) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute<void>(
-            builder: (_) => StudyGenerationJobScreen(
-              jobId: jobId,
-              courseId: courseId,
-            ),
+            builder: (_) =>
+                StudyGenerationJobScreen(jobId: jobId, courseId: courseId),
           ),
         );
       }
@@ -270,18 +269,19 @@ class _StudyAiCourseCreatorScreenState extends State<StudyAiCourseCreatorScreen>
                   DropdownButtonFormField<String>(
                     initialValue: _difficulty,
                     decoration: const InputDecoration(labelText: '선호 난이도'),
-                    items: [
-                      StudyDifficulty.beginner,
-                      StudyDifficulty.intermediate,
-                      StudyDifficulty.advanced,
-                    ]
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e,
-                            child: Text(StudyDifficulty.labelKo(e)),
-                          ),
-                        )
-                        .toList(),
+                    items:
+                        [
+                              StudyDifficulty.beginner,
+                              StudyDifficulty.intermediate,
+                              StudyDifficulty.advanced,
+                            ]
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e,
+                                child: Text(StudyDifficulty.labelKo(e)),
+                              ),
+                            )
+                            .toList(),
                     onChanged: (v) =>
                         setState(() => _difficulty = v ?? _difficulty),
                   ),
@@ -311,16 +311,12 @@ class _StudyAiCourseCreatorScreenState extends State<StudyAiCourseCreatorScreen>
                   ),
                   TextField(
                     controller: _include,
-                    decoration: const InputDecoration(
-                      labelText: '포함하고 싶은 내용',
-                    ),
+                    decoration: const InputDecoration(labelText: '포함하고 싶은 내용'),
                     maxLines: 2,
                   ),
                   TextField(
                     controller: _exclude,
-                    decoration: const InputDecoration(
-                      labelText: '제외하고 싶은 내용',
-                    ),
+                    decoration: const InputDecoration(labelText: '제외하고 싶은 내용'),
                     maxLines: 2,
                   ),
                   TextField(
@@ -333,9 +329,7 @@ class _StudyAiCourseCreatorScreenState extends State<StudyAiCourseCreatorScreen>
                   ),
                   TextField(
                     controller: _project,
-                    decoration: const InputDecoration(
-                      labelText: '관련 프로젝트 ID',
-                    ),
+                    decoration: const InputDecoration(labelText: '관련 프로젝트 ID'),
                   ),
                   TextField(
                     controller: _refs,
@@ -359,7 +353,9 @@ class _StudyAiCourseCreatorScreenState extends State<StudyAiCourseCreatorScreen>
             runSpacing: 10,
             children: [
               FilledButton(
-                onPressed: _busy ? null : () => _saveRequest(alsoScaffold: false),
+                onPressed: _busy
+                    ? null
+                    : () => _saveRequest(alsoScaffold: false),
                 child: const Text('생성 조건 저장'),
               ),
               FilledButton.tonal(

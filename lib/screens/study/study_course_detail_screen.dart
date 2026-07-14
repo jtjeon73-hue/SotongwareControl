@@ -158,19 +158,20 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
               DropdownButtonFormField<String>(
                 initialValue: understanding,
                 decoration: const InputDecoration(labelText: '이해도'),
-                items: [
-                  StudyUnderstanding.low,
-                  StudyUnderstanding.medium,
-                  StudyUnderstanding.high,
-                  StudyUnderstanding.mastered,
-                ]
-                    .map(
-                      (e) => DropdownMenuItem(
-                        value: e,
-                        child: Text(StudyUnderstanding.labelKo(e)),
-                      ),
-                    )
-                    .toList(),
+                items:
+                    [
+                          StudyUnderstanding.low,
+                          StudyUnderstanding.medium,
+                          StudyUnderstanding.high,
+                          StudyUnderstanding.mastered,
+                        ]
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(StudyUnderstanding.labelKo(e)),
+                          ),
+                        )
+                        .toList(),
                 onChanged: (v) =>
                     setLocal(() => understanding = v ?? understanding),
               ),
@@ -307,10 +308,11 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                     final progressMap = {
                       for (final p in progress) p.chapterId: p,
                     };
-                    final computed = StudyProgressCalculator.courseProgressPercent(
-                      chapters: chapters,
-                      progress: progress,
-                    );
+                    final computed =
+                        StudyProgressCalculator.courseProgressPercent(
+                          chapters: chapters,
+                          progress: progress,
+                        );
                     final openSessions = sessions
                         .where(
                           (s) =>
@@ -437,9 +439,7 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                                           context,
                                         ).showSnackBar(
                                           SnackBar(
-                                            content: Text(
-                                              '세션 종료 · $mins분 기록',
-                                            ),
+                                            content: Text('세션 종료 · $mins분 기록'),
                                           ),
                                         );
                                       }
@@ -459,16 +459,16 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                                 }
                                 final lessonPct =
                                     StudyProgressCalculator.lessonProgressPercent(
-                                  lessons: lessons,
-                                  progress: const [],
-                                );
+                                      lessons: lessons,
+                                      progress: const [],
+                                    );
                                 final resolved =
                                     StudyProgressCalculator.resolveCourseProgressPercent(
-                                  chapters: chapters,
-                                  chapterProgress: progress,
-                                  lessons: lessons,
-                                  lessonProgress: const [],
-                                );
+                                      chapters: chapters,
+                                      chapterProgress: progress,
+                                      lessons: lessons,
+                                      lessonProgress: const [],
+                                    );
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -483,35 +483,37 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                                       ' · 초안·비공개 강의는 분모에서 제외',
                                     ),
                                     const SizedBox(height: 8),
-                                    ...lessons.take(50).map(
-                                      (l) => Card(
-                                        margin: const EdgeInsets.only(
-                                          bottom: 4,
-                                        ),
-                                        child: ListTile(
-                                          dense: true,
-                                          title: Text(
-                                            '${l.lessonNumber}. ${l.title}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          subtitle: Text(
-                                            l.isPublished ? '공개' : '비공개/초안',
-                                          ),
-                                          onTap: () {
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute<void>(
-                                                builder: (_) =>
-                                                    StudyLessonScreen(
-                                                  courseId: course.id,
-                                                  lessonId: l.id,
-                                                ),
+                                    ...lessons
+                                        .take(50)
+                                        .map(
+                                          (l) => Card(
+                                            margin: const EdgeInsets.only(
+                                              bottom: 4,
+                                            ),
+                                            child: ListTile(
+                                              dense: true,
+                                              title: Text(
+                                                '${l.lessonNumber}. ${l.title}',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                            );
-                                          },
+                                              subtitle: Text(
+                                                l.isPublished ? '공개' : '비공개/초안',
+                                              ),
+                                              onTap: () {
+                                                Navigator.of(context).push(
+                                                  MaterialPageRoute<void>(
+                                                    builder: (_) =>
+                                                        StudyLessonScreen(
+                                                          courseId: course.id,
+                                                          lessonId: l.id,
+                                                        ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
                                     if (lessons.length > 50)
                                       Text(
                                         '… 외 ${lessons.length - 50}강 (전체는 목록에서 확인)',
@@ -541,35 +543,40 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                                   chapter: ch,
                                   progress: pr,
                                   onOpen: () async {
-                                    final action = await showModalBottomSheet<
-                                      String
-                                    >(
-                                      context: context,
-                                      builder: (ctx) => SafeArea(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            ListTile(
-                                              title: const Text('학습 시작'),
-                                              onTap: () =>
-                                                  Navigator.pop(ctx, 'start'),
+                                    final action =
+                                        await showModalBottomSheet<String>(
+                                          context: context,
+                                          builder: (ctx) => SafeArea(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                ListTile(
+                                                  title: const Text('학습 시작'),
+                                                  onTap: () => Navigator.pop(
+                                                    ctx,
+                                                    'start',
+                                                  ),
+                                                ),
+                                                ListTile(
+                                                  title: const Text('완료 기록'),
+                                                  onTap: () => Navigator.pop(
+                                                    ctx,
+                                                    'complete',
+                                                  ),
+                                                ),
+                                                ListTile(
+                                                  title: const Text(
+                                                    '공개(진도 포함)',
+                                                  ),
+                                                  onTap: () => Navigator.pop(
+                                                    ctx,
+                                                    'publish',
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            ListTile(
-                                              title: const Text('완료 기록'),
-                                              onTap: () => Navigator.pop(
-                                                ctx,
-                                                'complete',
-                                              ),
-                                            ),
-                                            ListTile(
-                                              title: const Text('공개(진도 포함)'),
-                                              onTap: () =>
-                                                  Navigator.pop(ctx, 'publish'),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
+                                          ),
+                                        );
                                     if (action == 'start') {
                                       await _startSession(course, ch);
                                     } else if (action == 'complete') {
@@ -611,21 +618,23 @@ class _StudyCourseDetailScreenState extends State<StudyCourseDetailScreen> {
                                 child: Text('학습 기록 없음'),
                               )
                             else
-                              ...sessions.take(8).map(
-                                (s) => ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text(
-                                    '챕터 ${s.chapterId}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                              ...sessions
+                                  .take(8)
+                                  .map(
+                                    (s) => ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(
+                                        '챕터 ${s.chapterId}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      subtitle: Text(
+                                        '${DateFormat('yyyy-MM-dd HH:mm').format(s.startedAt)} · '
+                                        '${StudySessionStatus.labelKo(s.status)} · '
+                                        '${s.durationMinutes}분',
+                                      ),
+                                    ),
                                   ),
-                                  subtitle: Text(
-                                    '${DateFormat('yyyy-MM-dd HH:mm').format(s.startedAt)} · '
-                                    '${StudySessionStatus.labelKo(s.status)} · '
-                                    '${s.durationMinutes}분',
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),

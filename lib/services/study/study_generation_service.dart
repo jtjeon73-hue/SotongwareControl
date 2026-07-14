@@ -23,10 +23,8 @@ class StudyGenerationService {
        _db = db ?? FirebaseFirestore.instance,
        _auth = auth ?? FirebaseAuth.instance,
        _aiProvider = aiProvider ?? DisconnectedStudyAiProvider(),
-       _courseGenerator =
-           courseGenerator ?? DisconnectedStudyCourseGenerator(),
-       _lessonGenerator =
-           lessonGenerator ?? DisconnectedStudyLessonGenerator();
+       _courseGenerator = courseGenerator ?? DisconnectedStudyCourseGenerator(),
+       _lessonGenerator = lessonGenerator ?? DisconnectedStudyLessonGenerator();
 
   final StudyRepository _repo;
   final FirebaseFirestore _db;
@@ -72,9 +70,7 @@ class StudyGenerationService {
 
   // —— lessons ——
   Stream<List<StudyLesson>> watchLessons(String courseId) {
-    return _lessons.where('courseId', isEqualTo: courseId).snapshots().map((
-      s,
-    ) {
+    return _lessons.where('courseId', isEqualTo: courseId).snapshots().map((s) {
       final list = s.docs.map(StudyLesson.fromDoc).toList()
         ..sort((a, b) => a.lessonNumber.compareTo(b.lessonNumber));
       return list;
@@ -230,7 +226,11 @@ class StudyGenerationService {
     return jobRef.id;
   }
 
-  Future<void> updateJobStatus(String jobId, String status, {String? error}) async {
+  Future<void> updateJobStatus(
+    String jobId,
+    String status, {
+    String? error,
+  }) async {
     await _jobs.doc(jobId).set({
       'status': status,
       if (error != null) 'lastError': error,
@@ -306,14 +306,10 @@ class StudyGenerationService {
       final nums = versions.docs
           .map((d) => (d.data()['versionNumber'] as num?)?.toInt() ?? 0)
           .toList();
-      final next = nums.isEmpty
-          ? 1
-          : nums.reduce((a, b) => a > b ? a : b) + 1;
+      final next = nums.isEmpty ? 1 : nums.reduce((a, b) => a > b ? a : b) + 1;
       final prev = versions.docs.isEmpty
           ? ''
-          : versions.docs
-                .map((d) => d.id)
-                .first;
+          : versions.docs.map((d) => d.id).first;
       final vRef = _versions.doc();
       await vRef.set({
         'courseId': courseId,
@@ -418,8 +414,7 @@ class StudyGenerationService {
       await updateJobStatus(
         jobId,
         StudyJobStatus.paused,
-        error:
-            'AI 강의 자동 생성 기능은 아직 연결되지 않았습니다. 본문 자동 생성을 시작할 수 없습니다.',
+        error: 'AI 강의 자동 생성 기능은 아직 연결되지 않았습니다. 본문 자동 생성을 시작할 수 없습니다.',
       );
       return;
     }
@@ -536,8 +531,7 @@ class StudyGenerationService {
     final existing = await _runs.where('courseId', isEqualTo: courseId).get();
     final maxRun = existing.docs.fold<int>(
       0,
-      (m, d) =>
-          ((d.data()['runNumber'] as num?)?.toInt() ?? 0) > m
+      (m, d) => ((d.data()['runNumber'] as num?)?.toInt() ?? 0) > m
           ? (d.data()['runNumber'] as num).toInt()
           : m,
     );
@@ -568,7 +562,10 @@ class StudyGenerationService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
     await batch.commit();
-    await _log('새 학습 회차 시작: ${maxRun + 1}회차', collection: 'study_learning_runs');
+    await _log(
+      '새 학습 회차 시작: ${maxRun + 1}회차',
+      collection: 'study_learning_runs',
+    );
     return ref.id;
   }
 
@@ -582,9 +579,7 @@ class StudyGenerationService {
   }
 
   Future<void> upsertLessonProgress(StudyLessonProgress p) async {
-    final id = p.id.isEmpty
-        ? '${p.learningRunId}_${p.lessonId}'
-        : p.id;
+    final id = p.id.isEmpty ? '${p.learningRunId}_${p.lessonId}' : p.id;
     await _lessonProgress.doc(id).set({
       ...p.toMap(),
       if (p.id.isEmpty) 'createdAt': FieldValue.serverTimestamp(),
@@ -620,8 +615,7 @@ class StudyGenerationService {
         .where((d) => d.data()['isCompleted'] == true)
         .length;
     final runSnap = await _runs.doc(learningRunId).get();
-    final total =
-        (runSnap.data()?['totalLessonCount'] as num?)?.toInt() ?? 0;
+    final total = (runSnap.data()?['totalLessonCount'] as num?)?.toInt() ?? 0;
     final pct = total <= 0
         ? null
         : ((done / total) * 100).round().clamp(0, 100);

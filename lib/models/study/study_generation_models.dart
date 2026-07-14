@@ -119,10 +119,15 @@ class StudyLesson {
       prerequisiteLessonIds: ((d['prerequisiteLessonIds'] as List?) ?? const [])
           .map((e) => '$e')
           .toList(),
-      keywords: ((d['keywords'] as List?) ?? const []).map((e) => '$e').toList(),
+      keywords: ((d['keywords'] as List?) ?? const [])
+          .map((e) => '$e')
+          .toList(),
       displayOrder: (d['displayOrder'] as num?)?.toInt() ?? 0,
       isPublished: d['isPublished'] == true,
-      generationStatus: _str(d['generationStatus'], StudyGenerationStatus.draft),
+      generationStatus: _str(
+        d['generationStatus'],
+        StudyGenerationStatus.draft,
+      ),
       validationStatus: _str(
         d['validationStatus'],
         StudyValidationStatus.notChecked,
