@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../models/business_analysis.dart';
 import '../models/ops_models.dart';
 
 class OpsRepository {
@@ -31,6 +32,8 @@ class OpsRepository {
       _db.collection('ideas');
   CollectionReference<Map<String, dynamic>> get _settings =>
       _db.collection('settings');
+  CollectionReference<Map<String, dynamic>> get _businessAnalysisReports =>
+      _db.collection('business_analysis_reports');
 
   User? get currentUser => _auth.currentUser;
 
@@ -157,6 +160,47 @@ class OpsRepository {
 
   Stream<List<IdeaDoc>> watchIdeas() {
     return _ideas.snapshots().map((s) => s.docs.map(IdeaDoc.fromDoc).toList());
+  }
+
+  Stream<List<BusinessAnalysisReport>> watchBusinessAnalysisReports({
+    int limit = 20,
+  }) {
+    return _businessAnalysisReports
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs.map(BusinessAnalysisReport.fromDoc).toList(),
+        );
+  }
+
+  Future<BusinessAnalysisReport?> latestBusinessAnalysisReport() async {
+    final snapshot = await _businessAnalysisReports
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .get();
+    if (snapshot.docs.isEmpty) return null;
+    return BusinessAnalysisReport.fromDoc(snapshot.docs.first);
+  }
+
+  Future<String> saveBusinessAnalysisReport(
+    BusinessAnalysisReport report,
+  ) async {
+    final reference = report.id.isEmpty
+        ? _businessAnalysisReports.doc()
+        : _businessAnalysisReports.doc(report.id);
+    await reference.set(
+      report.toMap(includeCreatedAt: report.id.isEmpty),
+      SetOptions(merge: true),
+    );
+    await _logActivity(
+      action: 'create',
+      collection: 'business_analysis_reports',
+      documentId: reference.id,
+      summary: '전체 사업 규칙 기반 분석 저장: ${report.overallStatus}',
+    );
+    return reference.id;
   }
 
   Future<bool> isStructureSeeded() async {
@@ -292,6 +336,7 @@ class OpsRepository {
       'deployments': await dump(_deployments),
       'issues': await dump(_issues),
       'ai_reports': await dump(_aiReports),
+      'business_analysis_reports': await dump(_businessAnalysisReports),
       'ideas': await dump(_ideas),
     };
   }

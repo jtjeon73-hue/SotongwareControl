@@ -15,6 +15,7 @@ enum ControlDestination {
   aiIdeaPlanningDept,
   aiMarketingDept,
   aiTaxAccountingDept,
+  aiBusinessAnalysis,
   studyDashboard,
   studyCourses,
   studyAiTeacher,
@@ -29,6 +30,8 @@ enum ControlDestination {
   youtubeContent,
   ebook,
   onlineExpansion,
+  webMarketing,
+  businessStudy,
   publicServices,
   adminData,
 }
@@ -62,6 +65,8 @@ extension ControlDestinationX on ControlDestination {
         return 'AI홍보.마케팅부';
       case ControlDestination.aiTaxAccountingDept:
         return 'AI세무회계부';
+      case ControlDestination.aiBusinessAnalysis:
+        return 'AI 사업분석';
       case ControlDestination.studyDashboard:
         return '학습 대시보드';
       case ControlDestination.studyCourses:
@@ -81,15 +86,19 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.sotong24work:
         return '소통24워크';
       case ControlDestination.industrialAutomation:
-        return '산업자동화사업부';
+        return '사업자동화SW제작사업부';
       case ControlDestination.appDevelopment:
-        return '앱개발사업부';
+        return '앱제작사업부';
       case ControlDestination.youtubeContent:
-        return '콘텐츠·음악사업부';
+        return '콘텐츠음악제작사업부';
       case ControlDestination.ebook:
-        return '전자책사업부';
+        return '전자책제작사업부';
       case ControlDestination.onlineExpansion:
         return '온라인판매/확장(보관)';
+      case ControlDestination.webMarketing:
+        return '웹마케팅제작사업부';
+      case ControlDestination.businessStudy:
+        return '사업 지식 학습';
       case ControlDestination.publicServices:
         return '공개 서비스';
     }
@@ -123,6 +132,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.campaign_outlined;
       case ControlDestination.aiTaxAccountingDept:
         return Icons.receipt_long_outlined;
+      case ControlDestination.aiBusinessAnalysis:
+        return Icons.auto_graph_outlined;
       case ControlDestination.studyDashboard:
         return Icons.school_outlined;
       case ControlDestination.studyCourses:
@@ -151,6 +162,10 @@ extension ControlDestinationX on ControlDestination {
         return Icons.auto_stories_outlined;
       case ControlDestination.onlineExpansion:
         return Icons.storefront_outlined;
+      case ControlDestination.webMarketing:
+        return Icons.language_outlined;
+      case ControlDestination.businessStudy:
+        return Icons.school_outlined;
       case ControlDestination.publicServices:
         return Icons.public_outlined;
     }
@@ -170,6 +185,8 @@ extension ControlDestinationX on ControlDestination {
         return 'ebook';
       case ControlDestination.onlineExpansion:
         return 'online_expansion';
+      case ControlDestination.webMarketing:
+        return 'web_marketing';
       default:
         return null;
     }
@@ -212,38 +229,18 @@ class SidebarNavigation extends StatelessWidget {
   static const _commandHub = [
     ControlDestination.dashboardOverview,
     ControlDestination.divisionProgress,
-    ControlDestination.revenueProgress,
-    ControlDestination.issuesCheck,
-    ControlDestination.nextPriority,
   ];
 
-  static const _aiDepartments = [
-    ControlDestination.aiRepresentative,
-    ControlDestination.aiProductDevDept,
-    ControlDestination.aiWorkOrderDept,
-    ControlDestination.aiStrategyDept,
-    ControlDestination.aiIdeaPlanningDept,
-    ControlDestination.aiMarketingDept,
-    ControlDestination.aiTaxAccountingDept,
-  ];
+  static const _aiDepartments = [ControlDestination.aiBusinessAnalysis];
 
-  static const _study = [
-    ControlDestination.studyDashboard,
-    ControlDestination.studyCourses,
-    ControlDestination.studyAiTeacher,
-    ControlDestination.studyAssignments,
-    ControlDestination.studyQuizzes,
-    ControlDestination.studyNotes,
-    ControlDestination.studyHistory,
-    ControlDestination.studyAdmin,
-  ];
+  static const _study = [ControlDestination.businessStudy];
 
   static const _divisions = [
-    ControlDestination.sotong24work,
     ControlDestination.industrialAutomation,
     ControlDestination.appDevelopment,
     ControlDestination.youtubeContent,
     ControlDestination.ebook,
+    ControlDestination.webMarketing,
   ];
 
   @override
@@ -306,7 +303,7 @@ class SidebarNavigation extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
               children: [
-                const _SectionLabel(label: '소통총괄관제'),
+                const _SectionLabel(label: '소통총관제'),
                 ..._commandHub.map(
                   (d) => _NavItem(
                     destination: d,
@@ -330,7 +327,7 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const _SectionLabel(label: '소통스터디부'),
+                const _SectionLabel(label: '소통사업스터디부'),
                 ..._study.map(
                   (d) => _NavItem(
                     destination: d,
@@ -354,17 +351,7 @@ class SidebarNavigation extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const _SectionLabel(label: '공개 서비스 바로가기'),
-                _NavItem(
-                  destination: ControlDestination.publicServices,
-                  isSelected: selected == ControlDestination.publicServices,
-                  onTap: () {
-                    onDestinationSelected(ControlDestination.publicServices);
-                    onClose?.call();
-                  },
-                ),
-                const SizedBox(height: 8),
-                const _SectionLabel(label: '데이터 관리'),
+                const _SectionLabel(label: '운영 도구'),
                 _NavItem(
                   destination: ControlDestination.adminData,
                   isSelected: selected == ControlDestination.adminData,

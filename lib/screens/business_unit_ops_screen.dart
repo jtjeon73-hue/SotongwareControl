@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../core/business/business_catalog.dart';
 import '../models/ops_enums.dart';
 import '../models/ops_models.dart';
 import '../screens/project_detail_screen.dart';
@@ -44,10 +45,10 @@ class BusinessUnitOpsScreen extends StatelessWidget {
       stream: repo.watchBusinessUnits(),
       builder: (context, unitSnap) {
         return StreamBuilder<List<ProjectDoc>>(
-          stream: repo.watchProjects(businessUnitId: businessUnitId),
+          stream: repo.watchProjects(),
           builder: (context, projectSnap) {
             return StreamBuilder<List<TaskDoc>>(
-              stream: repo.watchTasks(businessUnitId: businessUnitId),
+              stream: repo.watchTasks(),
               builder: (context, taskSnap) {
                 return StreamBuilder<List<WorkLogDoc>>(
                   stream: repo.watchWorkLogs(),
@@ -73,17 +74,35 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                             break;
                           }
                         }
-                        final projects = projectSnap.data ?? const [];
-                        final tasks = taskSnap.data ?? const [];
+                        final business = BusinessCatalog.byId(businessUnitId);
+                        final projects = (projectSnap.data ?? const [])
+                            .where(
+                              (p) =>
+                                  business?.matches(p.businessUnitId) ??
+                                  p.businessUnitId == businessUnitId,
+                            )
+                            .toList();
+                        final tasks = (taskSnap.data ?? const [])
+                            .where(
+                              (t) =>
+                                  business?.matches(t.businessUnitId) ??
+                                  t.businessUnitId == businessUnitId,
+                            )
+                            .toList();
                         final logs = (logSnap.data ?? const [])
-                            .where((l) => l.businessUnitId == businessUnitId)
+                            .where(
+                              (l) =>
+                                  business?.matches(l.businessUnitId) ??
+                                  l.businessUnitId == businessUnitId,
+                            )
                             .toList();
                         final issues = (issueSnap.data ?? const []).where((i) {
                           return projects.any((p) => p.id == i.projectId) ||
                               i.projectId.isEmpty;
                         }).toList();
 
-                        final title = unit?.name ?? fallbackTitle;
+                        final title =
+                            business?.name ?? unit?.name ?? fallbackTitle;
                         final inProgress = projects
                             .where(
                               (p) =>
@@ -116,6 +135,19 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                                 badge: unit?.status ?? '확인 필요',
                               ),
                               const SizedBox(height: 16),
+                              if (business != null) ...[
+                                _InfoCard(
+                                  title: '사업 방향',
+                                  lines: [
+                                    '목적: ${business.purpose}',
+                                    '방향: ${business.direction}',
+                                    '주요 고객: ${business.customers}',
+                                    '수익 방식: ${business.revenueModel}',
+                                  ],
+                                  note: '수익 금액은 실제 데이터가 연결되기 전까지 표시하지 않습니다.',
+                                ),
+                                const SizedBox(height: 12),
+                              ],
                               if (unit == null && projects.isEmpty)
                                 EmptyStatePanel(
                                   title: '아직 등록된 정보가 없습니다',
@@ -167,6 +199,24 @@ class BusinessUnitOpsScreen extends StatelessWidget {
                                   ),
                                 if (recommendedPlan.isNotEmpty)
                                   const SizedBox(height: 12),
+                                if (business != null) ...[
+                                  _InfoCard(
+                                    title: '사업 기본 지식',
+                                    lines: business.knowledge
+                                        .map((item) => '• $item')
+                                        .toList(),
+                                    note:
+                                        '기술·영업·품질·유지관리 지식을 실제 프로젝트와 연결해 확인합니다.',
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _InfoCard(
+                                    title: '오늘의 학습',
+                                    lines: [business.todayKnowledge],
+                                    note:
+                                        '소통웨어 적용: 현재 프로젝트 하나를 선택해 이 지식의 실행 항목을 작업 로그에 남기십시오.',
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 Text(
                                   '프로젝트',
                                   style: Theme.of(

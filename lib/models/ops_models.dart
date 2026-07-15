@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../core/business/business_catalog.dart';
 import 'ops_enums.dart';
 
 DateTime? _ts(dynamic v) {
@@ -112,6 +113,9 @@ class ProjectDoc {
   final DateTime? targetDate;
   final DateTime? lastWorkedAt;
   final DateTime? updatedAt;
+
+  /// 기존 businessUnitId를 보존하면서 5개 핵심 사업 ID로 해석합니다.
+  String get canonicalBusinessId => BusinessCatalog.canonicalId(businessUnitId);
 
   int? get computedProgress {
     if (progress != null) return progress!.clamp(0, 100);

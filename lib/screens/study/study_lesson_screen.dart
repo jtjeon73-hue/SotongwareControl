@@ -334,7 +334,7 @@ class _StudyLessonScreenState extends State<StudyLessonScreen> {
                                               lessonId: lesson.id,
                                               addedMinutes: 5,
                                             );
-                                            if (mounted) {
+                                            if (context.mounted) {
                                               ScaffoldMessenger.of(
                                                 context,
                                               ).showSnackBar(

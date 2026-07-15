@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'data/sample_business_data.dart';
 import 'screens/action_items_screen.dart';
 import 'screens/admin_data_screen.dart';
+import 'screens/ai_business_analysis_screen.dart';
 import 'screens/ai_ops_department_screen.dart';
+import 'screens/business_division_progress_screen.dart';
+import 'screens/business_overview_screen.dart';
+import 'screens/business_study_screen.dart';
 import 'screens/business_unit_ops_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
-import 'screens/ops_dashboard_screen.dart';
 import 'screens/public_services_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
 import 'screens/sotong24work_screen.dart';
@@ -111,9 +114,9 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   Widget _buildContent() {
     switch (_selected) {
       case ControlDestination.dashboardOverview:
-        return OpsDashboardScreen(onNavigate: _onDestinationSelected);
+        return BusinessOverviewScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.divisionProgress:
-        return OpsDashboardScreen(onNavigate: _onDestinationSelected);
+        return const BusinessDivisionProgressScreen();
       case ControlDestination.revenueProgress:
         return const RevenueDashboardScreen();
       case ControlDestination.issuesCheck:
@@ -164,6 +167,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           title: 'AI세무회계부',
           roleSummary: '실제 등록 금액만 표시합니다. 확정 신고 결과가 아닌 관리 참고 정보입니다.',
         );
+      case ControlDestination.aiBusinessAnalysis:
+        return const AiBusinessAnalysisScreen();
       case ControlDestination.studyDashboard:
         return StudyDashboardScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.studyCourses:
@@ -208,6 +213,13 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           businessUnitId: 'online_expansion',
           fallbackTitle: '온라인판매/확장',
         );
+      case ControlDestination.webMarketing:
+        return const BusinessUnitOpsScreen(
+          businessUnitId: 'web_marketing',
+          fallbackTitle: '웹마케팅제작사업부',
+        );
+      case ControlDestination.businessStudy:
+        return const BusinessStudyScreen();
       case ControlDestination.publicServices:
         return const PublicServicesScreen();
     }

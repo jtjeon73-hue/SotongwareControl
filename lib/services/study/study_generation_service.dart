@@ -233,7 +233,7 @@ class StudyGenerationService {
   }) async {
     await _jobs.doc(jobId).set({
       'status': status,
-      if (error != null) 'lastError': error,
+      ...error == null ? const <String, dynamic>{} : {'lastError': error},
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
