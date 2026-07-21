@@ -8,6 +8,7 @@ import 'screens/business_division_progress_screen.dart';
 import 'screens/business_overview_screen.dart';
 import 'screens/business_study_screen.dart';
 import 'screens/business_unit_ops_screen.dart';
+import 'screens/deployed_sites_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
 import 'screens/public_services_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
@@ -117,6 +118,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return BusinessOverviewScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.divisionProgress:
         return const BusinessDivisionProgressScreen();
+      case ControlDestination.deployedSites:
+        return const DeployedSitesScreen();
       case ControlDestination.revenueProgress:
         return const RevenueDashboardScreen();
       case ControlDestination.issuesCheck:

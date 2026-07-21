@@ -5,6 +5,7 @@ import 'sotong_brand_icon.dart';
 enum ControlDestination {
   dashboardOverview,
   divisionProgress,
+  deployedSites,
   revenueProgress,
   issuesCheck,
   nextPriority,
@@ -43,6 +44,8 @@ extension ControlDestinationX on ControlDestination {
         return '전체 사업 현황';
       case ControlDestination.divisionProgress:
         return '사업부별 진행상태';
+      case ControlDestination.deployedSites:
+        return '웹 배포사이트';
       case ControlDestination.revenueProgress:
         return '수익화 진행상태';
       case ControlDestination.issuesCheck:
@@ -110,6 +113,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.dashboard_outlined;
       case ControlDestination.divisionProgress:
         return Icons.business_outlined;
+      case ControlDestination.deployedSites:
+        return Icons.language_outlined;
       case ControlDestination.revenueProgress:
         return Icons.paid_outlined;
       case ControlDestination.issuesCheck:
@@ -229,6 +234,7 @@ class SidebarNavigation extends StatelessWidget {
   static const _commandHub = [
     ControlDestination.dashboardOverview,
     ControlDestination.divisionProgress,
+    ControlDestination.deployedSites,
   ];
 
   static const _aiDepartments = [ControlDestination.aiBusinessAnalysis];

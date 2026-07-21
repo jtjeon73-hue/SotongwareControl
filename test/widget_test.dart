@@ -185,6 +185,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('전체 사업 현황'), findsWidgets);
+    expect(find.text('웹 배포사이트'), findsOneWidget);
     expect(find.text('AI 사업분석'), findsOneWidget);
     expect(find.text('사업 지식 학습'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
