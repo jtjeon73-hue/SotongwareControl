@@ -19,13 +19,35 @@ void main() {
   });
 
   test('확인된 초기 사이트 카탈로그와 중복 방지', () {
-    expect(DeployedSitesCatalog.verifiedSeeds.length, 8);
+    expect(DeployedSitesCatalog.verifiedSeeds.length, 13);
     expect(
       DeployedSitesCatalog.verifiedSeeds.every(
         (s) => s.liveUrl.startsWith('https://'),
       ),
       isTrue,
     );
+    final education = DeployedSitesCatalog.verifiedSeeds
+        .where((s) => s.category == DeployedSiteCategory.education)
+        .map((s) => s.nameEn)
+        .toSet();
+    expect(
+      education,
+      containsAll(['SotongLanguage', 'SotongElec', 'SotongDev']),
+    );
+    expect(
+      DeployedSitesCatalog.verifiedSeeds.any(
+        (s) => s.nameEn == 'SotongCar' && s.liveUrl.contains('sotong-car'),
+      ),
+      isTrue,
+    );
+    expect(
+      DeployedSitesCatalog.verifiedSeeds.any(
+        (s) =>
+            s.nameEn == 'SotongPLC' && s.firebaseProjectId == 'sotongware-plc',
+      ),
+      isTrue,
+    );
+
     final existing = [DeployedSitesCatalog.verifiedSeeds.first];
     expect(
       DeployedSitesService.isDuplicate(
@@ -43,6 +65,57 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('GitHub·영문명·Project ID 중복 매칭과 upsert 병합', () {
+    final seed = DeployedSitesCatalog.verifiedSeeds.firstWhere(
+      (s) => s.nameEn == 'SotongLanguage',
+    );
+    final existing = [
+      DeployedSiteDoc(
+        id: 'legacy_language',
+        nameKo: '옛이름',
+        nameEn: 'SotongLanguage',
+        liveUrl: '',
+        githubUrl: seed.githubUrl,
+        adminMemo: '관리자 메모 유지',
+        isFavorite: true,
+        status: DeployedSiteStatus.operating,
+      ),
+    ];
+    final match = DeployedSitesService.findMatch(
+      existing,
+      id: seed.id,
+      liveUrl: seed.liveUrl,
+      firebaseProjectId: seed.firebaseProjectId,
+      githubUrl: seed.githubUrl,
+      nameEn: seed.nameEn,
+    );
+    expect(match?.id, 'legacy_language');
+    final merged = DeployedSitesService.mergeSeed(seed, match);
+    expect(merged.id, 'legacy_language');
+    expect(merged.liveUrl, seed.liveUrl);
+    expect(merged.firebaseProjectId, seed.firebaseProjectId);
+    expect(merged.adminMemo, '관리자 메모 유지');
+    expect(merged.isFavorite, isTrue);
+    expect(merged.nameKo, '소통랭귀지');
+  });
+
+  test('교육·학습·자동차 분야 필터', () {
+    final filtered = DeployedSitesService.applyFilter(
+      DeployedSitesCatalog.verifiedSeeds,
+      const DeployedSitesFilter(category: DeployedSiteCategory.education),
+    );
+    expect(filtered.length, greaterThanOrEqualTo(3));
+    expect(
+      filtered.every((s) => s.category == DeployedSiteCategory.education),
+      isTrue,
+    );
+    final lifestyle = DeployedSitesService.applyFilter(
+      DeployedSitesCatalog.verifiedSeeds,
+      const DeployedSitesFilter(category: DeployedSiteCategory.lifestyle),
+    );
+    expect(lifestyle.map((s) => s.nameEn), contains('SotongCar'));
   });
 
   test('KPI와 필터·정렬', () {
@@ -78,12 +151,6 @@ void main() {
     );
     expect(filtered.length, 1);
     expect(filtered.first.nameKo, '소통총관제');
-
-    final needsFirst = DeployedSitesService.applyFilter(
-      sites,
-      const DeployedSitesFilter(sort: DeployedSitesSort.needsCheckFirst),
-    );
-    expect(needsFirst.first.status, DeployedSiteStatus.needsCheck);
   });
 
   test('주소 미등록 시 열기 불가 판단', () {

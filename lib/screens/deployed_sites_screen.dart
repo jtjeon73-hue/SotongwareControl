@@ -69,6 +69,8 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
       existing,
       liveUrl: result.liveUrl,
       firebaseProjectId: result.firebaseProjectId,
+      githubUrl: result.githubUrl,
+      nameEn: result.nameEn,
       excludeId: site?.id,
     )) {
       if (!mounted) return;
@@ -267,7 +269,7 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
                           ? null
                           : () => _seedOrImport(missingOnly: true),
                       icon: const Icon(Icons.download_outlined),
-                      label: Text(_seeding ? '등록 중…' : '확인 사이트 불러오기'),
+                      label: Text(_seeding ? '동기화 중…' : '확인 사이트 동기화'),
                     ),
                     FilledButton.icon(
                       onPressed: () => _openEditor(),
@@ -312,7 +314,7 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
                   message:
                       '확인된 Firebase Hosting 사이트를 불러오거나 직접 등록하십시오. '
                       '확인되지 않은 주소는 임의로 만들지 않습니다.',
-                  actionLabel: '확인 사이트 불러오기',
+                  actionLabel: '확인 사이트 동기화',
                   onAction: _seeding
                       ? null
                       : () => _seedOrImport(missingOnly: true),

@@ -84,6 +84,7 @@ class DeployedSiteCategory {
   static const education = '교육·학습';
   static const rural = '지역·농촌';
   static const marketing = '마케팅';
+  static const lifestyle = '자동차·생활';
   static const other = '기타';
 
   static const all = [
@@ -96,6 +97,7 @@ class DeployedSiteCategory {
     education,
     rural,
     marketing,
+    lifestyle,
     other,
   ];
 }
@@ -311,6 +313,18 @@ class DeployedSiteDoc {
         return Icons.campaign_outlined;
       case 'rural':
         return Icons.agriculture_outlined;
+      case 'education':
+        return Icons.school_outlined;
+      case 'car':
+        return Icons.directions_car_outlined;
+      case 'plc':
+        return Icons.memory_outlined;
+      case 'dev':
+        return Icons.code_outlined;
+      case 'elec':
+        return Icons.bolt_outlined;
+      case 'language':
+        return Icons.translate_outlined;
       default:
         return Icons.public_outlined;
     }
