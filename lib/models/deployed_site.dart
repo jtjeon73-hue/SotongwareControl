@@ -72,6 +72,57 @@ class DeployedSiteStatus {
         return Icons.help_outline;
     }
   }
+
+  /// 저장된 status만 믿지 않고, 핵심 등록 정보로 표시 상태를 산출한다.
+  /// - 상세설명 없음 → 점검 필요
+  /// - 서비스 범위·운영 목적 중 하나만 채워진 불완전 입력 → 점검 필요
+  /// - 둘 다 비어 있고 상세만 있는 기존(레거시) 문서는 허용
+  /// - 과거 '점검 필요' 문구만 issues에 남은 경우는 차단하지 않음
+  static String evaluate(DeployedSiteDoc site) {
+    if (!site.isActive || site.status == inactive) return inactive;
+    if (site.status == deploying || site.status == preparing) {
+      return site.status;
+    }
+
+    if (!hasRequiredProfile(site)) return needsCheck;
+
+    final url = site.liveUrl.trim().toLowerCase();
+    if (url.isEmpty || !url.startsWith('https://')) return needsCheck;
+
+    if (hasSeriousIssues(site.issues)) return needsCheck;
+
+    final deploy = site.lastDeployResult.trim().toLowerCase();
+    if (deploy.contains('실패') ||
+        deploy.contains('fail') ||
+        deploy.contains('error')) {
+      return needsCheck;
+    }
+
+    return operating;
+  }
+
+  static bool hasRequiredProfile(DeployedSiteDoc site) {
+    final scope = site.serviceScope.trim();
+    final purpose = site.operationPurpose.trim();
+    final desc = site.description.trim();
+    if (desc.isEmpty) return false;
+    if (scope.isEmpty && purpose.isEmpty) return true;
+    return scope.isNotEmpty && purpose.isNotEmpty;
+  }
+
+  /// 운영을 막는 실질 이슈인지 판별. 과거 점검 안내 문구만 있으면 false.
+  static bool hasSeriousIssues(String issues) {
+    final t = issues.trim();
+    if (t.isEmpty) return false;
+    const placeholders = {
+      '점검 필요',
+      '서비스 범위·운영 목적 상세 점검 필요',
+      '서비스 범위·운영 목적 점검 필요',
+      '상세 점검 필요',
+    };
+    if (placeholders.contains(t)) return false;
+    return true;
+  }
 }
 
 class DeployedSiteCategory {
@@ -116,11 +167,14 @@ class DeployedSiteDoc {
     required this.nameKo,
     this.nameEn = '',
     this.description = '',
+    this.serviceScope = '',
+    this.operationPurpose = '',
     this.category = DeployedSiteCategory.other,
     this.hostingType = DeployedHostingType.firebase,
     this.firebaseProjectId = '',
     this.liveUrl = '',
     this.githubUrl = '',
+    this.strategyUrl = '',
     this.status = DeployedSiteStatus.needsCheck,
     this.isFavorite = false,
     this.iconName = 'public',
@@ -144,11 +198,14 @@ class DeployedSiteDoc {
   final String nameKo;
   final String nameEn;
   final String description;
+  final String serviceScope;
+  final String operationPurpose;
   final String category;
   final String hostingType;
   final String firebaseProjectId;
   final String liveUrl;
   final String githubUrl;
+  final String strategyUrl;
   final String status;
   final bool isFavorite;
   final String iconName;
@@ -169,16 +226,23 @@ class DeployedSiteDoc {
 
   bool get hasLiveUrl => liveUrl.trim().isNotEmpty;
   bool get hasGithubUrl => githubUrl.trim().isNotEmpty;
+  bool get hasStrategyUrl => strategyUrl.trim().isNotEmpty;
+
+  /// 화면·KPI용 상태. 저장값만 보지 않고 핵심 정보 충족 여부를 반영한다.
+  String get effectiveStatus => DeployedSiteStatus.evaluate(this);
 
   DeployedSiteDoc copyWith({
     String? nameKo,
     String? nameEn,
     String? description,
+    String? serviceScope,
+    String? operationPurpose,
     String? category,
     String? hostingType,
     String? firebaseProjectId,
     String? liveUrl,
     String? githubUrl,
+    String? strategyUrl,
     String? status,
     bool? isFavorite,
     String? iconName,
@@ -202,11 +266,14 @@ class DeployedSiteDoc {
       nameKo: nameKo ?? this.nameKo,
       nameEn: nameEn ?? this.nameEn,
       description: description ?? this.description,
+      serviceScope: serviceScope ?? this.serviceScope,
+      operationPurpose: operationPurpose ?? this.operationPurpose,
       category: category ?? this.category,
       hostingType: hostingType ?? this.hostingType,
       firebaseProjectId: firebaseProjectId ?? this.firebaseProjectId,
       liveUrl: liveUrl ?? this.liveUrl,
       githubUrl: githubUrl ?? this.githubUrl,
+      strategyUrl: strategyUrl ?? this.strategyUrl,
       status: status ?? this.status,
       isFavorite: isFavorite ?? this.isFavorite,
       iconName: iconName ?? this.iconName,
@@ -238,11 +305,14 @@ class DeployedSiteDoc {
       nameKo: _str(d['nameKo'], doc.id),
       nameEn: _str(d['nameEn']),
       description: _str(d['description']),
+      serviceScope: _str(d['serviceScope']),
+      operationPurpose: _str(d['operationPurpose']),
       category: _str(d['category'], DeployedSiteCategory.other),
       hostingType: _str(d['hostingType'], DeployedHostingType.firebase),
       firebaseProjectId: _str(d['firebaseProjectId']),
       liveUrl: _str(d['liveUrl']),
       githubUrl: _str(d['githubUrl']),
+      strategyUrl: _str(d['strategyUrl']),
       status: _str(d['status'], DeployedSiteStatus.needsCheck),
       isFavorite: d['isFavorite'] == true,
       iconName: _str(d['iconName'], 'public'),
@@ -267,11 +337,14 @@ class DeployedSiteDoc {
     'nameKo': nameKo,
     'nameEn': nameEn,
     'description': description,
+    'serviceScope': serviceScope,
+    'operationPurpose': operationPurpose,
     'category': category,
     'hostingType': hostingType,
     'firebaseProjectId': firebaseProjectId,
     'liveUrl': liveUrl,
     'githubUrl': githubUrl,
+    'strategyUrl': strategyUrl,
     'status': status,
     'isFavorite': isFavorite,
     'iconName': iconName,

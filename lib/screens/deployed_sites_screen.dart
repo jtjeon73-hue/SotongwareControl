@@ -50,11 +50,27 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
   }
 
   void _maybeAutoSeed(List<DeployedSiteDoc> sites) {
-    if (_autoSeedAttempted || _seeding || sites.isNotEmpty) return;
+    if (_autoSeedAttempted || _seeding) return;
     _autoSeedAttempted = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _seedOrImport(missingOnly: false);
+      if (sites.isEmpty) {
+        _seedOrImport(missingOnly: false);
+        return;
+      }
+      final countryNeedsRefresh = sites.any((s) {
+        final isCountry =
+            s.id == 'sotong_country_ai' ||
+            s.firebaseProjectId == 'sotong-country-ai' ||
+            s.nameEn.replaceAll(' ', '').toLowerCase() == 'sotongcountryai';
+        if (!isCountry) return false;
+        return s.serviceScope.trim().isEmpty ||
+            s.operationPurpose.trim().isEmpty ||
+            s.effectiveStatus == DeployedSiteStatus.needsCheck;
+      });
+      if (countryNeedsRefresh) {
+        _seedOrImport(missingOnly: true);
+      }
     });
   }
 
@@ -349,6 +365,9 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
                               onGithub: site.hasGithubUrl
                                   ? () => ExternalUrl.open(site.githubUrl)
                                   : null,
+                              onStrategy: site.hasStrategyUrl
+                                  ? () => ExternalUrl.open(site.strategyUrl)
+                                  : null,
                               onCopy: site.hasLiveUrl
                                   ? () => _copyUrl(site.liveUrl)
                                   : null,
@@ -486,12 +505,14 @@ class _SiteCard extends StatelessWidget {
     required this.onEdit,
     required this.onFavorite,
     required this.onStatus,
+    this.onStrategy,
   });
 
   final DeployedSiteDoc site;
   final VoidCallback? onOpen;
   final VoidCallback? onGithub;
   final VoidCallback? onCopy;
+  final VoidCallback? onStrategy;
   final VoidCallback onDetail;
   final VoidCallback onEdit;
   final VoidCallback onFavorite;
@@ -499,7 +520,8 @@ class _SiteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = DeployedSiteStatus.color(site.status);
+    final displayStatus = site.effectiveStatus;
+    final statusColor = DeployedSiteStatus.color(displayStatus);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -548,9 +570,22 @@ class _SiteCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              site.description.isEmpty ? '설명 미등록' : site.description,
+              site.description.isEmpty ? '상세정보 미등록' : site.description,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '서비스 범위: ${site.serviceScope.isEmpty ? '미등록' : site.serviceScope}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
+            Text(
+              '운영 목적: ${site.operationPurpose.isEmpty ? '미등록' : site.operationPurpose}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -559,7 +594,7 @@ class _SiteCard extends StatelessWidget {
               children: [
                 StatusBadge(label: site.category),
                 StatusBadge(
-                  label: DeployedSiteStatus.labelKo(site.status),
+                  label: DeployedSiteStatus.labelKo(displayStatus),
                   color: statusColor,
                 ),
                 StatusBadge(
@@ -592,7 +627,7 @@ class _SiteCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-            if (site.issues.isNotEmpty)
+            if (DeployedSiteStatus.hasSeriousIssues(site.issues))
               Text(
                 '점검: ${site.issues}',
                 maxLines: 2,
@@ -605,6 +640,11 @@ class _SiteCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 FilledButton(onPressed: onOpen, child: const Text('사이트 열기')),
+                if (onStrategy != null)
+                  OutlinedButton(
+                    onPressed: onStrategy,
+                    child: const Text('전략 페이지'),
+                  ),
                 OutlinedButton(
                   onPressed: onGithub,
                   child: const Text('GitHub'),
@@ -666,11 +706,19 @@ class _SiteDetailDialog extends StatelessWidget {
             children: [
               _line('영문명', site.nameEn.isEmpty ? '확인 필요' : site.nameEn),
               _line(
-                '설명',
-                site.description.isEmpty ? '확인 필요' : site.description,
+                '상세정보',
+                site.description.isEmpty ? '미등록' : site.description,
+              ),
+              _line(
+                '서비스 범위',
+                site.serviceScope.isEmpty ? '미등록' : site.serviceScope,
+              ),
+              _line(
+                '운영 목적',
+                site.operationPurpose.isEmpty ? '미등록' : site.operationPurpose,
               ),
               _line('사업 분야', site.category),
-              _line('상태', DeployedSiteStatus.labelKo(site.status)),
+              _line('상태', DeployedSiteStatus.labelKo(site.effectiveStatus)),
               _line('호스팅', site.hostingType),
               _line(
                 'Firebase Project ID',
@@ -680,6 +728,7 @@ class _SiteDetailDialog extends StatelessWidget {
               ),
               _line('운영 주소', site.hasLiveUrl ? site.liveUrl : '주소 미등록'),
               _line('GitHub', site.hasGithubUrl ? site.githubUrl : '확인 필요'),
+              _line('전략 페이지', site.hasStrategyUrl ? site.strategyUrl : '미등록'),
               _line(
                 '최근 작업',
                 site.recentWork.isEmpty ? '기록 없음' : site.recentWork,
@@ -692,7 +741,12 @@ class _SiteDetailDialog extends StatelessWidget {
               _line('데스크톱 확인', site.desktopChecked ? '확인' : '미확인'),
               _line('HTTPS 확인', site.httpsChecked ? '확인' : '미확인'),
               _line('마지막 점검', _SiteCard._fmt(site.lastCheckedAt)),
-              _line('문제·주의사항', site.issues.isEmpty ? '없음' : site.issues),
+              _line(
+                '문제·주의사항',
+                DeployedSiteStatus.hasSeriousIssues(site.issues)
+                    ? site.issues
+                    : '없음',
+              ),
               _line('다음 작업', site.nextAction.isEmpty ? '없음' : site.nextAction),
               _line('관리자 메모', site.adminMemo.isEmpty ? '없음' : site.adminMemo),
             ],
@@ -748,12 +802,21 @@ class _SiteEditorDialogState extends State<_SiteEditorDialog> {
   late final _description = TextEditingController(
     text: widget.site?.description ?? '',
   );
+  late final _serviceScope = TextEditingController(
+    text: widget.site?.serviceScope ?? '',
+  );
+  late final _operationPurpose = TextEditingController(
+    text: widget.site?.operationPurpose ?? '',
+  );
   late final _projectId = TextEditingController(
     text: widget.site?.firebaseProjectId ?? '',
   );
   late final _liveUrl = TextEditingController(text: widget.site?.liveUrl ?? '');
   late final _githubUrl = TextEditingController(
     text: widget.site?.githubUrl ?? '',
+  );
+  late final _strategyUrl = TextEditingController(
+    text: widget.site?.strategyUrl ?? '',
   );
   late final _memo = TextEditingController(text: widget.site?.adminMemo ?? '');
   late final _issues = TextEditingController(text: widget.site?.issues ?? '');
@@ -769,9 +832,12 @@ class _SiteEditorDialogState extends State<_SiteEditorDialog> {
     _nameKo.dispose();
     _nameEn.dispose();
     _description.dispose();
+    _serviceScope.dispose();
+    _operationPurpose.dispose();
     _projectId.dispose();
     _liveUrl.dispose();
     _githubUrl.dispose();
+    _strategyUrl.dispose();
     _memo.dispose();
     _issues.dispose();
     _next.dispose();
@@ -797,7 +863,17 @@ class _SiteEditorDialogState extends State<_SiteEditorDialog> {
               ),
               TextField(
                 controller: _description,
-                decoration: const InputDecoration(labelText: '설명'),
+                decoration: const InputDecoration(labelText: '상세정보'),
+                maxLines: 3,
+              ),
+              TextField(
+                controller: _serviceScope,
+                decoration: const InputDecoration(labelText: '서비스 범위'),
+                maxLines: 2,
+              ),
+              TextField(
+                controller: _operationPurpose,
+                decoration: const InputDecoration(labelText: '운영 목적'),
                 maxLines: 2,
               ),
               DropdownButtonFormField<String>(
@@ -845,6 +921,10 @@ class _SiteEditorDialogState extends State<_SiteEditorDialog> {
                 decoration: const InputDecoration(labelText: 'GitHub 주소'),
               ),
               TextField(
+                controller: _strategyUrl,
+                decoration: const InputDecoration(labelText: '대표 전략 페이지 URL'),
+              ),
+              TextField(
                 controller: _issues,
                 decoration: const InputDecoration(labelText: '점검 필요 사항'),
               ),
@@ -877,25 +957,29 @@ class _SiteEditorDialogState extends State<_SiteEditorDialog> {
             final base =
                 widget.site ??
                 DeployedSiteDoc(id: '', nameKo: _nameKo.text.trim());
+            final draft = base.copyWith(
+              nameKo: _nameKo.text.trim(),
+              nameEn: _nameEn.text.trim(),
+              description: _description.text.trim(),
+              serviceScope: _serviceScope.text.trim(),
+              operationPurpose: _operationPurpose.text.trim(),
+              category: _category,
+              hostingType: _hosting,
+              firebaseProjectId: _projectId.text.trim(),
+              liveUrl: _liveUrl.text.trim(),
+              githubUrl: _githubUrl.text.trim(),
+              strategyUrl: _strategyUrl.text.trim(),
+              status: _status,
+              isFavorite: _favorite,
+              issues: _issues.text.trim(),
+              nextAction: _next.text.trim(),
+              adminMemo: _memo.text.trim(),
+              isActive: _status != DeployedSiteStatus.inactive,
+              httpsChecked: _liveUrl.text.trim().startsWith('https://'),
+            );
             Navigator.pop(
               context,
-              base.copyWith(
-                nameKo: _nameKo.text.trim(),
-                nameEn: _nameEn.text.trim(),
-                description: _description.text.trim(),
-                category: _category,
-                hostingType: _hosting,
-                firebaseProjectId: _projectId.text.trim(),
-                liveUrl: _liveUrl.text.trim(),
-                githubUrl: _githubUrl.text.trim(),
-                status: _status,
-                isFavorite: _favorite,
-                issues: _issues.text.trim(),
-                nextAction: _next.text.trim(),
-                adminMemo: _memo.text.trim(),
-                isActive: _status != DeployedSiteStatus.inactive,
-                httpsChecked: _liveUrl.text.trim().startsWith('https://'),
-              ),
+              draft.copyWith(status: DeployedSiteStatus.evaluate(draft)),
             );
           },
           child: const Text('저장'),
