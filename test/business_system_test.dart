@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sotong_ware_control/core/business/business_catalog.dart';
 import 'package:sotong_ware_control/core/business/business_study_content.dart';
 import 'package:sotong_ware_control/models/ops_enums.dart';
@@ -39,6 +40,12 @@ class _FakeGithubService extends GithubService {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   test('6개 사업 분류와 기존 ID 호환', () {
     expect(BusinessCatalog.businesses.length, 6);
     expect(BusinessCatalog.canonicalId('online_expansion'), 'web_marketing');
