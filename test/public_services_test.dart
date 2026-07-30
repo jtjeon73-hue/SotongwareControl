@@ -3,7 +3,7 @@ import 'package:sotong_ware_control/core/constants/external_site_links.dart';
 import 'package:sotong_ware_control/widgets/sidebar_navigation.dart';
 
 void main() {
-  test('필수 공개 사이트 5개와 산업자동화 포함', () {
+  test('필수 공개 사이트 5개와 산업자동화·사이트매니저 포함', () {
     expect(ExternalSiteLinks.requiredSites.length, 5);
     expect(ExternalSiteLinks.requiredSites.map((e) => e.url).toSet(), {
       'https://sotongware-apps-promo.web.app',
@@ -16,7 +16,12 @@ void main() {
       ExternalSiteLinks.industrialAutomation.url,
       'https://sotong-automation-promo.web.app',
     );
-    expect(ExternalSiteLinks.hubSites.length, 6);
+    expect(
+      ExternalSiteLinks.siteManager.url,
+      'https://sotongsitemanager.web.app',
+    );
+    expect(ExternalSiteLinks.coreBusinessSites.length, 6);
+    expect(ExternalSiteLinks.hubSites.length, 7);
   });
 
   test('공개 서비스 메뉴 라벨', () {

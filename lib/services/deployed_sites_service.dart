@@ -51,6 +51,20 @@ class DeployedSitesService {
   static DeployedSitesKpis computeKpis(List<DeployedSiteDoc> sites) {
     final active = sites.where((s) => s.isActive).toList();
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+    final registered = sites.where((s) => s.hasLiveUrl).length;
+    final connected = sites
+        .where(
+          (s) =>
+              s.hasLiveUrl && s.effectiveStatus == DeployedSiteStatus.operating,
+        )
+        .length;
+    final needsUrl = sites
+        .where(
+          (s) =>
+              !s.hasLiveUrl ||
+              s.effectiveStatus == DeployedSiteStatus.needsCheck,
+        )
+        .length;
     return DeployedSitesKpis(
       total: sites.length,
       operating: active
@@ -78,7 +92,39 @@ class DeployedSitesService {
                 s.lastDeployedAt != null && s.lastDeployedAt!.isAfter(weekAgo),
           )
           .length,
+      coreBusinessCount: DeployedSitesCatalog.coreRepresentativeSeeds.length,
+      registeredRepresentatives: registered,
+      connectedRepresentatives: connected,
+      needsUrlCheck: needsUrl,
     );
+  }
+
+  /// 핵심 사업부 대표 사이트만 카탈로그 순서대로 해석한다.
+  /// Firestore 전체 데이터는 보존하고, 화면 표시용 목록만 만든다.
+  static List<DeployedSiteDoc> resolveCoreRepresentatives(
+    List<DeployedSiteDoc> existing,
+  ) {
+    final result = <DeployedSiteDoc>[];
+    for (final seed in DeployedSitesCatalog.coreRepresentativeSeeds) {
+      final match = findMatch(
+        existing,
+        id: seed.id,
+        liveUrl: seed.liveUrl,
+        firebaseProjectId: seed.firebaseProjectId,
+        githubUrl: seed.githubUrl,
+        nameEn: seed.nameEn,
+      );
+      final merged = mergeSeed(seed, match);
+      result.add(
+        merged.copyWith(
+          isCoreRepresentative: true,
+          businessUnitId: seed.businessUnitId.isNotEmpty
+              ? seed.businessUnitId
+              : merged.businessUnitId,
+        ),
+      );
+    }
+    return result;
   }
 
   static List<DeployedSiteDoc> applyFilter(
@@ -249,6 +295,11 @@ class DeployedSitesService {
       isActive: existing.status == DeployedSiteStatus.inactive
           ? false
           : seed.isActive,
+      isCoreRepresentative:
+          seed.isCoreRepresentative || existing.isCoreRepresentative,
+      businessUnitId: seed.businessUnitId.isNotEmpty
+          ? seed.businessUnitId
+          : existing.businessUnitId,
       createdAt: existing.createdAt,
       updatedAt: existing.updatedAt,
     );

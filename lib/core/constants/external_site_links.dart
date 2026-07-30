@@ -71,6 +71,16 @@ class ExternalSiteLinks {
     description: '고객 맞춤형 홍보·마케팅 사이트 제작 서비스를 소개하는 공개 사이트',
   );
 
+  static const siteManager = ExternalSiteLink(
+    id: 'site_manager',
+    title: '소통사이트매니저',
+    subtitle: '지식·운영 사이트 통합 허브',
+    url: 'https://sotongsitemanager.web.app',
+    icon: 'site_manager',
+    category: '공개 서비스',
+    description: '여러 지식 전문관과 운영 사이트의 등록·연결·분류·이동을 담당하는 통합 관리 사이트',
+  );
+
   static const requiredSites = <ExternalSiteLink>[
     apps,
     ebook,
@@ -90,9 +100,20 @@ class ExternalSiteLinks {
     description: '산업자동화 사업 소개 공개 사이트',
   );
 
+  /// 핵심 사업부 대표 사이트 6개
+  static List<ExternalSiteLink> get coreBusinessSites => [
+    industrialAutomation,
+    apps,
+    ebook,
+    contents,
+    marketing,
+    siteManager,
+  ];
+
   /// 허브 페이지에 표시할 전체 (요청 5개 + 산업자동화)
   static List<ExternalSiteLink> get hubSites => [
     ...requiredSites,
     industrialAutomation,
+    siteManager,
   ];
 }

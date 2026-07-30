@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../core/business/business_catalog.dart';
+import '../data/deployed_sites_catalog.dart';
 import '../models/deployed_site.dart';
 import '../services/deployed_sites_repository.dart';
 import '../services/deployed_sites_service.dart';
@@ -58,6 +60,19 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
         _seedOrImport(missingOnly: false);
         return;
       }
+      final coreMissing = DeployedSitesCatalog.coreRepresentativeSeeds.any((
+        seed,
+      ) {
+        return DeployedSitesService.findMatch(
+              sites,
+              id: seed.id,
+              liveUrl: seed.liveUrl,
+              firebaseProjectId: seed.firebaseProjectId,
+              githubUrl: seed.githubUrl,
+              nameEn: seed.nameEn,
+            ) ==
+            null;
+      });
       final countryNeedsRefresh = sites.any((s) {
         final isCountry =
             s.id == 'sotong_country_ai' ||
@@ -68,7 +83,7 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
             s.operationPurpose.trim().isEmpty ||
             s.effectiveStatus == DeployedSiteStatus.needsCheck;
       });
-      if (countryNeedsRefresh) {
+      if (coreMissing || countryNeedsRefresh) {
         _seedOrImport(missingOnly: true);
       }
     });
@@ -256,13 +271,15 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
             ),
           );
         }
-        final sites = snapshot.data ?? const <DeployedSiteDoc>[];
+        final allSites = snapshot.data ?? const <DeployedSiteDoc>[];
         if (snapshot.connectionState == ConnectionState.waiting &&
-            sites.isEmpty) {
+            allSites.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
-        _maybeAutoSeed(sites);
+        _maybeAutoSeed(allSites);
 
+        // 화면에는 핵심 사업부 대표 사이트 6개만 표시. Firestore 전체 데이터는 보존.
+        final sites = DeployedSitesService.resolveCoreRepresentatives(allSites);
         final kpis = DeployedSitesService.computeKpis(sites);
         final filtered = DeployedSitesService.applyFilter(sites, _filter);
 
@@ -274,8 +291,8 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
               PageHero(
                 title: '웹 배포사이트',
                 subtitle:
-                    'Firebase Hosting 등 실제 운영 중인 소통웨어 웹사이트를 한곳에서 확인하고 관리합니다.',
-                badge: '배포 관제',
+                    '핵심 사업부 대표 사이트 6개만 연동·표시합니다. 학습용 전문관·보조 사이트는 목록에서 제외하며 기존 등록 데이터는 삭제하지 않습니다.',
+                badge: '핵심 대표 사이트',
                 trailing: Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -284,8 +301,8 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
                       onPressed: _seeding
                           ? null
                           : () => _seedOrImport(missingOnly: true),
-                      icon: const Icon(Icons.download_outlined),
-                      label: Text(_seeding ? '동기화 중…' : '확인 사이트 동기화'),
+                      icon: const Icon(Icons.refresh),
+                      label: Text(_seeding ? '동기화 중…' : '상태 동기화'),
                     ),
                     FilledButton.icon(
                       onPressed: () => _openEditor(),
@@ -307,15 +324,16 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  KpiCard(label: '전체 사이트', value: '${kpis.total}'),
-                  KpiCard(label: '정상 운영', value: '${kpis.operating}'),
-                  KpiCard(label: '점검 필요', value: '${kpis.needsCheck}'),
+                  KpiCard(label: '핵심 사업부', value: '${kpis.coreBusinessCount}개'),
                   KpiCard(
-                    label: '개발·배포 준비',
-                    value: '${kpis.preparingOrDeploying}',
+                    label: '대표 사이트 등록',
+                    value: '${kpis.registeredRepresentatives}',
                   ),
-                  KpiCard(label: '비활성', value: '${kpis.inactive}'),
-                  KpiCard(label: '최근 7일 배포', value: '${kpis.recentlyDeployed}'),
+                  KpiCard(
+                    label: '정상 연결',
+                    value: '${kpis.connectedRepresentatives}',
+                  ),
+                  KpiCard(label: '확인 필요', value: '${kpis.needsUrlCheck}'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -326,11 +344,11 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
               const SizedBox(height: 16),
               if (sites.isEmpty)
                 EmptyStatePanel(
-                  title: '등록된 배포사이트가 없습니다',
+                  title: '대표 사이트를 불러오지 못했습니다',
                   message:
-                      '확인된 Firebase Hosting 사이트를 불러오거나 직접 등록하십시오. '
+                      '확인된 Firebase Hosting 사이트를 동기화하십시오. '
                       '확인되지 않은 주소는 임의로 만들지 않습니다.',
-                  actionLabel: '확인 사이트 동기화',
+                  actionLabel: '상태 동기화',
                   onAction: _seeding
                       ? null
                       : () => _seedOrImport(missingOnly: true),
@@ -377,6 +395,7 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
                                   _repo.setFavorite(site.id, !site.isFavorite),
                               onStatus: (status) =>
                                   _repo.setStatus(site.id, status),
+                              onRefresh: () => _seedOrImport(missingOnly: true),
                             ),
                           ),
                       ],
@@ -384,10 +403,15 @@ class _DeployedSitesScreenState extends State<DeployedSitesScreen> {
                   },
                 ),
               const SizedBox(height: 16),
-              const Text(
-                '접속 상태는 브라우저 CORS 제한 때문에 자동 장애 판정을 하지 않습니다. '
+              Text(
+                '전체 Firestore 등록 ${allSites.length}건은 보존됩니다. '
+                '이 화면은 핵심 사업부 대표 사이트 ${sites.length}개만 표시합니다. '
+                '접속 상태는 브라우저 CORS 제한 때문에 자동 장애 판정을 하지 않으며, '
                 '관리자 점검 결과·배포 기록·HTTPS 등록 여부를 기준으로 관리합니다.',
-                style: TextStyle(color: ControlColors.textMuted, fontSize: 12),
+                style: const TextStyle(
+                  color: ControlColors.textMuted,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -505,6 +529,7 @@ class _SiteCard extends StatelessWidget {
     required this.onEdit,
     required this.onFavorite,
     required this.onStatus,
+    required this.onRefresh,
     this.onStrategy,
   });
 
@@ -516,12 +541,22 @@ class _SiteCard extends StatelessWidget {
   final VoidCallback onDetail;
   final VoidCallback onEdit;
   final VoidCallback onFavorite;
+  final VoidCallback onRefresh;
   final ValueChanged<String> onStatus;
 
   @override
   Widget build(BuildContext context) {
     final displayStatus = site.effectiveStatus;
     final statusColor = DeployedSiteStatus.color(displayStatus);
+    final businessName =
+        BusinessCatalog.byId(site.businessUnitId)?.name ??
+        (site.businessUnitId.isEmpty ? '사업부 미지정' : site.businessUnitId);
+    final checkedLabel = site.lastCheckedAt == null
+        ? '최근 확인: 미확인'
+        : '최근 확인: ${DateFormat('yyyy-MM-dd HH:mm').format(site.lastCheckedAt!)}';
+    final githubLabel = site.hasGithubUrl ? '저장소 연결됨' : 'GitHub 주소 확인 필요';
+    final urlLabel = site.hasLiveUrl ? site.liveUrl : '주소 확인 필요';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -539,6 +574,14 @@ class _SiteCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        businessName,
+                        style: const TextStyle(
+                          color: ControlColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       Text(
                         site.nameKo,
                         style: Theme.of(context).textTheme.titleMedium
@@ -574,100 +617,75 @@ class _SiteCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 6),
-            Text(
-              '서비스 범위: ${site.serviceScope.isEmpty ? '미등록' : site.serviceScope}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12),
-            ),
-            Text(
-              '운영 목적: ${site.operationPurpose.isEmpty ? '미등록' : site.operationPurpose}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12),
-            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
-                StatusBadge(label: site.category),
                 StatusBadge(
                   label: DeployedSiteStatus.labelKo(displayStatus),
                   color: statusColor,
                 ),
                 StatusBadge(
-                  label: site.hostingType,
-                  color: ControlColors.sandBeige,
+                  label: githubLabel,
+                  color: site.hasGithubUrl
+                      ? ControlColors.tealSoft
+                      : ControlColors.accentWarm,
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
+              '운영 URL: $urlLabel',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
               'Project: ${site.firebaseProjectId.isEmpty ? '확인 필요' : site.firebaseProjectId}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            Text(
-              '운영: ${site.hasLiveUrl ? site.liveUrl : '주소 미등록'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              'GitHub: ${site.hasGithubUrl ? site.githubUrl : '확인 필요'}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text('마지막 배포: ${_fmt(site.lastDeployedAt)}'),
-            Text('마지막 점검: ${_fmt(site.lastCheckedAt)}'),
-            if (site.adminMemo.isNotEmpty)
-              Text(
-                '메모: ${site.adminMemo}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            if (DeployedSiteStatus.hasSeriousIssues(site.issues))
-              Text(
-                '점검: ${site.issues}',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: ControlColors.accentWarm),
-              ),
+            Text(checkedLabel),
             const SizedBox(height: 10),
             Wrap(
-              spacing: 6,
-              runSpacing: 6,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                FilledButton(onPressed: onOpen, child: const Text('사이트 열기')),
-                if (onStrategy != null)
-                  OutlinedButton(
-                    onPressed: onStrategy,
-                    child: const Text('전략 페이지'),
-                  ),
-                OutlinedButton(
-                  onPressed: onGithub,
-                  child: const Text('GitHub'),
+                FilledButton.tonalIcon(
+                  onPressed: onOpen,
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text('사이트 열기'),
                 ),
-                OutlinedButton(onPressed: onCopy, child: const Text('주소 복사')),
-                TextButton(onPressed: onDetail, child: const Text('상세보기')),
-                TextButton(onPressed: onEdit, child: const Text('수정')),
-                PopupMenuButton<String>(
-                  tooltip: '상태 변경',
-                  onSelected: onStatus,
-                  itemBuilder: (context) => [
-                    for (final s in DeployedSiteStatus.all)
-                      PopupMenuItem(
-                        value: s,
-                        child: Text(DeployedSiteStatus.labelKo(s)),
-                      ),
-                  ],
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    child: Text('상태 변경'),
-                  ),
+                OutlinedButton.icon(
+                  onPressed: onRefresh,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('상태 확인'),
                 ),
+                TextButton(onPressed: onDetail, child: const Text('상세')),
+                TextButton(onPressed: onEdit, child: const Text('편집')),
+                if (onGithub != null)
+                  TextButton(onPressed: onGithub, child: const Text('GitHub')),
+                if (onCopy != null)
+                  TextButton(onPressed: onCopy, child: const Text('URL 복사')),
               ],
+            ),
+            const SizedBox(height: 4),
+            DropdownButton<String>(
+              value: DeployedSiteStatus.all.contains(site.status)
+                  ? site.status
+                  : DeployedSiteStatus.needsCheck,
+              isDense: true,
+              underline: const SizedBox.shrink(),
+              items: [
+                for (final status in DeployedSiteStatus.all)
+                  DropdownMenuItem(
+                    value: status,
+                    child: Text(DeployedSiteStatus.labelKo(status)),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) onStatus(value);
+              },
             ),
           ],
         ),

@@ -193,7 +193,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.industrialAutomation:
         return const BusinessUnitOpsScreen(
           businessUnitId: 'industrial_automation',
-          fallbackTitle: '산업자동화사업부',
+          fallbackTitle: '산업자동화SW개발사업부',
         );
       case ControlDestination.appDevelopment:
         return const BusinessUnitOpsScreen(
@@ -203,12 +203,12 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.youtubeContent:
         return const BusinessUnitOpsScreen(
           businessUnitId: 'content_music',
-          fallbackTitle: '콘텐츠·음악사업부',
+          fallbackTitle: '콘텐츠개발사업부',
         );
       case ControlDestination.ebook:
         return const BusinessUnitOpsScreen(
           businessUnitId: 'ebook',
-          fallbackTitle: '전자책사업부',
+          fallbackTitle: '전자책개발사업부',
           recommendedPlan: _ebookPlan,
         );
       case ControlDestination.onlineExpansion:
@@ -219,7 +219,12 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.webMarketing:
         return const BusinessUnitOpsScreen(
           businessUnitId: 'web_marketing',
-          fallbackTitle: '웹마케팅제작사업부',
+          fallbackTitle: '웹마케팅개발사업부',
+        );
+      case ControlDestination.siteManager:
+        return const BusinessUnitOpsScreen(
+          businessUnitId: 'site_manager',
+          fallbackTitle: '소통사이트매니저개발사업부',
         );
       case ControlDestination.businessStudy:
         return const BusinessStudyScreen();

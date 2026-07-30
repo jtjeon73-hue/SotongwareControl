@@ -6,6 +6,7 @@ enum BusinessType {
   ebookDevelopment,
   contentDevelopment,
   webMarketingDevelopment,
+  siteManagerDevelopment,
 }
 
 class BusinessDefinition {
@@ -50,13 +51,18 @@ class BusinessCatalog {
     BusinessDefinition(
       type: BusinessType.industrialAutomation,
       id: 'industrial_automation',
-      name: '사업자동화SW제작사업부',
+      name: '산업자동화SW개발사업부',
       shortName: '산업자동화',
-      purpose: '산업·공장 현장의 설비 데이터 수집, 모니터링, 관제 및 자동화 소프트웨어를 제작합니다.',
+      purpose: '산업·공장 현장의 설비 데이터 수집, 모니터링, 관제 및 자동화 소프트웨어를 개발합니다.',
       direction: '현장 요구 분석부터 납품·유지보수까지 재사용 가능한 산업용 소프트웨어 제품군을 구축합니다.',
       customers: '제조업체, 공장 운영사, 설비 제작사, 자동화 SI 업체',
       revenueModel: '맞춤 개발비, 납품비, 유지보수비, 표준 제품 라이선스',
-      aliases: ['industrialautomation', 'automation', 'factory_automation'],
+      aliases: [
+        'industrialautomation',
+        'automation',
+        'factory_automation',
+        '사업자동화sw제작사업부',
+      ],
       knowledge: [
         '산업자동화와 공장자동화',
         'PLC·센서·현장 네트워크',
@@ -76,13 +82,13 @@ class BusinessCatalog {
     BusinessDefinition(
       type: BusinessType.appDevelopment,
       id: 'app_development',
-      name: '앱제작사업부',
+      name: '앱개발사업부',
       shortName: '앱개발',
       purpose: '실제 사용자 문제를 해결하는 모바일 앱을 기획·개발·출시하고 지속적으로 운영합니다.',
       direction: 'Flutter와 Firebase를 중심으로 앱을 제품화하고 출시·피드백·수익화의 반복 체계를 만듭니다.',
       customers: '일반 사용자, 소상공인, 지역 사업자, 특정 문제를 가진 틈새 사용자',
       revenueModel: '앱 판매, 광고, 구독, 인앱 결제, 맞춤 개발·유지관리',
-      aliases: ['appdevelopment', 'apps', 'mobile_app'],
+      aliases: ['appdevelopment', 'apps', 'mobile_app', '앱제작사업부'],
       knowledge: [
         '앱 아이디어와 문제 정의',
         '사용자 분석과 UI/UX',
@@ -102,13 +108,18 @@ class BusinessCatalog {
     BusinessDefinition(
       type: BusinessType.ebookDevelopment,
       id: 'ebook',
-      name: '전자책제작사업부',
+      name: '전자책개발사업부',
       shortName: '전자책개발',
-      purpose: '실용 지식을 독자가 구매하고 활용할 수 있는 전자책 상품으로 제작합니다.',
+      purpose: '실용 지식을 독자가 구매하고 활용할 수 있는 전자책 상품으로 개발합니다.',
       direction: '주제 검증부터 집필·편집·판매·업데이트까지 반복 가능한 출판 프로세스를 구축합니다.',
       customers: '실용 정보 학습자, 직무·취미 독자, 소프트웨어와 AI 활용에 관심 있는 독자',
       revenueModel: '전자책 단품 판매, 시리즈 판매, 업데이트판, 연계 교육·콘텐츠',
-      aliases: ['ebook_development', 'ebookdevelopment', 'digital_publishing'],
+      aliases: [
+        'ebook_development',
+        'ebookdevelopment',
+        'digital_publishing',
+        '전자책제작사업부',
+      ],
       knowledge: [
         '전자책 주제와 독자 분석',
         '목차·집필·AI 활용',
@@ -127,13 +138,18 @@ class BusinessCatalog {
     BusinessDefinition(
       type: BusinessType.contentDevelopment,
       id: 'content_music',
-      name: '콘텐츠음악제작사업부',
+      name: '콘텐츠개발사업부',
       shortName: '콘텐츠개발',
-      purpose: '영상·음악·이미지와 AI 콘텐츠를 제작하여 소통웨어 브랜드와 상품의 유입을 만듭니다.',
+      purpose: '영상·음악·이미지와 AI 콘텐츠를 개발하여 소통웨어 브랜드와 상품의 유입을 만듭니다.',
       direction: '기획부터 제작·업로드·성과 검토까지 반복 가능한 콘텐츠 워크플로를 만듭니다.',
       customers: '영상·음악·정보 콘텐츠 소비자와 소통웨어 잠재 고객',
       revenueModel: '플랫폼 수익, 제작 서비스, 브랜드 유입, 앱·전자책·웹 서비스 연계',
-      aliases: ['content_development', 'contents', 'youtube_content'],
+      aliases: [
+        'content_development',
+        'contents',
+        'youtube_content',
+        '콘텐츠음악제작사업부',
+      ],
       knowledge: [
         '콘텐츠 기획과 채널 전략',
         '유튜브·쇼츠',
@@ -152,9 +168,9 @@ class BusinessCatalog {
     BusinessDefinition(
       type: BusinessType.webMarketingDevelopment,
       id: 'web_marketing',
-      name: '웹마케팅제작사업부',
-      shortName: '마케팅사이트개발',
-      purpose: '고객의 사업과 소통웨어 상품을 소개하고 문의·구매로 연결하는 반응형 웹사이트를 제작합니다.',
+      name: '웹마케팅개발사업부',
+      shortName: '웹마케팅개발',
+      purpose: '고객의 사업과 소통웨어 상품을 소개하고 문의·구매로 연결하는 반응형 웹사이트를 개발합니다.',
       direction: 'Firebase Hosting 기반 제작 표준과 템플릿을 구축하여 빠르고 안정적으로 반복 납품합니다.',
       customers: '소상공인, 개인사업자, 지역 업체, 홍보·문의 사이트가 필요한 고객',
       revenueModel: '사이트 제작비, 유지보수비, 도메인·콘텐츠 관리, 반복 제작',
@@ -163,6 +179,7 @@ class BusinessCatalog {
         'web_marketing_development',
         'marketing',
         'marketing_site',
+        '웹마케팅제작사업부',
       ],
       knowledge: [
         '홍보 웹사이트와 랜딩페이지',
@@ -179,6 +196,35 @@ class BusinessCatalog {
       todayKnowledge:
           '마케팅 사이트의 완성은 배포가 아니라 방문자가 신뢰하고 문의할 수 있도록 명확한 고객 문제, 제공 가치, CTA가 연결된 상태입니다.',
       site: ExternalSiteLinks.marketing,
+    ),
+    BusinessDefinition(
+      type: BusinessType.siteManagerDevelopment,
+      id: 'site_manager',
+      name: '소통사이트매니저개발사업부',
+      shortName: '사이트매니저',
+      purpose: '여러 지식 전문관과 운영 사이트의 등록, 연결 상태, 분류, 이동, 통합 관리를 담당하는 플랫폼을 개발합니다.',
+      direction: '분산된 공개 사이트를 한곳에서 찾고 이동할 수 있게 하여 브랜드 유입과 운영 가시성을 높입니다.',
+      customers: '소통웨어 내부 운영자, 지식 사이트 이용자, 여러 공개 서비스를 탐색하는 방문객',
+      revenueModel: '플랫폼 유입 연계, 브랜드 허브 가치, 향후 프리미엄 디렉터리·운영 도구',
+      aliases: [
+        'sotongsitemanager',
+        'site_manager_development',
+        'knowledge_manager',
+        'sotong_site_manager',
+      ],
+      knowledge: [
+        '사이트 등록·분류·검색',
+        '운영 상태와 URL 연결',
+        '카테고리·추천·탐색 UX',
+        '브랜드 허브와 유입 경로',
+        '지식 전문관 통합 관리',
+        '배포 상태와 이동 링크',
+        '모바일 탐색성',
+        '운영 체크리스트',
+      ],
+      todayKnowledge:
+          '사이트매니저는 사이트를 많이 나열하는 것이 아니라, 방문자가 필요한 전문관으로 빠르게 이동하고 운영자가 연결 상태를 확인할 수 있게 하는 허브여야 합니다.',
+      site: ExternalSiteLinks.siteManager,
     ),
   ];
 

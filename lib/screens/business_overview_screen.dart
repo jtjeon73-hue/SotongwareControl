@@ -192,7 +192,7 @@ class _OverviewBody extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '5개 사업 비교',
+                  '6개 사업 비교',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -268,14 +268,16 @@ class _OverviewBody extends StatelessWidget {
           const SizedBox(height: 16),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.school_outlined),
-              title: const Text('오늘의 사업 지식'),
+              leading: const Icon(Icons.menu_book_outlined),
+              title: const Text('오늘의 전략 통찰'),
               subtitle: Text(
-                BusinessCatalog.businesses[now.day % 5].todayKnowledge,
+                BusinessCatalog
+                    .businesses[now.day % BusinessCatalog.businesses.length]
+                    .todayKnowledge,
               ),
               trailing: TextButton(
                 onPressed: () => onNavigate(ControlDestination.businessStudy),
-                child: const Text('학습하기'),
+                child: const Text('연구실 열기'),
               ),
             ),
           ),
@@ -301,6 +303,8 @@ class _OverviewBody extends StatelessWidget {
         return ControlDestination.youtubeContent;
       case 'web_marketing':
         return ControlDestination.webMarketing;
+      case 'site_manager':
+        return ControlDestination.siteManager;
       default:
         return ControlDestination.divisionProgress;
     }

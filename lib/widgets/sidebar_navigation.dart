@@ -32,6 +32,7 @@ enum ControlDestination {
   ebook,
   onlineExpansion,
   webMarketing,
+  siteManager,
   businessStudy,
   publicServices,
   adminData,
@@ -89,19 +90,21 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.sotong24work:
         return '소통24워크';
       case ControlDestination.industrialAutomation:
-        return '사업자동화SW제작사업부';
+        return '산업자동화SW개발사업부';
       case ControlDestination.appDevelopment:
-        return '앱제작사업부';
+        return '앱개발사업부';
       case ControlDestination.youtubeContent:
-        return '콘텐츠음악제작사업부';
+        return '콘텐츠개발사업부';
       case ControlDestination.ebook:
-        return '전자책제작사업부';
+        return '전자책개발사업부';
       case ControlDestination.onlineExpansion:
         return '온라인판매/확장(보관)';
       case ControlDestination.webMarketing:
-        return '웹마케팅제작사업부';
+        return '웹마케팅개발사업부';
+      case ControlDestination.siteManager:
+        return '소통사이트매니저개발사업부';
       case ControlDestination.businessStudy:
-        return '사업 지식 학습';
+        return '사업전략연구실';
       case ControlDestination.publicServices:
         return '공개 서비스';
     }
@@ -169,8 +172,10 @@ extension ControlDestinationX on ControlDestination {
         return Icons.storefront_outlined;
       case ControlDestination.webMarketing:
         return Icons.language_outlined;
+      case ControlDestination.siteManager:
+        return Icons.hub_outlined;
       case ControlDestination.businessStudy:
-        return Icons.school_outlined;
+        return Icons.menu_book_outlined;
       case ControlDestination.publicServices:
         return Icons.public_outlined;
     }
@@ -192,6 +197,8 @@ extension ControlDestinationX on ControlDestination {
         return 'online_expansion';
       case ControlDestination.webMarketing:
         return 'web_marketing';
+      case ControlDestination.siteManager:
+        return 'site_manager';
       default:
         return null;
     }
@@ -244,9 +251,10 @@ class SidebarNavigation extends StatelessWidget {
   static const _divisions = [
     ControlDestination.industrialAutomation,
     ControlDestination.appDevelopment,
-    ControlDestination.youtubeContent,
     ControlDestination.ebook,
+    ControlDestination.youtubeContent,
     ControlDestination.webMarketing,
+    ControlDestination.siteManager,
   ];
 
   @override

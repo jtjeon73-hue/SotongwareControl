@@ -187,11 +187,12 @@ void main() {
     expect(find.text('전체 사업 현황'), findsWidgets);
     expect(find.text('웹 배포사이트'), findsOneWidget);
     expect(find.text('AI 사업분석'), findsOneWidget);
-    expect(find.text('사업 지식 학습'), findsOneWidget);
+    expect(find.text('사업전략연구실'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
     await tester.drag(find.byType(ListView).first, const Offset(0, -800));
     await tester.pumpAndSettle();
-    expect(find.text('웹마케팅제작사업부'), findsWidgets);
+    expect(find.text('웹마케팅개발사업부'), findsWidgets);
+    expect(find.text('소통사이트매니저개발사업부'), findsWidgets);
     expect(find.text('데이터 관리'), findsWidgets);
     expect(find.text('관리자 로그인'), findsNothing);
     expect(tester.takeException(), isNull);

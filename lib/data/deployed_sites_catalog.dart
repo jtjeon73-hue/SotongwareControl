@@ -7,6 +7,117 @@ class DeployedSitesCatalog {
 
   static const verifiedSeeds = <DeployedSiteDoc>[
     DeployedSiteDoc(
+      id: 'sotong_automation_promo',
+      nameKo: '소통산업자동화',
+      nameEn: 'Sotong Automation Promo',
+      description: '산업·공장자동화 소프트웨어 사업 소개 공개 사이트',
+      category: DeployedSiteCategory.industrial,
+      hostingType: DeployedHostingType.firebase,
+      firebaseProjectId: 'sotong-automation-promo',
+      liveUrl: 'https://sotong-automation-promo.web.app',
+      status: DeployedSiteStatus.operating,
+      iconName: 'industrial',
+      httpsChecked: true,
+      lastDeployResult: '공개 Hosting 응답 200 확인',
+      nextAction: '문의·전환 구조 점검',
+      sortOrder: 10,
+      isCoreRepresentative: true,
+      businessUnitId: 'industrial_automation',
+    ),
+    DeployedSiteDoc(
+      id: 'sotongware_apps_promo',
+      nameKo: '소통앱 프로모',
+      nameEn: 'Sotong Apps Promo',
+      description: '소통웨어 앱 개발 사업과 주요 앱 프로젝트 소개',
+      category: DeployedSiteCategory.app,
+      hostingType: DeployedHostingType.firebase,
+      firebaseProjectId: 'sotongware-apps-promo',
+      liveUrl: 'https://sotongware-apps-promo.web.app',
+      status: DeployedSiteStatus.operating,
+      iconName: 'apps',
+      httpsChecked: true,
+      lastDeployResult: '공개 Hosting 응답 200 확인',
+      nextAction: '앱별 프로모 링크와 출시 상태 점검',
+      sortOrder: 20,
+      isCoreRepresentative: true,
+      businessUnitId: 'app_development',
+    ),
+    DeployedSiteDoc(
+      id: 'sotongware_ebook_promo',
+      nameKo: '소통전자책 프로모',
+      nameEn: 'Sotong Ebook Promo',
+      description: 'AI 기반 전자책 기획·제작·출판 사업 소개',
+      category: DeployedSiteCategory.ebook,
+      hostingType: DeployedHostingType.firebase,
+      firebaseProjectId: 'sotongware-ebook-promo',
+      liveUrl: 'https://sotongware-ebook-promo.web.app',
+      status: DeployedSiteStatus.operating,
+      iconName: 'ebook',
+      httpsChecked: true,
+      lastDeployResult: '공개 Hosting 응답 200 확인',
+      nextAction: '상품 소개 페이지와 판매 채널 연결 점검',
+      sortOrder: 30,
+      isCoreRepresentative: true,
+      businessUnitId: 'ebook',
+    ),
+    DeployedSiteDoc(
+      id: 'sotongware_contents_promo',
+      nameKo: '소통콘텐츠 프로모',
+      nameEn: 'Sotong Contents Promo',
+      description: '영상·음악·AI 콘텐츠 제작 사업 소개',
+      category: DeployedSiteCategory.contents,
+      hostingType: DeployedHostingType.firebase,
+      firebaseProjectId: 'sotongware-contents-promo',
+      liveUrl: 'https://sotongware-contents-promo.web.app',
+      status: DeployedSiteStatus.operating,
+      iconName: 'contents',
+      httpsChecked: true,
+      lastDeployResult: '공개 Hosting 응답 200 확인',
+      nextAction: '콘텐츠 포트폴리오 업데이트 여부 확인',
+      sortOrder: 40,
+      isCoreRepresentative: true,
+      businessUnitId: 'content_music',
+    ),
+    DeployedSiteDoc(
+      id: 'sotongware_marketing',
+      nameKo: '소통마케팅',
+      nameEn: 'Sotong Marketing',
+      description: '고객 맞춤형 홍보·마케팅 사이트 제작 서비스 소개',
+      category: DeployedSiteCategory.marketing,
+      hostingType: DeployedHostingType.firebase,
+      firebaseProjectId: 'sotongware-marketing',
+      liveUrl: 'https://sotongware-marketing.web.app',
+      status: DeployedSiteStatus.operating,
+      iconName: 'marketing',
+      httpsChecked: true,
+      lastDeployResult: '공개 Hosting 응답 200 확인',
+      nextAction: '문의 CTA·모바일 전환 점검',
+      sortOrder: 50,
+      isCoreRepresentative: true,
+      businessUnitId: 'web_marketing',
+    ),
+    DeployedSiteDoc(
+      id: 'sotong_site_manager',
+      nameKo: '소통사이트매니저',
+      nameEn: 'SotongSiteManager',
+      description: '여러 지식 전문관과 운영 사이트의 등록·연결 상태·분류·이동·통합 관리를 담당하는 플랫폼',
+      category: DeployedSiteCategory.control,
+      hostingType: DeployedHostingType.firebase,
+      firebaseProjectId: 'sotongsitemanager',
+      liveUrl: 'https://sotongsitemanager.web.app',
+      githubUrl: 'https://github.com/jtjeon73-hue/SotongSiteManager',
+      status: DeployedSiteStatus.operating,
+      iconName: 'site_manager',
+      httpsChecked: true,
+      desktopChecked: true,
+      lastDeployResult: '공개 Hosting 응답 200 · Flutter bootstrap 확인',
+      nextAction: '전문관 등록·연결 상태·분류 체계 점검',
+      adminMemo: '핵심 사업부 대표 사이트. 학습용 전문관 개별 나열 대신 통합 허브 역할.',
+      sortOrder: 60,
+      isCoreRepresentative: true,
+      businessUnitId: 'site_manager',
+    ),
+    DeployedSiteDoc(
       id: 'sotongware_control',
       nameKo: '소통총관제',
       nameEn: 'SotongwareControl',
@@ -24,71 +135,7 @@ class DeployedSitesCatalog {
       recentWork: '통합 사업 관제·분석·학습 구조 개편',
       nextAction: '웹 배포사이트 관제 화면 운영 확인',
       adminMemo: '관리자 dart-define 포함 빌드로만 배포',
-      sortOrder: 10,
-    ),
-    DeployedSiteDoc(
-      id: 'sotong_automation_promo',
-      nameKo: '소통산업자동화',
-      nameEn: 'Sotong Automation Promo',
-      description: '산업·공장자동화 소프트웨어 사업 소개 공개 사이트',
-      category: DeployedSiteCategory.industrial,
-      hostingType: DeployedHostingType.firebase,
-      firebaseProjectId: 'sotong-automation-promo',
-      liveUrl: 'https://sotong-automation-promo.web.app',
-      status: DeployedSiteStatus.operating,
-      iconName: 'industrial',
-      httpsChecked: true,
-      lastDeployResult: '공개 Hosting 응답 200 확인',
-      nextAction: '문의·전환 구조 점검',
-      sortOrder: 20,
-    ),
-    DeployedSiteDoc(
-      id: 'sotongware_apps_promo',
-      nameKo: '소통앱 프로모',
-      nameEn: 'Sotong Apps Promo',
-      description: '소통웨어 앱 개발 사업과 주요 앱 프로젝트 소개',
-      category: DeployedSiteCategory.app,
-      hostingType: DeployedHostingType.firebase,
-      firebaseProjectId: 'sotongware-apps-promo',
-      liveUrl: 'https://sotongware-apps-promo.web.app',
-      status: DeployedSiteStatus.operating,
-      iconName: 'apps',
-      httpsChecked: true,
-      lastDeployResult: '공개 Hosting 응답 200 확인',
-      nextAction: '앱별 프로모 링크와 출시 상태 점검',
-      sortOrder: 30,
-    ),
-    DeployedSiteDoc(
-      id: 'sotongware_ebook_promo',
-      nameKo: '소통전자책 프로모',
-      nameEn: 'Sotong Ebook Promo',
-      description: 'AI 기반 전자책 기획·제작·출판 사업 소개',
-      category: DeployedSiteCategory.ebook,
-      hostingType: DeployedHostingType.firebase,
-      firebaseProjectId: 'sotongware-ebook-promo',
-      liveUrl: 'https://sotongware-ebook-promo.web.app',
-      status: DeployedSiteStatus.operating,
-      iconName: 'ebook',
-      httpsChecked: true,
-      lastDeployResult: '공개 Hosting 응답 200 확인',
-      nextAction: '상품 소개 페이지와 판매 채널 연결 점검',
-      sortOrder: 40,
-    ),
-    DeployedSiteDoc(
-      id: 'sotongware_contents_promo',
-      nameKo: '소통콘텐츠 프로모',
-      nameEn: 'Sotong Contents Promo',
-      description: '영상·음악·AI 콘텐츠 제작 사업 소개',
-      category: DeployedSiteCategory.contents,
-      hostingType: DeployedHostingType.firebase,
-      firebaseProjectId: 'sotongware-contents-promo',
-      liveUrl: 'https://sotongware-contents-promo.web.app',
-      status: DeployedSiteStatus.operating,
-      iconName: 'contents',
-      httpsChecked: true,
-      lastDeployResult: '공개 Hosting 응답 200 확인',
-      nextAction: '콘텐츠 포트폴리오 업데이트 여부 확인',
-      sortOrder: 50,
+      sortOrder: 100,
     ),
     DeployedSiteDoc(
       id: 'sotongware_ai_story',
@@ -104,23 +151,7 @@ class DeployedSitesCatalog {
       httpsChecked: true,
       lastDeployResult: '공개 Hosting 응답 200 확인',
       nextAction: '콘텐츠 최신성과 모바일 가독성 점검',
-      sortOrder: 60,
-    ),
-    DeployedSiteDoc(
-      id: 'sotongware_marketing',
-      nameKo: '소통마케팅',
-      nameEn: 'Sotong Marketing',
-      description: '고객 맞춤형 홍보·마케팅 사이트 제작 서비스 소개',
-      category: DeployedSiteCategory.marketing,
-      hostingType: DeployedHostingType.firebase,
-      firebaseProjectId: 'sotongware-marketing',
-      liveUrl: 'https://sotongware-marketing.web.app',
-      status: DeployedSiteStatus.operating,
-      iconName: 'marketing',
-      httpsChecked: true,
-      lastDeployResult: '공개 Hosting 응답 200 확인',
-      nextAction: '문의 CTA·모바일 전환 점검',
-      sortOrder: 70,
+      sortOrder: 110,
     ),
     DeployedSiteDoc(
       id: 'sotong_country_ai',
@@ -149,7 +180,7 @@ class DeployedSitesCatalog {
       nextAction: '사매면 실제 자원 현장조사, 관계기관 검증, 주민 의견수렴 및 공식 자료 지속 보완',
       adminMemo:
           '주요 서비스: 지역정보, 자원·차별화, 전략, 관광·행사·사업 아이디어, 주민 참여, AI 활용, 실행계획·KPI, 공식 출처 관리',
-      sortOrder: 80,
+      sortOrder: 120,
     ),
     DeployedSiteDoc(
       id: 'sotong_language',
@@ -167,7 +198,7 @@ class DeployedSitesCatalog {
       desktopChecked: true,
       lastDeployResult: 'Hosting 200 · Flutter bootstrap · main.dart.js 확인',
       nextAction: '학습 콘텐츠 최신성 점검',
-      sortOrder: 90,
+      sortOrder: 130,
     ),
     DeployedSiteDoc(
       id: 'sotong_elec',
@@ -185,7 +216,7 @@ class DeployedSitesCatalog {
       desktopChecked: true,
       lastDeployResult: 'Hosting 200 · Flutter bootstrap · main.dart.js 확인',
       nextAction: '자격 콘텐츠·계산기 점검',
-      sortOrder: 100,
+      sortOrder: 140,
     ),
     DeployedSiteDoc(
       id: 'sotong_dev',
@@ -203,7 +234,7 @@ class DeployedSitesCatalog {
       desktopChecked: true,
       lastDeployResult: 'Hosting 200 · Flutter bootstrap · main.dart.js 확인',
       nextAction: '개발 학습 커리큘럼 점검',
-      sortOrder: 110,
+      sortOrder: 150,
     ),
     DeployedSiteDoc(
       id: 'sotong_car',
@@ -221,7 +252,7 @@ class DeployedSitesCatalog {
       desktopChecked: true,
       lastDeployResult: 'Hosting 200 · Flutter bootstrap · main.dart.js 확인',
       nextAction: '관리 정보 최신성 점검',
-      sortOrder: 120,
+      sortOrder: 160,
     ),
     DeployedSiteDoc(
       id: 'sotong_plc',
@@ -239,7 +270,42 @@ class DeployedSitesCatalog {
       desktopChecked: true,
       lastDeployResult: 'Hosting 200 · Flutter bootstrap · main.dart.js 확인',
       nextAction: 'PLC 제조사 학습 경로 점검',
-      sortOrder: 130,
+      sortOrder: 170,
     ),
   ];
+
+  /// 핵심 사업부 대표 사이트 시드 (표시용 기준 목록)
+  static List<DeployedSiteDoc> get coreRepresentativeSeeds => verifiedSeeds
+      .where((s) => s.isCoreRepresentative)
+      .toList(growable: false);
+
+  static const coreRepresentativeIds = <String>{
+    'sotong_automation_promo',
+    'sotongware_apps_promo',
+    'sotongware_ebook_promo',
+    'sotongware_contents_promo',
+    'sotongware_marketing',
+    'sotong_site_manager',
+  };
+
+  static bool isCoreRepresentativeId(String id) =>
+      coreRepresentativeIds.contains(id);
+
+  /// Firestore에 플래그가 없어도 카탈로그 ID/URL로 대표 여부를 보완한다.
+  static bool resolvesAsCoreRepresentative(DeployedSiteDoc site) {
+    if (site.isCoreRepresentative) return true;
+    if (coreRepresentativeIds.contains(site.id)) return true;
+    final url = site.liveUrl.trim().toLowerCase();
+    final project = site.firebaseProjectId.trim().toLowerCase();
+    for (final seed in coreRepresentativeSeeds) {
+      if (url.isNotEmpty && seed.liveUrl.trim().toLowerCase() == url) {
+        return true;
+      }
+      if (project.isNotEmpty &&
+          seed.firebaseProjectId.trim().toLowerCase() == project) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

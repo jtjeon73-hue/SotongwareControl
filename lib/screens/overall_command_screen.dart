@@ -46,7 +46,7 @@ class OverallCommandScreen extends StatelessWidget {
               const SizedBox(height: 28),
               ControlSectionTitle(
                 title: '소통사업부 진행상태',
-                subtitle: '5개 사업부 · 진행률 · 다음 액션',
+                subtitle: '6개 사업부 · 진행률 · 다음 액션',
               ),
               _StatusGrid(items: ManagementHubData.divisionStatuses),
               const SizedBox(height: 28),

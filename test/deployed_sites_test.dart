@@ -19,12 +19,32 @@ void main() {
   });
 
   test('확인된 초기 사이트 카탈로그와 중복 방지', () {
-    expect(DeployedSitesCatalog.verifiedSeeds.length, 13);
+    expect(DeployedSitesCatalog.verifiedSeeds.length, 14);
+    expect(DeployedSitesCatalog.coreRepresentativeSeeds.length, 6);
     expect(
       DeployedSitesCatalog.verifiedSeeds.every(
         (s) => s.liveUrl.startsWith('https://'),
       ),
       isTrue,
+    );
+    expect(
+      DeployedSitesCatalog.coreRepresentativeSeeds.every(
+        (s) => s.isCoreRepresentative && s.businessUnitId.isNotEmpty,
+      ),
+      isTrue,
+    );
+    expect(
+      DeployedSitesCatalog.coreRepresentativeSeeds
+          .map((s) => s.businessUnitId)
+          .toSet(),
+      {
+        'industrial_automation',
+        'app_development',
+        'ebook',
+        'content_music',
+        'web_marketing',
+        'site_manager',
+      },
     );
     final education = DeployedSitesCatalog.verifiedSeeds
         .where((s) => s.category == DeployedSiteCategory.education)
@@ -47,6 +67,14 @@ void main() {
       ),
       isTrue,
     );
+    expect(
+      DeployedSitesCatalog.verifiedSeeds.any(
+        (s) =>
+            s.id == 'sotong_site_manager' &&
+            s.liveUrl == 'https://sotongsitemanager.web.app',
+      ),
+      isTrue,
+    );
 
     final existing = [DeployedSitesCatalog.verifiedSeeds.first];
     expect(
@@ -65,6 +93,16 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('웹배포사이트 화면은 대표 6개만 해석', () {
+    final all = DeployedSitesCatalog.verifiedSeeds;
+    final core = DeployedSitesService.resolveCoreRepresentatives(all);
+    expect(core.length, 6);
+    expect(core.every((s) => s.isCoreRepresentative), isTrue);
+    final kpis = DeployedSitesService.computeKpis(core);
+    expect(kpis.coreBusinessCount, 6);
+    expect(kpis.registeredRepresentatives, 6);
   });
 
   test('SotongCountryAI 정상 운영 시드와 상태 판정', () {
@@ -298,11 +336,20 @@ void main() {
   });
 
   test('KPI와 필터·정렬', () {
+    final control = DeployedSitesCatalog.verifiedSeeds.firstWhere(
+      (s) => s.id == 'sotongware_control',
+    );
+    final apps = DeployedSitesCatalog.verifiedSeeds.firstWhere(
+      (s) => s.id == 'sotongware_apps_promo',
+    );
+    final ebook = DeployedSitesCatalog.verifiedSeeds.firstWhere(
+      (s) => s.id == 'sotongware_ebook_promo',
+    );
     final country = DeployedSitesCatalog.verifiedSeeds.firstWhere(
       (s) => s.firebaseProjectId == 'sotong-country-ai',
     );
     final sites = [
-      DeployedSitesCatalog.verifiedSeeds[0].copyWith(
+      control.copyWith(
         status: DeployedSiteStatus.operating,
         isFavorite: true,
         lastDeployedAt: DateTime.now(),
@@ -310,14 +357,14 @@ void main() {
         operationPurpose: '관제 목적',
         description: '관제 상세',
       ),
-      DeployedSitesCatalog.verifiedSeeds[1].copyWith(
+      apps.copyWith(
         status: DeployedSiteStatus.needsCheck,
         serviceScope: '',
         operationPurpose: '',
         description: '',
         lastDeployedAt: DateTime.now().subtract(const Duration(days: 30)),
       ),
-      DeployedSitesCatalog.verifiedSeeds[2].copyWith(
+      ebook.copyWith(
         status: DeployedSiteStatus.inactive,
         isActive: false,
       ),

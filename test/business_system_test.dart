@@ -39,17 +39,30 @@ class _FakeGithubService extends GithubService {
 }
 
 void main() {
-  test('5개 사업 분류와 기존 ID 호환', () {
-    expect(BusinessCatalog.businesses.length, 5);
+  test('6개 사업 분류와 기존 ID 호환', () {
+    expect(BusinessCatalog.businesses.length, 6);
     expect(BusinessCatalog.canonicalId('online_expansion'), 'web_marketing');
     expect(BusinessCatalog.canonicalId('content_music'), 'content_music');
+    expect(
+      BusinessCatalog.canonicalId('사업자동화sw제작사업부'),
+      'industrial_automation',
+    );
     expect(BusinessCatalog.businesses.map((e) => e.id).toSet(), {
       'industrial_automation',
       'app_development',
       'ebook',
       'content_music',
       'web_marketing',
+      'site_manager',
     });
+    expect(BusinessCatalog.businesses.map((e) => e.name).toList(), [
+      '산업자동화SW개발사업부',
+      '앱개발사업부',
+      '전자책개발사업부',
+      '콘텐츠개발사업부',
+      '웹마케팅개발사업부',
+      '소통사이트매니저개발사업부',
+    ]);
   });
 
   test('프로젝트는 기존 businessUnitId를 보존하며 공통 사업으로 해석', () {
@@ -81,7 +94,7 @@ void main() {
       deployments: const [],
       issues: const [],
     );
-    expect(report.businessResults.length, 5);
+    expect(report.businessResults.length, 6);
     expect(report.projectResults.length, 1);
     expect(report.analysisMethod, 'rules_based');
     expect(report.githubStatus, 'success');
@@ -107,8 +120,13 @@ void main() {
     expect(ControlDestination.dashboardOverview.label, '전체 사업 현황');
     expect(ControlDestination.divisionProgress.label, '사업부별 진행상태');
     expect(ControlDestination.aiBusinessAnalysis.label, 'AI 사업분석');
-    expect(ControlDestination.businessStudy.label, '사업 지식 학습');
-    expect(ControlDestination.webMarketing.label, '웹마케팅제작사업부');
+    expect(ControlDestination.businessStudy.label, '사업전략연구실');
+    expect(ControlDestination.webMarketing.label, '웹마케팅개발사업부');
+    expect(ControlDestination.siteManager.label, '소통사이트매니저개발사업부');
+    expect(ControlDestination.industrialAutomation.label, '산업자동화SW개발사업부');
+    expect(ControlDestination.appDevelopment.label, '앱개발사업부');
+    expect(ControlDestination.ebook.label, '전자책개발사업부');
+    expect(ControlDestination.youtubeContent.label, '콘텐츠개발사업부');
   });
 
   for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1440.0]) {
@@ -120,7 +138,7 @@ void main() {
         const MaterialApp(home: Scaffold(body: BusinessStudyScreen())),
       );
       await tester.pumpAndSettle();
-      expect(find.text('소통사업스터디부'), findsOneWidget);
+      expect(find.text('사업전략연구실'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }

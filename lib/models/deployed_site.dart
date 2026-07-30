@@ -190,6 +190,8 @@ class DeployedSiteDoc {
     this.adminMemo = '',
     this.sortOrder = 100,
     this.isActive = true,
+    this.isCoreRepresentative = false,
+    this.businessUnitId = '',
     this.createdAt,
     this.updatedAt,
   });
@@ -221,6 +223,13 @@ class DeployedSiteDoc {
   final String adminMemo;
   final int sortOrder;
   final bool isActive;
+
+  /// 핵심 사업부 대표 사이트 여부. 기존 문서에 필드가 없으면 false로 읽고,
+  /// 카탈로그 ID 폴백으로 화면에서 보완한다.
+  final bool isCoreRepresentative;
+
+  /// 연결 사업부 ID (`BusinessCatalog` id). 하위 호환을 위해 선택 필드.
+  final String businessUnitId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -258,6 +267,8 @@ class DeployedSiteDoc {
     String? adminMemo,
     int? sortOrder,
     bool? isActive,
+    bool? isCoreRepresentative,
+    String? businessUnitId,
     bool clearLastDeployedAt = false,
     bool clearLastCheckedAt = false,
   }) {
@@ -293,6 +304,8 @@ class DeployedSiteDoc {
       adminMemo: adminMemo ?? this.adminMemo,
       sortOrder: sortOrder ?? this.sortOrder,
       isActive: isActive ?? this.isActive,
+      isCoreRepresentative: isCoreRepresentative ?? this.isCoreRepresentative,
+      businessUnitId: businessUnitId ?? this.businessUnitId,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
@@ -328,6 +341,8 @@ class DeployedSiteDoc {
       adminMemo: _str(d['adminMemo']),
       sortOrder: (d['sortOrder'] as num?)?.toInt() ?? 100,
       isActive: d['isActive'] != false,
+      isCoreRepresentative: d['isCoreRepresentative'] == true,
+      businessUnitId: _str(d['businessUnitId']),
       createdAt: _ts(d['createdAt']),
       updatedAt: _ts(d['updatedAt']),
     );
@@ -364,6 +379,8 @@ class DeployedSiteDoc {
     'adminMemo': adminMemo,
     'sortOrder': sortOrder,
     'isActive': isActive,
+    'isCoreRepresentative': isCoreRepresentative,
+    'businessUnitId': businessUnitId,
     'updatedAt': FieldValue.serverTimestamp(),
     if (includeCreatedAt) 'createdAt': FieldValue.serverTimestamp(),
   };
@@ -398,6 +415,8 @@ class DeployedSiteDoc {
         return Icons.bolt_outlined;
       case 'language':
         return Icons.translate_outlined;
+      case 'site_manager':
+        return Icons.hub_outlined;
       default:
         return Icons.public_outlined;
     }
@@ -412,6 +431,10 @@ class DeployedSitesKpis {
     required this.preparingOrDeploying,
     required this.inactive,
     required this.recentlyDeployed,
+    this.coreBusinessCount = 6,
+    this.registeredRepresentatives = 0,
+    this.connectedRepresentatives = 0,
+    this.needsUrlCheck = 0,
   });
 
   final int total;
@@ -420,4 +443,8 @@ class DeployedSitesKpis {
   final int preparingOrDeploying;
   final int inactive;
   final int recentlyDeployed;
+  final int coreBusinessCount;
+  final int registeredRepresentatives;
+  final int connectedRepresentatives;
+  final int needsUrlCheck;
 }
