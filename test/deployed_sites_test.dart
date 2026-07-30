@@ -364,10 +364,7 @@ void main() {
         description: '',
         lastDeployedAt: DateTime.now().subtract(const Duration(days: 30)),
       ),
-      ebook.copyWith(
-        status: DeployedSiteStatus.inactive,
-        isActive: false,
-      ),
+      ebook.copyWith(status: DeployedSiteStatus.inactive, isActive: false),
       country,
     ];
     final kpis = DeployedSitesService.computeKpis(sites);
