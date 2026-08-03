@@ -114,7 +114,7 @@ class ProjectDoc {
   final DateTime? lastWorkedAt;
   final DateTime? updatedAt;
 
-  /// 기존 businessUnitId를 보존하면서 5개 핵심 사업 ID로 해석합니다.
+  /// 기존 businessUnitId를 보존하면서 카탈로그 사업 ID로 해석합니다.
   String get canonicalBusinessId => BusinessCatalog.canonicalId(businessUnitId);
 
   int? get computedProgress {

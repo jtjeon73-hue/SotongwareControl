@@ -142,9 +142,11 @@ class _OverviewBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const PageHero(
+          PageHero(
             title: '전체 사업 현황',
-            subtitle: '5개 핵심 사업의 개발·운영·성장 준비도를 실제 프로젝트, 작업 로그, 배포 기록으로 확인합니다.',
+            subtitle:
+                '${BusinessCatalog.businesses.length}개 핵심 사업의 개발·운영·성장 준비도를 '
+                '실제 프로젝트, 작업 로그, 배포 기록으로 확인합니다.',
             badge: '통합 사업 관제',
           ),
           const SizedBox(height: 16),
@@ -152,7 +154,10 @@ class _OverviewBody extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              const KpiCard(label: '핵심 사업', value: '5개'),
+              KpiCard(
+                label: '핵심 사업',
+                value: '${BusinessCatalog.businesses.length}개',
+              ),
               KpiCard(label: '전체 프로젝트', value: '${projects.length}건'),
               KpiCard(label: '진행 중', value: '$active건'),
               KpiCard(label: '완료', value: '$completed건'),
@@ -192,7 +197,7 @@ class _OverviewBody extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '6개 사업 비교',
+                  '${BusinessCatalog.businesses.length}개 사업 비교',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),

@@ -9,7 +9,9 @@ import '../services/ops_repository.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/page_hero.dart';
+import 'business_planning_tab.dart';
 
+/// AI 사업분석 — 운영 분석(기존) + 사업 기획·작업지시(신규).
 class AiBusinessAnalysisScreen extends StatefulWidget {
   const AiBusinessAnalysisScreen({super.key});
 
@@ -19,25 +21,87 @@ class AiBusinessAnalysisScreen extends StatefulWidget {
 }
 
 class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
-  final _repository = OpsRepository();
+  var _tab = 0; // 0 운영 분석, 1 사업 기획·작업지시
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageHero(
+            title: 'AI 사업분석',
+            subtitle: _tab == 0
+                ? '실제 프로젝트·작업·배포·GitHub 기록을 바탕으로 사업 운영 준비도를 점검합니다.'
+                : '사업 아이디어를 검토하고 소통24워크에서 실행할 표준 작업지시서를 준비합니다.',
+            badge: _tab == 0 ? '운영 분석 · 규칙 기반' : '사업 기획 · 로컬 규칙',
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(
+                value: 0,
+                label: Text('운영 분석'),
+                icon: Icon(Icons.auto_graph_outlined, size: 18),
+              ),
+              ButtonSegment(
+                value: 1,
+                label: Text('사업 기획·작업지시'),
+                icon: Icon(Icons.assignment_outlined, size: 18),
+              ),
+            ],
+            selected: {_tab},
+            onSelectionChanged: (s) => setState(() => _tab = s.first),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: _tab == 0
+                ? const _OperationsAnalysisPane()
+                : const BusinessPlanningTab(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OperationsAnalysisPane extends StatefulWidget {
+  const _OperationsAnalysisPane();
+
+  @override
+  State<_OperationsAnalysisPane> createState() =>
+      _OperationsAnalysisPaneState();
+}
+
+class _OperationsAnalysisPaneState extends State<_OperationsAnalysisPane> {
+  OpsRepository? _repository;
   final _analysis = BusinessAnalysisService();
   bool _running = false;
   String? _error;
 
+  OpsRepository get _ops {
+    return _repository ??= OpsRepository();
+  }
+
   Future<void> _runAnalysis() async {
     if (_running) return;
+    if (!isFirebaseReady()) {
+      setState(() => _error = 'Firebase 연결이 필요합니다.');
+      return;
+    }
     setState(() {
       _running = true;
       _error = null;
     });
     try {
       final values = await Future.wait<dynamic>([
-        _repository.watchProjects().first,
-        _repository.watchTasks().first,
-        _repository.watchWorkLogs().first,
-        _repository.watchDeployments().first,
-        _repository.watchIssues().first,
-        _repository.latestBusinessAnalysisReport(),
+        _ops.watchProjects().first,
+        _ops.watchTasks().first,
+        _ops.watchWorkLogs().first,
+        _ops.watchDeployments().first,
+        _ops.watchIssues().first,
+        _ops.latestBusinessAnalysisReport(),
       ]);
       final report = await _analysis.analyze(
         projects: values[0] as List<ProjectDoc>,
@@ -47,7 +111,7 @@ class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
         issues: values[4] as List<IssueDoc>,
         previous: values[5] as BusinessAnalysisReport?,
       );
-      await _repository.saveBusinessAnalysisReport(report);
+      await _ops.saveBusinessAnalysisReport(report);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('실제 등록 데이터 기반 분석 결과를 저장했습니다.')),
@@ -63,31 +127,20 @@ class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
   @override
   Widget build(BuildContext context) {
     if (!isFirebaseReady()) {
-      return const Padding(
-        padding: EdgeInsets.all(24),
-        child: EmptyStatePanel(
-          title: 'AI 사업분석',
-          message: 'Firebase 연결 후 분석 이력을 저장할 수 있습니다.',
-        ),
+      return const EmptyStatePanel(
+        title: '운영 분석',
+        message: 'Firebase 연결 후 분석 이력을 저장할 수 있습니다.',
       );
     }
     return StreamBuilder<List<BusinessAnalysisReport>>(
-      stream: _repository.watchBusinessAnalysisReports(),
+      stream: _ops.watchBusinessAnalysisReports(),
       builder: (context, snapshot) {
         final reports = snapshot.data ?? const [];
         final latest = reports.firstOrNull;
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const PageHero(
-                title: 'AI 사업분석',
-                subtitle:
-                    'Firestore 운영 데이터와 공개 GitHub 저장소를 분석해 실제 데이터와 규칙 기반 판단을 구분합니다.',
-                badge: 'AI대표 · 규칙 기반',
-              ),
-              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
@@ -107,7 +160,7 @@ class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                '현재 분석은 AI가 내용을 만들어내는 방식이 아니라 실제 프로젝트·작업·배포·이슈와 '
+                '현재 운영 분석은 AI가 내용을 만들어내는 방식이 아니라 실제 프로젝트·작업·배포·이슈와 '
                 '공개 GitHub의 커밋·README·테스트·설정 파일 존재 여부를 규칙으로 평가합니다.',
               ),
               if (_error != null) ...[
@@ -193,7 +246,7 @@ class _ReportView extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text('[실제 데이터]\n${report.summary}'),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   '[분석 판단]\n'
                   '진행률·완료·최근 활동·배포 확인 비율을 조합한 운영 준비도입니다. '
                   '매출이나 미래 성과를 추정하지 않습니다.',

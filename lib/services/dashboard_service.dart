@@ -1,3 +1,4 @@
+import '../core/business/display_names.dart';
 import '../models/ops_enums.dart';
 import '../models/ops_models.dart';
 
@@ -131,10 +132,11 @@ class DashboardService {
     }
 
     for (final d in deployments.where((e) => !e.isFullyComplete)) {
+      final projectLabel = DisplayNames.project(d.projectId);
       if (d.deployOkSitePending) {
-        items.add('배포 성공 / 실제 반영 확인 필요: ${d.projectId}');
+        items.add('배포 성공 / 실제 반영 확인 필요: $projectLabel');
       } else {
-        items.add('배포 확인 미완료: ${d.projectId}');
+        items.add('배포 확인 미완료: $projectLabel');
       }
     }
 
