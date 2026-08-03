@@ -15,13 +15,33 @@ class BusinessPlanningStore {
     final raw = prefs.getString(plansKey);
     if (raw == null || raw.isEmpty) return [];
     final list = jsonDecode(raw) as List<dynamic>;
-    return list
+    final plans = list
         .map(
           (e) => BusinessPlanDocument.fromJson(
             Map<String, dynamic>.from(e as Map),
           ),
         )
-        .toList()
+        .toList();
+    final deduped = dedupeById(plans);
+    if (deduped.length != plans.length) {
+      await savePlans(deduped);
+    }
+    return deduped;
+  }
+
+  /// 동일 id가 여러 번 있으면 최신 updatedAt 1건만 남긴다.
+  static List<BusinessPlanDocument> dedupeById(
+    List<BusinessPlanDocument> plans,
+  ) {
+    final byId = <String, BusinessPlanDocument>{};
+    for (final plan in plans) {
+      final existing = byId[plan.id];
+      if (existing == null ||
+          plan.updatedAt.compareTo(existing.updatedAt) >= 0) {
+        byId[plan.id] = plan;
+      }
+    }
+    return byId.values.toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
@@ -29,7 +49,7 @@ class BusinessPlanningStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       plansKey,
-      jsonEncode(plans.map((e) => e.toJson()).toList()),
+      jsonEncode(dedupeById(plans).map((e) => e.toJson()).toList()),
     );
   }
 

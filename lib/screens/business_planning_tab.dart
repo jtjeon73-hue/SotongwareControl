@@ -22,7 +22,6 @@ class BusinessPlanningTab extends StatefulWidget {
 class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _service = BusinessPlanningService();
   final _store = BusinessPlanningStore();
-  final _scrollController = ScrollController();
   final _resultsTitleKey = GlobalKey();
 
   final _topicCtrl = TextEditingController();
@@ -63,7 +62,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   @override
   void dispose() {
     _draftTimer?.cancel();
-    _scrollController.dispose();
     for (final c in _allControllers) {
       c.dispose();
     }
@@ -104,7 +102,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       final draft = results[1] as BusinessPlanInput?;
       if (!mounted) return;
       setState(() {
-        _plans = plans;
+        _plans = BusinessPlanningStore.dedupeById(plans);
         _loading = false;
         if (draft != null) _applyInput(draft);
       });
@@ -202,7 +200,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Future<void> _refreshPlans() async {
-    _plans = await _store.loadPlans();
+    _plans = BusinessPlanningStore.dedupeById(await _store.loadPlans());
   }
 
   void _snack(String message) {
@@ -445,8 +443,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToResultsTitle();
       });
-    } else if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
     }
   }
 
@@ -460,9 +456,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _applyInput(const BusinessPlanInput());
     });
     _persistDraft();
-    if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
-    }
   }
 
   String _formatIso(String iso) {
@@ -486,67 +479,66 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
+  List<BusinessPlanDocument> get _visiblePlans {
+    return BusinessPlanningStore.dedupeById(
+      _plans.where((p) => p.status != PlanningStatus.archived).toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
 
-    // 콘텐츠 영역 단일 스크롤만 사용 (중첩 세로 스크롤·고정 높이 없음).
-    return SingleChildScrollView(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildBanner(),
-          const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final desktopSplit = width >= 1200 && _analysis != null;
-              final tabletish = width >= 768 && width < 1200;
+    // 부모(AiBusinessAnalysisScreen)의 단일 페이지 스크롤에 참여한다.
+    // 여기서 추가 SingleChildScrollView를 두지 않는다.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildBanner(),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final desktopSplit = width >= 1200 && _analysis != null;
+            final tabletish = width >= 768 && width < 1200;
 
-              if (_analysis == null) {
-                return _buildPreAnalysisLayout(width, tabletish);
-              }
-              if (desktopSplit) {
-                return _buildPostAnalysisDesktop();
-              }
-              return _buildPostAnalysisStacked();
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildInstructionSection(),
-          const SizedBox(height: 16),
-          _buildActionsBar(),
-          const SizedBox(height: 20),
-          _buildSavedPlansSection(),
-        ],
-      ),
+            if (_analysis == null) {
+              return _buildPreAnalysisLayout(width, tabletish);
+            }
+            if (desktopSplit) {
+              return _buildPostAnalysisDesktop();
+            }
+            return _buildPostAnalysisStacked();
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildInstructionSection(),
+        const SizedBox(height: 12),
+        _buildActionsBar(),
+        const SizedBox(height: 20),
+        _buildSavedPlansSection(),
+      ],
     );
   }
 
   Widget _buildPreAnalysisLayout(double width, bool tabletish) {
     final form = _buildInputForm(showAnalyzeButton: true);
-    final tip = _buildEmptyResultsHint();
 
     if (width >= 768) {
       return Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: tabletish ? 820 : 720),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [form, const SizedBox(height: 12), tip],
-          ),
+          child: form,
         ),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [form, const SizedBox(height: 12), tip],
-    );
+    return form;
   }
 
   Widget _buildPostAnalysisDesktop() {
@@ -591,20 +583,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       child: const Text(
         '현재 단계는 로컬 규칙 기반 기획 도우미입니다. 외부 AI 생성·소통24워크 자동 실행은 포함하지 않습니다.',
         style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
-      ),
-    );
-  }
-
-  Widget _buildEmptyResultsHint() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Text(
-          '필수 항목을 입력한 뒤 「사업 기획안 분석」을 실행하면 12개 기준 평가와 제작 형태 추천이 표시됩니다.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: ControlColors.textSecondary),
-        ),
       ),
     );
   }
@@ -1035,23 +1013,30 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           icon: const Icon(Icons.inventory_2_outlined, size: 18),
           label: const Text('보관'),
         ),
-        OutlinedButton.icon(
-          onPressed: _startNewPlan,
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('새 기획'),
-        ),
       ],
     );
   }
 
   Widget _buildSavedPlansSection() {
-    final visible = _plans
-        .where((p) => p.status != PlanningStatus.archived)
-        .toList();
+    final visible = _visiblePlans;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('저장된 기획안', style: Theme.of(context).textTheme.titleLarge),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '저장된 기획안',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _startNewPlan,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('새 기획'),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         if (visible.isEmpty)
           const EmptyStatePanel(
@@ -1061,6 +1046,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         else
           for (final plan in visible)
             Card(
+              key: ValueKey('saved-plan-${plan.id}'),
               child: ListTile(
                 onTap: () => _loadPlan(plan),
                 title: Text(

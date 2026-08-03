@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -286,7 +288,101 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('유지 주제'), findsWidgets);
-    expect(find.textContaining('저장된 기획안'), findsOneWidget);
+    expect(find.text('저장된 기획안'), findsOneWidget);
+    expect(find.text('새 기획'), findsOneWidget);
+  });
+
+  test('동일 id 기획안은 로드 시 1건으로 정리된다', () async {
+    final older = BusinessPlanDocument(
+      id: 'plan_dup',
+      input: const BusinessPlanInput(topic: '옛 주제'),
+      status: PlanningStatus.idea,
+      createdAt: DateTime.utc(2026, 8, 1).toIso8601String(),
+      updatedAt: DateTime.utc(2026, 8, 1).toIso8601String(),
+    );
+    final newer = BusinessPlanDocument(
+      id: 'plan_dup',
+      input: const BusinessPlanInput(topic: '새 주제'),
+      status: PlanningStatus.idea,
+      createdAt: DateTime.utc(2026, 8, 1).toIso8601String(),
+      updatedAt: DateTime.utc(2026, 8, 4).toIso8601String(),
+    );
+    SharedPreferences.setMockInitialValues({
+      BusinessPlanningStore.plansKey: jsonEncode([
+        older.toJson(),
+        newer.toJson(),
+      ]),
+    });
+    final store = BusinessPlanningStore();
+    final plans = await store.loadPlans();
+    expect(plans.length, 1);
+    expect(plans.single.input.topic, '새 주제');
+    expect(BusinessPlanningStore.dedupeById([older, newer, older]).length, 1);
+  });
+
+  testWidgets('페이지는 단일 스크롤이며 탭이 스크롤 문서 안에 있다', (tester) async {
+    tester.view.physicalSize = const Size(1366, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('사업 기획·작업지시'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(AiBusinessAnalysisScreen),
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(SingleChildScrollView),
+        matching: find.byType(SegmentedButton<int>),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('동일 id면 저장된 기획안 카드는 1개만 렌더링된다', (tester) async {
+    final now = DateTime.utc(2026, 8, 4).toIso8601String();
+    final plan = BusinessPlanDocument(
+      id: 'plan_one',
+      input: const BusinessPlanInput(
+        topic: '단일 카드 주제',
+        customerProblem: '문제',
+        targetCustomer: '고객',
+        desiredOutcome: '결과',
+      ),
+      status: PlanningStatus.idea,
+      createdAt: now,
+      updatedAt: now,
+    );
+    SharedPreferences.setMockInitialValues({
+      BusinessPlanningStore.plansKey: jsonEncode([
+        plan.toJson(),
+        plan.toJson(),
+      ]),
+    });
+
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('사업 기획·작업지시'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('saved-plan-plan_one')), findsOneWidget);
+    expect(find.text('새 기획'), findsOneWidget);
+    expect(find.text('저장된 기획안'), findsOneWidget);
   });
 
   for (final width in [360.0, 768.0, 1366.0, 1440.0]) {

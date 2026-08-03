@@ -22,25 +22,40 @@ class AiBusinessAnalysisScreen extends StatefulWidget {
 
 class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
   var _tab = 0; // 0 운영 분석, 1 사업 기획·작업지시
+  final _pageScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _pageScrollController.dispose();
+    super.dispose();
+  }
 
   void _selectTab(int tab) {
     if (_tab == tab) return;
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _tab = tab);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageScrollController.hasClients) {
+        _pageScrollController.jumpTo(0);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final planning = _tab == 1;
-    return Padding(
+    // 히어로·탭·본문을 하나의 세로 문서 흐름으로 스크롤한다.
+    // Expanded 밖 고정 탭 + 내부 중첩 스크롤 구조를 쓰지 않는다.
+    return SingleChildScrollView(
+      controller: _pageScrollController,
       padding: EdgeInsets.fromLTRB(
         planning ? 16 : 24,
         planning ? 12 : 24,
         planning ? 16 : 24,
-        planning ? 12 : 24,
+        planning ? 24 : 24,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHero(
             title: 'AI 사업분석',
@@ -68,14 +83,11 @@ class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
             onSelectionChanged: (s) => _selectTab(s.first),
           ),
           SizedBox(height: planning ? 8 : 12),
-          Expanded(
-            // 탭별 새 키로 전환 시 콘텐츠가 시작 위치에서 그려지게 한다.
-            child: KeyedSubtree(
-              key: ValueKey('ai-biz-tab-$_tab'),
-              child: planning
-                  ? const BusinessPlanningTab()
-                  : const _OperationsAnalysisPane(),
-            ),
+          KeyedSubtree(
+            key: ValueKey('ai-biz-tab-$_tab'),
+            child: planning
+                ? const BusinessPlanningTab()
+                : const _OperationsAnalysisPane(),
           ),
         ],
       ),
@@ -154,76 +166,74 @@ class _OperationsAnalysisPaneState extends State<_OperationsAnalysisPane> {
       builder: (context, snapshot) {
         final reports = snapshot.data ?? const [];
         final latest = reports.firstOrNull;
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _running ? null : _runAnalysis,
-                  icon: _running
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.auto_graph_outlined),
-                  label: Text(_running ? 'GitHub·운영 데이터 분석 중…' : '전체 사업 분석 실행'),
-                ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _running ? null : _runAnalysis,
+                icon: _running
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.auto_graph_outlined),
+                label: Text(_running ? 'GitHub·운영 데이터 분석 중…' : '전체 사업 분석 실행'),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '현재 운영 분석은 AI가 내용을 만들어내는 방식이 아니라 실제 프로젝트·작업·배포·이슈와 '
-                '공개 GitHub의 커밋·README·테스트·설정 파일 존재 여부를 규칙으로 평가합니다.',
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Card(
-                  color: ControlColors.warningBg,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'GitHub 또는 분석 데이터를 불러오지 못했습니다.\n'
-                      '기존 소통총관제 데이터는 유지됩니다.\n$_error',
-                    ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '현재 운영 분석은 AI가 내용을 만들어내는 방식이 아니라 실제 프로젝트·작업·배포·이슈와 '
+              '공개 GitHub의 커밋·README·테스트·설정 파일 존재 여부를 규칙으로 평가합니다.',
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Card(
+                color: ControlColors.warningBg,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'GitHub 또는 분석 데이터를 불러오지 못했습니다.\n'
+                    '기존 소통총관제 데이터는 유지됩니다.\n$_error',
                   ),
                 ),
-              ],
-              const SizedBox(height: 16),
-              if (latest == null)
-                const EmptyStatePanel(
-                  title: '저장된 사업분석이 없습니다',
-                  message: '전체 사업 분석 실행을 눌러 첫 기준점을 저장하십시오.',
-                )
-              else
-                _ReportView(report: latest),
-              if (reports.length > 1) ...[
-                const SizedBox(height: 20),
-                Text('분석 이력', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 8),
-                for (final report in reports.skip(1).take(10))
-                  Card(
-                    child: ListTile(
-                      title: Text(
-                        '${report.overallStatus} · ${report.overallScore}점',
-                      ),
-                      subtitle: Text(
-                        report.createdAt == null
-                            ? '저장 시각 확인 필요'
-                            : DateFormat(
-                                'yyyy-MM-dd HH:mm',
-                              ).format(report.createdAt!),
-                      ),
-                      trailing: const Icon(Icons.history),
-                    ),
-                  ),
-              ],
+              ),
             ],
-          ),
+            const SizedBox(height: 16),
+            if (latest == null)
+              const EmptyStatePanel(
+                title: '저장된 사업분석이 없습니다',
+                message: '전체 사업 분석 실행을 눌러 첫 기준점을 저장하십시오.',
+              )
+            else
+              _ReportView(report: latest),
+            if (reports.length > 1) ...[
+              const SizedBox(height: 20),
+              Text('분석 이력', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              for (final report in reports.skip(1).take(10))
+                Card(
+                  child: ListTile(
+                    title: Text(
+                      '${report.overallStatus} · ${report.overallScore}점',
+                    ),
+                    subtitle: Text(
+                      report.createdAt == null
+                          ? '저장 시각 확인 필요'
+                          : DateFormat(
+                              'yyyy-MM-dd HH:mm',
+                            ).format(report.createdAt!),
+                    ),
+                    trailing: const Icon(Icons.history),
+                  ),
+                ),
+            ],
+          ],
         );
       },
     );
