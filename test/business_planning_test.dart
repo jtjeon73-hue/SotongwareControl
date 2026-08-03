@@ -171,6 +171,122 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('표준 작업지시서를 준비'), findsOneWidget);
     expect(find.textContaining('로컬 규칙 기반 기획 도우미'), findsWidgets);
+    // 탭 전환 후 기획 입력 시작 영역이 보인다.
+    expect(find.text('기획 입력'), findsOneWidget);
+    expect(find.text('사업 기획안 분석'), findsOneWidget);
+  });
+
+  testWidgets('분석 후 입력 요약·펼치기·데스크톱 2열', (tester) async {
+    tester.view.physicalSize = const Size(1366, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('사업 기획·작업지시'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, '사업 주제 *'), '테스트 주제');
+    await tester.enterText(find.widgetWithText(TextField, '고객 문제 *'), '고객 문제');
+    await tester.enterText(find.widgetWithText(TextField, '대상 고객 *'), '대상 고객');
+    await tester.enterText(
+      find.widgetWithText(TextField, '원하는 결과 *'),
+      '원하는 결과',
+    );
+
+    await tester.ensureVisible(find.text('사업 기획안 분석'));
+    await tester.tap(find.text('사업 기획안 분석'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('분석 결과'), findsOneWidget);
+    expect(find.text('기획 요약'), findsOneWidget);
+    expect(find.text('입력 내용 펼치기'), findsOneWidget);
+    expect(find.text('입력 수정'), findsOneWidget);
+    // 분석 후 기본은 요약(전체 양식 제목 숨김)
+    expect(find.text('기획 입력'), findsNothing);
+
+    await tester.tap(find.text('입력 내용 펼치기'));
+    await tester.pumpAndSettle();
+    expect(find.text('기획 입력'), findsOneWidget);
+    expect(find.text('입력 내용 접기'), findsOneWidget);
+
+    await tester.tap(find.text('입력 내용 접기'));
+    await tester.pumpAndSettle();
+    expect(find.text('기획 요약'), findsOneWidget);
+  });
+
+  testWidgets('모바일에서는 분석 후 1열 요약 구조를 쓴다', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('사업 기획·작업지시'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, '사업 주제 *'), '모바일 주제');
+    await tester.enterText(find.widgetWithText(TextField, '고객 문제 *'), '문제');
+    await tester.enterText(find.widgetWithText(TextField, '대상 고객 *'), '고객');
+    await tester.enterText(find.widgetWithText(TextField, '원하는 결과 *'), '결과');
+    await tester.ensureVisible(find.text('사업 기획안 분석'));
+    await tester.tap(find.text('사업 기획안 분석'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('분석 결과'), findsOneWidget);
+    expect(find.text('기획 요약'), findsOneWidget);
+  });
+
+  testWidgets('새로고침 후 임시 저장 데이터가 유지된다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = BusinessPlanningStore();
+    final now = DateTime.utc(2026, 8, 4).toIso8601String();
+    await store.upsertPlan(
+      BusinessPlanDocument(
+        id: 'plan_persist',
+        input: const BusinessPlanInput(
+          topic: '유지 주제',
+          customerProblem: '문제',
+          targetCustomer: '고객',
+          desiredOutcome: '결과',
+        ),
+        status: PlanningStatus.idea,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await store.saveDraftInput(
+      const BusinessPlanInput(
+        topic: '유지 주제',
+        customerProblem: '문제',
+        targetCustomer: '고객',
+        desiredOutcome: '결과',
+      ),
+    );
+
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('사업 기획·작업지시'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('유지 주제'), findsWidgets);
+    expect(find.textContaining('저장된 기획안'), findsOneWidget);
   });
 
   for (final width in [360.0, 768.0, 1366.0, 1440.0]) {
@@ -188,6 +304,27 @@ void main() {
       await tester.tap(find.text('사업 기획·작업지시'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+
+      // 분석 전·후에도 오버플로 없음
+      if (width >= 360) {
+        await tester.enterText(
+          find.widgetWithText(TextField, '사업 주제 *'),
+          '오버플로 검사 주제',
+        );
+        await tester.enterText(find.widgetWithText(TextField, '고객 문제 *'), '문제');
+        await tester.enterText(find.widgetWithText(TextField, '대상 고객 *'), '고객');
+        await tester.enterText(
+          find.widgetWithText(TextField, '원하는 결과 *'),
+          '결과',
+        );
+        await tester.ensureVisible(find.text('사업 기획안 분석'));
+        await tester.tap(find.text('사업 기획안 분석'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('분석 결과'), findsOneWidget);
+      }
     });
   }
 }

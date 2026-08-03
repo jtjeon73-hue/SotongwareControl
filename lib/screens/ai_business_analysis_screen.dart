@@ -23,21 +23,34 @@ class AiBusinessAnalysisScreen extends StatefulWidget {
 class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
   var _tab = 0; // 0 운영 분석, 1 사업 기획·작업지시
 
+  void _selectTab(int tab) {
+    if (_tab == tab) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _tab = tab);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final planning = _tab == 1;
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(
+        planning ? 16 : 24,
+        planning ? 12 : 24,
+        planning ? 16 : 24,
+        planning ? 12 : 24,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           PageHero(
             title: 'AI 사업분석',
-            subtitle: _tab == 0
-                ? '실제 프로젝트·작업·배포·GitHub 기록을 바탕으로 사업 운영 준비도를 점검합니다.'
-                : '사업 아이디어를 검토하고 소통24워크에서 실행할 표준 작업지시서를 준비합니다.',
-            badge: _tab == 0 ? '운영 분석 · 규칙 기반' : '사업 기획 · 로컬 규칙',
+            subtitle: planning
+                ? '사업 아이디어를 검토하고 소통24워크에서 실행할 표준 작업지시서를 준비합니다.'
+                : '실제 프로젝트·작업·배포·GitHub 기록을 바탕으로 사업 운영 준비도를 점검합니다.',
+            badge: planning ? '사업 기획 · 로컬 규칙' : '운영 분석 · 규칙 기반',
+            compact: planning,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: planning ? 8 : 12),
           SegmentedButton<int>(
             segments: const [
               ButtonSegment(
@@ -52,13 +65,17 @@ class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
               ),
             ],
             selected: {_tab},
-            onSelectionChanged: (s) => setState(() => _tab = s.first),
+            onSelectionChanged: (s) => _selectTab(s.first),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: planning ? 8 : 12),
           Expanded(
-            child: _tab == 0
-                ? const _OperationsAnalysisPane()
-                : const BusinessPlanningTab(),
+            // 탭별 새 키로 전환 시 콘텐츠가 시작 위치에서 그려지게 한다.
+            child: KeyedSubtree(
+              key: ValueKey('ai-biz-tab-$_tab'),
+              child: planning
+                  ? const BusinessPlanningTab()
+                  : const _OperationsAnalysisPane(),
+            ),
           ),
         ],
       ),

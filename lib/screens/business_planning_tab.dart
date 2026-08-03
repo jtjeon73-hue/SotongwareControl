@@ -22,6 +22,8 @@ class BusinessPlanningTab extends StatefulWidget {
 class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _service = BusinessPlanningService();
   final _store = BusinessPlanningStore();
+  final _scrollController = ScrollController();
+  final _resultsTitleKey = GlobalKey();
 
   final _topicCtrl = TextEditingController();
   final _problemCtrl = TextEditingController();
@@ -41,6 +43,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   String? _activePlanId;
   bool _loading = true;
   bool _analyzing = false;
+
+  /// 분석 후 기본은 요약(접힘). true면 전체 입력 양식.
+  bool _inputExpanded = true;
   Timer? _draftTimer;
 
   static const _deliverableOptions = [
@@ -58,6 +63,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   @override
   void dispose() {
     _draftTimer?.cancel();
+    _scrollController.dispose();
     for (final c in _allControllers) {
       c.dispose();
     }
@@ -212,6 +218,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('주제·고객 문제·대상 고객·원하는 결과는 필수입니다.');
       return;
     }
+    // 포커스 유지 시 Flutter가 입력 필드로 ensureVisible 하며 중간으로 점프한다.
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _analyzing = true);
     try {
       final result = _service.analyze(input);
@@ -246,11 +254,27 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _analysis = result;
         _activePlanId = id;
         _instruction = doc.instruction;
+        _inputExpanded = false;
       });
       _snack('로컬 규칙 기반 분석을 완료했습니다.');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToResultsTitle();
+      });
     } finally {
       if (mounted) setState(() => _analyzing = false);
     }
+  }
+
+  void _scrollToResultsTitle() {
+    final ctx = _resultsTitleKey.currentContext;
+    if (ctx == null || !mounted) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.0,
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _saveDraftPlan() async {
@@ -398,32 +422,47 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _activePlanId = null;
       _analysis = null;
       _instruction = null;
+      _inputExpanded = true;
       _applyInput(const BusinessPlanInput());
     });
     _snack('기획안을 보관함으로 이동했습니다.');
   }
 
   void _loadPlan(BusinessPlanDocument plan) {
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _activePlanId = plan.id;
       _applyInput(plan.input);
       _analysis = plan.analysis;
       _instruction = plan.instruction;
+      _inputExpanded = plan.analysis == null;
     });
     _persistDraft();
     _snack(
       '「${plan.input.topic.isEmpty ? '제목 없음' : plan.input.topic}」을(를) 불러왔습니다.',
     );
+    if (plan.analysis != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToResultsTitle();
+      });
+    } else if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   void _startNewPlan() {
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _activePlanId = null;
       _analysis = null;
       _instruction = null;
+      _inputExpanded = true;
       _applyInput(const BusinessPlanInput());
     });
     _persistDraft();
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   String _formatIso(String iso) {
@@ -453,36 +492,33 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // 콘텐츠 영역 단일 스크롤만 사용 (중첩 세로 스크롤·고정 높이 없음).
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildBanner(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 900;
-              if (wide) {
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildInputPanel()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildResultsPanel()),
-                  ],
-                );
+              final width = constraints.maxWidth;
+              final desktopSplit = width >= 1200 && _analysis != null;
+              final tabletish = width >= 768 && width < 1200;
+
+              if (_analysis == null) {
+                return _buildPreAnalysisLayout(width, tabletish);
               }
-              return Column(
-                children: [
-                  _buildInputPanel(),
-                  const SizedBox(height: 16),
-                  _buildResultsPanel(),
-                ],
-              );
+              if (desktopSplit) {
+                return _buildPostAnalysisDesktop();
+              }
+              return _buildPostAnalysisStacked();
             },
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          _buildInstructionSection(),
+          const SizedBox(height: 16),
           _buildActionsBar(),
           const SizedBox(height: 20),
           _buildSavedPlansSection(),
@@ -491,31 +527,178 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
+  Widget _buildPreAnalysisLayout(double width, bool tabletish) {
+    final form = _buildInputForm(showAnalyzeButton: true);
+    final tip = _buildEmptyResultsHint();
+
+    if (width >= 768) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: tabletish ? 820 : 720),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [form, const SizedBox(height: 12), tip],
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [form, const SizedBox(height: 12), tip],
+    );
+  }
+
+  Widget _buildPostAnalysisDesktop() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 4,
+          child: _inputExpanded
+              ? _buildInputForm(showAnalyzeButton: true)
+              : _buildInputSummaryCard(),
+        ),
+        const SizedBox(width: 16),
+        Expanded(flex: 6, child: _buildResultsContent()),
+      ],
+    );
+  }
+
+  Widget _buildPostAnalysisStacked() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_inputExpanded)
+          _buildInputForm(showAnalyzeButton: true)
+        else
+          _buildInputSummaryCard(),
+        const SizedBox(height: 12),
+        _buildResultsContent(),
+      ],
+    );
+  }
+
   Widget _buildBanner() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: ControlColors.warningBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: ControlColors.border),
       ),
       child: const Text(
-        '현재 단계는 로컬 규칙 기반 기획 도우미입니다. '
-        '외부 AI가 내용을 생성하지 않으며, 소통24워크 자동 실행은 포함하지 않습니다.',
-        style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
+        '현재 단계는 로컬 규칙 기반 기획 도우미입니다. 외부 AI 생성·소통24워크 자동 실행은 포함하지 않습니다.',
+        style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
       ),
     );
   }
 
-  Widget _buildInputPanel() {
+  Widget _buildEmptyResultsHint() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Text(
+          '필수 항목을 입력한 뒤 「사업 기획안 분석」을 실행하면 12개 기준 평가와 제작 형태 추천이 표시됩니다.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: ControlColors.textSecondary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputSummaryCard() {
+    final input = _currentInput;
+    String line(String label, String value) {
+      final v = value.trim().isEmpty ? '—' : value.trim();
+      return '$label: $v';
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '기획 요약',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => setState(() => _inputExpanded = true),
+                  child: const Text('입력 수정'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(line('사업 주제', input.topic)),
+            const SizedBox(height: 4),
+            Text(line('고객 문제', input.customerProblem)),
+            const SizedBox(height: 4),
+            Text(line('대상 고객', input.targetCustomer)),
+            const SizedBox(height: 4),
+            Text(line('결과물', input.desiredOutcome)),
+            const SizedBox(height: 4),
+            Text(
+              line(
+                '선택 제작 형태',
+                input.deliverableTypes.map(DeliverableType.labelKo).join(', '),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(line('목표 수익', input.revenueModel)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => setState(() => _inputExpanded = true),
+                  icon: const Icon(Icons.unfold_more, size: 18),
+                  label: const Text('입력 내용 펼치기'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _analyzing ? null : _runAnalyze,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('다시 분석'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputForm({required bool showAnalyzeButton}) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('기획 입력', style: Theme.of(context).textTheme.titleMedium),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '기획 입력',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (_analysis != null)
+                  TextButton.icon(
+                    onPressed: () => setState(() => _inputExpanded = false),
+                    icon: const Icon(Icons.unfold_less, size: 18),
+                    label: const Text('입력 내용 접기'),
+                  ),
+              ],
+            ),
             const SizedBox(height: 12),
             _field(_topicCtrl, '사업 주제 *', maxLines: 1),
             _field(_problemCtrl, '고객 문제 *', maxLines: 3),
@@ -552,24 +735,26 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 _field(_notesCtrl, '메모', maxLines: 3),
               ],
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _analyzing ? null : _runAnalyze,
-                icon: _analyzing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.fact_check_outlined),
-                label: Text(_analyzing ? '분석 중…' : '사업 기획안 분석'),
+            if (showAnalyzeButton) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _analyzing ? null : _runAnalyze,
+                  icon: _analyzing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.fact_check_outlined),
+                  label: Text(_analyzing ? '분석 중…' : '사업 기획안 분석'),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -591,29 +776,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
-  Widget _buildResultsPanel() {
-    if (_analysis == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('분석 결과', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(
-                '필수 항목을 입력한 뒤 「사업 기획안 분석」을 실행하면 '
-                '12개 기준 5점 척도 평가, 판단, 결과물 추천 순위가 표시됩니다.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: ControlColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+  Widget _buildResultsContent() {
     final analysis = _analysis!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,7 +787,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('분석 결과', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  '분석 결과',
+                  key: _resultsTitleKey,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 10),
                 Wrap(
                   spacing: 10,
@@ -665,7 +832,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                     tilePadding: EdgeInsets.zero,
                     title: Row(
                       children: [
-                        Expanded(child: Text(c.label)),
+                        Expanded(child: Text(c.label, softWrap: true)),
+                        const SizedBox(width: 8),
                         Text(
                           '${c.score}/5',
                           style: const TextStyle(
@@ -746,11 +914,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _buildInstructionSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         SizedBox(
           width: double.infinity,
           child: FilledButton.tonalIcon(
-            onPressed: _buildInstructionDoc,
+            onPressed: _analysis == null ? null : _buildInstructionDoc,
             icon: const Icon(Icons.description_outlined),
             label: const Text('소통24워크 작업지시서 생성'),
           ),
@@ -890,14 +1065,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 onTap: () => _loadPlan(plan),
                 title: Text(
                   plan.input.topic.isEmpty ? '(주제 미입력)' : plan.input.topic,
-                  maxLines: 1,
+                  maxLines: 2,
+                  softWrap: true,
                   overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Text(
                   '${plan.input.deliverableTypes.map(DeliverableType.labelKo).join(', ')} · '
                   '${PlanningStatus.labelKo(plan.status)} · '
                   '${_formatIso(plan.updatedAt)}',
+                  softWrap: true,
                 ),
+                isThreeLine: true,
                 trailing: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,

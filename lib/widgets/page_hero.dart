@@ -8,6 +8,7 @@ class PageHero extends StatelessWidget {
     required this.subtitle,
     this.badge,
     this.trailing,
+    this.compact = false,
   });
 
   final String title;
@@ -15,11 +16,17 @@ class PageHero extends StatelessWidget {
   final String? badge;
   final Widget? trailing;
 
+  /// 세로 공간을 줄인 소개 영역 (사업 기획 탭 등).
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 16 : 28,
+        vertical: compact ? 12 : 28,
+      ),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -29,7 +36,7 @@ class PageHero extends StatelessWidget {
             ControlColors.heroGradientEnd,
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(compact ? 14 : 20),
         border: Border.all(color: ControlColors.border),
       ),
       child: Column(
@@ -51,7 +58,7 @@ class PageHero extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: compact ? 6 : 12),
           ],
           LayoutBuilder(
             builder: (context, constraints) {
@@ -60,10 +67,17 @@ class PageHero extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    style: compact
+                        ? Theme.of(context).textTheme.titleLarge
+                        : Theme.of(context).textTheme.headlineMedium,
                   ),
-                  const SizedBox(height: 10),
-                  Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+                  SizedBox(height: compact ? 4 : 10),
+                  Text(
+                    subtitle,
+                    style: compact
+                        ? Theme.of(context).textTheme.bodyMedium
+                        : Theme.of(context).textTheme.bodyLarge,
+                  ),
                 ],
               );
 
