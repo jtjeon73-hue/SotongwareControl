@@ -21,7 +21,7 @@ class AiBusinessAnalysisScreen extends StatefulWidget {
 }
 
 class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
-  var _tab = 0; // 0 운영 분석, 1 사업 기획·작업지시
+  var _tab = 1; // 기본: 사업기획·작업지시 (0 운영 분석 보존)
   final _pageScrollController = ScrollController();
 
   @override
@@ -58,25 +58,25 @@ class _AiBusinessAnalysisScreenState extends State<AiBusinessAnalysisScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PageHero(
-            title: 'AI 사업분석',
+            title: '사업기획 및 작업지시 관리',
             subtitle: planning
-                ? '사업 아이디어를 검토하고 소통24워크에서 실행할 표준 작업지시서를 준비합니다.'
+                ? '사업기획을 작성하고 검증된 작업지시서를 소통24워크로 전달합니다.'
                 : '실제 프로젝트·작업·배포·GitHub 기록을 바탕으로 사업 운영 준비도를 점검합니다.',
-            badge: planning ? '사업 기획 · 로컬 규칙' : '운영 분석 · 규칙 기반',
+            badge: planning ? '기획 · 작업지시 · 전달' : '운영 분석 · 규칙 기반',
             compact: planning,
           ),
           SizedBox(height: planning ? 8 : 12),
           SegmentedButton<int>(
             segments: const [
               ButtonSegment(
+                value: 1,
+                label: Text('사업기획·작업지시'),
+                icon: Icon(Icons.assignment_outlined, size: 18),
+              ),
+              ButtonSegment(
                 value: 0,
                 label: Text('운영 분석'),
                 icon: Icon(Icons.auto_graph_outlined, size: 18),
-              ),
-              ButtonSegment(
-                value: 1,
-                label: Text('사업 기획·작업지시'),
-                icon: Icon(Icons.assignment_outlined, size: 18),
               ),
             ],
             selected: {_tab},

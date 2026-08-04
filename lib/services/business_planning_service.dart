@@ -57,18 +57,19 @@ class BusinessPlanningService {
       DeliverableType.youtubeShorts: 10,
       DeliverableType.webMarketing: 10,
       DeliverableType.app: 8,
-      DeliverableType.contentMusic: 6,
+      DeliverableType.content: 6,
+      DeliverableType.industrialAutomation: 5,
     };
 
     void bump(String type, int delta) {
       scores[type] = (scores[type] ?? 0) + delta;
     }
 
-    if (_containsAny(text, ['방법', '가이드', '노하우', '체크리스트', '정리', '공부'])) {
+    if (_containsAny(text, ['방법', '가이드', '노하우', '체크리스트', '정리', '공부', '전자책'])) {
       bump(DeliverableType.ebook, 8);
       bump(DeliverableType.youtubeShorts, 4);
     }
-    if (_containsAny(text, ['홍보', '문의', '랜딩', '사이트', '고객 확보', '소개'])) {
+    if (_containsAny(text, ['홍보', '문의', '랜딩', '사이트', '고객 확보', '소개', '마케팅'])) {
       bump(DeliverableType.webMarketing, 9);
     }
     if (_containsAny(text, ['앱', '알림', '기록', '관리', '모바일', '반복 사용'])) {
@@ -76,14 +77,18 @@ class BusinessPlanningService {
     }
     if (_containsAny(text, ['쇼츠', '유튜브', '영상', '짧게', '바이럴', '콘텐츠'])) {
       bump(DeliverableType.youtubeShorts, 9);
-      bump(DeliverableType.contentMusic, 3);
+      bump(DeliverableType.content, 3);
     }
-    if (_containsAny(text, ['노래', '음악', '음원', '브금'])) {
-      bump(DeliverableType.contentMusic, 12);
+    if (_containsAny(text, ['노래', '음악', '음원', '브금', '콘텐츠'])) {
+      bump(DeliverableType.content, 8);
+    }
+    if (_containsAny(text, ['산업', '자동화', 'plc', '현장', '설비'])) {
+      bump(DeliverableType.industrialAutomation, 12);
     }
     if (_containsAny(skills, ['산업', '자동화', 'plc', '현장', '개발', 'flutter'])) {
       bump(DeliverableType.app, 3);
       bump(DeliverableType.ebook, 2);
+      bump(DeliverableType.industrialAutomation, 4);
     }
     if (input.existingMaterials.trim().isNotEmpty) {
       bump(DeliverableType.ebook, 3);
@@ -121,19 +126,43 @@ class BusinessPlanningService {
     required BusinessPlanInput input,
     required PlanningAnalysisResult analysis,
     DateTime? now,
+    String? instructionId,
+    int version = 1,
+    String? createdAt,
+    List<String>? followUpTracks,
   }) {
     final stamp = (now ?? DateTime.now()).toUtc();
     final iso = stamp.toIso8601String();
-    final types = analysis.recommendations.take(3).map((r) => r.type).toList();
-    final primary = types.isEmpty ? DeliverableType.ebook : types.first;
+    final selected = input.normalizedDeliverables;
+    final recommended = analysis.recommendations.map((r) => r.type).toList();
+    final types = selected.isNotEmpty
+        ? [
+            ...selected,
+            ...recommended.where((t) => !selected.contains(t)),
+          ].take(3).toList()
+        : recommended.take(3).toList();
+    final primary = selected.isNotEmpty
+        ? selected.first
+        : (types.isEmpty ? DeliverableType.ebook : types.first);
+    final primaryTrack = WorkTrack.fromDeliverable(primary);
+    final followUps =
+        followUpTracks ??
+        recommended
+            .map(WorkTrack.fromDeliverable)
+            .where((t) => t != primaryTrack)
+            .take(2)
+            .toList();
     final steps = _workflowFor(primary);
+    final stableId = (instructionId != null && instructionId.isNotEmpty)
+        ? instructionId
+        : 'wi_$planId';
 
     return WorkInstruction(
       schemaVersion: '1.0',
-      instructionId: 'wi_${planId}_${stamp.millisecondsSinceEpoch}',
+      instructionId: stableId,
       projectId: planId,
-      instructionVersion: '1',
-      createdAt: iso,
+      instructionVersion: '$version',
+      createdAt: createdAt ?? iso,
       updatedAt: iso,
       businessIdea: input.topic.trim(),
       businessPurpose: input.desiredOutcome.trim(),
@@ -169,6 +198,8 @@ class BusinessPlanningService {
           .toList(),
       monetizationOptions: [
         if (input.revenueModel.trim().isNotEmpty) input.revenueModel.trim(),
+        if (input.salesPrice.trim().isNotEmpty)
+          '희망 가격: ${input.salesPrice.trim()}',
         '단품 판매',
         '문의·맞춤 의뢰 연계',
         '시리즈·구독 검토(검증 후)',
@@ -179,6 +210,8 @@ class BusinessPlanningService {
         if (types.contains(DeliverableType.webMarketing))
           'Firebase Hosting 웹사이트',
         if (types.contains(DeliverableType.youtubeShorts)) '유튜브',
+        if (types.contains(DeliverableType.industrialAutomation))
+          '현장 배포·설치 패키지',
         '소통사이트매니저 등록 검토',
       ],
       promotionChannels: ['웹마케팅 사이트 CTA', '쇼츠·콘텐츠 유입', '기존 고객·현장 네트워크'],
@@ -190,6 +223,8 @@ class BusinessPlanningService {
       ],
       executionStatus: '지시서 준비',
       notes: input.notes.trim(),
+      primaryTrack: primaryTrack,
+      followUpTracks: followUps,
     );
   }
 
@@ -557,6 +592,7 @@ class BusinessPlanningService {
           monetizationOptions: '유입 → 사이트 문의/전자책',
           risks: '조회와 매출을 동일시하는 착각',
         );
+      case DeliverableType.content:
       case DeliverableType.contentMusic:
         return DeliverableRecommendation(
           type: type,
@@ -568,6 +604,18 @@ class BusinessPlanningService {
           nextExpansion: '쇼츠·앱 오프닝과 결합한다.',
           monetizationOptions: '콘텐츠 유입, 제작 의뢰',
           risks: '저작권·취향 의존·단독 수익화 난이도',
+        );
+      case DeliverableType.industrialAutomation:
+        return DeliverableRecommendation(
+          type: type,
+          rank: rank,
+          reason: '현장·설비·자동화 요구가 분명할 때 적합하다. 제작·검증 주기가 길다.',
+          minimumOutput: '핵심 공정 1개의 최소 동작 데모',
+          requiredMaterials: '현장 요구사항, 입출력 정의, 안전 제약',
+          workSteps: '요구 정의 → 설계 → 구현 → 현장 검증',
+          nextExpansion: '모니터링 대시보드·교육 자료로 확장한다.',
+          monetizationOptions: '구축 용역, 유지보수 계약',
+          risks: '현장 의존·납기·안전 규제',
         );
       case DeliverableType.webMarketing:
       default:

@@ -64,6 +64,28 @@ class BusinessPlanningStore {
     await savePlans(plans);
   }
 
+  /// instructionId별 최신 버전만 반환 (보관 제외 옵션).
+  static List<BusinessPlanDocument> latestByInstructionId(
+    List<BusinessPlanDocument> plans, {
+    bool includeArchived = false,
+  }) {
+    final map = <String, BusinessPlanDocument>{};
+    for (final plan in plans) {
+      final status = PlanningStatus.normalize(plan.status);
+      if (!includeArchived && status == PlanningStatus.archived) continue;
+      final key = plan.stableInstructionId;
+      final existing = map[key];
+      if (existing == null ||
+          plan.version > existing.version ||
+          (plan.version == existing.version &&
+              plan.updatedAt.compareTo(existing.updatedAt) >= 0)) {
+        map[key] = plan;
+      }
+    }
+    return map.values.toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
   Future<void> deletePlan(String id) async {
     final plans = await loadPlans();
     plans.removeWhere((p) => p.id == id);

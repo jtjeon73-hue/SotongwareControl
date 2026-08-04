@@ -70,7 +70,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.aiTaxAccountingDept:
         return 'AI세무회계부';
       case ControlDestination.aiBusinessAnalysis:
-        return 'AI 사업분석';
+        return '사업기획·작업지시';
       case ControlDestination.studyDashboard:
         return '학습 대시보드';
       case ControlDestination.studyCourses:

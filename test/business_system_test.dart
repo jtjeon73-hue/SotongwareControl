@@ -126,7 +126,7 @@ void main() {
   test('통합 메뉴 목적지', () {
     expect(ControlDestination.dashboardOverview.label, '전체 사업 현황');
     expect(ControlDestination.divisionProgress.label, '사업부별 진행상태');
-    expect(ControlDestination.aiBusinessAnalysis.label, 'AI 사업분석');
+    expect(ControlDestination.aiBusinessAnalysis.label, '사업기획·작업지시');
     expect(ControlDestination.businessStudy.label, '사업전략연구실');
     expect(ControlDestination.webMarketing.label, '웹마케팅개발사업부');
     expect(ControlDestination.siteManager.label, '소통사이트매니저개발사업부');

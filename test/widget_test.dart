@@ -186,7 +186,7 @@ void main() {
 
     expect(find.text('전체 사업 현황'), findsWidgets);
     expect(find.text('웹 배포사이트'), findsOneWidget);
-    expect(find.text('AI 사업분석'), findsOneWidget);
+    expect(find.text('사업기획·작업지시'), findsOneWidget);
     expect(find.text('사업전략연구실'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
     await tester.drag(find.byType(ListView).first, const Offset(0, -800));
