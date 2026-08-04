@@ -17,6 +17,7 @@ enum ControlDestination {
   aiMarketingDept,
   aiTaxAccountingDept,
   aiBusinessAnalysis,
+  portfolioHub,
   studyDashboard,
   studyCourses,
   studyAiTeacher,
@@ -71,6 +72,8 @@ extension ControlDestinationX on ControlDestination {
         return 'AI세무회계부';
       case ControlDestination.aiBusinessAnalysis:
         return '사업기획·작업지시';
+      case ControlDestination.portfolioHub:
+        return '제작 포트폴리오';
       case ControlDestination.studyDashboard:
         return '학습 대시보드';
       case ControlDestination.studyCourses:
@@ -142,6 +145,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.receipt_long_outlined;
       case ControlDestination.aiBusinessAnalysis:
         return Icons.auto_graph_outlined;
+      case ControlDestination.portfolioHub:
+        return Icons.collections_bookmark_outlined;
       case ControlDestination.studyDashboard:
         return Icons.school_outlined;
       case ControlDestination.studyCourses:
@@ -244,7 +249,10 @@ class SidebarNavigation extends StatelessWidget {
     ControlDestination.deployedSites,
   ];
 
-  static const _aiDepartments = [ControlDestination.aiBusinessAnalysis];
+  static const _aiDepartments = [
+    ControlDestination.aiBusinessAnalysis,
+    ControlDestination.portfolioHub,
+  ];
 
   static const _study = [ControlDestination.businessStudy];
 

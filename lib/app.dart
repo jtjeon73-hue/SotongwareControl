@@ -11,6 +11,7 @@ import 'screens/business_unit_ops_screen.dart';
 import 'screens/deployed_sites_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
 import 'screens/public_services_screen.dart';
+import 'screens/portfolio_hub_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
 import 'screens/sotong24work_screen.dart';
 import 'screens/study/study_admin_screen.dart';
@@ -172,6 +173,11 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         );
       case ControlDestination.aiBusinessAnalysis:
         return const AiBusinessAnalysisScreen();
+      case ControlDestination.portfolioHub:
+        return PortfolioHubScreen(
+          onOpenPlanning: () =>
+              _onDestinationSelected(ControlDestination.aiBusinessAnalysis),
+        );
       case ControlDestination.studyDashboard:
         return StudyDashboardScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.studyCourses:
