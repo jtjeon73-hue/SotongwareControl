@@ -130,32 +130,38 @@ class BusinessPlanningService {
     int version = 1,
     String? createdAt,
     List<String>? followUpTracks,
+    String status = 'active',
+    String checksum = '',
+    String sourceFileName = '',
   }) {
     final stamp = (now ?? DateTime.now()).toUtc();
     final iso = stamp.toIso8601String();
+    final artifact = input.resolvedArtifactType == ArtifactType.undecided
+        ? ArtifactType.ebook
+        : input.resolvedArtifactType;
+    final subtype = input.contentSubtype.trim().isEmpty
+        ? ''
+        : ContentSubtype.normalize(input.contentSubtype);
     final selected = input.normalizedDeliverables;
     final recommended = analysis.recommendations.map((r) => r.type).toList();
-    final types = selected.isNotEmpty
-        ? [
-            ...selected,
-            ...recommended.where((t) => !selected.contains(t)),
-          ].take(3).toList()
-        : recommended.take(3).toList();
-    final primary = selected.isNotEmpty
-        ? selected.first
-        : (types.isEmpty ? DeliverableType.ebook : types.first);
-    final primaryTrack = WorkTrack.fromDeliverable(primary);
+    final types = {
+      artifact,
+      if (selected.isNotEmpty)
+        ...selected.where((t) => ArtifactType.normalize(t) != artifact),
+      ...recommended
+          .map(ArtifactType.normalize)
+          .where((t) => t != artifact && t != ArtifactType.undecided),
+    }.take(3).toList();
+    final primaryTrack = ArtifactType.primaryTrackId(artifact);
     final followUps =
-        followUpTracks ??
-        recommended
-            .map(WorkTrack.fromDeliverable)
-            .where((t) => t != primaryTrack)
-            .take(2)
-            .toList();
-    final steps = _workflowFor(primary);
+        followUpTracks ?? _defaultFollowUpTracks(artifact, subtype: subtype);
+    final steps = _workflowForArtifact(artifact, subtype: subtype);
     final stableId = (instructionId != null && instructionId.isNotEmpty)
         ? instructionId
         : 'wi_$planId';
+    final fileName = sourceFileName.isNotEmpty
+        ? sourceFileName
+        : 'WI_$stableId.json';
 
     return WorkInstruction(
       schemaVersion: '1.0',
@@ -172,51 +178,28 @@ class BusinessPlanningService {
       recommendedSequence: types,
       valueProposition:
           '${input.targetCustomer.trim()}의 ${input.customerProblem.trim()}을(를) '
-          '줄이기 위해 ${DeliverableType.labelKo(primary)}부터 검증한다.',
-      requiredMaterials: [
-        if (input.existingMaterials.trim().isNotEmpty)
-          input.existingMaterials.trim()
-        else
-          '고객 문제·대상·결과물 설명을 문장으로 정리한 기획 메모',
-        '사례·근거 자료(실제 경험·출처·수치) 목록',
-        '수익 방식 후보와 가격 가설',
-      ],
+          '줄이기 위해 ${ArtifactType.labelKo(artifact)}부터 검증한다.',
+      requiredMaterials: _materialsFor(artifact, input, subtype: subtype),
       workflowSteps: steps,
-      completionCriteria: [
-        '고객 문제·대상·결과물이 한 페이지로 설명 가능',
-        '최소 결과물 1개가 초안 수준으로 존재',
-        '사용자 확인 항목이 체크리스트로 남아 있음',
+      completionCriteria: _completionFor(artifact, subtype: subtype),
+      qualityChecks: _qualityFor(artifact, subtype: subtype),
+      risks: [
+        ...analysis.criteria
+            .where((c) => c.score <= 2)
+            .map((c) => '${c.label}: ${c.risks}'),
+        ..._riskHintsFor(artifact, subtype: subtype),
       ],
-      qualityChecks: [
-        '사실·경험·출처를 과장하지 않았는가',
-        '성공·매출 보장 표현이 없는가',
-        '모바일에서 읽기·문의·다운로드 경로가 끊기지 않는가',
-      ],
-      risks: analysis.criteria
-          .where((c) => c.score <= 2)
-          .map((c) => '${c.label}: ${c.risks}')
-          .toList(),
       monetizationOptions: [
         if (input.revenueModel.trim().isNotEmpty) input.revenueModel.trim(),
         if (input.salesPrice.trim().isNotEmpty)
           '희망 가격: ${input.salesPrice.trim()}',
-        '단품 판매',
-        '문의·맞춤 의뢰 연계',
-        '시리즈·구독 검토(검증 후)',
+        ..._monetizationHints(artifact),
       ],
-      deploymentTargets: [
-        if (types.contains(DeliverableType.app)) '앱 스토어 또는 내부 배포 채널',
-        if (types.contains(DeliverableType.ebook)) '전자책 판매 채널',
-        if (types.contains(DeliverableType.webMarketing))
-          'Firebase Hosting 웹사이트',
-        if (types.contains(DeliverableType.youtubeShorts)) '유튜브',
-        if (types.contains(DeliverableType.industrialAutomation))
-          '현장 배포·설치 패키지',
-        '소통사이트매니저 등록 검토',
-      ],
-      promotionChannels: ['웹마케팅 사이트 CTA', '쇼츠·콘텐츠 유입', '기존 고객·현장 네트워크'],
+      deploymentTargets: _deployTargets(artifact, subtype: subtype),
+      promotionChannels: _promoChannels(artifact, subtype: subtype),
       approvalItems: [
-        '최종 가격·판매 채널',
+        '제작 형태·범위 최종 확정',
+        '최종 가격·판매·배포 채널',
         '공개 문구·과장 표현 검토',
         '저작권·출처·개인정보 확인',
         '소통24워크 실행 전 사용자 승인',
@@ -225,7 +208,298 @@ class BusinessPlanningService {
       notes: input.notes.trim(),
       primaryTrack: primaryTrack,
       followUpTracks: followUps,
+      artifactType: artifact,
+      contentSubtype: subtype,
+      checksum: checksum,
+      sourceFileName: fileName,
+      status: status,
     );
+  }
+
+  List<String> _defaultFollowUpTracks(String artifact, {String subtype = ''}) {
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.ebook:
+        return [
+          ArtifactType.primaryTrackId(ArtifactType.contents),
+          ArtifactType.primaryTrackId(ArtifactType.promoSite),
+        ];
+      case ArtifactType.app:
+        return [
+          ArtifactType.primaryTrackId(ArtifactType.promoSite),
+          ArtifactType.primaryTrackId(ArtifactType.ebook),
+        ];
+      case ArtifactType.contents:
+        if (subtype == ContentSubtype.song) {
+          return [ArtifactType.primaryTrackId(ArtifactType.contents)];
+        }
+        return [
+          ArtifactType.primaryTrackId(ArtifactType.promoSite),
+          ArtifactType.primaryTrackId(ArtifactType.ebook),
+        ];
+      case ArtifactType.site:
+        return [ArtifactType.primaryTrackId(ArtifactType.promoSite)];
+      case ArtifactType.promoSite:
+        return [ArtifactType.primaryTrackId(ArtifactType.contents)];
+      default:
+        return const [];
+    }
+  }
+
+  List<String> _materialsFor(
+    String artifact,
+    BusinessPlanInput input, {
+    String subtype = '',
+  }) {
+    final base = <String>[
+      if (input.existingMaterials.trim().isNotEmpty)
+        input.existingMaterials.trim()
+      else
+        '고객 문제·대상·결과 설명을 문장으로 정리한 기획 메모',
+      '사례·근거 자료(실제 경험·출처·수치) 목록',
+    ];
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.ebook:
+        return [...base, '목차 초안', '표지·삽화 필요 여부 메모'];
+      case ArtifactType.app:
+        return [...base, '핵심 화면·기능 목록', '플랫폼(Android/iOS/Web) 선택'];
+      case ArtifactType.contents:
+        if (subtype == ContentSubtype.song ||
+            subtype == ContentSubtype.songAndShorts) {
+          return [...base, '장르·분위기·가사 방향', '공개 플랫폼 목록'];
+        }
+        if (subtype == ContentSubtype.shorts) {
+          return [...base, '핵심 메시지 한 줄', '영상 소스·자막·음악 필요 여부'];
+        }
+        return [...base, '콘텐츠 형식·공개 채널'];
+      case ArtifactType.site:
+        return [...base, '메뉴 구조 초안', '도메인·호스팅 방향'];
+      case ArtifactType.promoSite:
+        return [...base, '상품·서비스 한 줄 소개', '연락·상담 경로', '사진·후기 자료'];
+      default:
+        return base;
+    }
+  }
+
+  List<String> _completionFor(String artifact, {String subtype = ''}) {
+    final common = ['고객 문제·대상·결과가 한 페이지로 설명 가능', '사용자 확인 항목이 체크리스트로 남아 있음'];
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.ebook:
+        return [...common, '목차와 1장 초안이 존재', '출력 형식(PDF/EPUB)이 확정됨'];
+      case ArtifactType.app:
+        return [...common, '핵심 기능 1개의 동작 초안이 존재', '플랫폼·로그인·데이터 범위가 확정됨'];
+      case ArtifactType.contents:
+        if (subtype == ContentSubtype.song) {
+          return [...common, '데모/가이드 음원 또는 가사 초안이 존재'];
+        }
+        if (subtype == ContentSubtype.shorts) {
+          return [...common, '쇼츠 스토리보드·초안 영상이 존재'];
+        }
+        return [...common, '콘텐츠 초안 1건이 존재'];
+      case ArtifactType.site:
+        return [...common, '메뉴·페이지 구조와 첫 페이지 초안이 존재'];
+      case ArtifactType.promoSite:
+        return [...common, '랜딩 초안과 CTA(상담·문의) 경로가 존재'];
+      default:
+        return [...common, '최소 결과물 1개가 초안 수준으로 존재'];
+    }
+  }
+
+  List<String> _qualityFor(String artifact, {String subtype = ''}) {
+    final common = [
+      '사실·경험·출처를 과장하지 않았는가',
+      '성공·매출 보장 표현이 없는가',
+      '비밀번호·API 키·고객 개인정보가 문서에 없는가',
+    ];
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.app:
+        return [...common, '핵심 사용자 행동이 끊기지 않는가', '권한·알림 요청이 목적에 맞는가'];
+      case ArtifactType.contents:
+        return [
+          ...common,
+          if (subtype == ContentSubtype.shorts ||
+              subtype == ContentSubtype.songAndShorts)
+            '자막·메시지·길이(15/30/60초)가 채널에 맞는가',
+          '저작권·상업 이용 방향이 명시됐는가',
+        ];
+      case ArtifactType.site:
+      case ArtifactType.promoSite:
+        return [...common, '모바일에서 읽기·문의 경로가 끊기지 않는가'];
+      default:
+        return [...common, '모바일에서 읽기 경로가 끊기지 않는가'];
+    }
+  }
+
+  List<String> _riskHintsFor(String artifact, {String subtype = ''}) {
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.ebook:
+        return ['목차 없이 본문만 쓰면 완독·판매 전환이 약해질 수 있음'];
+      case ArtifactType.app:
+        return ['기능 범위가 넓으면 첫 버전 출시가 지연될 수 있음'];
+      case ArtifactType.contents:
+        return subtype == ContentSubtype.song
+            ? ['저작권·보컬·공개 채널이 불명확하면 배포가 막힐 수 있음']
+            : ['메시지 없이 영상만 만들면 유입·전환이 약해질 수 있음'];
+      case ArtifactType.site:
+        return ['메뉴가 많으면 핵심 목적 페이지가 희석될 수 있음'];
+      case ArtifactType.promoSite:
+        return ['CTA·연락처 없이 소개만 있으면 문의가 발생하지 않을 수 있음'];
+      default:
+        return const [];
+    }
+  }
+
+  List<String> _monetizationHints(String artifact) {
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.ebook:
+        return ['무료·저가 검증 후 일반 판매', '상담·맞춤 의뢰 연계'];
+      case ArtifactType.app:
+        return ['무료+광고', '유료·구독(검증 후)', '문의·B2B 연계'];
+      case ArtifactType.contents:
+        return ['채널 구독·후원', '전자책·앱·사이트로 유입 연계'];
+      case ArtifactType.promoSite:
+        return ['상담·견적 전환', '상품·서비스 판매 페이지'];
+      default:
+        return ['단품 판매', '문의·맞춤 의뢰 연계'];
+    }
+  }
+
+  List<String> _deployTargets(String artifact, {String subtype = ''}) {
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.app:
+        return ['Play Store 또는 내부 배포', 'Web 배포(해당 시)', '소통사이트매니저 등록 검토'];
+      case ArtifactType.ebook:
+        return ['전자책 판매 채널', 'PDF/EPUB 배포', '소통사이트매니저 등록 검토'];
+      case ArtifactType.contents:
+        return [
+          if (subtype == ContentSubtype.shorts ||
+              subtype == ContentSubtype.songAndShorts)
+            'YouTube Shorts / Instagram / TikTok',
+          if (subtype == ContentSubtype.song ||
+              subtype == ContentSubtype.songAndShorts)
+            '음원·영상 공개 플랫폼',
+          '소통사이트매니저 등록 검토',
+        ];
+      case ArtifactType.site:
+        return ['Firebase Hosting 또는 선택 호스팅', '도메인 연결', '소통사이트매니저 등록 검토'];
+      case ArtifactType.promoSite:
+        return ['Firebase Hosting', '도메인 연결', '광고·SNS 랜딩 URL'];
+      default:
+        return ['소통사이트매니저 등록 검토'];
+    }
+  }
+
+  List<String> _promoChannels(String artifact, {String subtype = ''}) {
+    switch (ArtifactType.normalize(artifact)) {
+      case ArtifactType.ebook:
+        return ['쇼츠 요약', '마케팅 사이트 CTA', 'SNS 소개'];
+      case ArtifactType.app:
+        return ['마케팅 사이트', '스토어 설명', '쇼츠 데모'];
+      case ArtifactType.contents:
+        return ['채널 고정 댓글·설명', '마케팅 사이트 연계', '시리즈 업로드'];
+      case ArtifactType.promoSite:
+        return ['검색·지역 광고', 'SNS 링크', '명함·오프라인 QR'];
+      default:
+        return ['웹마케팅 사이트 CTA', '쇼츠·콘텐츠 유입'];
+    }
+  }
+
+  List<WorkflowStep> _workflowForArtifact(
+    String artifact, {
+    String subtype = '',
+  }) {
+    final primary = ArtifactType.normalize(artifact);
+    return [
+      for (var i = 0; i < standardWorkflowTitles.length; i++)
+        WorkflowStep(
+          order: i + 1,
+          id: standardWorkflowTitles[i].$1,
+          title: standardWorkflowTitles[i].$2,
+          applicable: _stepApplicableArtifact(
+            standardWorkflowTitles[i].$1,
+            primary: primary,
+            subtype: subtype,
+          ),
+          completionCriteria: _stepCriteriaArtifact(
+            standardWorkflowTitles[i].$1,
+            primary: primary,
+            subtype: subtype,
+          ),
+          notes:
+              _stepApplicableArtifact(
+                standardWorkflowTitles[i].$1,
+                primary: primary,
+                subtype: subtype,
+              )
+              ? _stepNotesArtifact(
+                  standardWorkflowTitles[i].$1,
+                  primary: primary,
+                  subtype: subtype,
+                )
+              : '해당 없음',
+        ),
+    ];
+  }
+
+  bool _stepApplicableArtifact(
+    String id, {
+    required String primary,
+    String subtype = '',
+  }) {
+    switch (id) {
+      case 'build_test':
+        return primary == ArtifactType.app;
+      case 'deploy':
+        return primary == ArtifactType.app ||
+            primary == ArtifactType.site ||
+            primary == ArtifactType.promoSite;
+      case 'publish_prep':
+        return primary != ArtifactType.undecided;
+      default:
+        return true;
+    }
+  }
+
+  String _stepCriteriaArtifact(
+    String id, {
+    required String primary,
+    String subtype = '',
+  }) {
+    final base = _stepCriteria(id);
+    switch (id) {
+      case 'draft':
+        switch (primary) {
+          case ArtifactType.ebook:
+            return '목차·1장 초안 파일이 존재함';
+          case ArtifactType.app:
+            return '핵심 화면·기능 초안이 존재함';
+          case ArtifactType.contents:
+            return subtype == ContentSubtype.song
+                ? '가사·가이드 음원 초안이 존재함'
+                : '쇼츠/콘텐츠 스토리보드·초안이 존재함';
+          case ArtifactType.site:
+            return '사이트 첫 페이지·메뉴 초안이 존재함';
+          case ArtifactType.promoSite:
+            return '랜딩 초안과 CTA가 존재함';
+          default:
+            return base;
+        }
+      case 'quality':
+        return '$base / ${ArtifactType.labelKo(primary)} 전용 품질 항목 통과';
+      default:
+        return base;
+    }
+  }
+
+  String _stepNotesArtifact(
+    String id, {
+    required String primary,
+    String subtype = '',
+  }) {
+    if (id == 'planning') {
+      return '주 트랙: ${ArtifactType.primaryTrack(primary)}'
+          '${subtype.isNotEmpty ? ' / 하위: ${ContentSubtype.labelKo(subtype)}' : ''}';
+    }
+    return '';
   }
 
   String buildReadableInstruction(WorkInstruction instruction) {
@@ -630,44 +904,6 @@ class BusinessPlanningService {
           monetizationOptions: '문의 전환, 상품 판매 페이지',
           risks: '예쁜 페이지만 있고 제안이 없으면 문의가 없다',
         );
-    }
-  }
-
-  List<WorkflowStep> _workflowFor(String primary) {
-    // 1순위 제작 형태를 기준으로 해당 없는 단계를 남긴다(삭제하지 않음).
-    return [
-      for (var i = 0; i < standardWorkflowTitles.length; i++)
-        WorkflowStep(
-          order: i + 1,
-          id: standardWorkflowTitles[i].$1,
-          title: standardWorkflowTitles[i].$2,
-          applicable: _stepApplicable(
-            standardWorkflowTitles[i].$1,
-            primary: primary,
-          ),
-          completionCriteria: _stepCriteria(standardWorkflowTitles[i].$1),
-          notes: _stepApplicable(standardWorkflowTitles[i].$1, primary: primary)
-              ? ''
-              : '해당 없음',
-        ),
-    ];
-  }
-
-  bool _stepApplicable(String id, {required String primary}) {
-    // 작업지시서의 1순위 제작 형태 기준으로 단계 적용 여부를 결정한다.
-    switch (id) {
-      case 'build_test':
-        return primary == DeliverableType.app;
-      case 'deploy':
-        return primary == DeliverableType.app ||
-            primary == DeliverableType.webMarketing;
-      case 'promo':
-      case 'measure':
-      case 'iterate':
-      case 'maintain':
-        return true;
-      default:
-        return true;
     }
   }
 

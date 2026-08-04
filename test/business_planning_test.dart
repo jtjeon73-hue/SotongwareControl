@@ -44,20 +44,22 @@ void main() {
     expect(items.any((e) => e.contains('소통총관제')), isTrue);
   });
 
-  test('필수 입력과 희망 결과물 검증', () {
+  test('필수 입력과 제작 형태 검증', () {
     const empty = BusinessPlanInput();
     expect(empty.hasRequiredFields, isFalse);
     expect(empty.missingRequiredLabels, contains('사업 주제'));
+    expect(empty.missingRequiredLabels, contains('제작 형태'));
 
     final filled = empty.copyWith(
       topic: '주제',
       customerProblem: '문제',
       targetCustomer: '고객',
       desiredOutcome: '결과',
-      deliverableTypes: [DeliverableType.ebook],
+      artifactType: ArtifactType.ebook,
+      deliverableTypes: [ArtifactType.ebook],
     );
     expect(filled.hasRequiredFields, isTrue);
-    expect(filled.primaryTrack, WorkTrack.ebookDev);
+    expect(filled.primaryTrack, 'ebook_dev');
   });
 
   test('전자책 선택 시 관련 선택지·추천이 동작한다', () {
@@ -181,7 +183,7 @@ void main() {
       now: DateTime.utc(2026, 8, 4, 1, 2, 3),
     );
     expect(v1.instructionId, 'wi_plan_rural');
-    expect(v1.primaryTrack, WorkTrack.ebookDev);
+    expect(v1.primaryTrack, 'ebook_dev');
     expect(v1.schemaVersion, '1.0');
     expect(v1.workflowSteps.length, 18);
 
@@ -251,7 +253,7 @@ void main() {
     expect(find.text('사업기획 및 작업지시 관리'), findsOneWidget);
     expect(find.textContaining('소통24워크로 전달'), findsWidgets);
     expect(find.text('빠른 선택으로 만들기'), findsOneWidget);
-    expect(find.text('전자책'), findsWidgets);
+    expect(find.text('전자책개발'), findsWidgets);
     // 긴 텍스트 입력 라벨이 기본 노출되지 않음
     expect(find.text('사업 주제 *'), findsNothing);
   });

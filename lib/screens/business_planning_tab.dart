@@ -9,6 +9,8 @@ import '../models/business_planning.dart';
 import '../models/planning_wizard_state.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
+import '../services/dev_work_doc_paths.dart';
+import '../services/dev_work_doc_service.dart';
 import '../services/instruction_transfer_service.dart';
 import '../services/planning_sentence_composer.dart';
 import '../services/work_instruction_filename.dart';
@@ -29,6 +31,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _service = BusinessPlanningService();
   final _store = BusinessPlanningStore();
   final _transfer = InstructionTransferService();
+  final _devWorkDoc = DevWorkDocService();
   final _validator = WorkInstructionValidator();
   final _composer = const PlanningSentenceComposer();
 
@@ -48,7 +51,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _searchCtrl = TextEditingController();
 
   PlanningWizardState _wizardState = PlanningWizardState(mode: 'quick');
-  List<String> _deliverableTypes = const [DeliverableType.undecided];
+  String _artifactType = ArtifactType.undecided;
+  String _contentSubtype = '';
   List<BusinessPlanDocument> _allPlans = const [];
   BusinessPlanDocument? _activeDoc;
   PlanningAnalysisResult? _analysis;
@@ -62,12 +66,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   bool _inputModeQuick = true;
   String _statusFilter = 'all';
   FolderPermissionState? _folderState;
+  DevWorkDocState? _devDocState;
   Timer? _draftTimer;
   Timer? _wizardTimer;
 
-  static const _deliverableOptions = [
-    ...DeliverableType.allSelectable,
-    DeliverableType.undecided,
+  static const _artifactOptions = [
+    ...ArtifactType.allSelectable,
+    ArtifactType.undecided,
+  ];
+
+  static const _contentSubtypeOptions = [
+    ...ContentSubtype.allSelectable,
+    ContentSubtype.undecided,
   ];
 
   @override
@@ -122,14 +132,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _store.loadPlans(),
         _store.loadDraftInput(),
         _transfer.currentState(),
+        _devWorkDoc.currentState(),
       ]);
       final plans = results[0] as List<BusinessPlanDocument>;
       final draft = results[1] as BusinessPlanInput?;
       final folder = results[2] as FolderPermissionState;
+      final devDoc = results[3] as DevWorkDocState;
       if (!mounted) return;
       setState(() {
         _allPlans = BusinessPlanningStore.dedupeById(plans);
         _folderState = folder;
+        _devDocState = devDoc;
         _loading = false;
         if (draft != null) {
           _applyInput(draft);
@@ -148,7 +161,27 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   BusinessPlanInput get _currentInput {
     if (_inputModeQuick) {
-      return _composer.toBusinessPlanInput(_wizardState);
+      final composed = _composer.toBusinessPlanInput(_wizardState);
+      final artifact = _wizardState.effectiveArtifactType;
+      if (artifact != null && artifact != ArtifactType.undecided) {
+        return composed.copyWith(
+          artifactType: artifact,
+          contentSubtype: _wizardState.contentSubtype == null
+              ? ''
+              : ContentSubtype.normalize(_wizardState.contentSubtype!),
+          artifactAnswers: Map<String, List<String>>.from(
+            _wizardState.artifactAnswers,
+          ),
+          deliverableTypes: [artifact],
+          wizardSelections: _wizardState.toJson(),
+        );
+      }
+      return composed.copyWith(
+        wizardSelections: _wizardState.toJson(),
+        artifactAnswers: Map<String, List<String>>.from(
+          _wizardState.artifactAnswers,
+        ),
+      );
     }
     return BusinessPlanInput(
       topic: _topicCtrl.text,
@@ -164,7 +197,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       constraints: _constraintsCtrl.text,
       extraRequests: _extraRequestsCtrl.text,
       notes: _notesCtrl.text,
-      deliverableTypes: _deliverableTypes,
+      deliverableTypes: _artifactType == ArtifactType.undecided
+          ? const [DeliverableType.undecided]
+          : [_artifactType],
+      artifactType: _artifactType,
+      contentSubtype: _contentSubtype,
       wizardSelections: _wizardState.toJson(),
       sentencesManuallyEdited: _wizardState.sentencesManuallyEdited,
     );
@@ -176,20 +213,33 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         input.customerProblem.trim().isNotEmpty ||
         input.targetCustomer.trim().isNotEmpty ||
         input.desiredOutcome.trim().isNotEmpty ||
-        _wizardState.deliverable != null ||
-        _wizardState.domains.isNotEmpty;
+        _wizardState.artifactType != null ||
+        _artifactType != ArtifactType.undecided;
   }
 
   bool get _planReady {
     final input = _currentInput;
-    if (!input.hasRequiredFields) return false;
     if (_inputModeQuick) {
-      return _wizardState.step >= 8;
+      return _wizardState.step >= 4 && input.hasRequiredFields;
+    }
+    return input.hasRequiredFields;
+  }
+
+  bool get _canCreateInstruction {
+    final input = _currentInput;
+    if (!input.hasRequiredFields) return false;
+    final artifact = input.resolvedArtifactType;
+    if (artifact == ArtifactType.undecided) return false;
+    if (artifact == ArtifactType.contents) {
+      final sub = ContentSubtype.normalize(
+        input.contentSubtype.isEmpty
+            ? ContentSubtype.undecided
+            : input.contentSubtype,
+      );
+      return sub != ContentSubtype.undecided;
     }
     return true;
   }
-
-  bool get _canCreateInstruction => _currentInput.hasRequiredFields;
 
   bool get _canTransfer =>
       _instruction != null &&
@@ -209,9 +259,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _constraintsCtrl.text = input.constraints;
     _extraRequestsCtrl.text = input.extraRequests;
     _notesCtrl.text = input.notes;
-    _deliverableTypes = input.deliverableTypes.isEmpty
-        ? const [DeliverableType.undecided]
-        : List<String>.from(input.deliverableTypes);
+    _artifactType = input.resolvedArtifactType;
+    _contentSubtype = input.contentSubtype;
   }
 
   void _onWizardChanged(PlanningWizardState state) {
@@ -225,25 +274,41 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     await _store.saveDraftInput(_currentInput);
   }
 
-  void _toggleDeliverable(String type) {
+  void _selectArtifact(String type) {
+    final normalized = ArtifactType.normalize(type);
     setState(() {
-      if (type == DeliverableType.undecided) {
-        _deliverableTypes = const [DeliverableType.undecided];
-      } else {
-        final next = _deliverableTypes
-            .where((t) => t != DeliverableType.undecided)
-            .toSet();
-        if (next.contains(type)) {
-          next.remove(type);
-        } else {
-          next.add(type);
-        }
-        _deliverableTypes = next.isEmpty
-            ? const [DeliverableType.undecided]
-            : next.toList();
+      _artifactType = normalized;
+      if (normalized != ArtifactType.contents) {
+        _contentSubtype = '';
       }
     });
     _persistDraft();
+  }
+
+  void _selectContentSubtype(String subtype) {
+    setState(() {
+      _contentSubtype = ContentSubtype.normalize(subtype);
+    });
+    _persistDraft();
+  }
+
+  String get _docStatus => _activeDoc == null
+      ? PlanningStatus.draft
+      : PlanningStatus.normalize(_activeDoc!.status);
+
+  bool get _isInstructionArchived => _docStatus == PlanningStatus.archived;
+
+  bool get _isInstructionReady {
+    switch (_docStatus) {
+      case PlanningStatus.instructionReady:
+      case PlanningStatus.readyToTransfer:
+      case PlanningStatus.validationRequired:
+      case PlanningStatus.transferred:
+      case PlanningStatus.downloadedPendingImport:
+        return _instruction != null;
+      default:
+        return false;
+    }
   }
 
   void _snack(String message) {
@@ -345,12 +410,52 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return doc;
   }
 
-  Future<void> _createInstruction({bool fromWizard = false}) async {
+  Future<void> _createInstruction() async {
     if (!_canCreateInstruction) {
-      _snack('주제·고객 문제·대상·결과·결과물을 먼저 완성하세요.');
+      _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
+      return;
+    }
+    if (_instruction != null) {
+      _snack('이미 작업지시서가 있습니다. 「수정」 또는 「새 버전」을 사용하세요.');
       return;
     }
 
+    await _saveInstructionInternal(
+      version: 1,
+      isNewVersion: false,
+      appendPreviousToHistory: false,
+    );
+  }
+
+  Future<void> _editInstruction() async {
+    if (!_canCreateInstruction || _instruction == null) {
+      _snack('수정할 작업지시서가 없거나 필수 항목이 부족합니다.');
+      return;
+    }
+    await _saveInstructionInternal(
+      version: _version,
+      isNewVersion: false,
+      appendPreviousToHistory: false,
+    );
+  }
+
+  Future<void> _createNewVersion() async {
+    if (!_canCreateInstruction || _instruction == null || _activeDoc == null) {
+      _snack('새 버전을 만들 수 없습니다. 필수 항목을 확인하세요.');
+      return;
+    }
+    await _saveInstructionInternal(
+      version: _version + 1,
+      isNewVersion: true,
+      appendPreviousToHistory: true,
+    );
+  }
+
+  Future<void> _saveInstructionInternal({
+    required int version,
+    required bool isNewVersion,
+    required bool appendPreviousToHistory,
+  }) async {
     FocusManager.instance.primaryFocus?.unfocus();
     final input = _currentInput;
     final analysis = _ensureAnalysis(input);
@@ -362,13 +467,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
 
     final iid = existing?.stableInstructionId ?? _stableInstructionId(id);
-    var version = existing?.version ?? 1;
     var history = List<PlanVersionSnapshot>.from(
       existing?.versionHistory ?? const [],
     );
-    final wasTransferred = existing?.wasTransferred == true;
 
-    if (wasTransferred && existing?.instruction != null) {
+    if (appendPreviousToHistory && existing?.instruction != null) {
       history.add(
         PlanVersionSnapshot(
           version: existing!.version,
@@ -380,18 +483,59 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           checksum: existing.lastTransferChecksum,
         ),
       );
-      version += 1;
     }
 
-    final instruction = _service.buildInstruction(
+    var instruction = _service.buildInstruction(
       planId: id,
       input: input,
       analysis: analysis,
       now: now,
       instructionId: iid,
       version: version,
-      createdAt: wasTransferred ? null : existing?.instruction?.createdAt,
+      createdAt: isNewVersion || existing?.instruction == null
+          ? null
+          : existing?.instruction?.createdAt,
+      status: PlanningStatus.instructionReady,
     );
+
+    // checksum 필드 없이 본문을 만든 뒤 해시 → 필드 주입 → 저장 (파일·앱 상태 일치)
+    final provisionalMap = Map<String, dynamic>.from(instruction.toJson())
+      ..remove('checksum');
+    final provisionalText = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(provisionalMap);
+    final checksum = contentChecksum(provisionalText);
+    final sourceFileName =
+        'WI_${DevWorkDocPaths.sanitizeInstructionId(iid)}.json';
+    instruction = _service.buildInstruction(
+      planId: id,
+      input: input,
+      analysis: analysis,
+      now: now,
+      instructionId: iid,
+      version: version,
+      createdAt: instruction.createdAt,
+      checksum: checksum,
+      sourceFileName: sourceFileName,
+      status: PlanningStatus.instructionReady,
+    );
+
+    final jsonText = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(instruction.toJson());
+    final artifact = input.resolvedArtifactType;
+    final saveResult = await _devWorkDoc.saveInstruction(
+      artifactType: artifact,
+      instructionId: iid,
+      version: version,
+      jsonText: jsonText,
+      isNewVersion: isNewVersion && version > 1,
+    );
+
+    if (!saveResult.ok) {
+      _snack(saveResult.message ?? 'DevWorkDoc 저장에 실패했습니다.');
+      return;
+    }
 
     final validation = _validator.validate(
       input: input,
@@ -426,12 +570,16 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _analysis = analysis;
       _instruction = instruction;
       _activeDoc = doc;
-      if (fromWizard) {
-        _wizardState = _wizardState.copyWith(step: 8);
-      }
     });
 
-    if (validation.ok) {
+    if (saveResult.mode == 'folder') {
+      final hint =
+          saveResult.activePathHint ??
+          DevWorkDocPaths.activeRelative(artifact, iid);
+      _snack('작업지시서 v$version 저장: $hint');
+    } else if (saveResult.mode == 'download') {
+      _snack('작업지시서 v$version 생성됨. DevWorkDoc에 직접 저장되지 않았고 다운로드로 대체되었습니다.');
+    } else if (validation.ok) {
       _snack('작업지시서를 생성했습니다. (v$version)');
     } else {
       _snack('작업지시서를 생성했으나 검증 이슈가 있습니다. 「기타 작업」에서 확인하세요.');
@@ -595,12 +743,44 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _snack('기획안을 복제했습니다.');
   }
 
-  Future<void> _archivePlan() async {
-    final id = _activePlanId;
-    if (id == null) {
-      _snack('보관할 기획안을 선택하세요.');
+  Future<void> _archiveInstruction() async {
+    if (_instruction == null || _activePlanId == null) {
+      _snack('보관할 작업지시서가 없습니다.');
       return;
     }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('작업지시서 보관'),
+        content: const Text('작업지시서를 보관함으로 이동하시겠습니까?\n필요하면 다시 복원할 수 있습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('보관'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final input = _currentInput;
+    final artifact = input.resolvedArtifactType;
+    final iid = _instruction!.instructionId;
+    final result = await _devWorkDoc.archiveInstruction(
+      artifactType: artifact,
+      instructionId: iid,
+      version: _version,
+    );
+    if (!result.ok) {
+      _snack(result.message ?? '보관에 실패했습니다.');
+      return;
+    }
+
+    final id = _activePlanId!;
     final existing = _allPlans.firstWhere((p) => p.id == id);
     final now = DateTime.now().toUtc().toIso8601String();
     final doc = existing.copyWith(
@@ -610,8 +790,241 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     await _store.upsertPlan(doc);
     await _refreshPlans();
     if (!mounted) return;
-    _startNewPlan();
-    _snack('기획안을 보관함으로 이동했습니다.');
+    setState(() => _activeDoc = doc);
+    _snack('작업지시서를 보관함으로 이동했습니다.');
+  }
+
+  Future<void> _restoreInstruction() async {
+    if (_instruction == null || _activePlanId == null) {
+      _snack('복원할 작업지시서가 없습니다.');
+      return;
+    }
+    final input = _currentInput;
+    final artifact = input.resolvedArtifactType;
+    final iid = _instruction!.instructionId;
+    final result = await _devWorkDoc.restoreInstruction(
+      artifactType: artifact,
+      instructionId: iid,
+    );
+    if (!result.ok) {
+      _snack(result.message ?? '복원에 실패했습니다.');
+      return;
+    }
+
+    final id = _activePlanId!;
+    final existing = _allPlans.firstWhere((p) => p.id == id);
+    final now = DateTime.now().toUtc().toIso8601String();
+    final doc = existing.copyWith(
+      status: PlanningStatus.instructionReady,
+      updatedAt: now,
+    );
+    await _store.upsertPlan(doc);
+    await _refreshPlans();
+    if (!mounted) return;
+    setState(() => _activeDoc = doc);
+    _snack('작업지시서를 복원했습니다.');
+  }
+
+  Future<void> _permanentDeleteInstruction() async {
+    if (_docStatus != PlanningStatus.archived) {
+      _snack('영구 삭제는 보관 상태에서만 가능합니다.');
+      return;
+    }
+    if (_instruction == null || _activePlanId == null) return;
+
+    final input = _currentInput;
+    final artifact = input.resolvedArtifactType;
+    final iid = _instruction!.instructionId;
+    final versionCount = 1 + (_activeDoc?.versionHistory.length ?? 0);
+    final filesHint = [
+      DevWorkDocPaths.activeRelative(artifact, iid),
+      DevWorkDocPaths.archiveRelative(artifact, iid, _version),
+      DevWorkDocPaths.versionDirRelative(artifact, iid),
+    ].join('\n');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('작업지시서 영구 삭제'),
+        content: SingleChildScrollView(
+          child: Text(
+            '「${_currentInput.topic.isEmpty ? '제목 없음' : _currentInput.topic}」\n'
+            'ID: $iid · 버전 $versionCount개\n\n'
+            '삭제 대상:\n$filesHint\n\n'
+            '이 작업은 되돌릴 수 없습니다.'
+            '${_activeDoc?.wasTransferred == true ? '\n\n소통24워크 쪽 파일은 자동 삭제되지 않습니다.' : ''}',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: ControlColors.accentWarm,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('영구 삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final result = await _devWorkDoc.permanentDelete(
+      artifactType: artifact,
+      instructionId: iid,
+    );
+    if (!result.ok) {
+      _snack(result.message ?? '삭제에 실패했습니다.');
+      return;
+    }
+
+    final id = _activePlanId!;
+    final existing = _allPlans.firstWhere((p) => p.id == id);
+    final now = DateTime.now().toUtc().toIso8601String();
+    final doc = existing.copyWith(
+      status: PlanningStatus.draft,
+      updatedAt: now,
+      clearInstruction: true,
+      version: 1,
+      versionHistory: const [],
+    );
+    await _store.upsertPlan(doc);
+    await _refreshPlans();
+    if (!mounted) return;
+    setState(() {
+      _instruction = null;
+      _version = 1;
+      _activeDoc = doc;
+    });
+    _snack('작업지시서를 영구 삭제했습니다.');
+  }
+
+  Future<void> _pickDevWorkDocFolder() async {
+    final state = await _devWorkDoc.pickRootFolder();
+    if (!mounted) return;
+    if (state.hasRoot) {
+      final structure = await _devWorkDoc.ensureStructure();
+      if (!mounted) return;
+      if (!structure.ok && structure.mode == 'failed') {
+        _snack(structure.message ?? '폴더 구조 생성에 실패했습니다.');
+      }
+    }
+    final refreshed = await _devWorkDoc.currentState();
+    if (!mounted) return;
+    setState(() => _devDocState = refreshed);
+    if (refreshed.hasRoot && refreshed.rootFolderName != null) {
+      _snack('DevWorkDoc 폴더: ${refreshed.rootFolderName}');
+    }
+  }
+
+  Future<void> _migratePlansToDevWorkDoc() async {
+    final withInstruction = _allPlans.where((p) => p.hasInstruction).toList();
+    if (withInstruction.isEmpty) {
+      _snack('마이그레이션할 작업지시서가 없습니다.');
+      return;
+    }
+
+    var success = 0;
+    var skipped = 0;
+    var failed = 0;
+    final seenIds = <String>{};
+    final reports = <String>[];
+
+    for (final plan in withInstruction) {
+      final iid = plan.stableInstructionId;
+      if (seenIds.contains(iid)) {
+        skipped++;
+        reports.add('건너뜀 (중복 ID): $iid');
+        continue;
+      }
+      seenIds.add(iid);
+
+      var artifact = plan.instruction!.artifactType.trim().isNotEmpty
+          ? ArtifactType.normalize(plan.instruction!.artifactType)
+          : plan.input.resolvedArtifactType;
+
+      if (artifact == ArtifactType.undecided) {
+        if (!mounted) return;
+        final picked = await _pickArtifactDialog(
+          title: '「${plan.input.topic.isEmpty ? iid : plan.input.topic}」 제작 형태',
+        );
+        if (picked == null) {
+          skipped++;
+          reports.add('건너뜀 (유형 미선택): $iid');
+          continue;
+        }
+        artifact = picked;
+      }
+
+      final jsonText = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(plan.instruction!.toJson());
+      final result = await _devWorkDoc.saveInstruction(
+        artifactType: artifact,
+        instructionId: iid,
+        version: plan.version,
+        jsonText: jsonText,
+        isNewVersion: plan.version > 1,
+      );
+      if (result.ok) {
+        success++;
+        reports.add('성공: $iid → ${result.activePathHint ?? artifact}');
+      } else {
+        failed++;
+        reports.add('실패: $iid — ${result.message ?? result.errorCode}');
+      }
+    }
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('DevWorkDoc 마이그레이션 결과'),
+        content: SingleChildScrollView(
+          child: Text(
+            '성공 $success · 건너뜀 $skipped · 실패 $failed\n\n'
+            '${reports.join('\n')}',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<String?> _pickArtifactDialog({required String title}) async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final type in ArtifactType.allSelectable)
+                ActionChip(
+                  label: Text(ArtifactType.labelKo(type)),
+                  onPressed: () => Navigator.pop(ctx, type),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _loadPlan(BusinessPlanDocument plan) {
@@ -631,7 +1044,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _inputModeQuick = _wizardState.mode != 'advanced';
       } else {
         _inputModeQuick = false;
-        _wizardState = PlanningWizardState(mode: 'advanced', step: 8);
+        _wizardState = PlanningWizardState(mode: 'advanced', step: 4);
       }
     });
     _persistDraft();
@@ -703,11 +1116,54 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
+  Future<void> _showInstructionViewer() async {
+    if (_instruction == null) {
+      _snack('작업지시서가 없습니다.');
+      return;
+    }
+    final text = _service.buildReadableInstruction(_instruction!);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('작업지시서 v${_instruction!.instructionVersion}'),
+        content: SingleChildScrollView(child: Text(text)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showOtherActionsMenu(BuildContext context) async {
     final box = context.findRenderObject() as RenderBox?;
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final position = box?.localToGlobal(Offset.zero) ?? Offset.zero;
     final size = box?.size ?? Size.zero;
+
+    final hasInstruction = _instruction != null;
+    final items = <PopupMenuEntry<String>>[
+      if (_isInstructionArchived && hasInstruction)
+        const PopupMenuItem(value: 'permanent_delete', child: Text('영구 삭제'))
+      else if (hasInstruction) ...[
+        const PopupMenuItem(value: 'view', child: Text('작업지시서 보기')),
+        const PopupMenuItem(value: 'edit', child: Text('작업지시서 수정')),
+        const PopupMenuItem(value: 'new_version', child: Text('새 버전 생성')),
+        const PopupMenuItem(value: 'archive', child: Text('보관')),
+        const PopupMenuDivider(),
+      ],
+      if (!_isInstructionArchived) ...[
+        const PopupMenuItem(value: 'validate', child: Text('지시서 검증 보기')),
+        const PopupMenuItem(value: 'json', child: Text('JSON 내보내기')),
+        const PopupMenuItem(value: 'readable', child: Text('텍스트 지시서 복사')),
+        const PopupMenuItem(value: 'cursor', child: Text('Cursor 프롬프트 복사')),
+        const PopupMenuItem(value: 'duplicate', child: Text('기획 복제')),
+      ],
+    ];
+
+    if (items.isEmpty) return;
 
     final value = await showMenu<String>(
       context: context,
@@ -717,18 +1173,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         overlay.size.width - position.dx - size.width,
         overlay.size.height - position.dy - size.height,
       ),
-      items: const [
-        PopupMenuItem(value: 'validate', child: Text('지시서 검증 보기')),
-        PopupMenuItem(value: 'json', child: Text('JSON 내보내기')),
-        PopupMenuItem(value: 'readable', child: Text('텍스트 지시서 복사')),
-        PopupMenuItem(value: 'cursor', child: Text('Cursor 프롬프트 복사')),
-        PopupMenuItem(value: 'duplicate', child: Text('기획 복제')),
-        PopupMenuItem(value: 'archive', child: Text('보관')),
-      ],
+      items: items,
     );
 
     if (value == null) return;
     switch (value) {
+      case 'view':
+        await _showInstructionViewer();
+      case 'edit':
+        await _editInstruction();
+      case 'new_version':
+        await _createNewVersion();
+      case 'archive':
+        await _archiveInstruction();
+      case 'permanent_delete':
+        await _permanentDeleteInstruction();
       case 'validate':
         _showValidationIssues();
       case 'json':
@@ -739,8 +1198,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         await _copyCursorPrompt();
       case 'duplicate':
         await _duplicatePlan();
-      case 'archive':
-        await _archivePlan();
     }
   }
 
@@ -764,6 +1221,24 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       default:
         return ControlColors.textMuted;
     }
+  }
+
+  String _planListBadge(BusinessPlanDocument plan) {
+    final status = PlanningStatus.normalize(plan.status);
+    if (status == PlanningStatus.archived) return '보관됨';
+    if (plan.wasTransferred || status == PlanningStatus.transferred) {
+      return '전달됨';
+    }
+    if (plan.hasInstruction) return '지시서 v${plan.version}';
+    return '기획안만';
+  }
+
+  Color _planListBadgeColor(BusinessPlanDocument plan) {
+    final badge = _planListBadge(plan);
+    if (badge == '전달됨') return ControlColors.accentGreen;
+    if (badge.startsWith('지시서')) return ControlColors.teal;
+    if (badge == '보관됨') return ControlColors.textMuted;
+    return ControlColors.sandBeige;
   }
 
   List<BusinessPlanDocument> get _latestPlans {
@@ -819,8 +1294,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           PlanningWizardPanel(
             initial: _wizardState,
             onChanged: _onWizardChanged,
-            onConfirmCreateInstruction: () =>
-                _createInstruction(fromWizard: true),
             onSavePlan: () => _savePlan(),
           )
         else
@@ -831,6 +1304,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           const SizedBox(height: 12),
           _buildMainActions(),
         ],
+        const SizedBox(height: 12),
+        _buildDevWorkDocFolderSettings(),
         const SizedBox(height: 12),
         _buildFolderSettings(),
         const SizedBox(height: 20),
@@ -889,20 +1364,40 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _field(_targetCtrl, '대상 고객 *', maxLines: 2),
             _field(_outcomeCtrl, '원하는 결과 *', maxLines: 2),
             const SizedBox(height: 8),
-            Text('희망 결과물', style: Theme.of(context).textTheme.labelLarge),
+            Text('제작 형태 *', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
-                for (final type in _deliverableOptions)
+                for (final type in _artifactOptions)
                   FilterChip(
-                    label: Text(DeliverableType.labelKo(type)),
-                    selected: _deliverableTypes.contains(type),
-                    onSelected: (_) => _toggleDeliverable(type),
+                    label: Text(ArtifactType.labelKo(type)),
+                    selected: _artifactType == type,
+                    onSelected: (_) => _selectArtifact(type),
                   ),
               ],
             ),
+            if (_artifactType == ArtifactType.contents) ...[
+              const SizedBox(height: 8),
+              Text(
+                '콘텐츠 하위 유형 *',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final sub in _contentSubtypeOptions)
+                    FilterChip(
+                      label: Text(ContentSubtype.labelKo(sub)),
+                      selected: _contentSubtype == sub,
+                      onSelected: (_) => _selectContentSubtype(sub),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
@@ -984,8 +1479,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
             const SizedBox(height: 6),
             Text(
-              '${DeliverableType.labelKo(input.primaryDeliverable)} · '
-              '${WorkTrack.labelKo(input.primaryTrack)}',
+              '${ArtifactType.labelKo(input.resolvedArtifactType)} · '
+              '${ArtifactType.primaryTrack(input.resolvedArtifactType)}',
               style: const TextStyle(
                 fontSize: 12,
                 color: ControlColors.textMuted,
@@ -1006,21 +1501,59 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Widget _buildMainActions() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton.icon(
-          onPressed: _hasSomeContent ? () => _savePlan() : null,
-          icon: const Icon(Icons.save_outlined, size: 18),
-          label: const Text('기획 저장'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              onPressed: _hasSomeContent ? () => _savePlan() : null,
+              icon: const Icon(Icons.save_outlined, size: 18),
+              label: const Text('기획 저장'),
+            ),
+            ..._buildStatusPrimaryActions(),
+          ],
         ),
-        FilledButton.tonalIcon(
+        if (_instruction != null ||
+            _isInstructionArchived ||
+            _hasSomeContent) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () => _showOtherActionsMenu(context),
+              icon: const Icon(Icons.more_horiz, size: 18),
+              label: const Text('기타 작업'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _buildStatusPrimaryActions() {
+    if (_isInstructionArchived) {
+      return [
+        FilledButton.icon(
+          onPressed: _restoreInstruction,
+          icon: const Icon(Icons.unarchive_outlined, size: 18),
+          label: const Text('복원'),
+        ),
+      ];
+    }
+    if (_instruction == null) {
+      return [
+        FilledButton.icon(
           onPressed: _canCreateInstruction ? () => _createInstruction() : null,
           icon: const Icon(Icons.description_outlined, size: 18),
-          label: const Text('작업지시서 생성·검토'),
+          label: const Text('작업지시서 생성'),
         ),
+      ];
+    }
+    if (_isInstructionReady) {
+      return [
         FilledButton.icon(
           onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
           icon: _transferBusy
@@ -1032,12 +1565,75 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               : const Icon(Icons.upload_outlined, size: 18),
           label: Text(_transferBusy ? '전달 중…' : '소통24워크로 전달'),
         ),
-        OutlinedButton.icon(
-          onPressed: () => _showOtherActionsMenu(context),
-          icon: const Icon(Icons.more_horiz, size: 18),
-          label: const Text('기타 작업'),
+      ];
+    }
+    return [
+      FilledButton.tonalIcon(
+        onPressed: _canCreateInstruction ? () => _createInstruction() : null,
+        icon: const Icon(Icons.description_outlined, size: 18),
+        label: const Text('작업지시서 생성'),
+      ),
+    ];
+  }
+
+  Widget _buildDevWorkDocFolderSettings() {
+    final devDoc = _devDocState;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'DevWorkDoc 작업지시서 저장',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'SotongWareControl 폴더 안에 DevWorkDoc 폴더를 만들거나 선택해 주세요.',
+              style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
+            ),
+            const SizedBox(height: 6),
+            if (devDoc != null &&
+                devDoc.hasRoot &&
+                devDoc.rootFolderName != null)
+              Text(
+                '선택된 폴더: ${devDoc.rootFolderName}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              )
+            else if (devDoc != null && !devDoc.supported)
+              const Text(
+                '이 환경에서는 폴더 직접 저장을 지원하지 않습니다. '
+                '작업지시서 생성 시 JSON 다운로드로 대체됩니다.',
+                style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
+              )
+            else
+              const Text(
+                '폴더가 선택되지 않았습니다.',
+                style: TextStyle(color: ControlColors.textMuted),
+              ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: devDoc?.supported == false
+                      ? null
+                      : _pickDevWorkDocFolder,
+                  icon: const Icon(Icons.folder_open, size: 18),
+                  label: const Text('작업지시서 관리 폴더 설정'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _migratePlansToDevWorkDoc,
+                  icon: const Icon(Icons.sync_alt, size: 18),
+                  label: const Text('기존 작업지시서를 DevWorkDoc으로 정리'),
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -1165,7 +1761,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               ],
             ),
             subtitle: Text(
-              '${plan.input.deliverableTypes.map(DeliverableType.labelKo).join(', ')} · '
+              '${ArtifactType.labelKo(plan.input.resolvedArtifactType)} · '
               'v${plan.version} · ${PlanningStatus.labelKo(plan.status)} · '
               '${_formatIso(plan.updatedAt)}',
               softWrap: true,
@@ -1176,12 +1772,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 StatusBadge(
-                  label: plan.hasInstruction ? '지시서 있음' : '지시서 없음',
-                  color: plan.hasInstruction
-                      ? ControlColors.teal
-                      : ControlColors.textMuted,
+                  label: _planListBadge(plan),
+                  color: _planListBadgeColor(plan),
                 ),
-                if (plan.wasTransferred)
+                if (plan.wasTransferred && _planListBadge(plan) != '전달됨')
                   const Padding(
                     padding: EdgeInsets.only(top: 4),
                     child: StatusBadge(

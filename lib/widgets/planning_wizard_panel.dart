@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../data/planning_choice_catalog.dart';
+import '../data/artifact_question_catalog.dart';
+import '../models/artifact_type.dart';
 import '../models/business_planning.dart';
 import '../models/planning_wizard_state.dart';
-import '../services/planning_recent_store.dart';
 import '../services/planning_sentence_composer.dart';
 import '../theme/control_theme.dart';
 
-/// 선택형 기획 마법사 (0–7 단계 + 8 최종 확인).
+/// artifact-first 선택형 기획 마법사 (0–4 단계).
 class PlanningWizardPanel extends StatefulWidget {
   const PlanningWizardPanel({
     super.key,
@@ -29,21 +29,28 @@ class PlanningWizardPanel extends StatefulWidget {
 }
 
 class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
-  static const _visibleOptionCount = 8;
-  static const _stepTitles = [
-    '만들 결과물',
-    '분야·주제',
-    '대상 고객',
-    '고객 문제',
-    '원하는 결과',
-    '제공 형태',
-    '규모·기간·예산',
-    '기획 문장',
-    '최종 확인',
-  ];
+  static const _stepTitles = ['만들 결과물', '콘텐츠 유형', '기획 질문', '기획 문장', '최종 확인'];
+
+  static const _quickCommonIds = {
+    'customerProblem',
+    'targetCustomer',
+    'desiredOutcome',
+  };
+
+  static const _advancedOnlyCommonIds = {
+    'materialsExperience',
+    'schedule',
+    'budget',
+    'salesDeploy',
+  };
+
+  static const _requiredQuestionIds = {
+    'customerProblem',
+    'targetCustomer',
+    'desiredOutcome',
+  };
 
   final _composer = const PlanningSentenceComposer();
-  final _recentStore = PlanningRecentStore();
 
   late PlanningWizardState _state;
   Timer? _notifyTimer;
@@ -52,9 +59,9 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
   final _problemCtrl = TextEditingController();
   final _targetCtrl = TextEditingController();
   final _outcomeCtrl = TextEditingController();
-  final _customCtrl = TextEditingController();
 
-  final _expandedSteps = <String, bool>{};
+  final _expandedQuestions = <String, bool>{};
+  final _customCtrls = <String, TextEditingController>{};
 
   @override
   void initState() {
@@ -79,7 +86,9 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
     _problemCtrl.dispose();
     _targetCtrl.dispose();
     _outcomeCtrl.dispose();
-    _customCtrl.dispose();
+    for (final c in _customCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -107,75 +116,175 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
     _emit(immediate: immediate);
   }
 
-  int get _totalSteps => 9;
-  int get _currentDisplayStep => _state.step.clamp(0, 8);
+  bool get _needsSubtype =>
+      ArtifactType.normalize(_state.artifactType ?? '') ==
+          ArtifactType.contents &&
+      _state.canProceedPastArtifact;
+
+  int get _maxStep => 4;
+
+  int get _progressStep {
+    var display = _state.step;
+    if (!_needsSubtype && display > 1) {
+      display -= 1;
+    }
+    return display.clamp(0, _needsSubtype ? 4 : 3);
+  }
+
+  int get _progressTotal => _needsSubtype ? 5 : 4;
+
   int get _remainingSteps =>
-      (_totalSteps - 1 - _currentDisplayStep).clamp(0, 8);
+      (_progressTotal - 1 - _progressStep).clamp(0, _progressTotal);
 
-  Set<String> get _domainSet => _state.domains.toSet();
-  Set<String> get _audienceSet => _state.audiences.toSet();
+  String get _stepTitle {
+    final step = _state.step.clamp(0, _maxStep);
+    if (step >= 0 && step < _stepTitles.length) {
+      return _stepTitles[step];
+    }
+    return _stepTitles.last;
+  }
 
-  List<String> _recommendedIds(String step) {
-    switch (step) {
-      case PlanningChoiceSteps.problems:
-        return suggestProblems(
-          deliverable: _state.deliverable,
-          domains: _domainSet,
-          audiences: _audienceSet,
-        );
-      case PlanningChoiceSteps.outcomes:
-        return suggestOutcomes(
-          deliverable: _state.deliverable,
-          domains: _domainSet,
-        );
-      case PlanningChoiceSteps.formats:
-        return suggestFormats(
-          deliverable: _state.deliverable,
-          domains: _domainSet,
-        );
-      case PlanningChoiceSteps.audiences:
-        return suggestAudiences(domains: _domainSet);
-      default:
-        return const [];
+  List<ArtifactQuestion> get _activeQuestions {
+    final artifact = _state.effectiveArtifactType;
+    if (artifact == null || artifact == ArtifactType.undecided) {
+      return commonQuestions()
+          .where((q) => _quickCommonIds.contains(q.id))
+          .toList();
+    }
+
+    final all = questionsFor(
+      artifact: artifact,
+      contentSubtype: _state.contentSubtype,
+    );
+
+    if (_state.mode == 'advanced') return all;
+
+    return all.where((q) {
+      if (_quickCommonIds.contains(q.id)) return true;
+      if (_advancedOnlyCommonIds.contains(q.id)) return false;
+      return q.options.any((o) => o.recommended);
+    }).toList();
+  }
+
+  void _onArtifactChanged(String id) {
+    final normalized = ArtifactType.normalize(id);
+    final prev = _state.artifactType;
+    if (prev == normalized) return;
+
+    var next = _state.copyWith(
+      artifactType: normalized,
+      clearRecommendedArtifact: normalized != ArtifactType.undecided,
+      clearContentSubtype: normalized != ArtifactType.contents,
+    );
+
+    if (normalized != ArtifactType.undecided &&
+        normalized != ArtifactType.contents) {
+      next = _applyDefaultAnswers(next, normalized);
+    }
+
+    _setState(next, immediate: true);
+  }
+
+  void _onSubtypeChanged(String id) {
+    final normalized = ContentSubtype.normalize(id);
+    if (_state.contentSubtype == normalized) return;
+
+    var next = _state.copyWith(contentSubtype: normalized);
+    final artifact = _state.effectiveArtifactType;
+    if (artifact != null && normalized != ContentSubtype.undecided) {
+      next = _applyDefaultAnswers(next, artifact);
+    }
+    _setState(next, immediate: true);
+  }
+
+  PlanningWizardState _applyDefaultAnswers(
+    PlanningWizardState state,
+    String artifact,
+  ) {
+    final defaults = defaultSelectionsFor(
+      artifact,
+      contentSubtype: state.contentSubtype,
+    );
+    final answers = Map<String, List<String>>.from(state.artifactAnswers);
+    for (final entry in defaults.entries) {
+      answers.putIfAbsent(entry.key, () => List<String>.from(entry.value));
+    }
+    return state.copyWith(artifactAnswers: answers);
+  }
+
+  void _runRecommend() {
+    final domains = _state.domains;
+    final problems = _state.artifactAnswers['customerProblem'] ?? const [];
+    final recommended = recommendArtifact(domains: domains, problems: problems);
+    _setState(
+      _state.copyWith(recommendedArtifact: recommended),
+      immediate: true,
+    );
+    if (recommended == ArtifactType.undecided) {
+      _snack('추천할 만한 유형을 찾지 못했습니다. 직접 선택해 주세요.');
     }
   }
 
-  void _applySample(String sampleId) {
-    final seed = cloneSampleSeed(sampleId);
-    final completed = _composer.applyAutoComplete(seed);
-    _sentencesEditing = false;
-    _setState(completed.copyWith(step: 0), immediate: true);
-    _syncSentenceControllers();
+  void _confirmRecommended(String artifactId) {
+    final normalized = ArtifactType.normalize(artifactId);
+    if (normalized == ArtifactType.undecided) return;
+
+    var next = _state.copyWith(
+      artifactType: normalized,
+      recommendedArtifact: normalized,
+      clearContentSubtype: normalized != ArtifactType.contents,
+    );
+    next = _applyDefaultAnswers(next, normalized);
+    _setState(next, immediate: true);
   }
 
-  Future<void> _autoCompleteAll() async {
-    if (!_state.canAutoComplete) {
-      _snack('결과물과 분야를 먼저 선택하세요.');
-      return;
+  void _toggleAnswer(ArtifactQuestion question, String optionId) {
+    final answers = Map<String, List<String>>.from(_state.artifactAnswers);
+    final current = List<String>.from(answers[question.id] ?? []);
+
+    if (question.multi) {
+      if (current.contains(optionId)) {
+        current.remove(optionId);
+      } else {
+        current.add(optionId);
+      }
+    } else {
+      current
+        ..clear()
+        ..add(optionId);
     }
-    if (_state.sentencesManuallyEdited) {
+
+    answers[question.id] = current;
+    _setState(_state.copyWith(artifactAnswers: answers));
+  }
+
+  void _updateCustomText(String questionId, String value) {
+    final texts = Map<String, String>.from(_state.customTexts);
+    texts[questionId] = value;
+    _setState(_state.copyWith(customTexts: texts));
+  }
+
+  TextEditingController _customController(String questionId) {
+    return _customCtrls.putIfAbsent(
+      questionId,
+      () => TextEditingController(text: _state.customTexts[questionId] ?? ''),
+    );
+  }
+
+  Future<void> _applyDefaults() async {
+    if (_state.sentencesManuallyEdited && _state.step >= 3) {
       final ok = await _confirmRegenerateSentences();
       if (!ok) return;
     }
-    final next = _composer.applyAutoComplete(_state);
+
+    var next = _composer.applyAutoComplete(_state);
+    if (_state.step >= 3 && !next.sentencesManuallyEdited) {
+      next = _composer.regenerateSentences(next, force: true);
+    }
     _sentencesEditing = false;
     _setState(next, immediate: true);
     _syncSentenceControllers();
     _snack('추천 선택과 문장을 자동으로 채웠습니다.');
-  }
-
-  Future<void> _applyDontKnow() async {
-    if (_state.sentencesManuallyEdited && _state.step >= 7) {
-      final ok = await _confirmRegenerateSentences();
-      if (!ok) return;
-    }
-    var next = applyRecommendations(_state);
-    if (_state.step >= 7 && !next.sentencesManuallyEdited) {
-      next = _composer.regenerateSentences(next, force: true);
-    }
-    _setState(next, immediate: true);
-    _syncSentenceControllers();
-    _snack('안전한 추천값을 적용했습니다.');
   }
 
   Future<bool> _confirmRegenerateSentences() async {
@@ -199,138 +308,31 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
     return result == true;
   }
 
-  void _onDeliverableChanged(String id) {
-    final prev = _state.deliverable;
-    if (prev == id) return;
-
-    final cleared = <String>[];
-    var next = _state.copyWith(
-      deliverable: id,
-      clearScale: id != PlanningDeliverables.ebook,
-    );
-
-    final validFormats = optionsFor(
-      PlanningChoiceSteps.formats,
-      deliverable: id,
-      domains: _domainSet,
-      audiences: _audienceSet,
-    ).map((o) => o.id).toSet();
-    if (next.formats.any((f) => !validFormats.contains(f))) {
-      next = next.copyWith(
-        formats: next.formats.where(validFormats.contains).toList(),
-      );
-      cleared.add('제공 형태');
+  bool _questionComplete(ArtifactQuestion question) {
+    final selected = _state.artifactAnswers[question.id] ?? const [];
+    if (!_requiredQuestionIds.contains(question.id)) return true;
+    if (selected.isEmpty) return false;
+    if (selected.contains('custom')) {
+      return _state.customTexts[question.id]?.trim().isNotEmpty ?? false;
     }
-
-    final validProblems = optionsFor(
-      PlanningChoiceSteps.problems,
-      deliverable: id,
-      domains: _domainSet,
-      audiences: _audienceSet,
-    ).map((o) => o.id).toSet();
-    if (next.problems.any((p) => !validProblems.contains(p))) {
-      next = next.copyWith(
-        problems: next.problems.where(validProblems.contains).toList(),
-      );
-      cleared.add('고객 문제');
-    }
-
-    if (id != PlanningDeliverables.ebook && _state.scale != null) {
-      cleared.add('규모');
-    }
-
-    if (id == PlanningDeliverables.custom) {
-      _customCtrl.text = _state.customTexts['deliverables'] ?? '';
-    }
-
-    _setState(next, immediate: true);
-
-    if (cleared.isNotEmpty && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('결과물 변경으로 ${cleared.join(', ')} 선택이 초기화되었습니다.')),
-      );
-    }
-  }
-
-  void _toggleMulti(String step, String id, List<String> current) {
-    final next = List<String>.from(current);
-    if (next.contains(id)) {
-      next.remove(id);
-    } else {
-      next.add(id);
-    }
-
-    PlanningWizardState updated;
-    switch (step) {
-      case PlanningChoiceSteps.domains:
-        updated = _state.copyWith(domains: next);
-        _recentStore.recordDomainSelections(next);
-        break;
-      case PlanningChoiceSteps.audiences:
-        updated = _state.copyWith(audiences: next);
-        _recentStore.recordAudienceSelections(next);
-        break;
-      case PlanningChoiceSteps.problems:
-        updated = _state.copyWith(problems: next);
-        break;
-      case PlanningChoiceSteps.outcomes:
-        updated = _state.copyWith(outcomes: next);
-        break;
-      case PlanningChoiceSteps.formats:
-        updated = _state.copyWith(formats: next);
-        break;
-      default:
-        return;
-    }
-    _setState(updated);
-  }
-
-  void _selectSingle(String field, String id) {
-    PlanningWizardState updated;
-    switch (field) {
-      case PlanningChoiceSteps.scales:
-        updated = _state.copyWith(scale: id);
-        break;
-      case PlanningChoiceSteps.durations:
-        updated = _state.copyWith(duration: id);
-        break;
-      case PlanningChoiceSteps.budgets:
-        updated = _state.copyWith(budget: id);
-        break;
-      case PlanningChoiceSteps.salesModes:
-        updated = _state.copyWith(salesMode: id);
-        break;
-      default:
-        return;
-    }
-    _setState(updated);
+    return true;
   }
 
   bool _canProceedFromStep(int step) {
     switch (step) {
       case 0:
-        return _state.deliverable != null && _state.deliverable!.isNotEmpty;
-      case 1:
-        return _state.domains.isNotEmpty ||
-            (_state.deliverable == PlanningDeliverables.custom &&
-                (_state.customTexts['domains']?.trim().isNotEmpty ?? false));
-      case 2:
-        return _state.audiences.isNotEmpty;
-      case 3:
-        return _state.problems.isNotEmpty;
-      case 4:
-        return _state.outcomes.isNotEmpty;
-      case 5:
-        final formats = optionsFor(
-          PlanningChoiceSteps.formats,
-          deliverable: _state.deliverable,
-          domains: _domainSet,
-          audiences: _audienceSet,
-        );
-        return formats.isEmpty || _state.formats.isNotEmpty;
-      case 6:
+        if (_state.artifactType == null) return false;
+        if (_state.artifactType == ArtifactType.undecided) {
+          return _state.canProceedPastArtifact;
+        }
         return true;
-      case 7:
+      case 1:
+        if (!_needsSubtype) return true;
+        final sub = ContentSubtype.normalize(_state.contentSubtype ?? '');
+        return sub.isNotEmpty && sub != ContentSubtype.undecided;
+      case 2:
+        return _activeQuestions.every(_questionComplete);
+      case 3:
         return _state.topic.trim().isNotEmpty &&
             _state.customerProblem.trim().isNotEmpty &&
             _state.targetCustomer.trim().isNotEmpty &&
@@ -340,8 +342,20 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
     }
   }
 
+  int _nextStep(int current) {
+    var next = current + 1;
+    if (next == 1 && !_needsSubtype) next = 2;
+    return next;
+  }
+
+  int _prevStep(int current) {
+    var prev = current - 1;
+    if (prev == 1 && !_needsSubtype) prev = 0;
+    return prev;
+  }
+
   Future<void> _goNext() async {
-    if (_state.step == 7) {
+    if (_state.step == 3) {
       if (_state.sentencesManuallyEdited) {
         _applySentenceEdits();
       } else {
@@ -356,34 +370,14 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
       return;
     }
 
-    if (_state.step < 8) {
-      var nextStep = _state.step + 1;
-      if (nextStep == 5) {
-        final formats = optionsFor(
-          PlanningChoiceSteps.formats,
-          deliverable: _state.deliverable,
-          domains: _domainSet,
-          audiences: _audienceSet,
-        );
-        if (formats.isEmpty) nextStep = 6;
-      }
-      _setState(_state.copyWith(step: nextStep), immediate: true);
+    if (_state.step < _maxStep) {
+      _setState(_state.copyWith(step: _nextStep(_state.step)), immediate: true);
     }
   }
 
   void _goPrev() {
     if (_state.step <= 0) return;
-    var prevStep = _state.step - 1;
-    if (prevStep == 5) {
-      final formats = optionsFor(
-        PlanningChoiceSteps.formats,
-        deliverable: _state.deliverable,
-        domains: _domainSet,
-        audiences: _audienceSet,
-      );
-      if (formats.isEmpty) prevStep = 4;
-    }
-    _setState(_state.copyWith(step: prevStep), immediate: true);
+    _setState(_state.copyWith(step: _prevStep(_state.step)), immediate: true);
   }
 
   void _applySentenceEdits() {
@@ -422,20 +416,29 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                _buildSampleChips(),
-                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: _autoCompleteAll,
+                      onPressed: _state.canProceedPastArtifact
+                          ? _applyDefaults
+                          : null,
                       icon: const Icon(Icons.auto_fix_high, size: 18),
                       label: const Text('추천 기획으로 자동 완성'),
                     ),
-                    TextButton(
-                      onPressed: _applyDontKnow,
-                      child: const Text('잘 모르겠음'),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: 'quick', label: Text('빠른')),
+                        ButtonSegment(value: 'advanced', label: Text('상세')),
+                      ],
+                      selected: {_state.mode},
+                      onSelectionChanged: (s) {
+                        _setState(
+                          _state.copyWith(mode: s.first),
+                          immediate: true,
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -451,7 +454,7 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.all(12),
-            child: _state.step == 8
+            child: _state.step == _maxStep
                 ? _buildConfirmButtons()
                 : _buildNavButtons(),
           ),
@@ -460,23 +463,7 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
     );
   }
 
-  Widget _buildSampleChips() {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final sample in planningSamples)
-          ActionChip(
-            avatar: const Icon(Icons.lightbulb_outline, size: 16),
-            label: Text(sample.title, softWrap: true),
-            onPressed: () => _applySample(sample.id),
-          ),
-      ],
-    );
-  }
-
   Widget _buildProgress() {
-    final step = _currentDisplayStep;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -484,7 +471,7 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
           children: [
             Expanded(
               child: Text(
-                '${step + 1} / $_totalSteps · ${_stepTitles[step]}',
+                '${_progressStep + 1} / $_progressTotal · $_stepTitle',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   color: ControlColors.textPrimary,
@@ -504,7 +491,7 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: (step + 1) / _totalSteps,
+            value: (_progressStep + 1) / _progressTotal,
             minHeight: 6,
             backgroundColor: ControlColors.slate,
             color: ControlColors.teal,
@@ -517,269 +504,242 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
   Widget _buildStepContent() {
     switch (_state.step) {
       case 0:
-        return _buildChoiceStep(
-          step: PlanningChoiceSteps.deliverables,
-          title: '어떤 결과물을 만들고 싶으신가요?',
-          multi: false,
-          selectedIds: _state.deliverable == null ? [] : [_state.deliverable!],
-          onSelect: (id) => _onDeliverableChanged(id),
-        );
+        return _buildArtifactStep();
       case 1:
-        return _buildChoiceStep(
-          step: PlanningChoiceSteps.domains,
-          title: '어떤 분야·주제인가요? (복수 선택 가능)',
-          multi: true,
-          selectedIds: _state.domains,
-          onSelect: (id) =>
-              _toggleMulti(PlanningChoiceSteps.domains, id, _state.domains),
-        );
+        return _buildSubtypeStep();
       case 2:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildChoiceStep(
-              step: PlanningChoiceSteps.audiences,
-              title: '누구를 위한 것인가요? (복수 선택 가능)',
-              multi: true,
-              selectedIds: _state.audiences,
-              onSelect: (id) => _toggleMulti(
-                PlanningChoiceSteps.audiences,
-                id,
-                _state.audiences,
-              ),
-            ),
-            if (_state.audiences.contains('age_custom')) ...[
-              const SizedBox(height: 8),
-              TextFormField(
-                key: ValueKey('age_${_state.customTexts['age_custom']}'),
-                initialValue: _state.customTexts['age_custom'] ?? '',
-                decoration: const InputDecoration(
-                  labelText: '연령대 직접 입력',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                onChanged: (v) {
-                  final texts = Map<String, String>.from(_state.customTexts);
-                  texts['age_custom'] = v;
-                  _setState(_state.copyWith(customTexts: texts));
-                },
-              ),
-            ],
-            if (exceedsRecommendedAudienceCount(_state.audiences.length))
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  audienceCountHint(_state.audiences.length),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: ControlColors.accentWarm,
-                  ),
-                ),
-              ),
-          ],
-        );
+        return _buildQuestionsStep();
       case 3:
-        return _buildChoiceStep(
-          step: PlanningChoiceSteps.problems,
-          title: '어떤 문제를 해결하나요?',
-          multi: true,
-          selectedIds: _state.problems,
-          onSelect: (id) =>
-              _toggleMulti(PlanningChoiceSteps.problems, id, _state.problems),
-        );
-      case 4:
-        return _buildChoiceStep(
-          step: PlanningChoiceSteps.outcomes,
-          title: '어떤 결과를 원하시나요?',
-          multi: true,
-          selectedIds: _state.outcomes,
-          onSelect: (id) =>
-              _toggleMulti(PlanningChoiceSteps.outcomes, id, _state.outcomes),
-        );
-      case 5:
-        return _buildChoiceStep(
-          step: PlanningChoiceSteps.formats,
-          title: '어떤 형태로 제공할까요?',
-          multi: true,
-          selectedIds: _state.formats,
-          onSelect: (id) =>
-              _toggleMulti(PlanningChoiceSteps.formats, id, _state.formats),
-        );
-      case 6:
-        return _buildOperationalStep();
-      case 7:
         return _buildSentenceStep();
-      case 8:
+      case 4:
         return _buildConfirmationSummary();
       default:
         return const SizedBox.shrink();
     }
   }
 
-  Widget _buildChoiceStep({
-    required String step,
-    required String title,
-    required bool multi,
-    required List<String> selectedIds,
-    required ValueChanged<String> onSelect,
-  }) {
-    final recommended = _recommendedIds(step).toSet();
-    final options = optionsFor(
-      step,
-      deliverable: _state.deliverable,
-      domains: _domainSet,
-      audiences: _audienceSet,
-      recommendedIds: recommended,
-    );
-
-    final showMore = _expandedSteps[step] ?? false;
-    final visible = showMore
-        ? options
-        : options.take(_visibleOptionCount).toList();
-    final hasMore = options.length > _visibleOptionCount;
+  Widget _buildArtifactStep() {
+    final options = artifactTypeOptions();
+    final selected = _state.artifactType;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleSmall),
-        if (_state.deliverable == PlanningDeliverables.custom &&
-            step == PlanningChoiceSteps.deliverables) ...[
-          const SizedBox(height: 8),
-          TextField(
-            controller: _customCtrl,
-            decoration: const InputDecoration(
-              labelText: '결과물 직접 입력',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (v) {
-              final texts = Map<String, String>.from(_state.customTexts);
-              texts['deliverables'] = v;
-              _setState(_state.copyWith(customTexts: texts));
-            },
-          ),
-        ],
+        Text(
+          '어떤 결과물을 만들고 싶으신가요?',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final opt in visible)
+            for (final opt in options)
               _ChoiceCard(
-                option: opt,
-                selected: selectedIds.contains(opt.id),
-                multi: multi,
-                reason: recommendationReason(
-                  step: step,
-                  optionId: opt.id,
-                  deliverable: _state.deliverable,
-                  domains: _domainSet,
-                ),
-                onTap: () => onSelect(opt.id),
+                label: opt.label,
+                hint: opt.recommended ? '추천' : null,
+                selected: selected == opt.id,
+                multi: false,
+                onTap: () => _onArtifactChanged(opt.id),
               ),
           ],
         ),
-        if (hasMore)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _expandedSteps[step] = !showMore;
-                });
-              },
-              icon: Icon(showMore ? Icons.expand_less : Icons.expand_more),
-              label: Text(
-                showMore
-                    ? '접기'
-                    : '더 보기 (${options.length - _visibleOptionCount}개)',
+        if (selected == ArtifactType.undecided) ...[
+          const SizedBox(height: 16),
+          Text(
+            '아래 질문에 답하거나 바로 추천을 받은 뒤, 실제 유형을 하나 선택해야 다음으로 진행할 수 있습니다.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: ControlColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          ..._buildUndecidedMiniQuestions(),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _runRecommend,
+            icon: const Icon(Icons.lightbulb_outline, size: 18),
+            label: const Text('답변 기반 유형 추천'),
+          ),
+          if (_state.recommendedArtifact != null &&
+              _state.recommendedArtifact != ArtifactType.undecided) ...[
+            const SizedBox(height: 12),
+            Text(
+              '추천: ${ArtifactType.labelKo(_state.recommendedArtifact!)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: ControlColors.teal,
               ),
             ),
-          ),
-        if (selectedIds.contains('custom')) ...[
+          ],
+          const SizedBox(height: 10),
+          Text('최종 유형 선택', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
-          TextFormField(
-            key: ValueKey('custom_${step}_${_state.customTexts[step]}'),
-            initialValue: _state.customTexts[step] ?? '',
-            decoration: InputDecoration(
-              labelText: '${labelForChoice(step, 'custom')} 내용',
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (v) {
-              final texts = Map<String, String>.from(_state.customTexts);
-              texts[step] = v;
-              _setState(_state.copyWith(customTexts: texts));
-            },
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final opt in options.where(
+                (o) => o.id != ArtifactType.undecided,
+              ))
+                FilterChip(
+                  label: Text(opt.label),
+                  selected: _state.effectiveArtifactType == opt.id,
+                  onSelected: (_) => _confirmRecommended(opt.id),
+                ),
+            ],
           ),
         ],
       ],
     );
   }
 
-  Widget _buildOperationalStep() {
-    final isEbook = _state.deliverable == PlanningDeliverables.ebook;
+  List<Widget> _buildUndecidedMiniQuestions() {
+    final mini = commonQuestions()
+        .where((q) => _quickCommonIds.contains(q.id))
+        .toList();
 
-    Widget section(String step, String title, String? selected) {
-      final options = optionsFor(
-        step,
-        deliverable: _state.deliverable,
-        domains: _domainSet,
-        audiences: _audienceSet,
-      );
-      if (options.isEmpty) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final opt in options)
-                  FilterChip(
-                    label: Text(opt.label, softWrap: true),
-                    selected: selected == opt.id,
-                    onSelected: (_) => _selectSingle(step, opt.id),
-                    avatar: opt.recommended
-                        ? const Icon(
-                            Icons.star,
-                            size: 14,
-                            color: ControlColors.teal,
-                          )
-                        : null,
-                  ),
-              ],
-            ),
-          ],
-        ),
+    return [for (final q in mini) _buildQuestionBlock(q, compact: true)];
+  }
+
+  Widget _buildSubtypeStep() {
+    if (!_needsSubtype) {
+      return Text(
+        '콘텐츠 유형 선택이 필요하지 않습니다.',
+        style: Theme.of(context).textTheme.bodyMedium,
       );
     }
+
+    final options = contentSubtypeOptions();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('어떤 콘텐츠인가요?', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final opt in options)
+              _ChoiceCard(
+                label: opt.label,
+                selected: _state.contentSubtype == opt.id,
+                multi: false,
+                onTap: () => _onSubtypeChanged(opt.id),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuestionsStep() {
+    final questions = _activeQuestions;
+    final advancedHidden = _state.mode == 'quick';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('규모·기간·예산·판매 방식', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 10),
-        if (isEbook)
-          section(PlanningChoiceSteps.scales, '전자책 규모', _state.scale),
-        section(PlanningChoiceSteps.durations, '예상 기간', _state.duration),
-        section(PlanningChoiceSteps.budgets, '예산', _state.budget),
-        section(PlanningChoiceSteps.salesModes, '판매·배포 방식', _state.salesMode),
-        if (_state.followUpDeliverables.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            '추천 후속 결과물: ${_state.followUpDeliverables.map((d) => labelForChoice(PlanningChoiceSteps.deliverables, d)).join(', ')}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: ControlColors.textSecondary,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '기획 질문',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            if (advancedHidden)
+              TextButton(
+                onPressed: () {
+                  _setState(_state.copyWith(mode: 'advanced'), immediate: true);
+                },
+                child: const Text('상세 질문 보기'),
+              ),
+          ],
+        ),
+        if (advancedHidden)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '빠른 모드: 핵심 질문과 추천 항목만 표시합니다.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: ControlColors.textMuted),
             ),
           ),
-        ],
+        const SizedBox(height: 8),
+        for (final q in questions) _buildQuestionBlock(q),
       ],
+    );
+  }
+
+  Widget _buildQuestionBlock(
+    ArtifactQuestion question, {
+    bool compact = false,
+  }) {
+    final selected = _state.artifactAnswers[question.id] ?? const [];
+    final showMore = _expandedQuestions[question.id] ?? false;
+    const visibleCount = 8;
+    final options = showMore
+        ? question.options
+        : question.options.take(visibleCount).toList();
+    final hasMore = question.options.length > visibleCount;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: compact ? 12 : 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question.label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: compact ? 13 : 14,
+              color: ControlColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final opt in options)
+                _ChoiceCard(
+                  label: opt.label,
+                  selected: selected.contains(opt.id),
+                  multi: question.multi,
+                  recommended: opt.recommended,
+                  onTap: () => _toggleAnswer(question, opt.id),
+                ),
+            ],
+          ),
+          if (hasMore)
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _expandedQuestions[question.id] = !showMore;
+                });
+              },
+              icon: Icon(showMore ? Icons.expand_less : Icons.expand_more),
+              label: Text(
+                showMore
+                    ? '접기'
+                    : '더 보기 (${question.options.length - visibleCount}개)',
+              ),
+            ),
+          if (selected.contains('custom') && question.allowCustom) ...[
+            const SizedBox(height: 6),
+            TextField(
+              controller: _customController(question.id),
+              decoration: InputDecoration(
+                labelText: '${question.label} 직접 입력',
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (v) => _updateCustomText(question.id, v),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -889,19 +849,26 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
 
   Widget _buildConfirmationSummary() {
     final input = _composer.toBusinessPlanInput(_state);
+    final artifact = _state.effectiveArtifactType;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('기획 요약', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 10),
+        if (artifact != null)
+          _summaryRow('결과물', ArtifactType.labelKo(artifact)),
+        if (_state.contentSubtype != null && artifact == ArtifactType.contents)
+          _summaryRow(
+            '콘텐츠 유형',
+            ContentSubtype.labelKo(
+              ContentSubtype.normalize(_state.contentSubtype!),
+            ),
+          ),
         _summaryRow('주제', input.topic),
         _summaryRow('고객 문제', input.customerProblem),
         _summaryRow('대상 고객', input.targetCustomer),
         _summaryRow('원하는 결과', input.desiredOutcome),
-        _summaryRow(
-          '결과물',
-          input.deliverableTypes.map(DeliverableType.labelKo).join(', '),
-        ),
         if (input.expectedScale.isNotEmpty)
           _summaryRow('규모', input.expectedScale),
         if (input.expectedDuration.isNotEmpty)
@@ -910,6 +877,48 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
           _summaryRow('예산', input.budgetEstimate),
         if (input.revenueModel.isNotEmpty)
           _summaryRow('판매 방식', input.revenueModel),
+        const SizedBox(height: 8),
+        _buildAnswerSummary(),
+      ],
+    );
+  }
+
+  Widget _buildAnswerSummary() {
+    final artifact = _state.effectiveArtifactType;
+    if (artifact == null) return const SizedBox.shrink();
+
+    final questions = questionsFor(
+      artifact: artifact,
+      contentSubtype: _state.contentSubtype,
+    );
+    final rows = <Widget>[];
+
+    for (final q in questions) {
+      final ids = _state.artifactAnswers[q.id];
+      if (ids == null || ids.isEmpty) continue;
+
+      final labels = ids
+          .map((id) {
+            if (id == 'custom') {
+              return _state.customTexts[q.id]?.trim() ?? '직접 입력';
+            }
+            final opt = q.options.where((o) => o.id == id).firstOrNull;
+            return opt?.label ?? id;
+          })
+          .where((l) => l.isNotEmpty);
+
+      if (labels.isEmpty) continue;
+      rows.add(_summaryRow(q.label, labels.join(', ')));
+    }
+
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('선택 답변', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 6),
+        ...rows,
       ],
     );
   }
@@ -948,7 +957,7 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
         Expanded(
           child: FilledButton(
             onPressed: _goNext,
-            child: Text(_state.step == 7 ? '최종 확인' : '다음'),
+            child: Text(_state.step == 3 ? '최종 확인' : '다음'),
           ),
         ),
       ],
@@ -965,9 +974,9 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
         ),
         const SizedBox(height: 8),
         FilledButton.icon(
-          onPressed: widget.onConfirmCreateInstruction,
-          icon: const Icon(Icons.description_outlined),
-          label: const Text('이 기획으로 작업지시서 생성'),
+          onPressed: widget.onSavePlan,
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('기획안 저장'),
         ),
       ],
     );
@@ -976,18 +985,20 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
 
 class _ChoiceCard extends StatelessWidget {
   const _ChoiceCard({
-    required this.option,
+    required this.label,
     required this.selected,
     required this.multi,
     required this.onTap,
-    this.reason,
+    this.hint,
+    this.recommended = false,
   });
 
-  final ChoiceOption option;
+  final String label;
   final bool selected;
   final bool multi;
   final VoidCallback onTap;
-  final String? reason;
+  final String? hint;
+  final bool recommended;
 
   @override
   Widget build(BuildContext context) {
@@ -1005,80 +1016,56 @@ class _ChoiceCard extends StatelessWidget {
             width: selected ? 1.5 : 1,
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Icon(
-                  multi
-                      ? (selected
-                            ? Icons.check_box
-                            : Icons.check_box_outline_blank)
-                      : (selected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off),
-                  size: 18,
-                  color: selected
-                      ? ControlColors.teal
-                      : ControlColors.textMuted,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    option.label,
-                    softWrap: true,
-                    style: TextStyle(
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                      color: ControlColors.textPrimary,
-                    ),
-                  ),
-                ),
-                if (option.recommended)
-                  Container(
-                    margin: const EdgeInsets.only(left: 4),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: ControlColors.teal.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text(
-                      '추천',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: ControlColors.teal,
-                      ),
-                    ),
-                  ),
-              ],
+            Icon(
+              multi
+                  ? (selected ? Icons.check_box : Icons.check_box_outline_blank)
+                  : (selected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off),
+              size: 18,
+              color: selected ? ControlColors.teal : ControlColors.textMuted,
             ),
-            if (option.hint != null && option.hint!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                option.hint!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: ControlColors.textMuted,
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                softWrap: true,
+                style: TextStyle(
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: ControlColors.textPrimary,
                 ),
               ),
-            ],
-            if (reason != null && reason!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                reason!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: ControlColors.sandBeige,
+            ),
+            if (recommended || hint != null)
+              Container(
+                margin: const EdgeInsets.only(left: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: ControlColors.teal.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  hint ?? '추천',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: ControlColors.teal,
+                  ),
                 ),
               ),
-            ],
           ],
         ),
       ),
     );
+  }
+}
+
+extension _FirstOrNullPanel<E> on Iterable<E> {
+  E? get firstOrNull {
+    final iterator = this.iterator;
+    if (!iterator.moveNext()) return null;
+    return iterator.current;
   }
 }

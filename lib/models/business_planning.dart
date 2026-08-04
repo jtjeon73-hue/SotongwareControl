@@ -1,6 +1,10 @@
 /// 사업 기획·작업지시 데이터 모델 (로컬 규칙 기반, 외부 AI API 없음).
 library;
 
+import 'artifact_type.dart';
+
+export 'artifact_type.dart';
+
 class DeliverableType {
   static const app = 'app';
   static const ebook = 'ebook';
@@ -254,6 +258,9 @@ class BusinessPlanInput {
     this.extraRequests = '',
     this.wizardSelections,
     this.sentencesManuallyEdited = false,
+    this.artifactType = '',
+    this.contentSubtype = '',
+    this.artifactAnswers = const {},
   });
 
   final String topic;
@@ -277,26 +284,46 @@ class BusinessPlanInput {
   /// 선택형 기획 도우미 원본 (`PlanningWizardState.toJson`).
   final Map<String, dynamic>? wizardSelections;
   final bool sentencesManuallyEdited;
+  final String artifactType;
+  final String contentSubtype;
+  final Map<String, List<String>> artifactAnswers;
 
   List<String> get missingRequiredLabels {
     final missing = <String>[];
+    final artifact = artifactType.trim().isNotEmpty
+        ? ArtifactType.normalize(artifactType)
+        : (deliverableTypes.isNotEmpty
+              ? ArtifactType.normalize(deliverableTypes.first)
+              : ArtifactType.undecided);
+    if (artifact == ArtifactType.undecided || artifact.isEmpty) {
+      missing.add('제작 형태');
+    }
+    if (artifact == ArtifactType.contents) {
+      final sub = ContentSubtype.normalize(
+        contentSubtype.isEmpty ? ContentSubtype.undecided : contentSubtype,
+      );
+      if (sub == ContentSubtype.undecided) {
+        missing.add('콘텐츠 하위 유형');
+      }
+    }
     if (topic.trim().isEmpty) missing.add('사업 주제');
     if (customerProblem.trim().isEmpty) missing.add('고객 문제');
     if (targetCustomer.trim().isEmpty) missing.add('대상 고객');
     if (desiredOutcome.trim().isEmpty) missing.add('원하는 결과');
-    final types = deliverableTypes
-        .map(DeliverableType.normalize)
-        .where((t) => t != DeliverableType.undecided)
-        .toList();
-    if (types.isEmpty &&
-        (deliverableTypes.isEmpty ||
-            deliverableTypes.every((t) => t == DeliverableType.undecided))) {
-      missing.add('희망 결과물');
-    }
     return missing;
   }
 
   bool get hasRequiredFields => missingRequiredLabels.isEmpty;
+
+  String get resolvedArtifactType {
+    if (artifactType.trim().isNotEmpty) {
+      return ArtifactType.normalize(artifactType);
+    }
+    if (deliverableTypes.isNotEmpty) {
+      return ArtifactType.normalize(deliverableTypes.first);
+    }
+    return ArtifactType.undecided;
+  }
 
   List<String> get normalizedDeliverables => deliverableTypes
       .map(DeliverableType.normalize)
@@ -304,10 +331,12 @@ class BusinessPlanInput {
       .toList();
 
   String get primaryDeliverable => normalizedDeliverables.isEmpty
-      ? DeliverableType.ebook
+      ? (resolvedArtifactType == ArtifactType.undecided
+            ? DeliverableType.ebook
+            : resolvedArtifactType)
       : normalizedDeliverables.first;
 
-  String get primaryTrack => WorkTrack.fromDeliverable(primaryDeliverable);
+  String get primaryTrack => ArtifactType.primaryTrackId(resolvedArtifactType);
 
   BusinessPlanInput copyWith({
     String? topic,
@@ -330,6 +359,9 @@ class BusinessPlanInput {
     Map<String, dynamic>? wizardSelections,
     bool? sentencesManuallyEdited,
     bool clearWizardSelections = false,
+    String? artifactType,
+    String? contentSubtype,
+    Map<String, List<String>>? artifactAnswers,
   }) {
     return BusinessPlanInput(
       topic: topic ?? this.topic,
@@ -354,6 +386,9 @@ class BusinessPlanInput {
           : (wizardSelections ?? this.wizardSelections),
       sentencesManuallyEdited:
           sentencesManuallyEdited ?? this.sentencesManuallyEdited,
+      artifactType: artifactType ?? this.artifactType,
+      contentSubtype: contentSubtype ?? this.contentSubtype,
+      artifactAnswers: artifactAnswers ?? this.artifactAnswers,
     );
   }
 
@@ -379,12 +414,33 @@ class BusinessPlanInput {
     'extraRequests': extraRequests,
     if (wizardSelections != null) 'wizardSelections': wizardSelections,
     if (sentencesManuallyEdited) 'sentencesManuallyEdited': true,
+    if (artifactType.isNotEmpty) 'artifactType': artifactType,
+    if (contentSubtype.isNotEmpty) 'contentSubtype': contentSubtype,
+    if (artifactAnswers.isNotEmpty)
+      'artifactAnswers': artifactAnswers.map((k, v) => MapEntry(k, v)),
   };
 
   factory BusinessPlanInput.fromJson(Map<String, dynamic> json) {
     final types =
         (json['deliverableTypes'] as List?)?.map((e) => '$e').toList() ??
         const [DeliverableType.undecided];
+    final answersRaw = json['artifactAnswers'];
+    final answers = <String, List<String>>{};
+    if (answersRaw is Map) {
+      for (final e in answersRaw.entries) {
+        final v = e.value;
+        if (v is List) {
+          answers['${e.key}'] = v.map((x) => '$x').toList();
+        }
+      }
+    }
+    final artifactRaw = '${json['artifactType'] ?? ''}';
+    final resolvedArtifact = artifactRaw.isNotEmpty
+        ? ArtifactType.normalize(artifactRaw)
+        : (types.isNotEmpty
+              ? ArtifactType.normalize(types.first)
+              : ArtifactType.undecided);
+    final subtypeRaw = '${json['contentSubtype'] ?? ''}';
     return BusinessPlanInput(
       topic: '${json['topic'] ?? ''}',
       customerProblem: '${json['customerProblem'] ?? ''}',
@@ -409,6 +465,11 @@ class BusinessPlanInput {
           ? null
           : Map<String, dynamic>.from(json['wizardSelections'] as Map),
       sentencesManuallyEdited: json['sentencesManuallyEdited'] == true,
+      artifactType: resolvedArtifact,
+      contentSubtype: subtypeRaw.isEmpty
+          ? ''
+          : ContentSubtype.normalize(subtypeRaw),
+      artifactAnswers: answers,
     );
   }
 }
@@ -587,6 +648,11 @@ class WorkInstruction {
     this.notes = '',
     this.primaryTrack = '',
     this.followUpTracks = const [],
+    this.artifactType = '',
+    this.contentSubtype = '',
+    this.checksum = '',
+    this.sourceFileName = '',
+    this.status = '',
   });
 
   final String schemaVersion;
@@ -615,6 +681,11 @@ class WorkInstruction {
   final String notes;
   final String primaryTrack;
   final List<String> followUpTracks;
+  final String artifactType;
+  final String contentSubtype;
+  final String checksum;
+  final String sourceFileName;
+  final String status;
 
   Map<String, dynamic> toJson() => {
     'schemaVersion': schemaVersion,
@@ -643,6 +714,12 @@ class WorkInstruction {
     'notes': notes,
     'primaryTrack': primaryTrack,
     'followUpTracks': followUpTracks,
+    'followupTracks': followUpTracks,
+    'artifactType': artifactType,
+    'contentSubtype': contentSubtype,
+    'checksum': checksum,
+    'sourceFileName': sourceFileName,
+    if (status.isNotEmpty) 'status': status,
   };
 
   factory WorkInstruction.fromJson(
@@ -697,7 +774,13 @@ class WorkInstruction {
     primaryTrack: '${json['primaryTrack'] ?? ''}',
     followUpTracks:
         (json['followUpTracks'] as List?)?.map((e) => '$e').toList() ??
+        (json['followupTracks'] as List?)?.map((e) => '$e').toList() ??
         const [],
+    artifactType: '${json['artifactType'] ?? ''}',
+    contentSubtype: '${json['contentSubtype'] ?? ''}',
+    checksum: '${json['checksum'] ?? ''}',
+    sourceFileName: '${json['sourceFileName'] ?? ''}',
+    status: '${json['status'] ?? ''}',
   );
 }
 

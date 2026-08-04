@@ -9,6 +9,8 @@
 # dart-define 없는 flutter build web --release 만으로 운영 배포하지 마세요.
 
 $ErrorActionPreference = "Stop"
+# Flutter/Firebase may write info to stderr; do not treat native stderr as terminating.
+$PSNativeCommandUseErrorActionPreference = $false
 $Root = Split-Path $PSScriptRoot -Parent
 Set-Location $Root
 

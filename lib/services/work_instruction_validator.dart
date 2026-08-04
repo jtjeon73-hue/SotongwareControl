@@ -127,17 +127,28 @@ class WorkInstructionValidator {
       );
     }
 
-    final primary = input.primaryDeliverable;
-    final expectedTrack = WorkTrack.fromDeliverable(primary);
+    final expectedTrack = input.primaryTrack;
     if (instruction.primaryTrack.isNotEmpty &&
-        instruction.primaryTrack != expectedTrack &&
-        primary == DeliverableType.ebook) {
+        instruction.primaryTrack != expectedTrack) {
       issues.add(
         ValidationIssue(
           field: 'primaryTrack',
           reason:
-              '전자책 결과물의 주 트랙이 ${WorkTrack.labelKo(expectedTrack)}이(가) 아닙니다.',
-          fix: '주 작업 트랙을 전자책개발로 맞추세요.',
+              '제작 형태의 주 트랙이 ${ArtifactType.primaryTrack(input.resolvedArtifactType)}(이)가 아닙니다.',
+          fix: '작업지시서를 다시 생성하세요.',
+        ),
+      );
+    }
+
+    final artifact = input.resolvedArtifactType;
+    if (artifact != ArtifactType.undecided &&
+        instruction.artifactType.isNotEmpty &&
+        ArtifactType.normalize(instruction.artifactType) != artifact) {
+      issues.add(
+        ValidationIssue(
+          field: 'artifactType',
+          reason: '지시서 artifactType이 기획과 일치하지 않습니다.',
+          fix: '작업지시서를 다시 생성하세요.',
         ),
       );
     }
