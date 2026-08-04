@@ -253,7 +253,7 @@ void main() {
     expect(find.text('사업기획 및 작업지시 관리'), findsOneWidget);
     expect(find.textContaining('소통24워크로 전달'), findsWidgets);
     expect(find.text('빠른 선택으로 만들기'), findsOneWidget);
-    expect(find.text('전자책개발'), findsWidgets);
+    expect(find.text('전자책'), findsWidgets);
     // 긴 텍스트 입력 라벨이 기본 노출되지 않음
     expect(find.text('사업 주제 *'), findsNothing);
   });

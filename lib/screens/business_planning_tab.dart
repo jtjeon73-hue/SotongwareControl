@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../models/business_planning.dart';
+import '../models/dev_work_doc_status.dart';
 import '../models/planning_wizard_state.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
@@ -67,6 +68,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   String _statusFilter = 'all';
   FolderPermissionState? _folderState;
   DevWorkDocState? _devDocState;
+  DevWorkDocWriteResult? _lastDevWorkDocResult;
   Timer? _draftTimer;
   Timer? _wizardTimer;
 
@@ -410,6 +412,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return doc;
   }
 
+  DevWorkDocStatus get _devWorkDocStatus => DevWorkDocStatus.resolve(
+    devDocState: _devDocState,
+    lastSaveResult: _lastDevWorkDocResult,
+    instruction: _instruction,
+    activeDoc: _activeDoc,
+    transferFolder: _folderState,
+    input: _currentInput,
+  );
+
+  bool get _devWorkDocFolderReady =>
+      _devDocState?.supported == true && _devDocState?.hasRoot == true;
+
   Future<void> _createInstruction() async {
     if (!_canCreateInstruction) {
       _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
@@ -419,11 +433,28 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('이미 작업지시서가 있습니다. 「수정」 또는 「새 버전」을 사용하세요.');
       return;
     }
-
+    if (!_devWorkDocFolderReady) {
+      _snack('DevWorkDoc 폴더를 먼저 설정하세요. JSON만 필요하면 「JSON 다운로드」를 사용하세요.');
+      return;
+    }
     await _saveInstructionInternal(
       version: 1,
       isNewVersion: false,
       appendPreviousToHistory: false,
+      saveTarget: DevWorkDocSaveTarget.folder,
+    );
+  }
+
+  Future<void> _downloadInstructionJson() async {
+    if (!_canCreateInstruction) {
+      _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
+      return;
+    }
+    await _saveInstructionInternal(
+      version: _instruction == null ? 1 : _version,
+      isNewVersion: false,
+      appendPreviousToHistory: false,
+      saveTarget: DevWorkDocSaveTarget.downloadOnly,
     );
   }
 
@@ -436,6 +467,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       version: _version,
       isNewVersion: false,
       appendPreviousToHistory: false,
+      saveTarget: DevWorkDocSaveTarget.folder,
     );
   }
 
@@ -448,6 +480,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       version: _version + 1,
       isNewVersion: true,
       appendPreviousToHistory: true,
+      saveTarget: DevWorkDocSaveTarget.folder,
     );
   }
 
@@ -455,7 +488,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     required int version,
     required bool isNewVersion,
     required bool appendPreviousToHistory,
+    DevWorkDocSaveTarget saveTarget = DevWorkDocSaveTarget.folder,
   }) async {
+    if (!_canCreateInstruction) {
+      _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
+      return;
+    }
+    if (saveTarget == DevWorkDocSaveTarget.folder &&
+        _instruction == null &&
+        !_devWorkDocFolderReady) {
+      _snack('DevWorkDoc 폴더를 먼저 설정하세요.');
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     final input = _currentInput;
     final analysis = _ensureAnalysis(input);
@@ -524,15 +568,28 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       '  ',
     ).convert(instruction.toJson());
     final artifact = input.resolvedArtifactType;
-    final saveResult = await _devWorkDoc.saveInstruction(
-      artifactType: artifact,
-      instructionId: iid,
-      version: version,
-      jsonText: jsonText,
-      isNewVersion: isNewVersion && version > 1,
-    );
+    final DevWorkDocWriteResult saveResult;
+    if (saveTarget == DevWorkDocSaveTarget.downloadOnly) {
+      saveResult = await _devWorkDoc.downloadInstructionJson(
+        artifactType: artifact,
+        instructionId: iid,
+        version: version,
+        jsonText: jsonText,
+      );
+    } else {
+      saveResult = await _devWorkDoc.saveInstruction(
+        artifactType: artifact,
+        instructionId: iid,
+        version: version,
+        jsonText: jsonText,
+        isNewVersion: isNewVersion && version > 1,
+      );
+    }
 
     if (!saveResult.ok) {
+      if (mounted) {
+        setState(() => _lastDevWorkDocResult = saveResult);
+      }
       _snack(saveResult.message ?? 'DevWorkDoc 저장에 실패했습니다.');
       return;
     }
@@ -570,15 +627,31 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _analysis = analysis;
       _instruction = instruction;
       _activeDoc = doc;
+      _lastDevWorkDocResult = saveResult;
     });
 
-    if (saveResult.mode == 'folder') {
-      final hint =
+    if (saveTarget == DevWorkDocSaveTarget.downloadOnly) {
+      _snack(
+        '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님). '
+        'v$version · ${saveResult.fileName ?? ''}',
+      );
+    } else if (saveResult.mode == 'folder') {
+      final activeHint =
           saveResult.activePathHint ??
           DevWorkDocPaths.activeRelative(artifact, iid);
-      _snack('작업지시서 v$version 저장: $hint');
+      final versionHint =
+          saveResult.versionPathHint ??
+          DevWorkDocPaths.versionRelative(artifact, iid, version);
+      _snack(
+        'DevWorkDoc에 저장했습니다. v$version\n'
+        'Active: $activeHint\n'
+        'Versions: $versionHint',
+      );
     } else if (saveResult.mode == 'download') {
-      _snack('작업지시서 v$version 생성됨. DevWorkDoc에 직접 저장되지 않았고 다운로드로 대체되었습니다.');
+      _snack(
+        '폴더 저장에 실패해 다운로드로 대체되었습니다. '
+        'DevWorkDoc 직접 저장이 아닙니다. (v$version)',
+      );
     } else if (validation.ok) {
       _snack('작업지시서를 생성했습니다. (v$version)');
     } else {
@@ -1546,7 +1619,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (_instruction == null) {
       return [
         FilledButton.icon(
-          onPressed: _canCreateInstruction ? () => _createInstruction() : null,
+          onPressed: _canCreateInstruction ? _createOrPromptInstruction : null,
           icon: const Icon(Icons.description_outlined, size: 18),
           label: const Text('작업지시서 생성'),
         ),
@@ -1567,11 +1640,83 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ),
       ];
     }
+    return const [];
+  }
+
+  Future<void> _createOrPromptInstruction() async {
+    if (!_canCreateInstruction) {
+      _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
+      return;
+    }
+    if (_devWorkDocFolderReady) {
+      await _createInstruction();
+      return;
+    }
+    // 폴더 미설정: 지시서는 생성하되 DevWorkDoc 직접 저장과 구분 (다운로드)
+    await _downloadInstructionJson();
+  }
+
+  Widget _buildDevWorkDocStatusBanner() {
+    final status = _devWorkDocStatus;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: ControlColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: ControlColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(status.icon, size: 18, color: ControlColors.textPrimary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  status.displayLabel,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: ControlColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            status.nextAction,
+            style: const TextStyle(
+              fontSize: 12,
+              color: ControlColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildDevWorkDocSaveActions() {
+    if (!_planReady || _isInstructionArchived) return const [];
+
     return [
-      FilledButton.tonalIcon(
-        onPressed: _canCreateInstruction ? () => _createInstruction() : null,
-        icon: const Icon(Icons.description_outlined, size: 18),
-        label: const Text('작업지시서 생성'),
+      FilledButton.icon(
+        onPressed: (_canCreateInstruction && _devWorkDocFolderReady)
+            ? () => _instruction == null
+                  ? _createInstruction()
+                  : _editInstruction()
+            : null,
+        icon: const Icon(Icons.save, size: 18),
+        label: Text(
+          _instruction == null ? 'DevWorkDoc에 저장' : 'DevWorkDoc에 다시 저장',
+        ),
+      ),
+      OutlinedButton.icon(
+        onPressed: _canCreateInstruction ? _downloadInstructionJson : null,
+        icon: const Icon(Icons.download_outlined, size: 18),
+        label: const Text('JSON 다운로드'),
       ),
     ];
   }
@@ -1588,7 +1733,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               'DevWorkDoc 작업지시서 저장',
               style: Theme.of(context).textTheme.titleSmall,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+            _buildDevWorkDocStatusBanner(),
+            const SizedBox(height: 10),
             const Text(
               'SotongWareControl 폴더 안에 DevWorkDoc 폴더를 만들거나 선택해 주세요.',
               style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
@@ -1604,7 +1751,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             else if (devDoc != null && !devDoc.supported)
               const Text(
                 '이 환경에서는 폴더 직접 저장을 지원하지 않습니다. '
-                '작업지시서 생성 시 JSON 다운로드로 대체됩니다.',
+                '「JSON 다운로드」로 파일을 받은 뒤 수동으로 배치하세요.',
                 style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
               )
             else
@@ -1624,6 +1771,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   icon: const Icon(Icons.folder_open, size: 18),
                   label: const Text('작업지시서 관리 폴더 설정'),
                 ),
+                ..._buildDevWorkDocSaveActions(),
                 OutlinedButton.icon(
                   onPressed: _migratePlansToDevWorkDoc,
                   icon: const Icon(Icons.sync_alt, size: 18),

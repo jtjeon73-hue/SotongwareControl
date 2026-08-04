@@ -15,6 +15,18 @@ class DevWorkDocService {
 
   Future<DevWorkDocWriteResult> ensureStructure() => impl.ensureStructure();
 
+  Future<DevWorkDocWriteResult> downloadInstructionJson({
+    required String artifactType,
+    required String instructionId,
+    required int version,
+    required String jsonText,
+  }) => impl.downloadInstructionJson(
+    artifactType: artifactType,
+    instructionId: instructionId,
+    version: version,
+    jsonText: jsonText,
+  );
+
   Future<DevWorkDocWriteResult> saveInstruction({
     required String artifactType,
     required String instructionId,

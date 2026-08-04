@@ -20,24 +20,31 @@ class ArtifactType {
     promoSite: 'PromoSite',
   };
 
-  static String labelKo(String id) {
+  /// UI 짧은 표시명 (기획 마법사·목록 통일).
+  static String labelShortKo(String id) {
     switch (normalize(id)) {
       case app:
-        return '앱개발';
+        return '앱';
       case ebook:
-        return '전자책개발';
+        return '전자책';
       case contents:
-        return '콘텐츠개발';
+        return '콘텐츠';
       case site:
-        return '일반 사이트개발';
+        return '사이트';
       case promoSite:
-        return '마케팅 사이트개발';
+        return '홍보사이트';
       case undecided:
         return '아직 결정하지 못함';
       default:
         return id;
     }
   }
+
+  /// [labelShortKo]와 동일 — 화면 표시는 짧은 이름으로 통일.
+  static String labelKo(String id) => labelShortKo(id);
+
+  /// 개발 트랙 짧은 표시 (primaryTrack과 동일 계열).
+  static String labelDevKo(String id) => primaryTrack(id);
 
   /// 레거시 deliverable → artifact.
   static String normalize(String raw) {

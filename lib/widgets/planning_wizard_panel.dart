@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../data/artifact_question_catalog.dart';
 import '../models/artifact_type.dart';
 import '../models/business_planning.dart';
+import '../models/planning_summary.dart';
 import '../models/planning_wizard_state.dart';
 import '../services/planning_sentence_composer.dart';
 import '../theme/control_theme.dart';
@@ -848,77 +849,30 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
   }
 
   Widget _buildConfirmationSummary() {
-    final input = _composer.toBusinessPlanInput(_state);
-    final artifact = _state.effectiveArtifactType;
+    final summary = PlanningSummary.fromWizard(_state);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('기획 요약', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 10),
-        if (artifact != null)
-          _summaryRow('결과물', ArtifactType.labelKo(artifact)),
-        if (_state.contentSubtype != null && artifact == ArtifactType.contents)
+        _summaryRow('제작 형태', summary.artifactLabel),
+        _summaryRow('주 트랙', summary.primaryTrack),
+        _summaryRow('주요 결과물', summary.mainDeliverables),
+        _summaryRow('대상 사용자', summary.targetUser),
+        _summaryRow('핵심 목적', summary.purpose),
+        _summaryRow('수익화 방향', summary.monetization),
+        _summaryRow('소통24워크 전달 준비 상태', summary.transferReadyLabel),
+        if (_state.contentSubtype != null &&
+            _state.effectiveArtifactType == ArtifactType.contents) ...[
+          const SizedBox(height: 4),
           _summaryRow(
             '콘텐츠 유형',
             ContentSubtype.labelKo(
               ContentSubtype.normalize(_state.contentSubtype!),
             ),
           ),
-        _summaryRow('주제', input.topic),
-        _summaryRow('고객 문제', input.customerProblem),
-        _summaryRow('대상 고객', input.targetCustomer),
-        _summaryRow('원하는 결과', input.desiredOutcome),
-        if (input.expectedScale.isNotEmpty)
-          _summaryRow('규모', input.expectedScale),
-        if (input.expectedDuration.isNotEmpty)
-          _summaryRow('기간', input.expectedDuration),
-        if (input.budgetEstimate.isNotEmpty)
-          _summaryRow('예산', input.budgetEstimate),
-        if (input.revenueModel.isNotEmpty)
-          _summaryRow('판매 방식', input.revenueModel),
-        const SizedBox(height: 8),
-        _buildAnswerSummary(),
-      ],
-    );
-  }
-
-  Widget _buildAnswerSummary() {
-    final artifact = _state.effectiveArtifactType;
-    if (artifact == null) return const SizedBox.shrink();
-
-    final questions = questionsFor(
-      artifact: artifact,
-      contentSubtype: _state.contentSubtype,
-    );
-    final rows = <Widget>[];
-
-    for (final q in questions) {
-      final ids = _state.artifactAnswers[q.id];
-      if (ids == null || ids.isEmpty) continue;
-
-      final labels = ids
-          .map((id) {
-            if (id == 'custom') {
-              return _state.customTexts[q.id]?.trim() ?? '직접 입력';
-            }
-            final opt = q.options.where((o) => o.id == id).firstOrNull;
-            return opt?.label ?? id;
-          })
-          .where((l) => l.isNotEmpty);
-
-      if (labels.isEmpty) continue;
-      rows.add(_summaryRow(q.label, labels.join(', ')));
-    }
-
-    if (rows.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('선택 답변', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 6),
-        ...rows,
+        ],
       ],
     );
   }
@@ -957,7 +911,7 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
         Expanded(
           child: FilledButton(
             onPressed: _goNext,
-            child: Text(_state.step == 3 ? '최종 확인' : '다음'),
+            child: Text(_state.step == 3 ? '기획안 완성' : '다음'),
           ),
         ),
       ],
@@ -1059,13 +1013,5 @@ class _ChoiceCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-extension _FirstOrNullPanel<E> on Iterable<E> {
-  E? get firstOrNull {
-    final iterator = this.iterator;
-    if (!iterator.moveNext()) return null;
-    return iterator.current;
   }
 }

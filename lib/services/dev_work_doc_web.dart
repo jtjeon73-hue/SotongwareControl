@@ -320,6 +320,37 @@ Future<DevWorkDocWriteResult> ensureStructure() async {
   }
 }
 
+Future<DevWorkDocWriteResult> downloadInstructionJson({
+  required String artifactType,
+  required String instructionId,
+  required int version,
+  required String jsonText,
+}) async {
+  final activePath = DevWorkDocPaths.activeRelative(
+    artifactType,
+    instructionId,
+  );
+  final versionPath = DevWorkDocPaths.versionRelative(
+    artifactType,
+    instructionId,
+    version,
+  );
+  final fileName =
+      '${DevWorkDocPaths.wiBaseName(instructionId)}_v$version.json';
+  _triggerDownload(fileName, jsonText);
+  return DevWorkDocWriteResult(
+    ok: true,
+    mode: 'download',
+    fileName: fileName,
+    activePathHint: activePath,
+    versionPathHint: versionPath,
+    message:
+        '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님). '
+        '폴더에 배치하려면 DevWorkDoc에 저장을 사용하세요.',
+    errorCode: 'download_only',
+  );
+}
+
 Future<DevWorkDocWriteResult> saveInstruction({
   required String artifactType,
   required String instructionId,
