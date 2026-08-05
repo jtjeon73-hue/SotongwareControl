@@ -80,17 +80,86 @@ class PlanningSentenceComposer {
       return '$subLabel $artifactLabel';
     }
 
+    final domainPhrase = _artifactDomainPhrase(state);
     final kindLabel =
         _firstAnswerLabel(state, artifact, 'ebookKind') ??
         _firstAnswerLabel(state, artifact, 'appKind') ??
         _firstAnswerLabel(state, artifact, 'sitePurpose') ??
         _firstAnswerLabel(state, artifact, 'productService');
 
+    if (artifact == ArtifactType.ebook) {
+      final kindIds = state.artifactAnswers['ebookKind'] ?? const [];
+      if (domainPhrase.isNotEmpty && kindLabel != null) {
+        return '$domainPhrase $kindLabel $artifactLabel';
+      }
+      if (kindIds.contains('guide') || kindLabel == '가이드') {
+        if (_hasRuralOnlineContext(state)) {
+          return 'AI·온라인 수익 실행 가이드 $artifactLabel';
+        }
+        return '실행 가이드 $artifactLabel';
+      }
+      if (kindLabel != null && kindLabel.isNotEmpty) {
+        return '$kindLabel $artifactLabel';
+      }
+      if (domainPhrase.isNotEmpty) {
+        return '$domainPhrase $artifactLabel';
+      }
+      return '$artifactLabel 기획';
+    }
+
     if (kindLabel != null && kindLabel.isNotEmpty) {
+      if (domainPhrase.isNotEmpty) {
+        return '$domainPhrase $kindLabel $artifactLabel';
+      }
       return '$kindLabel $artifactLabel';
     }
 
+    if (domainPhrase.isNotEmpty) {
+      return '$domainPhrase $artifactLabel';
+    }
+
     return '$artifactLabel 기획';
+  }
+
+  bool _hasRuralOnlineContext(PlanningWizardState state) {
+    if (state.domains.contains('rural_life') ||
+        state.domains.contains('online_income') ||
+        state.domains.contains('return_farm')) {
+      return true;
+    }
+    final problems = state.artifactAnswers['customerProblem'] ?? const [];
+    if (problems.contains('productize_unknown')) return true;
+    final targets = state.artifactAnswers['targetCustomer'] ?? const [];
+    return targets.contains('return_prep') ||
+        targets.contains('sidejob_40_60') ||
+        targets.contains('rural_resident');
+  }
+
+  String _artifactDomainPhrase(PlanningWizardState state) {
+    if (state.domains.contains('rural_life') ||
+        state.domains.contains('return_farm')) {
+      if (state.domains.contains('online_income')) {
+        return 'AI·온라인 수익';
+      }
+      return '농촌·귀촌';
+    }
+    if (state.domains.contains('online_income')) {
+      return '온라인 수익';
+    }
+
+    final problems = state.artifactAnswers['customerProblem'] ?? const [];
+    if (problems.contains('productize_unknown')) {
+      return 'AI·온라인 수익';
+    }
+
+    for (final entry in state.customTexts.entries) {
+      if (entry.key.startsWith('_')) continue;
+      final v = entry.value.trim();
+      if (v.contains('농촌') || v.contains('시골') || v.contains('귀촌')) {
+        return '농촌·온라인';
+      }
+    }
+    return '';
   }
 
   String? _firstAnswerLabel(
@@ -172,8 +241,11 @@ class PlanningSentenceComposer {
         .toList();
   }
 
-  /// 추천값 + 문장을 채운다. [sentencesManuallyEdited]이면 문장은 건드리지 않는다.
-  PlanningWizardState applyAutoComplete(PlanningWizardState state) {
+  /// 추천값 + 빈 문장만 채운다. [sentencesManuallyEdited]이면 문장은 건드리지 않는다.
+  PlanningWizardState applyAutoComplete(
+    PlanningWizardState state, {
+    bool trackUndo = false,
+  }) {
     if (!state.canProceedPastArtifact && !state.canAutoComplete) return state;
 
     var next = _usesArtifactFlow(state)
@@ -182,12 +254,71 @@ class PlanningSentenceComposer {
 
     if (next.sentencesManuallyEdited) return next;
 
+    final customTexts = Map<String, String>.from(next.customTexts);
+
+    String fillField(
+      String current,
+      String fieldKey,
+      String Function() compose,
+    ) {
+      if (current.trim().isNotEmpty) return current;
+      if (trackUndo) {
+        customTexts['_undo_$fieldKey'] = current;
+      }
+      customTexts['_recommended:$fieldKey'] = '1';
+      return compose();
+    }
+
     return next.copyWith(
-      topic: composeTopic(next),
-      customerProblem: composeProblem(next),
-      targetCustomer: composeAudience(next),
-      desiredOutcome: composeOutcome(next),
+      topic: fillField(next.topic, 'topic', () => composeTopic(next)),
+      customerProblem: fillField(
+        next.customerProblem,
+        'customerProblem',
+        () => composeProblem(next),
+      ),
+      targetCustomer: fillField(
+        next.targetCustomer,
+        'targetCustomer',
+        () => composeAudience(next),
+      ),
+      desiredOutcome: fillField(
+        next.desiredOutcome,
+        'desiredOutcome',
+        () => composeOutcome(next),
+      ),
+      customTexts: customTexts,
     );
+  }
+
+  /// 자동 완성 직전 값으로 되돌린다 (추적된 필드만).
+  PlanningWizardState undoAutofill(PlanningWizardState state) {
+    final customTexts = Map<String, String>.from(state.customTexts);
+    var next = state;
+
+    for (final field in const [
+      'topic',
+      'customerProblem',
+      'targetCustomer',
+      'desiredOutcome',
+    ]) {
+      final undoKey = '_undo_$field';
+      if (!customTexts.containsKey(undoKey)) continue;
+      final previous = customTexts.remove(undoKey)!;
+      customTexts.remove('_recommended:$field');
+      next = switch (field) {
+        'topic' => next.copyWith(topic: previous),
+        'customerProblem' => next.copyWith(customerProblem: previous),
+        'targetCustomer' => next.copyWith(targetCustomer: previous),
+        'desiredOutcome' => next.copyWith(desiredOutcome: previous),
+        _ => next,
+      };
+    }
+
+    return next.copyWith(customTexts: customTexts);
+  }
+
+  bool hasAutofillUndo(PlanningWizardState state) {
+    return state.customTexts.keys.any((k) => k.startsWith('_undo_'));
   }
 
   PlanningWizardState _applyArtifactDefaults(PlanningWizardState state) {

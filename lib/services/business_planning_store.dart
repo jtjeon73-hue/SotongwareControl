@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/business_planning.dart';
+import 'plan_progress_status.dart';
 
 /// 사업 기획안·작업지시서 로컬 저장 (SharedPreferences).
 /// Firestore/유료 API를 사용하지 않는다.
@@ -22,11 +23,26 @@ class BusinessPlanningStore {
           ),
         )
         .toList();
-    final deduped = dedupeById(plans);
-    if (deduped.length != plans.length) {
+    final reconciled = PlanProgressStatus.reconcileAll(plans);
+    final deduped = dedupeById(reconciled);
+    final changed =
+        deduped.length != plans.length || !_sameStatuses(plans, deduped);
+    if (changed) {
       await savePlans(deduped);
     }
     return deduped;
+  }
+
+  static bool _sameStatuses(
+    List<BusinessPlanDocument> a,
+    List<BusinessPlanDocument> b,
+  ) {
+    if (a.length != b.length) return false;
+    final map = {for (final p in b) p.id: p.status};
+    for (final p in a) {
+      if (map[p.id] != p.status) return false;
+    }
+    return true;
   }
 
   /// 동일 id가 여러 번 있으면 최신 updatedAt 1건만 남긴다.

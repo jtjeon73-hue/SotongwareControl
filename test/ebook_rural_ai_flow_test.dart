@@ -220,10 +220,14 @@ void main() {
 
     expect(summary.artifactLabel, '전자책');
     expect(summary.primaryTrack, '전자책개발');
-    expect(summary.mainDeliverables, contains(testDeliverables));
+    expect(summary.deliverableItems, isNotEmpty);
+    expect(summary.deliverableItems, isNot(contains('전자책개발')));
     expect(summary.targetUser, testAudience);
     expect(summary.purpose, testTopic);
     expect(summary.transferReadyLabel, '작업지시서 미생성 — 전달 준비 전');
+
+    final basic = summary.sections.firstWhere((s) => s.title == '기본 기획');
+    expect(basic.fields.where((f) => f.label == '고객 문제').length, 1);
 
     final withInstruction = PlanningSummary.fromWizard(
       state,
@@ -295,7 +299,11 @@ void main() {
     expect(archived.stableInstructionId, 'wi_test_rural_ai');
     expect(archived.version, 2);
     expect(
-      DevWorkDocPaths.archiveRelative(ArtifactType.ebook, archived.stableInstructionId, 2),
+      DevWorkDocPaths.archiveRelative(
+        ArtifactType.ebook,
+        archived.stableInstructionId,
+        2,
+      ),
       'Ebook/Archive/WI_wi_test_rural_ai_v2.json',
     );
 

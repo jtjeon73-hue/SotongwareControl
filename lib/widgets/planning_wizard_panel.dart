@@ -278,7 +278,7 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
       if (!ok) return;
     }
 
-    var next = _composer.applyAutoComplete(_state);
+    var next = _composer.applyAutoComplete(_state, trackUndo: true);
     if (_state.step >= 3 && !next.sentencesManuallyEdited) {
       next = _composer.regenerateSentences(next, force: true);
     }
@@ -286,6 +286,14 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
     _setState(next, immediate: true);
     _syncSentenceControllers();
     _snack('추천 선택과 문장을 자동으로 채웠습니다.');
+  }
+
+  void _undoAutofill() {
+    final next = _composer.undoAutofill(_state);
+    _sentencesEditing = false;
+    _setState(next, immediate: true);
+    _syncSentenceControllers();
+    _snack('자동 완성을 취소했습니다.');
   }
 
   Future<bool> _confirmRegenerateSentences() async {
@@ -428,6 +436,12 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
                       icon: const Icon(Icons.auto_fix_high, size: 18),
                       label: const Text('추천 기획으로 자동 완성'),
                     ),
+                    if (_composer.hasAutofillUndo(_state))
+                      OutlinedButton.icon(
+                        onPressed: _undoAutofill,
+                        icon: const Icon(Icons.undo, size: 18),
+                        label: const Text('자동 완성 취소'),
+                      ),
                     SegmentedButton<String>(
                       segments: const [
                         ButtonSegment(value: 'quick', label: Text('빠른')),
@@ -851,29 +865,66 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
   Widget _buildConfirmationSummary() {
     final summary = PlanningSummary.fromWizard(_state);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('기획 요약', style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 10),
-        _summaryRow('제작 형태', summary.artifactLabel),
-        _summaryRow('주 트랙', summary.primaryTrack),
-        _summaryRow('주요 결과물', summary.mainDeliverables),
-        _summaryRow('대상 사용자', summary.targetUser),
-        _summaryRow('핵심 목적', summary.purpose),
-        _summaryRow('수익화 방향', summary.monetization),
-        _summaryRow('소통24워크 전달 준비 상태', summary.transferReadyLabel),
-        if (_state.contentSubtype != null &&
-            _state.effectiveArtifactType == ArtifactType.contents) ...[
-          const SizedBox(height: 4),
-          _summaryRow(
-            '콘텐츠 유형',
-            ContentSubtype.labelKo(
-              ContentSubtype.normalize(_state.contentSubtype!),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenW = MediaQuery.sizeOf(context).width;
+        final width = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : screenW;
+        final twoColumn = width >= 900;
+        final cards = summary.sections
+            .where((s) => s.nonEmptyFields.isNotEmpty)
+            .map((section) => _buildSummarySectionCard(section))
+            .toList();
+
+        if (twoColumn) {
+          final cardW = ((width - 12) / 2).clamp(280.0, 640.0);
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final card in cards) SizedBox(width: cardW, child: card),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < cards.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              cards[i],
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSummarySectionCard(PlanningSummarySection section) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ControlColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: ControlColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            section.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: ControlColors.textPrimary,
             ),
           ),
+          const SizedBox(height: 8),
+          for (final field in section.nonEmptyFields)
+            _summaryRow(field.label, field.value),
         ],
-      ],
+      ),
     );
   }
 
@@ -929,8 +980,8 @@ class _PlanningWizardPanelState extends State<PlanningWizardPanel> {
         const SizedBox(height: 8),
         FilledButton.icon(
           onPressed: widget.onSavePlan,
-          icon: const Icon(Icons.save_outlined),
-          label: const Text('기획안 저장'),
+          icon: const Icon(Icons.check_circle_outline),
+          label: const Text('기획안 완성'),
         ),
       ],
     );

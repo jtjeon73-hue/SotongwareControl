@@ -13,6 +13,7 @@ import '../services/business_planning_store.dart';
 import '../services/dev_work_doc_paths.dart';
 import '../services/dev_work_doc_service.dart';
 import '../services/instruction_transfer_service.dart';
+import '../services/plan_progress_status.dart';
 import '../services/planning_sentence_composer.dart';
 import '../services/work_instruction_filename.dart';
 import '../services/work_instruction_validator.dart';
@@ -408,7 +409,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _instruction = doc.instruction;
       }
     });
-    if (!silent) _snack('기획을 저장했습니다.');
+    if (!silent) _snack('기획안을 임시 저장했습니다.');
     return doc;
   }
 
@@ -678,15 +679,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     setState(() => _transferBusy = true);
     try {
       await _savePlan(silent: true);
-      if (_instruction == null) {
-        await _createInstruction();
-      }
-
-      final folder = await _transfer.currentState();
-      if (!folder.supported) {
-        _snack('이 환경에서는 폴더 전달을 지원하지 않습니다.');
-        return;
-      }
 
       final jsonText = const JsonEncoder.withIndent(
         '  ',
@@ -712,9 +704,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       }
 
       final now = DateTime.now().toUtc().toIso8601String();
-      final newStatus = result.mode == 'folder'
-          ? PlanningStatus.transferred
-          : PlanningStatus.downloadedPendingImport;
+      final newStatus = PlanProgressStatus.statusAfterTransferAttempt(
+        mode: result.mode,
+      );
 
       final id = _activePlanId!;
       final existing = _allPlans.firstWhere((p) => p.id == id);
@@ -731,14 +723,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       await _store.upsertPlan(doc);
       await _refreshPlans();
       if (!mounted) return;
+      final folder = await _transfer.currentState();
+      if (!mounted) return;
       setState(() {
         _activeDoc = doc;
+        _folderState = folder;
       });
 
-      if (result.mode == 'folder') {
-        _snack('소통24워크 Inbox 폴더에 전달했습니다.');
+      if (result.mode == PlanProgressStatus.folderMode) {
+        _snack('소통24워크 Inbox 전달 완료');
       } else {
-        _snack('파일을 다운로드했습니다. 소통24워크에서 가져오기를 진행하세요.');
+        _snack('수동 가져오기용 JSON 다운로드');
       }
     } finally {
       if (mounted) setState(() => _transferBusy = false);
@@ -1280,38 +1275,41 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return DateFormat('yyyy-MM-dd HH:mm').format(dt.toLocal());
   }
 
-  Color _statusColor(String status) {
-    switch (PlanningStatus.normalize(status)) {
-      case PlanningStatus.transferred:
+  PlanProgressView _progressFor(BusinessPlanDocument? plan) {
+    return PlanProgressStatus.resolve(
+      plan,
+      hasDevWorkDocRoot: _devWorkDocFolderReady,
+      hasTransferFolder: _folderState?.hasHandle == true,
+      lastDevWorkDocMode: _lastDevWorkDocResult?.mode,
+    );
+  }
+
+  PlanProgressView get _activeProgressView => _progressFor(_activeDoc);
+
+  Color _progressBadgeColor(PlanProgressView view) {
+    switch (view.kind) {
+      case PlanProgressKind.inboxTransferred:
+      case PlanProgressKind.imported:
         return ControlColors.accentGreen;
-      case PlanningStatus.instructionReady:
-      case PlanningStatus.readyToTransfer:
-        return ControlColors.teal;
-      case PlanningStatus.validationRequired:
-        return ControlColors.accentWarm;
-      case PlanningStatus.downloadedPendingImport:
+      case PlanProgressKind.jsonDownloaded:
         return ControlColors.sandBeige;
-      default:
+      case PlanProgressKind.transferReady:
+        return ControlColors.teal;
+      case PlanProgressKind.failed:
+        return ControlColors.accentWarm;
+      case PlanProgressKind.archived:
         return ControlColors.textMuted;
+      default:
+        return ControlColors.sandBeige;
     }
   }
 
   String _planListBadge(BusinessPlanDocument plan) {
-    final status = PlanningStatus.normalize(plan.status);
-    if (status == PlanningStatus.archived) return '보관됨';
-    if (plan.wasTransferred || status == PlanningStatus.transferred) {
-      return '전달됨';
-    }
-    if (plan.hasInstruction) return '지시서 v${plan.version}';
-    return '기획안만';
+    return _progressFor(plan).badgeLabel;
   }
 
   Color _planListBadgeColor(BusinessPlanDocument plan) {
-    final badge = _planListBadge(plan);
-    if (badge == '전달됨') return ControlColors.accentGreen;
-    if (badge.startsWith('지시서')) return ControlColors.teal;
-    if (badge == '보관됨') return ControlColors.textMuted;
-    return ControlColors.sandBeige;
+    return _progressBadgeColor(_progressFor(plan));
   }
 
   List<BusinessPlanDocument> get _latestPlans {
@@ -1332,6 +1330,89 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           .toList();
     }
     return list;
+  }
+
+  List<BusinessPlanDocument> _similarPlans(BusinessPlanDocument plan) {
+    final topic = plan.input.topic.trim().toLowerCase();
+    if (topic.isEmpty) return const [];
+    return _latestPlans
+        .where(
+          (p) => p.id != plan.id && p.input.topic.trim().toLowerCase() == topic,
+        )
+        .toList();
+  }
+
+  Future<void> _onPlanTileTap(BusinessPlanDocument plan) async {
+    final similar = _similarPlans(plan);
+    if (similar.isEmpty) {
+      _loadPlan(plan);
+      return;
+    }
+
+    if (!mounted) return;
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(plan.input.topic.isEmpty ? '(주제 미입력)' : plan.input.topic),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '같은 주제의 기획안이 여러 개 있습니다. '
+                '어떻게 진행할지 선택하세요.',
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '유사 기획 ${similar.length + 1}건',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              for (final p in [plan, ...similar])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '· ${p.input.topic.isEmpty ? '(주제 미입력)' : p.input.topic} '
+                    '(v${p.version} · ${_planListBadge(p)})',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'link_theme'),
+            child: const Text('테마 묶음으로 연결'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'merge_review'),
+            child: const Text('병합 검토'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'open'),
+            child: const Text('이 기획안 열기'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'open':
+        _loadPlan(plan);
+      case 'link_theme':
+        _loadPlan(plan);
+        _snack('테마 묶음 연결은 메모에 표시했습니다. 관련 기획을 함께 검토하세요.');
+      case 'merge_review':
+        _loadPlan(plan);
+        _snack('병합 검토 모드: 유사 기획 ${similar.length}건과 내용을 비교하세요.');
+    }
   }
 
   Set<String> get _duplicateTopics {
@@ -1356,34 +1437,173 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildBanner(),
-        const SizedBox(height: 12),
-        _buildModeToggle(),
-        const SizedBox(height: 12),
-        if (_inputModeQuick)
-          PlanningWizardPanel(
-            initial: _wizardState,
-            onChanged: _onWizardChanged,
-            onSavePlan: () => _savePlan(),
-          )
-        else
-          _buildAdvancedForm(),
-        if (_planReady) ...[
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildBanner(),
+          if (_planReady || _activeDoc != null) ...[
+            const SizedBox(height: 10),
+            _buildProgressBanner(),
+          ],
           const SizedBox(height: 12),
-          _buildReviewCard(),
+          _buildModeToggle(),
           const SizedBox(height: 12),
-          _buildMainActions(),
+          if (_inputModeQuick)
+            PlanningWizardPanel(
+              initial: _wizardState,
+              onChanged: _onWizardChanged,
+              onSavePlan: () => _savePlan(),
+            )
+          else
+            _buildAdvancedForm(),
+          if (_planReady) ...[
+            const SizedBox(height: 12),
+            _buildReviewCard(),
+            const SizedBox(height: 12),
+            _buildWorkflowStepStrip(),
+            const SizedBox(height: 12),
+            _buildMainActions(),
+          ],
+          const SizedBox(height: 12),
+          _buildDevWorkDocFolderSettings(),
+          const SizedBox(height: 12),
+          _buildFolderSettings(),
+          const SizedBox(height: 20),
+          _buildSavedPlansSection(),
         ],
-        const SizedBox(height: 12),
-        _buildDevWorkDocFolderSettings(),
-        const SizedBox(height: 12),
-        _buildFolderSettings(),
-        const SizedBox(height: 20),
-        _buildSavedPlansSection(),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildProgressBanner() {
+    final view = _activeProgressView;
+    return Material(
+      elevation: 1,
+      borderRadius: BorderRadius.circular(10),
+      color: ControlColors.surfaceMuted,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: ControlColors.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.route_outlined, size: 20, color: ControlColors.teal),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    view.statusLine,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: ControlColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    view.nextAction,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: ControlColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            StatusBadge(
+              label: view.badgeLabel,
+              color: _progressBadgeColor(view),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkflowStepStrip() {
+    final view = _activeProgressView;
+    final steps = [
+      _WorkflowStepDef('기획안 완성', _planReady),
+      _WorkflowStepDef('작업지시서 생성', _instruction != null),
+      _WorkflowStepDef(
+        'DevWorkDoc 저장',
+        _lastDevWorkDocResult?.mode == PlanProgressStatus.folderMode ||
+            (_activeDoc?.hasInstruction == true && _devWorkDocFolderReady),
+      ),
+      _WorkflowStepDef('소통24워크 전달', view.isTrulyTransferred),
+      _WorkflowStepDef('가져오기 확인', view.kind == PlanProgressKind.imported),
+    ];
+
+    var currentIndex = steps.indexWhere((s) => !s.done);
+    if (currentIndex < 0) currentIndex = steps.length - 1;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('진행 단계', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 10),
+            for (var i = 0; i < steps.length; i++)
+              _buildWorkflowStepRow(
+                steps[i],
+                isCurrent: i == currentIndex,
+                isLast: i == steps.length - 1,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkflowStepRow(
+    _WorkflowStepDef step, {
+    required bool isCurrent,
+    required bool isLast,
+  }) {
+    final color = step.done
+        ? ControlColors.accentGreen
+        : isCurrent
+        ? ControlColors.teal
+        : ControlColors.textMuted;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            step.done
+                ? Icons.check_circle
+                : isCurrent
+                ? Icons.radio_button_checked
+                : Icons.radio_button_off,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              step.label,
+              style: TextStyle(
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                color: step.done || isCurrent
+                    ? ControlColors.textPrimary
+                    : ControlColors.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1510,6 +1730,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   Widget _buildReviewCard() {
     final input = _currentInput;
+    final progress = _activeProgressView;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1530,11 +1751,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                     color: ControlColors.teal,
                   ),
                 const SizedBox(width: 6),
-                if (_activeDoc != null)
-                  StatusBadge(
-                    label: PlanningStatus.labelKo(_activeDoc!.status),
-                    color: _statusColor(_activeDoc!.status),
-                  ),
+                StatusBadge(
+                  label: progress.badgeLabel,
+                  color: _progressBadgeColor(progress),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -1542,23 +1762,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               input.topic.trim().isEmpty ? '(주제 미입력)' : input.topic,
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 6),
-            Text(
-              input.customerProblem,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
-              style: const TextStyle(color: ControlColors.textSecondary),
+            const SizedBox(height: 8),
+            _reviewLabeledLine(
+              '제작 형태',
+              ArtifactType.labelKo(input.resolvedArtifactType),
+            ),
+            _reviewLabeledLine(
+              '주 트랙',
+              ArtifactType.primaryTrack(input.resolvedArtifactType),
             ),
             const SizedBox(height: 6),
-            Text(
-              '${ArtifactType.labelKo(input.resolvedArtifactType)} · '
-              '${ArtifactType.primaryTrack(input.resolvedArtifactType)}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: ControlColors.textMuted,
-              ),
-            ),
+            _reviewLabeledLine('고객 문제', input.customerProblem, maxLines: 3),
             if (_instruction != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -1573,6 +1787,33 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
+  Widget _reviewLabeledLine(String label, String value, {int maxLines = 2}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: RichText(
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        text: TextSpan(
+          style: const TextStyle(
+            fontSize: 13,
+            color: ControlColors.textSecondary,
+            height: 1.35,
+          ),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: ControlColors.textMuted,
+              ),
+            ),
+            TextSpan(text: value.trim().isEmpty ? '—' : value),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMainActions() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1581,14 +1822,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            FilledButton.icon(
-              onPressed: _hasSomeContent ? () => _savePlan() : null,
-              icon: const Icon(Icons.save_outlined, size: 18),
-              label: const Text('기획 저장'),
-            ),
+            if (!_isInstructionArchived)
+              FilledButton.icon(
+                onPressed: _hasSomeContent ? () => _savePlan() : null,
+                icon: const Icon(Icons.save_outlined, size: 18),
+                label: const Text('임시 저장'),
+              ),
             ..._buildStatusPrimaryActions(),
+            if (!_isInstructionArchived) ..._buildTransferActions(),
           ],
         ),
+        ..._buildActionHints(),
         if (_instruction != null ||
             _isInstructionArchived ||
             _hasSomeContent) ...[
@@ -1603,6 +1847,103 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           ),
         ],
       ],
+    );
+  }
+
+  List<Widget> _buildTransferActions() {
+    if (_instruction == null ||
+        !_isInstructionReady ||
+        _isInstructionArchived) {
+      return const [];
+    }
+
+    final hasFolder = _folderState?.hasHandle == true;
+    return [
+      if (hasFolder)
+        FilledButton.icon(
+          onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
+          icon: _transferBusy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.upload_outlined, size: 18),
+          label: Text(_transferBusy ? '전달 중…' : '소통24워크 Inbox로 전달'),
+        )
+      else
+        OutlinedButton.icon(
+          onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
+          icon: const Icon(Icons.download_outlined, size: 18),
+          label: const Text('수동 가져오기용 JSON 다운로드'),
+        ),
+    ];
+  }
+
+  List<Widget> _buildActionHints() {
+    final hints = <Widget>[];
+
+    if (_instruction == null && _planReady) {
+      hints.add(
+        _actionHint(
+          _canCreateInstruction
+              ? (_devWorkDocFolderReady
+                    ? '작업지시서 v1을 생성할 준비가 되었습니다.'
+                    : 'DevWorkDoc 폴더를 설정하거나 JSON 다운로드로 시작하세요.')
+              : '주제·고객 문제·대상·결과·제작 형태를 완성하세요.',
+          _canCreateInstruction
+              ? '「작업지시서 v1 생성」 또는 「수동 가져오기용 JSON 다운로드」'
+              : '마법사를 완료한 뒤 다시 시도하세요.',
+        ),
+      );
+    }
+
+    if (_instruction != null &&
+        _isInstructionReady &&
+        !_isInstructionArchived) {
+      final hasFolder = _folderState?.hasHandle == true;
+      if (!hasFolder) {
+        hints.add(
+          _actionHint(
+            '소통24워크 전달 폴더가 선택되지 않았습니다.',
+            '「전달 폴더 선택」 후 Inbox로 전달하거나, '
+                '「수동 가져오기용 JSON 다운로드」를 사용하세요.',
+          ),
+        );
+      } else if (!_canTransfer) {
+        hints.add(
+          _actionHint('전달 전 검증을 통과해야 합니다.', '「기타 작업 → 지시서 검증 보기」에서 이슈를 확인하세요.'),
+        );
+      }
+    }
+
+    if (hints.isEmpty) return const [];
+    return [const SizedBox(height: 8), ...hints];
+  }
+
+  Widget _actionHint(String reason, String nextAction) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            reason,
+            style: const TextStyle(
+              fontSize: 12,
+              color: ControlColors.textMuted,
+            ),
+          ),
+          Text(
+            nextAction,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: ControlColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1621,22 +1962,16 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         FilledButton.icon(
           onPressed: _canCreateInstruction ? _createOrPromptInstruction : null,
           icon: const Icon(Icons.description_outlined, size: 18),
-          label: const Text('작업지시서 생성'),
+          label: const Text('작업지시서 v1 생성'),
         ),
       ];
     }
     if (_isInstructionReady) {
       return [
-        FilledButton.icon(
-          onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
-          icon: _transferBusy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.upload_outlined, size: 18),
-          label: Text(_transferBusy ? '전달 중…' : '소통24워크로 전달'),
+        OutlinedButton.icon(
+          onPressed: _canCreateInstruction ? _createNewVersion : null,
+          icon: const Icon(Icons.add_circle_outline, size: 18),
+          label: Text('작업지시서 v${_version + 1} 생성'),
         ),
       ];
     }
@@ -1716,7 +2051,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       OutlinedButton.icon(
         onPressed: _canCreateInstruction ? _downloadInstructionJson : null,
         icon: const Icon(Icons.download_outlined, size: 18),
-        label: const Text('JSON 다운로드'),
+        label: const Text('수동 가져오기용 JSON 다운로드'),
       ),
     ];
   }
@@ -1883,6 +2218,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     final isDup = dupTopics.contains(plan.input.topic.trim().toLowerCase());
     final isActive = plan.id == _activePlanId;
     final history = plan.versionHistory;
+    final progress = _progressFor(plan);
 
     return Card(
       key: ValueKey('plan-${plan.id}'),
@@ -1890,7 +2226,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       child: Column(
         children: [
           ListTile(
-            onTap: () => _loadPlan(plan),
+            onTap: () => _onPlanTileTap(plan),
             title: Row(
               children: [
                 Expanded(
@@ -1908,30 +2244,44 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   ),
               ],
             ),
-            subtitle: Text(
-              '${ArtifactType.labelKo(plan.input.resolvedArtifactType)} · '
-              'v${plan.version} · ${PlanningStatus.labelKo(plan.status)} · '
-              '${_formatIso(plan.updatedAt)}',
-              softWrap: true,
-            ),
-            isThreeLine: true,
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                StatusBadge(
-                  label: _planListBadge(plan),
-                  color: _planListBadgeColor(plan),
+                Text(
+                  '${ArtifactType.labelKo(plan.input.resolvedArtifactType)} · v${plan.version}',
+                  style: const TextStyle(fontSize: 12.5),
                 ),
-                if (plan.wasTransferred && _planListBadge(plan) != '전달됨')
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: StatusBadge(
-                      label: '전달 이력',
-                      color: ControlColors.accentGreen,
-                    ),
+                Text(
+                  progress.devWorkDocLine,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  progress.transferLine,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  '수정: ${_formatIso(plan.updatedAt)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: ControlColors.textMuted,
                   ),
+                ),
+                Text(
+                  progress.nextAction,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: ControlColors.textSecondary,
+                  ),
+                ),
               ],
+            ),
+            isThreeLine: false,
+            trailing: StatusBadge(
+              label: progress.badgeLabel,
+              color: _planListBadgeColor(plan),
             ),
           ),
           if (history.isNotEmpty)
@@ -1957,4 +2307,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       ),
     );
   }
+}
+
+class _WorkflowStepDef {
+  const _WorkflowStepDef(this.label, this.done);
+
+  final String label;
+  final bool done;
 }

@@ -95,6 +95,10 @@ void main() {
     expect(state.targetCustomer, isNotEmpty);
     expect(state.desiredOutcome, isNotEmpty);
 
+    var withTopic = state.copyWith(topic: '사용자 수정 주제');
+    withTopic = composer.applyAutoComplete(withTopic);
+    expect(withTopic.topic, '사용자 수정 주제');
+
     final locked = state.copyWith(
       sentencesManuallyEdited: true,
       topic: '사용자 수정 주제',
@@ -251,7 +255,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('사업기획 및 작업지시 관리'), findsOneWidget);
-    expect(find.textContaining('소통24워크로 전달'), findsWidgets);
+    expect(find.textContaining('소통24워크 Inbox'), findsWidgets);
     expect(find.text('빠른 선택으로 만들기'), findsOneWidget);
     expect(find.text('전자책'), findsWidgets);
     // 긴 텍스트 입력 라벨이 기본 노출되지 않음

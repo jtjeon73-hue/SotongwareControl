@@ -181,11 +181,11 @@ class PlanningStatus {
       case readyToTransfer:
         return '24워크 전달 대기';
       case downloadedPendingImport:
-        return '파일 다운로드됨·가져오기 대기';
+        return 'JSON 다운로드 완료 · 수동 가져오기 대기';
       case transferred:
-        return '24워크 전달 완료';
+        return '소통24워크 Inbox 전달 완료';
       case imported:
-        return '24워크 가져오기 완료';
+        return '소통24워크 가져오기 완료';
       case inProgress:
         return '작업 진행';
       case completed:
@@ -933,9 +933,24 @@ class BusinessPlanDocument {
             ? instruction!.primaryTrack
             : input.primaryTrack);
 
-  bool get wasTransferred =>
-      PlanningStatus.normalize(status) == PlanningStatus.transferred ||
-      lastTransferAt != null;
+  /// Inbox 폴더에 실제 파일 쓰기가 성공한 경우만 true.
+  /// 브라우저 다운로드·lastTransferAt 만으로는 true가 되지 않는다.
+  bool get wasTransferred {
+    final s = PlanningStatus.normalize(status);
+    if (s == PlanningStatus.imported) return true;
+    if (s != PlanningStatus.transferred) return false;
+    return (lastTransferMode ?? '') == 'folder';
+  }
+
+  /// 다운로드만 되어 수동 가져오기 대기인 경우.
+  bool get isManualImportPending {
+    final s = PlanningStatus.normalize(status);
+    final mode = lastTransferMode ?? '';
+    if (s == PlanningStatus.downloadedPendingImport) return true;
+    if (mode == 'download' && s != PlanningStatus.imported) return true;
+    if (s == PlanningStatus.transferred && mode != 'folder') return true;
+    return false;
+  }
 
   BusinessPlanDocument copyWith({
     BusinessPlanInput? input,
