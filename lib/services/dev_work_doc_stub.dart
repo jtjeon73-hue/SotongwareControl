@@ -1,5 +1,7 @@
+import 'dev_work_doc_diagnosis.dart';
 import 'dev_work_doc_paths.dart';
 import 'dev_work_doc_types.dart';
+import 'instruction_content_checksum.dart';
 
 Future<DevWorkDocState> currentState() async {
   return const DevWorkDocState(
@@ -72,6 +74,45 @@ Future<DevWorkDocWriteResult> saveInstruction({
 
 Future<String?> readActive(String artifactType, String instructionId) async =>
     null;
+
+Future<DevWorkDocDiagnosis> diagnoseInstruction({
+  required String artifactType,
+  required String instructionId,
+  int? appVersion,
+  String? appJsonText,
+}) async {
+  return DevWorkDocDiagnosis(
+    instructionId: instructionId,
+    artifactType: artifactType,
+    versions: const [],
+    activeExists: false,
+    appVersion: appVersion,
+    appStableChecksum: appJsonText == null || appJsonText.isEmpty
+        ? ''
+        : stableContentChecksum(appJsonText),
+    summary: '이 환경에서는 DevWorkDoc 폴더를 진단할 수 없습니다.',
+    nextAction: '웹 브라우저에서 DevWorkDoc 폴더를 선택한 뒤 다시 시도하세요.',
+  );
+}
+
+Future<DevWorkDocWriteResult> restoreActiveFromVersion({
+  required String artifactType,
+  required String instructionId,
+  required int version,
+}) async {
+  return DevWorkDocWriteResult.failed(
+    message: '이 환경에서는 Active 복구를 지원하지 않습니다.',
+    errorCode: 'unsupported',
+    instructionId: instructionId,
+    version: version,
+  );
+}
+
+Future<String?> readVersionFile({
+  required String artifactType,
+  required String instructionId,
+  required int version,
+}) async => null;
 
 Future<DevWorkDocWriteResult> archiveInstruction({
   required String artifactType,

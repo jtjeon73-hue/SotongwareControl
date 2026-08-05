@@ -6,11 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web/web.dart' as web;
 
+import 'dev_work_doc_diagnosis.dart';
 import 'dev_work_doc_fs.dart';
 import 'dev_work_doc_paths.dart';
 import 'dev_work_doc_save_pipeline.dart';
 import 'dev_work_doc_types.dart';
 import 'dev_work_doc_verify.dart';
+import 'instruction_content_checksum.dart';
 import 'work_instruction_validator.dart';
 
 const _rootNameKey = 'dev_work_doc_root_name_v1';
@@ -768,6 +770,255 @@ Future<String?> readActive(String artifactType, String instructionId) async {
   final path = DevWorkDocPaths.activeRelative(artifactType, instructionId);
   final result = await _readTextFileExisting(root, path);
   return result.text;
+}
+
+Future<String?> readVersionFile({
+  required String artifactType,
+  required String instructionId,
+  required int version,
+}) async {
+  final root = _rootHandle;
+  if (root == null) return null;
+  if (!await _hasPermission(root)) return null;
+  final path = DevWorkDocPaths.versionRelative(
+    artifactType,
+    instructionId,
+    version,
+  );
+  final result = await _readTextFileExisting(root, path);
+  return result.text;
+}
+
+Future<DevWorkDocDiagnosis> diagnoseInstruction({
+  required String artifactType,
+  required String instructionId,
+  int? appVersion,
+  String? appJsonText,
+}) async {
+  final folder = DevWorkDocPaths.artifactFolder(artifactType);
+  final safeId = DevWorkDocPaths.sanitizeInstructionId(instructionId);
+  final activeRel = DevWorkDocPaths.activeRelative(artifactType, instructionId);
+  final appSum = (appJsonText == null || appJsonText.isEmpty)
+      ? ''
+      : stableContentChecksum(appJsonText);
+
+  final root = _rootHandle;
+  if (root == null || !await _hasPermission(root)) {
+    return DevWorkDocDiagnosis(
+      instructionId: instructionId,
+      artifactType: artifactType,
+      versions: const [],
+      activeExists: false,
+      activeRelativePath: activeRel,
+      appVersion: appVersion,
+      appStableChecksum: appSum,
+      summary: 'DevWorkDoc 루트가 없거나 권한이 없습니다.',
+      nextAction: '폴더를 다시 선택한 뒤 진단을 실행하세요.',
+    );
+  }
+
+  final versionInfos = <DevWorkDocVersionFileInfo>[];
+  final versionsDir = await _resolveDirExisting(root, [
+    folder,
+    'Versions',
+    safeId,
+  ]);
+  if (versionsDir != null) {
+    final names = await _listEntryNames(versionsDir);
+    final pattern = RegExp(
+      r'^' +
+          RegExp.escape(DevWorkDocPaths.wiBaseName(instructionId)) +
+          r'_v(\d+)\.json$',
+    );
+    for (final name in names) {
+      final m = pattern.firstMatch(name);
+      if (m == null) continue;
+      final v = int.tryParse(m.group(1)!) ?? 0;
+      final rel = '$folder/Versions/$safeId/$name';
+      final read = await _readTextFileExisting(root, rel);
+      var parseOk = false;
+      var sum = '';
+      var iid = '';
+      if (read.text != null && read.text!.isNotEmpty) {
+        try {
+          final map = jsonDecode(read.text!);
+          if (map is Map) {
+            parseOk = true;
+            iid = '${map['instructionId'] ?? ''}';
+            sum = stableContentChecksum(read.text!);
+          }
+        } catch (_) {}
+      }
+      versionInfos.add(
+        DevWorkDocVersionFileInfo(
+          version: v,
+          relativePath: rel,
+          exists: read.size > 0,
+          size: read.size,
+          stableChecksum: sum,
+          instructionId: iid,
+          parseOk: parseOk,
+        ),
+      );
+    }
+    versionInfos.sort((a, b) => a.version.compareTo(b.version));
+  }
+
+  // 앱에 알려진 버전이 목록에 없으면 프로브
+  final probeVersions = <int>{1, 2, 3};
+  if (appVersion != null) probeVersions.add(appVersion);
+  for (final v in probeVersions) {
+    if (versionInfos.any((e) => e.version == v)) continue;
+    final rel = DevWorkDocPaths.versionRelative(artifactType, instructionId, v);
+    final read = await _readTextFileExisting(root, rel);
+    if (read.text == null || read.size <= 0) continue;
+    var parseOk = false;
+    var sum = '';
+    var iid = '';
+    try {
+      final map = jsonDecode(read.text!);
+      if (map is Map) {
+        parseOk = true;
+        iid = '${map['instructionId'] ?? ''}';
+        sum = stableContentChecksum(read.text!);
+      }
+    } catch (_) {}
+    versionInfos.add(
+      DevWorkDocVersionFileInfo(
+        version: v,
+        relativePath: rel,
+        exists: true,
+        size: read.size,
+        stableChecksum: sum,
+        instructionId: iid,
+        parseOk: parseOk,
+      ),
+    );
+  }
+  versionInfos.sort((a, b) => a.version.compareTo(b.version));
+
+  final activeRead = await _readTextFileExisting(root, activeRel);
+  var activeExists = activeRead.size > 0 && activeRead.text != null;
+  int? activeVersion;
+  var activeSum = '';
+  if (activeExists) {
+    try {
+      final map = jsonDecode(activeRead.text!);
+      if (map is Map) {
+        activeVersion = int.tryParse('${map['instructionVersion'] ?? ''}');
+        activeSum = stableContentChecksum(activeRead.text!);
+      }
+    } catch (_) {
+      activeExists = false;
+    }
+  }
+
+  final latest = versionInfos.where((v) => v.exists && v.parseOk).toList()
+    ..sort((a, b) => b.version.compareTo(a.version));
+  final recommended = latest.isEmpty ? null : latest.first.version;
+
+  var coreDiffers = false;
+  var metaOnly = false;
+  if (appJsonText != null &&
+      appJsonText.isNotEmpty &&
+      recommended != null &&
+      latest.isNotEmpty) {
+    final verText = await _readTextFileExisting(
+      root,
+      latest.first.relativePath,
+    );
+    if (verText.text != null) {
+      final diff = diffInstructionContent(verText.text!, appJsonText);
+      coreDiffers = diff.relation == InstructionContentRelation.differentCore;
+      metaOnly =
+          diff.isMetadataOnly ||
+          (diff.isSameCore && diff.metadataOnlyDifferences.isNotEmpty);
+    }
+  }
+
+  final missingActive = !activeExists && recommended != null;
+  final summary = StringBuffer()
+    ..writeln(
+      'Versions: ${versionInfos.where((v) => v.exists).map((v) => 'v${v.version}(${v.size}B/${v.stableChecksum})').join(', ').ifEmpty('(없음)')}',
+    )
+    ..writeln(
+      activeExists
+          ? 'Active: v${activeVersion ?? '?'} ${activeRead.size}B / $activeSum'
+          : 'Active: 없음',
+    )
+    ..writeln('앱: v${appVersion ?? '?'} / ${appSum.isEmpty ? '(없음)' : appSum}');
+
+  String next;
+  if (missingActive) {
+    next = '권장: Versions v$recommended 로 Active 복구';
+  } else if (coreDiffers) {
+    next = '핵심 내용이 다릅니다. 비교 후 유지하거나 다음 버전으로 생성하세요.';
+  } else if (metaOnly || activeExists) {
+    next = '핵심 내용은 동일합니다. Active가 최신이면 기존 파일 확인으로 충분합니다.';
+  } else {
+    next = '진단 결과를 확인하세요.';
+  }
+
+  return DevWorkDocDiagnosis(
+    instructionId: instructionId,
+    artifactType: artifactType,
+    versions: versionInfos,
+    activeExists: activeExists,
+    activeVersion: activeVersion,
+    activeStableChecksum: activeSum,
+    activeBytes: activeRead.size,
+    activeRelativePath: activeRel,
+    appVersion: appVersion,
+    appStableChecksum: appSum,
+    recommendedVersion: recommended,
+    coreDiffersFromApp: coreDiffers,
+    metadataOnlyVsApp: metaOnly,
+    summary: summary.toString().trim(),
+    nextAction: next,
+  );
+}
+
+Future<DevWorkDocWriteResult> restoreActiveFromVersion({
+  required String artifactType,
+  required String instructionId,
+  required int version,
+}) async {
+  final root = await _requireRoot();
+  if (root == null) {
+    return DevWorkDocWriteResult.failed(
+      message: 'DevWorkDoc 루트 폴더를 선택해 주세요.',
+      errorCode: 'no_root',
+      outcome: DevWorkDocSaveOutcome.permissionNeeded,
+      instructionId: instructionId,
+      version: version,
+    );
+  }
+  final text = await readVersionFile(
+    artifactType: artifactType,
+    instructionId: instructionId,
+    version: version,
+  );
+  if (text == null || text.isEmpty) {
+    return DevWorkDocWriteResult.failed(
+      message:
+          '실패 단계: version_read\n대상: ${DevWorkDocPaths.versionRelative(artifactType, instructionId, version)}\n'
+          '오류: NotFoundError\nVersions 파일을 읽을 수 없습니다.',
+      errorCode: 'not_found',
+      instructionId: instructionId,
+      version: version,
+    );
+  }
+  final pipeline = DevWorkDocSavePipeline(_WebDevWorkDocFs(root));
+  return pipeline.restoreActiveFromVersionText(
+    artifactType: artifactType,
+    instructionId: instructionId,
+    version: version,
+    versionJsonText: text,
+  );
+}
+
+extension on String {
+  String ifEmpty(String fallback) => isEmpty ? fallback : this;
 }
 
 Future<DevWorkDocWriteResult> archiveInstruction({

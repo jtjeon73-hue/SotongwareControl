@@ -2,6 +2,19 @@ import 'dart:convert';
 
 import '../models/business_planning.dart';
 
+export 'instruction_content_checksum.dart'
+    show
+        contentChecksum,
+        contentChecksumRaw,
+        stableContentChecksum,
+        compareInstructionContent,
+        diffInstructionContent,
+        InstructionContentRelation,
+        InstructionContentDiff,
+        InstructionDiffEntry,
+        instructionVolatileKeys,
+        canonicalContentMap;
+
 class ValidationIssue {
   const ValidationIssue({
     required this.field,
@@ -190,13 +203,4 @@ class WorkInstructionValidator {
 
     return InstructionValidationResult(ok: issues.isEmpty, issues: issues);
   }
-}
-
-String contentChecksum(String content) {
-  var hash = 2166136261;
-  for (final unit in content.codeUnits) {
-    hash ^= unit;
-    hash = (hash * 16777619) & 0xffffffff;
-  }
-  return hash.toRadixString(16).padLeft(8, '0');
 }

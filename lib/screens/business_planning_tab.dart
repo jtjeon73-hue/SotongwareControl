@@ -495,12 +495,262 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('새 버전을 만들 수 없습니다. 필수 항목을 확인하세요.');
       return;
     }
+    if (_needsVersionRecovery) {
+      _snack('부분 저장 또는 충돌 상태입니다. 먼저 「기존 버전 확인 및 복구」를 진행하세요.');
+      await _openVersionDiagnoseAndRecover();
+      return;
+    }
+    if (!_folderVersionConfirmed) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('다음 버전 생성'),
+          content: const Text(
+            '직전 버전의 DevWorkDoc 저장이 확정되지 않았습니다.\n'
+            '그래도 현재 내용을 다음 버전으로 생성할까요?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('다음 버전으로 생성'),
+            ),
+          ],
+        ),
+      );
+      if (go != true) return;
+    }
     await _saveInstructionInternal(
       version: _version + 1,
       isNewVersion: true,
       appendPreviousToHistory: true,
       saveTarget: DevWorkDocSaveTarget.folder,
     );
+  }
+
+  bool get _folderVersionConfirmed {
+    final r = _lastDevWorkDocResult;
+    if (r == null) return false;
+    if (r.instructionId != null &&
+        _instructionId != null &&
+        r.instructionId != _instructionId &&
+        r.instructionId != _instruction?.instructionId) {
+      return false;
+    }
+    if (r.version != null && r.version != _version) return false;
+    return r.isFolderCompleteSuccess ||
+        (r.outcome == DevWorkDocSaveOutcome.alreadyExists &&
+            r.activeVerified &&
+            r.versionsVerified) ||
+        r.outcome == DevWorkDocSaveOutcome.recoveredFromPartial;
+  }
+
+  bool get _needsVersionRecovery {
+    final r = _lastDevWorkDocResult;
+    if (r == null) return false;
+    if (r.ok) return false;
+    if (r.instructionId != null &&
+        _instruction != null &&
+        r.instructionId != _instruction!.instructionId) {
+      return false;
+    }
+    return r.outcome == DevWorkDocSaveOutcome.conflict ||
+        r.outcome == DevWorkDocSaveOutcome.partialSuccess;
+  }
+
+  Future<void> _showConflictOrRecoverDialog({
+    required DevWorkDocWriteResult saveResult,
+  }) async {
+    if (!mounted) return;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Versions v${saveResult.version ?? _version} 충돌'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(saveResult.message ?? '기존 Versions와 핵심 내용이 다릅니다.'),
+              if (saveResult.conflictDiffSummary != null) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  '차이 요약',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(saveResult.conflictDiffSummary!),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'diagnose'),
+            child: const Text('기존 버전 확인'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'next'),
+            child: const Text('다음 버전으로 생성'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (choice == 'diagnose') {
+      await _openVersionDiagnoseAndRecover();
+    } else if (choice == 'next') {
+      await _saveInstructionInternal(
+        version: _version + 1,
+        isNewVersion: true,
+        appendPreviousToHistory: true,
+        saveTarget: DevWorkDocSaveTarget.folder,
+      );
+    }
+  }
+
+  Future<void> _openVersionDiagnoseAndRecover() async {
+    if (_instruction == null) {
+      _snack('작업지시서가 없습니다.');
+      return;
+    }
+    if (!_devWorkDocFolderReady) {
+      _snack('DevWorkDoc 폴더를 먼저 설정하세요.');
+      return;
+    }
+    final artifact = _currentInput.resolvedArtifactType;
+    final iid = _instruction!.instructionId;
+    final appJson = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(_instruction!.toJson());
+    final diagnosis = await _devWorkDoc.diagnoseInstruction(
+      artifactType: artifact,
+      instructionId: iid,
+      appVersion: _version,
+      appJsonText: appJson,
+    );
+    if (!mounted) return;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final lines = <Widget>[
+          Text(diagnosis.summary),
+          const SizedBox(height: 8),
+          Text(
+            diagnosis.nextAction,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          ...diagnosis.versions.map(
+            (v) => Text(
+              'Versions v${v.version}: ${v.exists ? '${v.size}B / ${v.stableChecksum}' : '없음'}'
+              '${v.parseOk ? '' : ' (파싱 실패)'}',
+            ),
+          ),
+          Text(
+            diagnosis.activeExists
+                ? 'Active: v${diagnosis.activeVersion ?? '?'} '
+                      '${diagnosis.activeBytes}B / ${diagnosis.activeStableChecksum}'
+                : 'Active: 없음',
+          ),
+          Text(
+            '앱: v${diagnosis.appVersion ?? _version} / '
+            '${diagnosis.appStableChecksum.isEmpty ? '(없음)' : diagnosis.appStableChecksum}',
+          ),
+        ];
+        return AlertDialog(
+          title: const Text('기존 버전 확인 및 복구'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: lines,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('취소'),
+            ),
+            if (diagnosis.recommendedVersion != null)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'restore'),
+                child: Text(
+                  'Versions v${diagnosis.recommendedVersion} → Active 복구',
+                ),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'next'),
+              child: const Text('현재 내용을 다음 버전으로'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || action == null || action == 'cancel') return;
+
+    if (action == 'restore' && diagnosis.recommendedVersion != null) {
+      final result = await _devWorkDoc.restoreActiveFromVersion(
+        artifactType: artifact,
+        instructionId: iid,
+        version: diagnosis.recommendedVersion!,
+      );
+      if (!mounted) return;
+      setState(() => _lastDevWorkDocResult = result);
+      ScaffoldMessenger.of(context).clearSnackBars();
+      if (result.ok) {
+        // 앱 지시서를 Versions 스냅샷에 맞춤
+        final verText = await _devWorkDoc.readVersionFile(
+          artifactType: artifact,
+          instructionId: iid,
+          version: diagnosis.recommendedVersion!,
+        );
+        if (verText != null && mounted) {
+          try {
+            final restored = WorkInstruction.fromJson(
+              Map<String, dynamic>.from(jsonDecode(verText) as Map),
+            );
+            final id = _activePlanId;
+            if (id != null) {
+              final existing = _allPlans.firstWhere((p) => p.id == id);
+              final doc = existing.copyWith(
+                instruction: restored,
+                version: diagnosis.recommendedVersion,
+                updatedAt: DateTime.now().toUtc().toIso8601String(),
+                status: PlanningStatus.instructionReady,
+              );
+              await _store.upsertPlan(doc);
+              await _refreshPlans();
+              if (!mounted) return;
+              setState(() {
+                _instruction = restored;
+                _version = diagnosis.recommendedVersion!;
+                _activeDoc = doc;
+              });
+            }
+          } catch (_) {}
+        }
+        _snack(result.message ?? 'Active 복구 완료');
+      } else {
+        _snack(result.message ?? 'Active 복구 실패');
+      }
+      return;
+    }
+
+    if (action == 'next') {
+      await _saveInstructionInternal(
+        version: _version + 1,
+        isNewVersion: true,
+        appendPreviousToHistory: true,
+        saveTarget: DevWorkDocSaveTarget.folder,
+      );
+    }
   }
 
   Future<void> _saveInstructionInternal({
@@ -548,6 +798,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       );
     }
 
+    final existingInstruction = existing?.instruction;
+    final preserveCreatedAt = isNewVersion || existingInstruction == null
+        ? null
+        : existingInstruction.createdAt;
+    final preserveUpdatedAt = isNewVersion || existingInstruction == null
+        ? null
+        : existingInstruction.updatedAt;
+
     var instruction = _service.buildInstruction(
       planId: id,
       input: input,
@@ -555,33 +813,41 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       now: now,
       instructionId: iid,
       version: version,
-      createdAt: isNewVersion || existing?.instruction == null
-          ? null
-          : existing?.instruction?.createdAt,
+      createdAt: preserveCreatedAt,
+      updatedAt: preserveUpdatedAt,
       status: PlanningStatus.instructionReady,
     );
 
-    // checksum 필드 없이 본문을 만든 뒤 해시 → 필드 주입 → 저장 (파일·앱 상태 일치)
-    final provisionalMap = Map<String, dynamic>.from(instruction.toJson())
-      ..remove('checksum');
-    final provisionalText = const JsonEncoder.withIndent(
-      '  ',
-    ).convert(provisionalMap);
-    final checksum = contentChecksum(provisionalText);
-    final sourceFileName =
-        'WI_${DevWorkDocPaths.sanitizeInstructionId(iid)}.json';
-    instruction = _service.buildInstruction(
-      planId: id,
-      input: input,
-      analysis: analysis,
-      now: now,
-      instructionId: iid,
-      version: version,
-      createdAt: instruction.createdAt,
-      checksum: checksum,
-      sourceFileName: sourceFileName,
-      status: PlanningStatus.instructionReady,
-    );
+    // 동일 버전 재저장: 핵심 내용이 같으면 기존 스냅샷 JSON을 재사용 (메타데이터 드리프트 방지)
+    if (!isNewVersion &&
+        existingInstruction != null &&
+        existingInstruction.instructionVersion == '$version' &&
+        compareInstructionContent(
+              existingInstruction.toJson(),
+              instruction.toJson(),
+            ) ==
+            InstructionContentRelation.sameCore) {
+      instruction = existingInstruction;
+    } else {
+      final provisionalMap = Map<String, dynamic>.from(instruction.toJson())
+        ..remove('checksum');
+      final checksum = stableContentChecksum(provisionalMap);
+      final sourceFileName =
+          'WI_${DevWorkDocPaths.sanitizeInstructionId(iid)}.json';
+      instruction = _service.buildInstruction(
+        planId: id,
+        input: input,
+        analysis: analysis,
+        now: now,
+        instructionId: iid,
+        version: version,
+        createdAt: instruction.createdAt,
+        updatedAt: instruction.updatedAt,
+        checksum: checksum,
+        sourceFileName: sourceFileName,
+        status: PlanningStatus.instructionReady,
+      );
+    }
 
     final jsonText = const JsonEncoder.withIndent(
       '  ',
@@ -611,7 +877,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         (saveResult.isFolderCompleteSuccess ||
             (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists &&
                 saveResult.activeVerified &&
-                saveResult.versionsVerified));
+                saveResult.versionsVerified) ||
+            saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial);
     final isDownloadComplete =
         isDownloadTarget &&
         saveResult.mode == 'download' &&
@@ -620,15 +887,22 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (!isFolderSuccess && !isDownloadComplete) {
       if (mounted) {
         setState(() => _lastDevWorkDocResult = saveResult);
+        ScaffoldMessenger.of(context).clearSnackBars();
       }
       final failureMessage = saveResult.message ?? 'DevWorkDoc 저장에 실패했습니다.';
+      if (!isDownloadTarget &&
+          saveResult.outcome == DevWorkDocSaveOutcome.conflict &&
+          mounted) {
+        await _showConflictOrRecoverDialog(saveResult: saveResult);
+        return;
+      }
       if (!isDownloadTarget && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(failureMessage),
             action: SnackBarAction(
-              label: 'JSON 다운로드',
-              onPressed: _downloadInstructionJson,
+              label: '진단·복구',
+              onPressed: _openVersionDiagnoseAndRecover,
             ),
           ),
         );
@@ -681,15 +955,19 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님). '
         'v$version · ${saveResult.fileName ?? ''}',
       );
-    } else if (saveResult.isFolderCompleteSuccess) {
+    } else if (saveResult.isFolderCompleteSuccess ||
+        saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial) {
       _snack(
-        'DevWorkDoc에 저장했습니다. v$version\n'
-        'Active: 저장·검증 완료 (${saveResult.activeBytes}B)\n'
-        'Versions: v$version 저장·검증 완료 (${saveResult.versionsBytes}B)',
+        saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial
+            ? '부분 저장 복구 완료. v$version\n'
+                  'Active: ${saveResult.activeBytes}B · Versions: ${saveResult.versionsBytes}B'
+            : 'DevWorkDoc에 저장했습니다. v$version\n'
+                  'Active: 저장·검증 완료 (${saveResult.activeBytes}B)\n'
+                  'Versions: v$version 저장·검증 완료 (${saveResult.versionsBytes}B)',
       );
     } else if (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists) {
       _snack(
-        'DevWorkDoc 기존 파일 확인 (동일 checksum). v$version\n'
+        'DevWorkDoc 기존 파일 확인 (동일 핵심 checksum). v$version\n'
         'Active·Versions v$version 검증 완료',
       );
     } else if (validation.ok) {
@@ -2196,12 +2474,32 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ),
       ];
     }
-    if (_isInstructionReady) {
+    if (_needsVersionRecovery) {
+      return [
+        FilledButton.icon(
+          onPressed: _openVersionDiagnoseAndRecover,
+          icon: const Icon(Icons.healing_outlined, size: 18),
+          label: const Text('기존 버전 확인 및 복구'),
+        ),
+      ];
+    }
+    if (_isInstructionReady && _folderVersionConfirmed) {
       return [
         OutlinedButton.icon(
           onPressed: _canCreateInstruction ? _createNewVersion : null,
           icon: const Icon(Icons.add_circle_outline, size: 18),
           label: Text('작업지시서 v${_version + 1} 생성'),
+        ),
+      ];
+    }
+    if (_isInstructionReady) {
+      return [
+        FilledButton.icon(
+          onPressed: (_canCreateInstruction && _devWorkDocFolderReady)
+              ? _editInstruction
+              : null,
+          icon: const Icon(Icons.save, size: 18),
+          label: const Text('DevWorkDoc에 다시 저장'),
         ),
       ];
     }
@@ -2278,6 +2576,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           _instruction == null ? 'DevWorkDoc에 저장' : 'DevWorkDoc에 다시 저장',
         ),
       ),
+      if (_instruction != null && _devWorkDocFolderReady)
+        OutlinedButton.icon(
+          onPressed: _openVersionDiagnoseAndRecover,
+          icon: const Icon(Icons.troubleshoot_outlined, size: 18),
+          label: Text(_needsVersionRecovery ? '기존 버전 확인 및 복구' : 'Versions 진단'),
+        ),
       OutlinedButton.icon(
         onPressed: _canCreateInstruction ? _downloadInstructionJson : null,
         icon: const Icon(Icons.download_outlined, size: 18),

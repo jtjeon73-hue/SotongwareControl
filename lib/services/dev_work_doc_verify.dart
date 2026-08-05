@@ -110,7 +110,7 @@ DevWorkDocVerifyResult verifyWrittenPair(DevWorkDocVerifyInput input) {
   );
 }
 
-/// 기존 파일과 비교.
+/// 기존 파일과 비교 (핵심 내용 기준 — 휘발성 메타데이터만 다르면 alreadyExists).
 DevWorkDocSaveOutcome compareExistingFile({
   required String? existingText,
   required String expectedJson,
@@ -123,8 +123,12 @@ DevWorkDocSaveOutcome compareExistingFile({
   } catch (_) {
     return DevWorkDocSaveOutcome.conflict;
   }
-  if (contentChecksum(existingText) == contentChecksum(expectedJson)) {
+  final relation = compareInstructionContent(existingText, expectedJson);
+  if (relation == InstructionContentRelation.sameCore) {
     return DevWorkDocSaveOutcome.alreadyExists;
+  }
+  if (relation == InstructionContentRelation.incomparable) {
+    return DevWorkDocSaveOutcome.conflict;
   }
   return DevWorkDocSaveOutcome.conflict;
 }
@@ -181,15 +185,17 @@ _FileCheck _checkFile({
   }
 
   final fileChecksum = contentChecksum(text);
-  if (fileChecksum != expectedChecksum && text != expectedJson) {
+  if (fileChecksum != expectedChecksum) {
+    // 필드 checksum이 있으면 그것도 참고하되, 안정 해시가 같으면 통과
     final field = '${map['checksum'] ?? ''}';
     final expectedMap = _tryMap(expectedJson);
     final expectedField = '${expectedMap?['checksum'] ?? ''}';
-    if (expectedField.isNotEmpty && field != expectedField) {
+    if (expectedField.isNotEmpty &&
+        field == expectedField &&
+        fileChecksum == expectedChecksum) {
+      // ok
+    } else if (fileChecksum != expectedChecksum) {
       return _FileCheck(ok: false, bytes: bytes, error: '$label checksum 불일치');
-    }
-    if (expectedField.isEmpty && fileChecksum != expectedChecksum) {
-      return _FileCheck(ok: false, bytes: bytes, error: '$label 내용 해시 불일치');
     }
   }
 
@@ -237,6 +243,8 @@ String outcomeLabelKo(DevWorkDocSaveOutcome o) {
       return '완전 성공';
     case DevWorkDocSaveOutcome.partialSuccess:
       return '부분 성공';
+    case DevWorkDocSaveOutcome.recoveredFromPartial:
+      return '부분 저장 복구 완료';
     case DevWorkDocSaveOutcome.alreadyExists:
       return '기존 파일 확인';
     case DevWorkDocSaveOutcome.conflict:

@@ -1,9 +1,11 @@
 import 'dev_work_doc_stub.dart'
     if (dart.library.js_interop) 'dev_work_doc_web.dart'
     as impl;
+import 'dev_work_doc_diagnosis.dart';
 import 'dev_work_doc_types.dart';
 
 export 'dev_work_doc_types.dart';
+export 'dev_work_doc_diagnosis.dart';
 
 /// DevWorkDoc 로컬 JSON 실작업 저장 (웹: File System Access API / 대체 다운로드).
 class DevWorkDocService {
@@ -46,6 +48,38 @@ class DevWorkDocService {
 
   Future<String?> readActive(String artifactType, String instructionId) =>
       impl.readActive(artifactType, instructionId);
+
+  Future<DevWorkDocDiagnosis> diagnoseInstruction({
+    required String artifactType,
+    required String instructionId,
+    int? appVersion,
+    String? appJsonText,
+  }) => impl.diagnoseInstruction(
+    artifactType: artifactType,
+    instructionId: instructionId,
+    appVersion: appVersion,
+    appJsonText: appJsonText,
+  );
+
+  Future<DevWorkDocWriteResult> restoreActiveFromVersion({
+    required String artifactType,
+    required String instructionId,
+    required int version,
+  }) => impl.restoreActiveFromVersion(
+    artifactType: artifactType,
+    instructionId: instructionId,
+    version: version,
+  );
+
+  Future<String?> readVersionFile({
+    required String artifactType,
+    required String instructionId,
+    required int version,
+  }) => impl.readVersionFile(
+    artifactType: artifactType,
+    instructionId: instructionId,
+    version: version,
+  );
 
   Future<DevWorkDocWriteResult> archiveInstruction({
     required String artifactType,

@@ -44,6 +44,9 @@ enum DevWorkDocSaveOutcome {
   /// Active 또는 Versions 중 한쪽만 성공.
   partialSuccess,
 
+  /// Versions 확인 후 Active 복구 완료.
+  recoveredFromPartial,
+
   /// 동일 checksum 파일이 이미 존재.
   alreadyExists,
 
@@ -76,6 +79,11 @@ class DevWorkDocWriteResult {
     this.versionsVerified = false,
     this.activeBytes = 0,
     this.versionsBytes = 0,
+    this.instructionId,
+    this.version,
+    this.operationId,
+    this.conflictIsMetadataOnly = false,
+    this.conflictDiffSummary,
   });
 
   /// folder | download | failed
@@ -94,11 +102,17 @@ class DevWorkDocWriteResult {
   final bool versionsVerified;
   final int activeBytes;
   final int versionsBytes;
+  final String? instructionId;
+  final int? version;
+  final String? operationId;
+  final bool conflictIsMetadataOnly;
+  final String? conflictDiffSummary;
 
   bool get isFolderCompleteSuccess =>
       ok &&
       mode == 'folder' &&
-      outcome == DevWorkDocSaveOutcome.completeSuccess &&
+      (outcome == DevWorkDocSaveOutcome.completeSuccess ||
+          outcome == DevWorkDocSaveOutcome.recoveredFromPartial) &&
       activeVerified &&
       versionsVerified;
 
@@ -108,6 +122,12 @@ class DevWorkDocWriteResult {
     String? activePathHint,
     String? versionPathHint,
     DevWorkDocSaveOutcome outcome = DevWorkDocSaveOutcome.failed,
+    String? instructionId,
+    int? version,
+    String? operationId,
+    bool conflictIsMetadataOnly = false,
+    String? conflictDiffSummary,
+    String? checksum,
   }) => DevWorkDocWriteResult(
     ok: false,
     mode: 'failed',
@@ -116,6 +136,12 @@ class DevWorkDocWriteResult {
     errorCode: errorCode,
     activePathHint: activePathHint,
     versionPathHint: versionPathHint,
+    instructionId: instructionId,
+    version: version,
+    operationId: operationId,
+    conflictIsMetadataOnly: conflictIsMetadataOnly,
+    conflictDiffSummary: conflictDiffSummary,
+    checksum: checksum,
   );
 
   factory DevWorkDocWriteResult.download({

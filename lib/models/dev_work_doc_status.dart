@@ -69,13 +69,51 @@ class DevWorkDocStatus {
       }
 
       if (!lastSaveResult.ok) {
-        return DevWorkDocStatus(
-          kind: DevWorkDocStatusKind.failed,
-          label: '실패',
-          icon: Icons.error_outline,
-          nextAction: '오류를 확인한 뒤 다시 저장하세요.',
-          failureReason: lastSaveResult.message ?? lastSaveResult.errorCode,
-        );
+        // 현재 instruction과 버전이 다른 오래된 오류는 배너에서 제외
+        final iid =
+            instruction?.instructionId ?? activeDoc?.stableInstructionId;
+        final ver = instruction == null
+            ? null
+            : int.tryParse(instruction.instructionVersion);
+        final staleId =
+            lastSaveResult.instructionId != null &&
+            iid != null &&
+            lastSaveResult.instructionId != iid;
+        final staleVer =
+            lastSaveResult.version != null &&
+            ver != null &&
+            lastSaveResult.version != ver;
+        if (!staleId && !staleVer) {
+          final verLabel = lastSaveResult.version == null
+              ? ''
+              : ' (v${lastSaveResult.version})';
+          return DevWorkDocStatus(
+            kind: DevWorkDocStatusKind.failed,
+            label: lastSaveResult.outcome == DevWorkDocSaveOutcome.conflict
+                ? '충돌$verLabel'
+                : lastSaveResult.outcome == DevWorkDocSaveOutcome.partialSuccess
+                ? '부분 저장$verLabel'
+                : '실패$verLabel',
+            icon: Icons.error_outline,
+            nextAction:
+                lastSaveResult.outcome == DevWorkDocSaveOutcome.conflict ||
+                    lastSaveResult.outcome ==
+                        DevWorkDocSaveOutcome.partialSuccess
+                ? '「기존 버전 확인 및 복구」에서 진단·복구하세요.'
+                : '오류를 확인한 뒤 다시 저장하세요.',
+            failureReason: lastSaveResult.message ?? lastSaveResult.errorCode,
+            activePathHint: lastSaveResult.activePathHint,
+            versionPathHint: lastSaveResult.versionPathHint,
+          );
+        }
+      }
+
+      if (lastSaveResult.ok &&
+          (lastSaveResult.outcome ==
+                  DevWorkDocSaveOutcome.recoveredFromPartial ||
+              lastSaveResult.outcome == DevWorkDocSaveOutcome.completeSuccess ||
+              lastSaveResult.outcome == DevWorkDocSaveOutcome.alreadyExists)) {
+        // 성공 결과가 있으면 실패 배너보다 우선하지 않도록 아래로 통과
       }
     }
 
