@@ -148,6 +148,8 @@ void main() {
         supported: true,
         hasHandle: true,
         folderName: 'Inbox',
+        permissionGranted: true,
+        readyToWrite: true,
       ),
       input: input,
     );

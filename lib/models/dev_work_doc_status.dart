@@ -136,7 +136,7 @@ class DevWorkDocStatus {
         input: input,
         instruction: instruction,
       );
-      final folderReady = transferFolder?.hasHandle == true;
+      final folderReady = transferFolder?.readyToWrite == true;
       if (validation.ok && folderReady) {
         return DevWorkDocStatus(
           kind: DevWorkDocStatusKind.transferReady,

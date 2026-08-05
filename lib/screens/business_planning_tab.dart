@@ -16,7 +16,6 @@ import '../services/dev_work_doc_verify.dart';
 import '../services/instruction_transfer_service.dart';
 import '../services/plan_progress_status.dart';
 import '../services/planning_sentence_composer.dart';
-import '../services/work_instruction_filename.dart';
 import '../services/work_instruction_validator.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
@@ -248,6 +247,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   bool get _canTransfer =>
       _instruction != null &&
       _validator.validate(input: _currentInput, instruction: _instruction!).ok;
+
+  bool get _inboxTransferReady => _folderState?.readyToWrite == true;
 
   void _applyInput(BusinessPlanInput input) {
     _topicCtrl.text = input.topic;
@@ -995,6 +996,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       instructionId: iid,
       version: version,
       versionHistory: history,
+      lastTransferAt: isDownloadComplete ? now.toIso8601String() : null,
+      lastTransferFileName: isDownloadComplete ? saveResult.fileName : null,
+      lastTransferChecksum: isDownloadComplete ? saveResult.checksum : null,
+      lastTransferMode: isDownloadComplete
+          ? PlanProgressStatus.downloadMode
+          : null,
     );
 
     await _store.upsertPlan(doc);
@@ -1014,8 +1021,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
     if (isDownloadComplete) {
       _snack(
-        '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님). '
-        'v$version · ${saveResult.fileName ?? ''}',
+        'JSON 다운로드 완료 · 수동 가져오기 대기 '
+        '(전달됨 아님). v$version · ${saveResult.fileName ?? ''}',
       );
     } else if (saveResult.isFolderCompleteSuccess ||
         saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial) {
@@ -1047,6 +1054,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('먼저 작업지시서를 생성하세요.');
       return;
     }
+    if (!_inboxTransferReady) {
+      _snack('Inbox 전달 준비가 되지 않았습니다. 「전달 폴더 다시 선택」으로 쓰기 권한을 확인하세요.');
+      return;
+    }
+    if (_needsVersionRecovery) {
+      _snack('부분 저장 또는 충돌 상태입니다. 먼저 Active를 복구하세요.');
+      await _openVersionDiagnoseAndRecover();
+      return;
+    }
 
     final validation = _validator.validate(
       input: _currentInput,
@@ -1057,48 +1073,93 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       return;
     }
 
+    final iid = _instruction!.instructionId.trim().isNotEmpty
+        ? _instruction!.instructionId
+        : (_activeDoc?.stableInstructionId ?? '');
+    final artifact = _currentInput.resolvedArtifactType;
+    if (iid.isEmpty || artifact == ArtifactType.undecided) {
+      _snack('instructionId 또는 결과물 유형이 없어 전달할 수 없습니다.');
+      return;
+    }
+
     setState(() => _transferBusy = true);
     try {
       await _savePlan(silent: true);
 
-      final jsonText = const JsonEncoder.withIndent(
-        '  ',
-      ).convert(_instruction!.toJson());
-      final checksum = contentChecksum(jsonText);
-      final seq = _allPlans.where((p) => p.lastTransferAt != null).length + 1;
-      final fileName = WorkInstructionFilename.build(
-        now: DateTime.now(),
-        sequence: seq,
-        topic: _currentInput.topic,
-        deliverableType: _currentInput.primaryDeliverable,
-        version: _version,
+      // 항상 확정 Active 스냅샷만 전달 (재생성 스냅샷·다른 기획 금지)
+      final activeText = _devWorkDocFolderReady
+          ? await _devWorkDoc.readActive(artifact, iid)
+          : null;
+      final gate = gateActiveSnapshotForTransfer(
+        activeText: activeText,
+        selectedInstructionId: iid,
+        selectedVersion: _version,
+        selectedArtifactType: artifact,
       );
+      if (!gate.allowed || gate.jsonText == null || gate.checksum == null) {
+        if (!mounted) return;
+        await _showTransferBlockedDialog(gate.message);
+        return;
+      }
+
+      final jsonText = gate.jsonText!;
+      final checksum = gate.checksum!;
+      final fileName = inboxTransferFileName(
+        instructionId: iid,
+        version: _version,
+        artifactType: artifact,
+      );
+
+      if (!mounted) return;
+      final proceed = await _confirmInboxTransfer(
+        title: _currentInput.topic,
+        instructionId: iid,
+        version: _version,
+        artifactType: artifact,
+        checksum: checksum,
+        folderName: _folderState?.folderName ?? 'Inbox',
+        fileName: fileName,
+      );
+      if (proceed != true) return;
 
       final result = await _transfer.writeJsonFile(
         fileName: fileName,
         jsonText: jsonText,
+        instructionId: iid,
+        version: _version,
+        expectedChecksum: checksum,
       );
 
-      if (!result.ok) {
-        _snack(result.message ?? '전달에 실패했습니다.');
+      // 직접 전달 경로에서는 다운로드가 발생하지 않음. 실패도 다운로드로 대체하지 않음.
+      if (result.outcome == TransferOutcome.downloadOnly ||
+          result.mode == PlanProgressStatus.downloadMode) {
+        _snack('전달 경로에서 다운로드가 감지되어 중단했습니다. 수동 다운로드 버튼을 사용하세요.');
+        return;
+      }
+
+      if (result.outcome == TransferOutcome.conflict) {
+        if (!mounted) return;
+        await _showTransferConflictDialog(result);
+        return;
+      }
+
+      if (!result.isFolderSuccess) {
+        if (!mounted) return;
+        await _showTransferFailedDialog(result.message ?? '직접 전달에 실패했습니다.');
         return;
       }
 
       final now = DateTime.now().toUtc().toIso8601String();
-      final newStatus = PlanProgressStatus.statusAfterTransferAttempt(
-        mode: result.mode,
-      );
-
       final id = _activePlanId!;
       final existing = _allPlans.firstWhere((p) => p.id == id);
       final doc = existing.copyWith(
-        status: newStatus,
+        status: PlanningStatus.transferred,
         updatedAt: now,
         instruction: _instruction,
         lastTransferAt: now,
         lastTransferFileName: result.fileName ?? fileName,
-        lastTransferChecksum: checksum,
-        lastTransferMode: result.mode,
+        lastTransferChecksum: result.checksum ?? checksum,
+        lastTransferMode: PlanProgressStatus.folderMode,
       );
 
       await _store.upsertPlan(doc);
@@ -1111,22 +1172,154 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _folderState = folder;
       });
 
-      if (result.mode == PlanProgressStatus.folderMode) {
-        _snack('소통24워크 Inbox 전달 완료');
+      if (result.outcome == TransferOutcome.alreadyExists) {
+        _snack('기존 Inbox 파일 확인');
       } else {
-        _snack('수동 가져오기용 JSON 다운로드');
+        _snack('소통24워크 Inbox 전달 완료');
       }
     } finally {
       if (mounted) setState(() => _transferBusy = false);
     }
   }
 
+  Future<bool?> _confirmInboxTransfer({
+    required String title,
+    required String instructionId,
+    required int version,
+    required String artifactType,
+    required String checksum,
+    required String folderName,
+    required String fileName,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Inbox로 전달'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('기획 제목: $title'),
+            Text('instructionId: $instructionId'),
+            Text('전달 버전: v$version'),
+            Text('artifactType: $artifactType'),
+            Text('contentChecksum: $checksum'),
+            Text('대상 폴더: $folderName (Inbox)'),
+            Text('파일명: $fileName'),
+            const SizedBox(height: 8),
+            const Text(
+              '선택된 Inbox에 직접 저장합니다. 브라우저 다운로드는 실행되지 않습니다.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('전달'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showTransferBlockedDialog(String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('전달 차단'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+          if (_needsVersionRecovery)
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _openVersionDiagnoseAndRecover();
+              },
+              child: const Text('Active 복구'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showTransferConflictDialog(TransferWriteResult result) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Inbox 충돌'),
+        content: Text(
+          result.message ??
+              '동일 버전인데 핵심 내용이 다릅니다. 덮어쓰지 않았습니다.\n'
+                  '사용자 승인 후 새 버전을 생성하세요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _createNewVersion();
+            },
+            child: const Text('새 버전 생성'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showTransferFailedDialog(String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('직접 전달 실패'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _pickTransferFolder();
+            },
+            child: const Text('전달 폴더 다시 선택'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _downloadInstructionJson();
+            },
+            child: const Text('수동 다운로드 화면으로'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickTransferFolder() async {
     final state = await _transfer.pickFolder();
     if (!mounted) return;
     setState(() => _folderState = state);
-    if (state.hasHandle) {
-      _snack('전달 폴더: ${state.folderName ?? '선택됨'}');
+    if (state.readyToWrite) {
+      _snack('전달 폴더 준비 완료: ${state.folderName ?? 'Inbox'}');
+    } else {
+      _snack(
+        state.statusMessage.isNotEmpty
+            ? state.statusMessage
+            : '전달 폴더를 다시 선택해 주세요.',
+      );
     }
   }
 
@@ -1851,7 +2044,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return PlanProgressStatus.resolve(
       plan,
       hasDevWorkDocRoot: _devWorkDocFolderReady,
-      hasTransferFolder: _folderState?.hasHandle == true,
+      hasTransferFolder: _inboxTransferReady,
       lastDevWorkDocMode: _lastDevWorkDocResult?.mode,
     );
   }
@@ -2429,26 +2622,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       return const [];
     }
 
-    final hasFolder = _folderState?.hasHandle == true;
+    // Inbox 직접 전달만 — 수동 다운로드와 완전히 분리 (다운로드는 DevWorkDoc 액션에만)
     return [
-      if (hasFolder)
-        FilledButton.icon(
-          onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
-          icon: _transferBusy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.upload_outlined, size: 18),
-          label: Text(_transferBusy ? '전달 중…' : '소통24워크 Inbox로 전달'),
-        )
-      else
-        OutlinedButton.icon(
-          onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
-          icon: const Icon(Icons.download_outlined, size: 18),
-          label: const Text('수동 가져오기용 JSON 다운로드'),
-        ),
+      FilledButton.icon(
+        onPressed: (_canTransfer && _inboxTransferReady && !_transferBusy)
+            ? _transferToWork
+            : null,
+        icon: _transferBusy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.upload_outlined, size: 18),
+        label: Text(_transferBusy ? '전달 중…' : '소통24워크 Inbox로 전달'),
+      ),
     ];
   }
 
@@ -2473,13 +2661,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (_instruction != null &&
         _isInstructionReady &&
         !_isInstructionArchived) {
-      final hasFolder = _folderState?.hasHandle == true;
-      if (!hasFolder) {
+      if (!_inboxTransferReady) {
+        final folder = _folderState;
+        final reason = folder == null || !folder.hasHandle
+            ? '소통24워크 Inbox 폴더가 선택되지 않았거나 핸들이 없습니다.'
+            : !folder.permissionGranted
+            ? 'Inbox 쓰기 권한이 없거나 만료되었습니다.'
+            : 'Inbox 직접 전달 준비가 되지 않았습니다.';
         hints.add(
           _actionHint(
-            '소통24워크 전달 폴더가 선택되지 않았습니다.',
-            '「전달 폴더 선택」 후 Inbox로 전달하거나, '
-                '「수동 가져오기용 JSON 다운로드」를 사용하세요.',
+            reason,
+            '「전달 폴더 다시 선택」으로 Inbox를 선택한 뒤 전달하세요. '
+            '실패 시에만 「수동 가져오기용 JSON 다운로드」를 사용하세요.',
           ),
         );
       } else if (!_canTransfer) {
@@ -2783,6 +2976,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   Widget _buildFolderSettings() {
     final folder = _folderState;
+    final name = folder?.folderName;
+    final hasHandle = folder?.hasHandle == true;
+    final granted = folder?.permissionGranted == true;
+    final ready = folder?.readyToWrite == true;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -2791,16 +2988,63 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           children: [
             Text('소통24워크 전달 폴더', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 6),
-            if (folder != null && folder.hasHandle && folder.folderName != null)
+            if (name != null && name.isNotEmpty)
               Text(
-                '선택된 폴더: ${folder.folderName}',
+                '선택된 폴더: $name',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               )
             else
               const Text(
-                '폴더가 선택되지 않았습니다.',
+                'Inbox 폴더 미선택',
                 style: TextStyle(color: ControlColors.textMuted),
               ),
+            const SizedBox(height: 6),
+            Text(
+              '선택 기준: Inbox 폴더',
+              style: TextStyle(
+                fontSize: 12,
+                color: hasHandle
+                    ? ControlColors.textSecondary
+                    : ControlColors.textMuted,
+              ),
+            ),
+            Text(
+              '쓰기 권한: ${!hasHandle
+                  ? '핸들 없음'
+                  : granted
+                  ? '허용'
+                  : '재승인 필요'}',
+              style: TextStyle(
+                fontSize: 12,
+                color: granted
+                    ? ControlColors.textSecondary
+                    : ControlColors.textMuted,
+              ),
+            ),
+            Text(
+              '실제 전달 준비 상태: ${ready
+                  ? '직접 전달 준비 완료'
+                  : folder?.needsReselect == true
+                  ? '전달 폴더 다시 선택 필요'
+                  : '미준비'}',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: ready
+                    ? ControlColors.textPrimary
+                    : ControlColors.textMuted,
+              ),
+            ),
+            if (folder != null && folder.statusMessage.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                folder.statusMessage,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textMuted,
+                ),
+              ),
+            ],
             const SizedBox(height: 4),
             const Text(
               '권장 위치: Documents\\Sotong24Work\\Instructions\\Inbox',
@@ -2810,7 +3054,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             OutlinedButton.icon(
               onPressed: _pickTransferFolder,
               icon: const Icon(Icons.folder_open, size: 18),
-              label: const Text('전달 폴더 선택'),
+              label: Text(ready ? '전달 폴더 다시 선택' : '전달 폴더 선택'),
             ),
           ],
         ),
