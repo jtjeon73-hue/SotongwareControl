@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web/web.dart' as web;
 
+import 'dev_work_doc_fs.dart';
 import 'dev_work_doc_paths.dart';
+import 'dev_work_doc_save_pipeline.dart';
 import 'dev_work_doc_types.dart';
 import 'dev_work_doc_verify.dart';
 import 'work_instruction_validator.dart';
@@ -16,6 +18,65 @@ const _rootNameKey = 'dev_work_doc_root_name_v1';
 JSObject? _rootHandle;
 String? _rootFolderName;
 DevWorkDocSelectionKind _selectionKind = DevWorkDocSelectionKind.none;
+bool _structureOk = false;
+bool _writeProbeOk = false;
+
+/// 진단 로그 (절대경로·JSON 본문 금지).
+void _diag(String step, [String detail = '']) {
+  final line = detail.isEmpty ? step : '$step: $detail';
+  if (kDebugMode) {
+    debugPrint('[DevWorkDoc] $line');
+  }
+}
+
+JSObject _jsOpts(Map<String, Object> map) {
+  final o = JSObject();
+  for (final e in map.entries) {
+    final v = e.value;
+    if (v is bool) {
+      o.setProperty(e.key.toJS, v.toJS);
+    } else if (v is String) {
+      o.setProperty(e.key.toJS, v.toJS);
+    } else if (v is num) {
+      o.setProperty(e.key.toJS, v.toJS);
+    }
+  }
+  return o;
+}
+
+/// callMethod에 List.toJS를 한 덩어리로 넘기면 브라우저가 단일 인자로 받아
+/// create 옵션이 무시되고, name이 "foo,[object Object]"로 깨진다.
+/// 인자는 반드시 개별 전달한다.
+Future<JSAny?> _call0(JSObject target, String method) async {
+  return (target.callMethod(method.toJS) as JSPromise).toDart;
+}
+
+Future<JSAny?> _call1(JSObject target, String method, JSAny? a1) async {
+  return (target.callMethod(method.toJS, a1) as JSPromise).toDart;
+}
+
+Future<JSAny?> _call2(
+  JSObject target,
+  String method,
+  JSAny? a1,
+  JSAny? a2,
+) async {
+  return (target.callMethod(method.toJS, a1, a2) as JSPromise).toDart;
+}
+
+String _domName(Object e) {
+  final s = '$e';
+  if (s.contains('NotFoundError')) return 'NotFoundError';
+  if (s.contains('NotAllowedError')) return 'NotAllowedError';
+  if (s.contains('TypeMismatchError')) return 'TypeMismatchError';
+  if (s.contains('InvalidStateError')) return 'InvalidStateError';
+  return e.runtimeType.toString();
+}
+
+bool _isNotFound(Object e) {
+  final n = _domName(e);
+  return n == 'NotFoundError' || '$e'.contains('NotFoundError');
+}
 
 bool _isSupported() {
   try {
@@ -27,15 +88,11 @@ bool _isSupported() {
 
 Future<bool> _hasPermission(JSObject handle) async {
   try {
-    final status =
-        await (handle.callMethod(
-                  'queryPermission'.toJS,
-                  [
-                    {'mode': 'readwrite'}.jsify(),
-                  ].toJS,
-                )
-                as JSPromise)
-            .toDart;
+    final status = await _call1(
+      handle,
+      'queryPermission',
+      _jsOpts({'mode': 'readwrite'}),
+    );
     return '$status' == 'granted';
   } catch (_) {
     return false;
@@ -44,25 +101,18 @@ Future<bool> _hasPermission(JSObject handle) async {
 
 Future<bool> _requestPermission(JSObject handle) async {
   try {
-    final status =
-        await (handle.callMethod(
-                  'requestPermission'.toJS,
-                  [
-                    {'mode': 'readwrite'}.jsify(),
-                  ].toJS,
-                )
-                as JSPromise)
-            .toDart;
+    final status = await _call1(
+      handle,
+      'requestPermission',
+      _jsOpts({'mode': 'readwrite'}),
+    );
     return '$status' == 'granted';
   } catch (_) {
     return false;
   }
 }
 
-Future<DevWorkDocState> _buildState({
-  String? statusMessage,
-  bool? structureOk,
-}) async {
+Future<DevWorkDocState> _buildState({String? statusMessage}) async {
   final prefs = await SharedPreferences.getInstance();
   _rootFolderName ??= prefs.getString(_rootNameKey);
   final supported = _isSupported();
@@ -75,7 +125,9 @@ Future<DevWorkDocState> _buildState({
       supported &&
       handle != null &&
       granted &&
-      _selectionKind == DevWorkDocSelectionKind.devWorkDocRoot;
+      _selectionKind == DevWorkDocSelectionKind.devWorkDocRoot &&
+      _structureOk &&
+      _writeProbeOk;
   return DevWorkDocState(
     supported: supported,
     hasRoot: handle != null,
@@ -84,8 +136,8 @@ Future<DevWorkDocState> _buildState({
     selectionKind: handle == null
         ? DevWorkDocSelectionKind.none
         : _selectionKind,
-    structureOk: structureOk ?? (handle != null && granted),
-    readyToWrite: ready && (structureOk ?? true),
+    structureOk: _structureOk,
+    readyToWrite: ready,
     statusMessage:
         statusMessage ??
         (ready
@@ -94,6 +146,10 @@ Future<DevWorkDocState> _buildState({
             ? 'DevWorkDoc 폴더를 선택해 주세요.'
             : !granted
             ? '쓰기 권한 재승인이 필요합니다.'
+            : !_structureOk
+            ? '경로 구조 준비가 필요합니다.'
+            : !_writeProbeOk
+            ? '쓰기 프로브가 실패했습니다. 폴더를 다시 선택하세요.'
             : '선택 기준을 확인해 주세요.'),
   );
 }
@@ -116,15 +172,16 @@ Future<DevWorkDocState> pickRootFolder() async {
     final handle =
         await (web.window.callMethod(
                   'showDirectoryPicker'.toJS,
-                  [
-                    {'mode': 'readwrite', 'id': 'dev-work-doc-root'}.jsify(),
-                  ].toJS,
+                  _jsOpts({'mode': 'readwrite', 'id': 'dev-work-doc-root'}),
                 )
                 as JSPromise<JSObject>)
             .toDart;
 
     final granted = await _requestPermission(handle);
     if (!granted) {
+      _rootHandle = null;
+      _structureOk = false;
+      _writeProbeOk = false;
       return const DevWorkDocState(
         supported: true,
         hasRoot: false,
@@ -144,6 +201,8 @@ Future<DevWorkDocState> pickRootFolder() async {
     _rootHandle = handle;
     _rootFolderName = name;
     _selectionKind = kind;
+    _structureOk = false;
+    _writeProbeOk = false;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_rootNameKey, name);
@@ -153,12 +212,10 @@ Future<DevWorkDocState> pickRootFolder() async {
         statusMessage:
             '저장소 루트로 보입니다. 하위 「DevWorkDoc」을 사용하려면 「DevWorkDoc 하위 폴더 사용」을 누르거나, '
             'DevWorkDoc 폴더를 다시 선택하세요.',
-        structureOk: false,
       );
     }
 
     if (kind == DevWorkDocSelectionKind.ambiguous) {
-      // 빈 폴더를 DevWorkDoc으로 쓸 수 있게 구조 생성 후 재판정
       final structure = await ensureStructure();
       if (structure.ok) {
         final refreshedChildren = await _listChildNames(handle);
@@ -169,10 +226,11 @@ Future<DevWorkDocState> pickRootFolder() async {
         if (kind2 == DevWorkDocSelectionKind.devWorkDocRoot ||
             name.toLowerCase() == 'devworkdoc') {
           _selectionKind = DevWorkDocSelectionKind.devWorkDocRoot;
+          await _runWriteProbe();
           return _buildState(
             statusMessage:
-                '선택 기준: DevWorkDoc 루트 · 쓰기 권한: 허용 · 경로 구조: 정상 · 저장 준비: 완료',
-            structureOk: true,
+                '선택 기준: DevWorkDoc 루트 · 쓰기 권한: 허용 · 경로 구조: 정상 · 저장 준비: '
+                '${_writeProbeOk ? '완료' : '프로브 실패'}',
           );
         }
       }
@@ -180,25 +238,24 @@ Future<DevWorkDocState> pickRootFolder() async {
         statusMessage:
             '선택 폴더「$name」가 DevWorkDoc 루트인지 확인이 필요합니다. '
             '폴더 이름이 DevWorkDoc 인 폴더를 선택하는 것을 권장합니다.',
-        structureOk: false,
       );
     }
 
     final structure = await ensureStructure();
     if (structure.ok) {
       _selectionKind = DevWorkDocSelectionKind.devWorkDocRoot;
+      await _runWriteProbe();
     }
     return _buildState(
       statusMessage: structure.ok
-          ? '선택 기준: DevWorkDoc 루트 · 쓰기 권한: 허용 · 경로 구조: 정상 · 저장 준비: 완료'
+          ? '선택 기준: DevWorkDoc 루트 · 쓰기 권한: 허용 · 경로 구조: 정상 · 저장 준비: '
+                '${_writeProbeOk ? '완료' : '프로브 실패'}'
           : structure.message,
-      structureOk: structure.ok,
     );
   } catch (_) {
-    return _buildState(
-      statusMessage: '폴더 선택이 취소되었거나 실패했습니다.',
-      structureOk: false,
-    );
+    _structureOk = false;
+    _writeProbeOk = false;
+    return _buildState(statusMessage: '폴더 선택이 취소되었거나 실패했습니다.');
   }
 }
 
@@ -206,42 +263,34 @@ Future<DevWorkDocState> pickRootFolder() async {
 Future<DevWorkDocState> useNestedDevWorkDocFolder() async {
   final root = _rootHandle;
   if (root == null) {
-    return _buildState(statusMessage: '먼저 폴더를 선택하세요.', structureOk: false);
+    return _buildState(statusMessage: '먼저 폴더를 선택하세요.');
   }
   if (!await _requestPermission(root)) {
-    return _buildState(statusMessage: '쓰기 권한 재승인이 필요합니다.', structureOk: false);
+    return _buildState(statusMessage: '쓰기 권한 재승인이 필요합니다.');
   }
   try {
     final nested =
-        await (root.callMethod(
-                  'getDirectoryHandle'.toJS,
-                  ['DevWorkDoc'.toJS].toJS,
-                )
-                as JSPromise<JSObject>)
-            .toDart;
+        await _call1(root, 'getDirectoryHandle', 'DevWorkDoc'.toJS) as JSObject;
     if (!await _requestPermission(nested)) {
-      return _buildState(
-        statusMessage: 'DevWorkDoc 하위 폴더 권한이 필요합니다.',
-        structureOk: false,
-      );
+      return _buildState(statusMessage: 'DevWorkDoc 하위 폴더 권한이 필요합니다.');
     }
     _rootHandle = nested;
     _rootFolderName = 'DevWorkDoc';
     _selectionKind = DevWorkDocSelectionKind.devWorkDocRoot;
+    _structureOk = false;
+    _writeProbeOk = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_rootNameKey, 'DevWorkDoc');
     final structure = await ensureStructure();
+    if (structure.ok) await _runWriteProbe();
     return _buildState(
       statusMessage: structure.ok
-          ? '선택 기준: DevWorkDoc 루트(하위) · 쓰기 권한: 허용 · 저장 준비: 완료'
+          ? '선택 기준: DevWorkDoc 루트(하위) · 쓰기 권한: 허용 · 저장 준비: '
+                '${_writeProbeOk ? '완료' : '프로브 실패'}'
           : structure.message,
-      structureOk: structure.ok,
     );
   } catch (e) {
-    return _buildState(
-      statusMessage: '하위에서 DevWorkDoc을 찾지 못했습니다. ($e)',
-      structureOk: false,
-    );
+    return _buildState(statusMessage: '하위에서 DevWorkDoc을 찾지 못했습니다. ($e)');
   }
 }
 
@@ -253,38 +302,49 @@ Future<JSObject?> _requireRoot() async {
 }
 
 Future<JSObject> _getOrCreateDir(JSObject parent, String name) async {
-  return await (parent.callMethod(
-            'getDirectoryHandle'.toJS,
-            [
-              name.toJS,
-              {'create': true}.jsify(),
-            ].toJS,
-          )
-          as JSPromise<JSObject>)
-      .toDart;
+  _diag('getDirectoryHandle', '$name create=true');
+  final result = await _call2(
+    parent,
+    'getDirectoryHandle',
+    name.toJS,
+    _jsOpts({'create': true}),
+  );
+  return result as JSObject;
 }
 
 Future<JSObject?> _getExistingDir(JSObject parent, String name) async {
   try {
-    return await (parent.callMethod('getDirectoryHandle'.toJS, [name.toJS].toJS)
-            as JSPromise<JSObject>)
-        .toDart;
-  } catch (_) {
-    return null;
+    _diag('getDirectoryHandle', '$name create=false');
+    final result = await _call1(parent, 'getDirectoryHandle', name.toJS);
+    return result as JSObject;
+  } catch (e) {
+    if (_isNotFound(e)) return null;
+    rethrow;
   }
 }
 
-Future<JSObject> _resolveDirCreate(JSObject root, String relativeDir) async {
+Future<JSObject> _resolveDirCreate(JSObject root, List<String> segments) async {
   var dir = root;
-  for (final part in relativeDir.split('/').where((p) => p.isNotEmpty)) {
+  for (final part in segments) {
+    if (part.isEmpty) {
+      throw DevWorkDocStepError(
+        step: DevWorkDocSaveStep.artifactDir,
+        relativePath: segments.join('/'),
+        domName: 'InvalidStateError',
+        message: '빈 경로 세그먼트',
+      );
+    }
     dir = await _getOrCreateDir(dir, part);
   }
   return dir;
 }
 
-Future<JSObject?> _resolveDirExisting(JSObject root, String relativeDir) async {
+Future<JSObject?> _resolveDirExisting(
+  JSObject root,
+  List<String> segments,
+) async {
   var dir = root;
-  for (final part in relativeDir.split('/').where((p) => p.isNotEmpty)) {
+  for (final part in segments) {
     final next = await _getExistingDir(dir, part);
     if (next == null) return null;
     dir = next;
@@ -292,101 +352,125 @@ Future<JSObject?> _resolveDirExisting(JSObject root, String relativeDir) async {
   return dir;
 }
 
+Future<void> _writeTextFileAt(
+  JSObject dir,
+  String fileName,
+  String content, {
+  required String stepCreate,
+  required String stepWrite,
+  required String relativePath,
+}) async {
+  try {
+    _diag(stepCreate, relativePath);
+    final fileHandle =
+        await _call2(
+              dir,
+              'getFileHandle',
+              fileName.toJS,
+              _jsOpts({'create': true}),
+            )
+            as JSObject;
+
+    _diag(stepWrite, '${content.length} chars');
+    final writable = await _call0(fileHandle, 'createWritable') as JSObject;
+
+    final bytes = Uint8List.fromList(utf8.encode(content));
+    final blob = web.Blob(
+      [bytes.toJS].toJS,
+      web.BlobPropertyBag(type: 'application/json;charset=utf-8'),
+    );
+    await _call1(writable, 'write', blob);
+    await _call0(writable, 'close');
+  } catch (e) {
+    throw DevWorkDocStepError(
+      step: stepWrite,
+      relativePath: relativePath,
+      domName: _domName(e),
+      message: '파일 쓰기 실패. 다음 행동: 코드/권한 확인 후 관리자에게 보고',
+    );
+  }
+}
+
+Future<({String? text, int size})> _readTextFileAt(
+  JSObject root,
+  List<String> dirSegments,
+  String fileName,
+) async {
+  try {
+    final dir = dirSegments.isEmpty
+        ? root
+        : await _resolveDirExisting(root, dirSegments);
+    if (dir == null) return (text: null, size: 0);
+
+    final fileHandle =
+        await _call1(dir, 'getFileHandle', fileName.toJS) as JSObject;
+    final file = await _call0(fileHandle, 'getFile') as JSObject;
+    final sizeProp = file.getProperty('size'.toJS);
+    final size = sizeProp == null ? 0 : (sizeProp as JSNumber).toDartInt;
+    if (size <= 0) return (text: '', size: 0);
+
+    final textJs = await _call0(file, 'text');
+    if (textJs == null) return (text: null, size: size);
+    return (text: (textJs as JSString).toDart, size: size);
+  } catch (e) {
+    if (_isNotFound(e)) return (text: null, size: 0);
+    return (text: null, size: 0);
+  }
+}
+
 Future<void> _writeTextFile(
   JSObject root,
   String relativePath,
   String content,
 ) async {
-  final segments = relativePath.split('/');
+  final segments = relativePath.split('/').where((p) => p.isNotEmpty).toList();
   final fileName = segments.removeLast();
-  final dir = segments.isEmpty
-      ? root
-      : await _resolveDirCreate(root, segments.join('/'));
-  final fileHandle =
-      await (dir.callMethod(
-                'getFileHandle'.toJS,
-                [
-                  fileName.toJS,
-                  {'create': true}.jsify(),
-                ].toJS,
-              )
-              as JSPromise<JSObject>)
-          .toDart;
-
-  final writable =
-      await (fileHandle.callMethod('createWritable'.toJS)
-              as JSPromise<JSObject>)
-          .toDart;
-
-  // Blob(UTF-8)로 기록 — String.toJS 단독 전달보다 안정적
-  final bytes = Uint8List.fromList(utf8.encode(content));
-  final blob = web.Blob(
-    [bytes.toJS].toJS,
-    web.BlobPropertyBag(type: 'application/json;charset=utf-8'),
+  final dir = segments.isEmpty ? root : await _resolveDirCreate(root, segments);
+  await _writeTextFileAt(
+    dir,
+    fileName,
+    content,
+    stepCreate: DevWorkDocSaveStep.activeFileCreate,
+    stepWrite: DevWorkDocSaveStep.activeFileWrite,
+    relativePath: relativePath,
   );
-  await (writable.callMethod('write'.toJS, [blob].toJS) as JSPromise).toDart;
-  await (writable.callMethod('close'.toJS) as JSPromise).toDart;
 }
 
 Future<({String? text, int size})> _readTextFileExisting(
   JSObject root,
   String relativePath,
 ) async {
-  try {
-    final segments = relativePath.split('/');
-    final fileName = segments.removeLast();
-    final dir = segments.isEmpty
-        ? root
-        : await _resolveDirExisting(root, segments.join('/'));
-    if (dir == null) return (text: null, size: 0);
-
-    final fileHandle =
-        await (dir.callMethod('getFileHandle'.toJS, [fileName.toJS].toJS)
-                as JSPromise<JSObject>)
-            .toDart;
-    final file =
-        await (fileHandle.callMethod('getFile'.toJS) as JSPromise<JSObject>)
-            .toDart;
-    final sizeProp = file.getProperty('size'.toJS);
-    final size = sizeProp == null ? 0 : (sizeProp as JSNumber).toDartInt;
-    if (size <= 0) return (text: '', size: 0);
-
-    final textJs = await (file.callMethod('text'.toJS) as JSPromise).toDart;
-    if (textJs == null) return (text: null, size: size);
-    return (text: (textJs as JSString).toDart, size: size);
-  } catch (_) {
-    return (text: null, size: 0);
-  }
+  final segments = relativePath.split('/').where((p) => p.isNotEmpty).toList();
+  final fileName = segments.removeLast();
+  return _readTextFileAt(root, segments, fileName);
 }
 
 Future<void> _deleteFile(JSObject root, String relativePath) async {
-  final segments = relativePath.split('/');
+  final segments = relativePath.split('/').where((p) => p.isNotEmpty).toList();
   final fileName = segments.removeLast();
   final dir = segments.isEmpty
       ? root
-      : await _resolveDirExisting(root, segments.join('/'));
+      : await _resolveDirExisting(root, segments);
   if (dir == null) return;
-  await (dir.callMethod('removeEntry'.toJS, [fileName.toJS].toJS) as JSPromise)
-      .toDart;
+  try {
+    await _call1(dir, 'removeEntry', fileName.toJS);
+  } catch (_) {}
 }
 
 Future<void> _deleteDirRecursive(JSObject root, String relativeDir) async {
   try {
-    final segments = relativeDir.split('/');
+    final segments = relativeDir.split('/').where((p) => p.isNotEmpty).toList();
     final dirName = segments.removeLast();
     final parent = segments.isEmpty
         ? root
-        : await _resolveDirExisting(root, segments.join('/'));
+        : await _resolveDirExisting(root, segments);
     if (parent == null) return;
-    await (parent.callMethod(
-              'removeEntry'.toJS,
-              [
-                dirName.toJS,
-                {'recursive': true}.jsify(),
-              ].toJS,
-            )
-            as JSPromise)
-        .toDart;
+    await _call2(
+      parent,
+      'removeEntry',
+      dirName.toJS,
+      _jsOpts({'recursive': true}),
+    );
   } catch (_) {}
 }
 
@@ -398,8 +482,7 @@ Future<List<String>> _listEntryNames(JSObject dirHandle) async {
     final values =
         (valuesMethod as JSFunction).callAsFunction(dirHandle) as JSObject;
     while (true) {
-      final result =
-          await (values.callMethod('next'.toJS) as JSPromise<JSObject>).toDart;
+      final result = await _call0(values, 'next') as JSObject;
       final done = result.getProperty('done'.toJS);
       if (done != null && (done as JSBoolean).toDart) break;
       final value = result.getProperty('value'.toJS);
@@ -430,6 +513,118 @@ void _triggerDownload(String fileName, String jsonText) {
   web.URL.revokeObjectURL(url);
 }
 
+/// 정적 폴더 create·임시 파일 쓰기/삭제 프로브 (흔적 남기지 않음).
+Future<void> _runWriteProbe() async {
+  _writeProbeOk = false;
+  final root = _rootHandle;
+  if (root == null) return;
+  try {
+    _diag(DevWorkDocSaveStep.root, 'probe');
+    final ebook = await _getOrCreateDir(root, 'Ebook');
+    final active = await _getOrCreateDir(ebook, 'Active');
+    await _getOrCreateDir(ebook, 'Versions');
+
+    const probeName = '.devworkdoc_write_probe.tmp';
+    await _writeTextFileAt(
+      active,
+      probeName,
+      'ok',
+      stepCreate: 'write_probe_create',
+      stepWrite: 'write_probe_write',
+      relativePath: 'Ebook/Active/$probeName',
+    );
+    final read = await _readTextFileAt(root, ['Ebook', 'Active'], probeName);
+    await _call1(active, 'removeEntry', probeName.toJS);
+    if (read.text != 'ok') {
+      _diag('write_probe', 'reread mismatch');
+      return;
+    }
+    _writeProbeOk = true;
+    _diag('write_probe', 'ok');
+  } catch (e) {
+    _diag('write_probe', 'failed ${_domName(e)}');
+    _writeProbeOk = false;
+  }
+}
+
+/// 브라우저 FSA → DevWorkDocFsAdapter
+class _WebDevWorkDocFs implements DevWorkDocFsAdapter {
+  _WebDevWorkDocFs(this.root);
+
+  final JSObject root;
+
+  @override
+  Future<bool> dirExists(List<String> segments) async {
+    final d = await _resolveDirExisting(root, segments);
+    return d != null;
+  }
+
+  @override
+  Future<void> ensureDir(List<String> segments, {required bool create}) async {
+    if (segments.isEmpty) return;
+    if (create) {
+      try {
+        await _resolveDirCreate(root, segments);
+      } catch (e) {
+        throw FsNotFoundException(
+          step: DevWorkDocSaveStep.instructionDir,
+          relativePath: segments.join('/'),
+          message: '${_domName(e)}: ${segments.join('/')}',
+        );
+      }
+    } else {
+      final d = await _resolveDirExisting(root, segments);
+      if (d == null) {
+        throw FsNotFoundException(
+          step: 'getDirectoryHandle',
+          relativePath: segments.join('/'),
+          message: 'Directory not found (create:false)',
+        );
+      }
+    }
+  }
+
+  @override
+  Future<bool> fileExists(List<String> dirSegments, String fileName) async {
+    final r = await readFile(dirSegments, fileName);
+    return r.text != null;
+  }
+
+  @override
+  Future<void> writeFile(
+    List<String> dirSegments,
+    String fileName,
+    String content,
+  ) async {
+    final rel = [...dirSegments, fileName].join('/');
+    try {
+      final dir = await _resolveDirCreate(root, dirSegments);
+      await _writeTextFileAt(
+        dir,
+        fileName,
+        content,
+        stepCreate: DevWorkDocSaveStep.versionFileCreate,
+        stepWrite: DevWorkDocSaveStep.versionFileWrite,
+        relativePath: rel,
+      );
+    } on DevWorkDocStepError {
+      rethrow;
+    } catch (e) {
+      throw FsNotFoundException(
+        step: DevWorkDocSaveStep.versionFileWrite,
+        relativePath: rel,
+        message: _domName(e),
+      );
+    }
+  }
+
+  @override
+  Future<({String? text, int size})> readFile(
+    List<String> dirSegments,
+    String fileName,
+  ) => _readTextFileAt(root, dirSegments, fileName);
+}
+
 Future<DevWorkDocWriteResult> ensureStructure() async {
   if (!_isSupported()) {
     return DevWorkDocWriteResult.failed(
@@ -439,6 +634,7 @@ Future<DevWorkDocWriteResult> ensureStructure() async {
   }
   final root = await _requireRoot();
   if (root == null) {
+    _structureOk = false;
     return DevWorkDocWriteResult.failed(
       message: 'DevWorkDoc 루트 폴더를 선택해 주세요.',
       errorCode: 'no_root',
@@ -446,12 +642,13 @@ Future<DevWorkDocWriteResult> ensureStructure() async {
     );
   }
   try {
-    // DevWorkDoc/DevWorkDoc 중첩을 만들지 않는다 — root 바로 아래 artifact 폴더
     for (final artifact in DevWorkDocPaths.allArtifacts) {
+      final art = await _getOrCreateDir(root, artifact);
       for (final sub in DevWorkDocPaths.subFolders) {
-        await _getOrCreateDir(await _getOrCreateDir(root, artifact), sub);
+        await _getOrCreateDir(art, sub);
       }
     }
+    _structureOk = true;
     return DevWorkDocWriteResult(
       ok: true,
       mode: 'folder',
@@ -459,8 +656,11 @@ Future<DevWorkDocWriteResult> ensureStructure() async {
       message: 'DevWorkDoc「${_rootFolderName ?? ''}」폴더 구조를 준비했습니다.',
     );
   } catch (e) {
+    _structureOk = false;
     return DevWorkDocWriteResult.failed(
-      message: '폴더 구조 생성에 실패했습니다. ($e)',
+      message:
+          '실패 단계: structure_ensure\n대상: App|Ebook|…/Active|Versions|Archive\n'
+          '오류: ${_domName(e)}\n폴더 구조 생성에 실패했습니다.',
       errorCode: 'structure_failed',
     );
   }
@@ -510,8 +710,6 @@ Future<DevWorkDocWriteResult> saveInstruction({
     instructionId,
     version,
   );
-  final fileName =
-      '${DevWorkDocPaths.wiBaseName(instructionId)}_v$version.json';
 
   if (!_isSupported()) {
     return DevWorkDocWriteResult.failed(
@@ -525,7 +723,9 @@ Future<DevWorkDocWriteResult> saveInstruction({
   final root = await _requireRoot();
   if (root == null) {
     return DevWorkDocWriteResult.failed(
-      message: 'DevWorkDoc 루트가 없거나 권한이 없습니다. 폴더를 다시 선택하세요.',
+      message:
+          '실패 단계: root_handle\n대상: DevWorkDoc\n오류: NotAllowedError\n'
+          '루트가 없거나 권한이 없습니다. 폴더를 다시 선택하세요.',
       errorCode: 'no_root',
       outcome: DevWorkDocSaveOutcome.permissionNeeded,
       activePathHint: activePath,
@@ -536,142 +736,29 @@ Future<DevWorkDocWriteResult> saveInstruction({
   if (_selectionKind != DevWorkDocSelectionKind.devWorkDocRoot) {
     return DevWorkDocWriteResult.failed(
       message:
-          '현재 선택 폴더가 DevWorkDoc 루트로 확정되지 않았습니다. '
-          'DevWorkDoc 폴더를 다시 선택하거나 「DevWorkDoc 하위 폴더 사용」을 누르세요.',
+          '실패 단계: root_handle\n대상: (선택 폴더)\n오류: InvalidStateError\n'
+          'DevWorkDoc 루트로 확정되지 않았습니다. 폴더를 다시 선택하세요.',
       errorCode: 'bad_root',
       activePathHint: activePath,
       versionPathHint: versionPath,
     );
   }
 
-  try {
-    // 기존 Active 검사 (중복/충돌)
-    final existingActive = await _readTextFileExisting(root, activePath);
-    if (existingActive.text != null && existingActive.text!.isNotEmpty) {
-      final cmp = compareExistingFile(
-        existingText: existingActive.text,
-        expectedJson: jsonText,
-      );
-      if (cmp == DevWorkDocSaveOutcome.alreadyExists) {
-        final existingVer = await _readTextFileExisting(root, versionPath);
-        final verSame =
-            existingVer.text != null &&
-            contentChecksum(existingVer.text!) == contentChecksum(jsonText);
-        if (verSame) {
-          final sum = contentChecksum(jsonText);
-          return DevWorkDocWriteResult(
-            ok: true,
-            mode: 'folder',
-            outcome: DevWorkDocSaveOutcome.alreadyExists,
-            activePathHint: activePath,
-            versionPathHint: versionPath,
-            checksum: sum,
-            fileName: fileName,
-            activeVerified: true,
-            versionsVerified: true,
-            activeBytes: existingActive.size,
-            versionsBytes: existingVer.size,
-            message: '기존 파일 확인: 동일 checksum — 다시 쓰지 않음',
-          );
-        }
-      }
-      if (cmp == DevWorkDocSaveOutcome.conflict && !isNewVersion) {
-        // Active 내용이 다른데 같은 경로 — 덮어쓰지 않고 보고
-        // 단, 의도적 저장(새 버전/재저장)은 Active 교체가 필요하므로 isNewVersion 또는 일반 저장은 진행
-        // 사용자 요구: 충돌 시 덮어쓰지 않음 → 마이그레이션에서만 엄격. 일반 저장은 Active 갱신 허용.
-      }
+  _diag(DevWorkDocSaveStep.root, 'save start');
+  final pipeline = DevWorkDocSavePipeline(_WebDevWorkDocFs(root));
+  final result = await pipeline.saveInstruction(
+    artifactType: artifactType,
+    instructionId: instructionId,
+    version: version,
+    jsonText: jsonText,
+    isNewVersion: isNewVersion,
+  );
+  if (!result.ok && kDebugMode) {
+    for (final line in pipeline.diagnostics) {
+      debugPrint('[DevWorkDoc] $line');
     }
-
-    // Versions 충돌: 다른 checksum이면 덮어쓰지 않음
-    final existingVersion = await _readTextFileExisting(root, versionPath);
-    if (existingVersion.text != null && existingVersion.text!.isNotEmpty) {
-      final cmp = compareExistingFile(
-        existingText: existingVersion.text,
-        expectedJson: jsonText,
-      );
-      if (cmp == DevWorkDocSaveOutcome.conflict) {
-        return DevWorkDocWriteResult.failed(
-          message: 'Versions 파일 충돌: 다른 내용이 이미 있습니다. 덮어쓰지 않았습니다.',
-          errorCode: 'conflict',
-          outcome: DevWorkDocSaveOutcome.conflict,
-          activePathHint: activePath,
-          versionPathHint: versionPath,
-        );
-      }
-      if (cmp == DevWorkDocSaveOutcome.alreadyExists) {
-        // 버전은 동일 — Active만 필요할 수 있음
-      }
-    }
-
-    await _writeTextFile(root, versionPath, jsonText);
-    await _writeTextFile(root, activePath, jsonText);
-
-    final activeRead = await _readTextFileExisting(root, activePath);
-    final versionRead = await _readTextFileExisting(root, versionPath);
-
-    if (activeRead.size <= 0 || versionRead.size <= 0) {
-      return DevWorkDocWriteResult.failed(
-        message:
-            '쓰기 후 파일 크기가 0입니다. Active=${activeRead.size}B Versions=${versionRead.size}B',
-        errorCode: 'empty_file',
-        activePathHint: activePath,
-        versionPathHint: versionPath,
-      );
-    }
-
-    final verified = verifyWrittenPair(
-      DevWorkDocVerifyInput(
-        expectedJson: jsonText,
-        activeText: activeRead.text,
-        versionsText: versionRead.text,
-        instructionId: instructionId,
-        version: version,
-      ),
-    );
-
-    if (!verified.isComplete) {
-      return DevWorkDocWriteResult(
-        ok: false,
-        mode: 'failed',
-        outcome: verified.outcome,
-        activePathHint: activePath,
-        versionPathHint: versionPath,
-        message: verified.message,
-        errorCode: verified.errorCode ?? 'verify_failed',
-        checksum: verified.checksum,
-        fileName: fileName,
-        activeVerified: verified.activeVerified,
-        versionsVerified: verified.versionsVerified,
-        activeBytes: verified.activeBytes,
-        versionsBytes: verified.versionsBytes,
-      );
-    }
-
-    return DevWorkDocWriteResult(
-      ok: true,
-      mode: 'folder',
-      outcome: DevWorkDocSaveOutcome.completeSuccess,
-      activePathHint: activePath,
-      versionPathHint: versionPath,
-      checksum: verified.checksum,
-      fileName: fileName,
-      activeVerified: true,
-      versionsVerified: true,
-      activeBytes: activeRead.size,
-      versionsBytes: versionRead.size,
-      message:
-          '완전 성공: Active ${activeRead.size}B · Versions ${versionRead.size}B 검증 완료 '
-          '(${_rootFolderName ?? 'DevWorkDoc'})',
-    );
-  } catch (e) {
-    // 다운로드로 조용히 대체하지 않음 — 폴더 저장 실패로 반환
-    return DevWorkDocWriteResult.failed(
-      message: '폴더 저장 실패: $e',
-      errorCode: 'write_failed',
-      activePathHint: activePath,
-      versionPathHint: versionPath,
-    );
   }
+  return result;
 }
 
 Future<String?> readActive(String artifactType, String instructionId) async {
@@ -711,7 +798,8 @@ Future<DevWorkDocWriteResult> archiveInstruction({
     final content = await _readTextFileExisting(root, activePath);
     if (content.text == null || content.size <= 0) {
       return DevWorkDocWriteResult.failed(
-        message: 'Active 파일이 없습니다.',
+        message:
+            '실패 단계: active_read\n대상: $activePath\n오류: NotFoundError\nActive 파일이 없습니다.',
         errorCode: 'not_found',
         activePathHint: activePath,
       );
@@ -721,7 +809,8 @@ Future<DevWorkDocWriteResult> archiveInstruction({
     final archiveRead = await _readTextFileExisting(root, archivePath);
     if (archiveRead.size <= 0 || archiveRead.text == null) {
       return DevWorkDocWriteResult.failed(
-        message: 'Archive 쓰기 검증 실패',
+        message:
+            '실패 단계: archive_reread\n대상: $archivePath\n오류: NotFoundError\nArchive 쓰기 검증 실패',
         errorCode: 'verify_failed',
       );
     }
@@ -739,9 +828,14 @@ Future<DevWorkDocWriteResult> archiveInstruction({
       versionsVerified: true,
       activeBytes: archiveRead.size,
     );
+  } on DevWorkDocStepError catch (e) {
+    return DevWorkDocWriteResult.failed(
+      message: e.userMessage,
+      errorCode: 'archive_failed',
+    );
   } catch (e) {
     return DevWorkDocWriteResult.failed(
-      message: '보관 실패: $e',
+      message: '보관 실패: ${_domName(e)}',
       errorCode: 'archive_failed',
     );
   }
@@ -768,10 +862,11 @@ Future<DevWorkDocWriteResult> restoreInstruction({
   }
 
   try {
-    final archiveDir = await _resolveDirExisting(root, '$folder/Archive');
+    final archiveDir = await _resolveDirExisting(root, [folder, 'Archive']);
     if (archiveDir == null) {
       return DevWorkDocWriteResult.failed(
-        message: 'Archive 폴더가 없습니다.',
+        message:
+            '실패 단계: archive_directory\n대상: $folder/Archive\n오류: NotFoundError',
         errorCode: 'not_found',
       );
     }
@@ -810,7 +905,8 @@ Future<DevWorkDocWriteResult> restoreInstruction({
     final activeRead = await _readTextFileExisting(root, activePath);
     if (activeRead.size <= 0) {
       return DevWorkDocWriteResult.failed(
-        message: '복원 후 Active 검증 실패',
+        message:
+            '실패 단계: active_file_reread\n대상: $activePath\n오류: NotFoundError\n복원 후 Active 검증 실패',
         errorCode: 'verify_failed',
       );
     }
@@ -827,9 +923,14 @@ Future<DevWorkDocWriteResult> restoreInstruction({
       versionsVerified: true,
       activeBytes: activeRead.size,
     );
+  } on DevWorkDocStepError catch (e) {
+    return DevWorkDocWriteResult.failed(
+      message: e.userMessage,
+      errorCode: 'restore_failed',
+    );
   } catch (e) {
     return DevWorkDocWriteResult.failed(
-      message: '복원 실패: $e',
+      message: '복원 실패: ${_domName(e)}',
       errorCode: 'restore_failed',
     );
   }
@@ -865,7 +966,7 @@ Future<DevWorkDocWriteResult> permanentDelete({
     } catch (_) {}
     await _deleteDirRecursive(root, versionDir);
 
-    final archiveDir = await _resolveDirExisting(root, '$folder/Archive');
+    final archiveDir = await _resolveDirExisting(root, [folder, 'Archive']);
     if (archiveDir != null) {
       final names = await _listEntryNames(archiveDir);
       for (final name in names) {
@@ -884,7 +985,7 @@ Future<DevWorkDocWriteResult> permanentDelete({
     );
   } catch (e) {
     return DevWorkDocWriteResult.failed(
-      message: '삭제 실패: $e',
+      message: '삭제 실패: ${_domName(e)}',
       errorCode: 'delete_failed',
     );
   }
