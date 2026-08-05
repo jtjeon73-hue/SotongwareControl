@@ -9,11 +9,18 @@ export 'instruction_content_checksum.dart'
         stableContentChecksum,
         compareInstructionContent,
         diffInstructionContent,
+        formatConflictDiagnosis,
+        withCanonicalChecksumFields,
+        storedChecksumOf,
+        storedAlgorithmOf,
+        normalizeInstructionMap,
         InstructionContentRelation,
         InstructionContentDiff,
         InstructionDiffEntry,
         instructionVolatileKeys,
-        canonicalContentMap;
+        canonicalContentMap,
+        checksumAlgorithmCanonicalV2,
+        checksumAlgorithmLegacyFullJson;
 
 class ValidationIssue {
   const ValidationIssue({

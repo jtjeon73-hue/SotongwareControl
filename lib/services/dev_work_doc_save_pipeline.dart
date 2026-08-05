@@ -79,6 +79,11 @@ class DevWorkDocSavePipeline {
 
       if (activeCmp == DevWorkDocSaveOutcome.alreadyExists &&
           versionCmp == DevWorkDocSaveOutcome.alreadyExists) {
+        final diff = diffInstructionContent(
+          existingVersion.text ?? '',
+          jsonText,
+        );
+        final legacy = diff.legacyCompatible;
         return DevWorkDocWriteResult(
           ok: true,
           mode: 'folder',
@@ -94,7 +99,9 @@ class DevWorkDocSavePipeline {
           instructionId: instructionId,
           version: version,
           operationId: opId,
-          message: '기존 파일 확인: 동일 핵심 checksum — 다시 쓰지 않음',
+          message: legacy
+              ? '기존 버전 확인 · 구형 체크섬 호환'
+              : '기존 파일 확인: 동일 핵심 checksum — 다시 쓰지 않음',
         );
       }
 
@@ -104,45 +111,50 @@ class DevWorkDocSavePipeline {
           existingVersion.text ?? '',
           jsonText,
         );
-        final metaOnly = diff.isMetadataOnly;
-        // 안정 checksum 기준으로 conflict인데 metaOnly는 이론상 없어야 함.
-        // 방어: sameCore면 conflict가 아니므로 여기까지 오지 않음.
-        final summary = diff.entries
-            .map((e) => '${e.label}: ${e.left} ↔ ${e.right}')
-            .join('\n');
-        return DevWorkDocWriteResult.failed(
-          message:
-              '실패 단계: Versions 충돌 검사\n대상: $versionRel\n오류: Conflict\n'
-              '버전 v$version 핵심 내용이 기존 Versions와 다릅니다. 기존 파일을 덮어쓰지 않았습니다.\n'
-              '다음 행동: 「기존 버전 확인 및 복구」에서 비교·복구하거나, '
-              '승인한 뒤 다음 버전으로 생성하세요.',
-          errorCode: 'conflict',
-          outcome: DevWorkDocSaveOutcome.conflict,
-          activePathHint: activeRel,
-          versionPathHint: versionRel,
-          instructionId: instructionId,
-          version: version,
-          operationId: opId,
-          conflictIsMetadataOnly: metaOnly,
-          conflictDiffSummary: summary,
-          checksum: expectedStable,
-        );
+        // 방어: 핵심 차이 0이면 동일로 재분류 → versionAlreadyOk 경로
+        if (!(diff.isSameCore || diff.coreDiffFieldCount == 0)) {
+          final diagnosis = formatConflictDiagnosis(diff);
+          return DevWorkDocWriteResult.failed(
+            message:
+                '실패 단계: Versions 충돌 검사\n대상: $versionRel\n오류: Conflict\n'
+                '버전 v$version 핵심 내용이 기존 Versions와 다릅니다. '
+                '기존 파일을 덮어쓰지 않았습니다.\n\n$diagnosis\n\n'
+                '다음 행동: 「기존 버전 확인 및 복구」에서 비교하거나, '
+                '승인한 뒤 다음 버전으로 생성하세요.',
+            errorCode: 'conflict',
+            outcome: DevWorkDocSaveOutcome.conflict,
+            activePathHint: activeRel,
+            versionPathHint: versionRel,
+            instructionId: instructionId,
+            version: version,
+            operationId: opId,
+            conflictIsMetadataOnly: false,
+            conflictDiffSummary: diagnosis,
+            checksum: expectedStable,
+          );
+        }
       }
 
+      final versionDiff = existingVersion.text == null
+          ? null
+          : diffInstructionContent(existingVersion.text!, jsonText);
       final versionAlreadyOk =
-          versionCmp == DevWorkDocSaveOutcome.alreadyExists;
-      // isNewVersion은 호출부에서 버전 번호를 올린 뒤 전달됨 (파이프라인은 덮어쓰기 금지).
+          versionCmp == DevWorkDocSaveOutcome.alreadyExists ||
+          (versionDiff != null &&
+              (versionDiff.isSameCore || versionDiff.coreDiffFieldCount == 0));
+      final legacyReuse = versionDiff?.legacyCompatible == true;
+      var recovered = false;
 
       late final ({String? text, int size}) versionRead;
-      var recovered = false;
 
       if (versionAlreadyOk) {
         _log(
           DevWorkDocSaveStep.versionFileReread,
-          'reuse existing Versions (same core)',
+          legacyReuse
+              ? 'reuse Versions (legacy checksum compatible)'
+              : 'reuse existing Versions (same core)',
         );
         versionRead = existingVersion;
-        // Active가 없거나 핵심이 다르면 Versions 내용으로 Active 복구
         if (activeCmp != DevWorkDocSaveOutcome.alreadyExists) {
           recovered = true;
         }
@@ -321,11 +333,16 @@ class DevWorkDocSavePipeline {
         version: version,
         operationId: opId,
         message: recovered
-            ? '부분 저장 복구 완료: 기존 Versions v$version 확인 후 Active 생성·검증\n'
-                  'Active: $activeRel (${activeRead.size}B)\n'
-                  'Versions: $versionRel (${versionRead.size}B)'
+            ? (legacyReuse
+                  ? '부분 저장 복구 완료 · 구형 체크섬 호환: Versions v$version → Active\n'
+                        'Active: $activeRel (${activeRead.size}B)'
+                  : '부분 저장 복구 완료: 기존 Versions v$version 확인 후 Active 생성·검증\n'
+                        'Active: $activeRel (${activeRead.size}B)\n'
+                        'Versions: $versionRel (${versionRead.size}B)')
             : versionAlreadyOk
-            ? '기존 Versions 확인 후 Active 동기화 완료'
+            ? (legacyReuse
+                  ? '기존 버전 확인 · 구형 체크섬 호환'
+                  : '기존 Versions 확인 후 Active 동기화 완료')
             : '완전 성공: Active ${activeRead.size}B · Versions ${versionRead.size}B 검증 완료\n'
                   'Active: $activeRel\nVersions: $versionRel',
       );

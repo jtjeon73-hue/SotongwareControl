@@ -438,6 +438,24 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
+  bool _planningInputMatchesInstruction(
+    BusinessPlanInput input,
+    WorkInstruction wi,
+  ) {
+    final artifact = input.resolvedArtifactType == ArtifactType.undecided
+        ? (wi.artifactType.isEmpty ? ArtifactType.ebook : wi.artifactType)
+        : input.resolvedArtifactType;
+    final wiArtifact = wi.artifactType.isEmpty
+        ? artifact
+        : ArtifactType.normalize(wi.artifactType);
+    return input.topic.trim() == wi.businessIdea.trim() &&
+        input.customerProblem.trim() == wi.customerProblem.trim() &&
+        input.targetCustomer.trim() == wi.targetCustomer.trim() &&
+        input.desiredOutcome.trim() == wi.businessPurpose.trim() &&
+        ArtifactType.normalize(artifact) == wiArtifact &&
+        input.notes.trim() == wi.notes.trim();
+  }
+
   String _boolLabel(bool? value) {
     if (value == null) return '—';
     return value ? '완료' : '미완료';
@@ -806,34 +824,79 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ? null
         : existingInstruction.updatedAt;
 
-    var instruction = _service.buildInstruction(
-      planId: id,
-      input: input,
-      analysis: analysis,
-      now: now,
-      instructionId: iid,
-      version: version,
-      createdAt: preserveCreatedAt,
-      updatedAt: preserveUpdatedAt,
-      status: PlanningStatus.instructionReady,
-    );
+    final artifact = input.resolvedArtifactType;
+    late WorkInstruction instruction;
+    late String jsonText;
 
-    // 동일 버전 재저장: 핵심 내용이 같으면 기존 스냅샷 JSON을 재사용 (메타데이터 드리프트 방지)
-    if (!isNewVersion &&
+    // 동일 버전 + 기획 입력 미변경: 디스크 Versions(우선) 또는 앱 스냅샷 재사용
+    // buildInstruction 재생성으로 파생 필드가 달라져 구형 파일과 Conflict 나던 문제 방지
+    final sameVersionReuse =
+        !isNewVersion &&
         existingInstruction != null &&
         existingInstruction.instructionVersion == '$version' &&
-        compareInstructionContent(
-              existingInstruction.toJson(),
-              instruction.toJson(),
-            ) ==
-            InstructionContentRelation.sameCore) {
+        _planningInputMatchesInstruction(input, existingInstruction);
+
+    if (sameVersionReuse) {
       instruction = existingInstruction;
+      String? diskVersion;
+      if (saveTarget == DevWorkDocSaveTarget.folder && _devWorkDocFolderReady) {
+        diskVersion = await _devWorkDoc.readVersionFile(
+          artifactType: artifact,
+          instructionId: iid,
+          version: version,
+        );
+      }
+      if (diskVersion != null && diskVersion.trim().isNotEmpty) {
+        final diskDiff = diffInstructionContent(
+          diskVersion,
+          existingInstruction.toJson(),
+        );
+        if (diskDiff.isSameCore || diskDiff.coreDiffFieldCount == 0) {
+          jsonText = diskVersion;
+        } else {
+          // 앱 스냅샷이 파생 필드로 달라도, 기획 입력이 디스크와 같으면 Versions를 기준으로 사용
+          try {
+            final diskInst = WorkInstruction.fromJson(
+              Map<String, dynamic>.from(jsonDecode(diskVersion) as Map),
+            );
+            if (_planningInputMatchesInstruction(input, diskInst)) {
+              jsonText = diskVersion;
+              instruction = diskInst;
+            } else {
+              jsonText = const JsonEncoder.withIndent(
+                '  ',
+              ).convert(existingInstruction.toJson());
+            }
+          } catch (_) {
+            jsonText = const JsonEncoder.withIndent(
+              '  ',
+            ).convert(existingInstruction.toJson());
+          }
+        }
+      } else {
+        jsonText = const JsonEncoder.withIndent(
+          '  ',
+        ).convert(existingInstruction.toJson());
+      }
     } else {
-      final provisionalMap = Map<String, dynamic>.from(instruction.toJson())
-        ..remove('checksum');
-      final checksum = stableContentChecksum(provisionalMap);
+      var built = _service.buildInstruction(
+        planId: id,
+        input: input,
+        analysis: analysis,
+        now: now,
+        instructionId: iid,
+        version: version,
+        createdAt: preserveCreatedAt,
+        updatedAt: preserveUpdatedAt,
+        status: PlanningStatus.instructionReady,
+      );
       final sourceFileName =
           'WI_${DevWorkDocPaths.sanitizeInstructionId(iid)}.json';
+      final withSums = withCanonicalChecksumFields({
+        ...built.toJson(),
+        'sourceFileName': sourceFileName,
+      });
+      final checksum = '${withSums['contentChecksum'] ?? ''}';
       instruction = _service.buildInstruction(
         planId: id,
         input: input,
@@ -841,18 +904,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         now: now,
         instructionId: iid,
         version: version,
-        createdAt: instruction.createdAt,
-        updatedAt: instruction.updatedAt,
+        createdAt: built.createdAt,
+        updatedAt: built.updatedAt,
         checksum: checksum,
         sourceFileName: sourceFileName,
         status: PlanningStatus.instructionReady,
       );
+      jsonText = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(withCanonicalChecksumFields(instruction.toJson()));
     }
 
-    final jsonText = const JsonEncoder.withIndent(
-      '  ',
-    ).convert(instruction.toJson());
-    final artifact = input.resolvedArtifactType;
     final DevWorkDocWriteResult saveResult;
     if (saveTarget == DevWorkDocSaveTarget.downloadOnly) {
       saveResult = await _devWorkDoc.downloadInstructionJson(
@@ -967,8 +1029,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       );
     } else if (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists) {
       _snack(
-        'DevWorkDoc 기존 파일 확인 (동일 핵심 checksum). v$version\n'
-        'Active·Versions v$version 검증 완료',
+        saveResult.message?.contains('구형') == true
+            ? '${saveResult.message}\nActive·Versions v$version 유지'
+            : 'DevWorkDoc 기존 파일 확인 (동일 핵심 checksum). v$version\n'
+                  'Active·Versions v$version 검증 완료',
       );
     } else if (validation.ok) {
       _snack('작업지시서를 생성했습니다. (v$version)');
