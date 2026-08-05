@@ -53,14 +53,30 @@ class DevWorkDocStatus {
     required FolderPermissionState? transferFolder,
     required BusinessPlanInput input,
   }) {
-    if (lastSaveResult != null && !lastSaveResult.ok) {
-      return DevWorkDocStatus(
-        kind: DevWorkDocStatusKind.failed,
-        label: '실패',
-        icon: Icons.error_outline,
-        nextAction: '오류를 확인한 뒤 다시 저장하세요.',
-        failureReason: lastSaveResult.message ?? lastSaveResult.errorCode,
-      );
+    if (lastSaveResult != null) {
+      if (lastSaveResult.mode == 'download' ||
+          lastSaveResult.outcome == DevWorkDocSaveOutcome.downloadOnly) {
+        return DevWorkDocStatus(
+          kind: DevWorkDocStatusKind.browserDownloadComplete,
+          label: '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님)',
+          icon: Icons.download_done,
+          nextAction:
+              '다운로드한 JSON을 DevWorkDoc 폴더에 수동 배치하거나, '
+              '「DevWorkDoc에 저장」으로 폴더에 직접 저장하세요.',
+          activePathHint: lastSaveResult.activePathHint,
+          versionPathHint: lastSaveResult.versionPathHint,
+        );
+      }
+
+      if (!lastSaveResult.ok) {
+        return DevWorkDocStatus(
+          kind: DevWorkDocStatusKind.failed,
+          label: '실패',
+          icon: Icons.error_outline,
+          nextAction: '오류를 확인한 뒤 다시 저장하세요.',
+          failureReason: lastSaveResult.message ?? lastSaveResult.errorCode,
+        );
+      }
     }
 
     final planStatus = activeDoc == null
@@ -94,19 +110,6 @@ class DevWorkDocStatus {
     }
 
     if (lastSaveResult != null && lastSaveResult.ok) {
-      if (lastSaveResult.mode == 'download') {
-        return DevWorkDocStatus(
-          kind: DevWorkDocStatusKind.browserDownloadComplete,
-          label: '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님)',
-          icon: Icons.download_done,
-          nextAction:
-              '다운로드한 JSON을 DevWorkDoc 폴더에 수동 배치하거나, '
-              '「DevWorkDoc에 저장」으로 폴더에 직접 저장하세요.',
-          activePathHint: lastSaveResult.activePathHint,
-          versionPathHint: lastSaveResult.versionPathHint,
-        );
-      }
-
       if (lastSaveResult.mode == 'folder') {
         final version = instruction?.instructionVersion;
         final isMultiVersion =
@@ -150,6 +153,15 @@ class DevWorkDocStatus {
     }
 
     final devDoc = devDocState;
+    if (devDoc != null && devDoc.readyToWrite) {
+      return const DevWorkDocStatus(
+        kind: DevWorkDocStatusKind.folderReady,
+        label: '저장 준비 완료',
+        icon: Icons.folder_open,
+        nextAction: '「DevWorkDoc에 저장」으로 작업지시서를 폴더에 저장하세요.',
+      );
+    }
+
     if (devDoc != null && devDoc.supported && devDoc.hasRoot) {
       return const DevWorkDocStatus(
         kind: DevWorkDocStatusKind.folderReady,
