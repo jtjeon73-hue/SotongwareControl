@@ -261,8 +261,9 @@ void main() {
         jsonText: jsonText,
       );
 
-      expect(result.ok, isTrue);
+      expect(result.ok, isFalse);
       expect(result.mode, 'download');
+      expect(result.outcome, DevWorkDocSaveOutcome.downloadOnly);
       expect(result.message, contains('DevWorkDoc 직접 저장 아님'));
     },
   );

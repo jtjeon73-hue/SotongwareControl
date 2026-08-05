@@ -12,6 +12,7 @@ import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
 import '../services/dev_work_doc_paths.dart';
 import '../services/dev_work_doc_service.dart';
+import '../services/dev_work_doc_verify.dart';
 import '../services/instruction_transfer_service.dart';
 import '../services/plan_progress_status.dart';
 import '../services/planning_sentence_composer.dart';
@@ -422,8 +423,25 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     input: _currentInput,
   );
 
-  bool get _devWorkDocFolderReady =>
-      _devDocState?.supported == true && _devDocState?.hasRoot == true;
+  bool get _devWorkDocFolderReady => _devDocState?.readyToWrite == true;
+
+  String _selectionKindLabel(DevWorkDocSelectionKind kind) {
+    switch (kind) {
+      case DevWorkDocSelectionKind.devWorkDocRoot:
+        return 'DevWorkDoc 루트 (권장)';
+      case DevWorkDocSelectionKind.repoRootWithDevWorkDoc:
+        return '저장소 루트 — DevWorkDoc 하위 필요';
+      case DevWorkDocSelectionKind.ambiguous:
+        return '확인 필요';
+      case DevWorkDocSelectionKind.none:
+        return '미선택';
+    }
+  }
+
+  String _boolLabel(bool? value) {
+    if (value == null) return '—';
+    return value ? '완료' : '미완료';
+  }
 
   Future<void> _createInstruction() async {
     if (!_canCreateInstruction) {
@@ -587,11 +605,36 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       );
     }
 
-    if (!saveResult.ok) {
+    final isDownloadTarget = saveTarget == DevWorkDocSaveTarget.downloadOnly;
+    final isFolderSuccess =
+        !isDownloadTarget &&
+        (saveResult.isFolderCompleteSuccess ||
+            (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists &&
+                saveResult.activeVerified &&
+                saveResult.versionsVerified));
+    final isDownloadComplete =
+        isDownloadTarget &&
+        saveResult.mode == 'download' &&
+        saveResult.outcome == DevWorkDocSaveOutcome.downloadOnly;
+
+    if (!isFolderSuccess && !isDownloadComplete) {
       if (mounted) {
         setState(() => _lastDevWorkDocResult = saveResult);
       }
-      _snack(saveResult.message ?? 'DevWorkDoc 저장에 실패했습니다.');
+      final failureMessage = saveResult.message ?? 'DevWorkDoc 저장에 실패했습니다.';
+      if (!isDownloadTarget && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(failureMessage),
+            action: SnackBarAction(
+              label: 'JSON 다운로드',
+              onPressed: _downloadInstructionJson,
+            ),
+          ),
+        );
+      } else {
+        _snack(failureMessage);
+      }
       return;
     }
 
@@ -599,7 +642,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       input: input,
       instruction: instruction,
     );
-    final status = validation.ok
+    final status = isDownloadComplete
+        ? PlanningStatus.downloadedPendingImport
+        : validation.ok
         ? PlanningStatus.instructionReady
         : PlanningStatus.validationRequired;
 
@@ -631,27 +676,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _lastDevWorkDocResult = saveResult;
     });
 
-    if (saveTarget == DevWorkDocSaveTarget.downloadOnly) {
+    if (isDownloadComplete) {
       _snack(
         '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님). '
         'v$version · ${saveResult.fileName ?? ''}',
       );
-    } else if (saveResult.mode == 'folder') {
-      final activeHint =
-          saveResult.activePathHint ??
-          DevWorkDocPaths.activeRelative(artifact, iid);
-      final versionHint =
-          saveResult.versionPathHint ??
-          DevWorkDocPaths.versionRelative(artifact, iid, version);
+    } else if (saveResult.isFolderCompleteSuccess) {
       _snack(
         'DevWorkDoc에 저장했습니다. v$version\n'
-        'Active: $activeHint\n'
-        'Versions: $versionHint',
+        'Active: 저장·검증 완료 (${saveResult.activeBytes}B)\n'
+        'Versions: v$version 저장·검증 완료 (${saveResult.versionsBytes}B)',
       );
-    } else if (saveResult.mode == 'download') {
+    } else if (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists) {
       _snack(
-        '폴더 저장에 실패해 다운로드로 대체되었습니다. '
-        'DevWorkDoc 직접 저장이 아닙니다. (v$version)',
+        'DevWorkDoc 기존 파일 확인 (동일 checksum). v$version\n'
+        'Active·Versions v$version 검증 완료',
       );
     } else if (validation.ok) {
       _snack('작업지시서를 생성했습니다. (v$version)');
@@ -970,6 +1009,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _snack('작업지시서를 영구 삭제했습니다.');
   }
 
+  Future<void> _useNestedDevWorkDocFolder() async {
+    final state = await _devWorkDoc.useNestedDevWorkDocFolder();
+    if (!mounted) return;
+    setState(() => _devDocState = state);
+    _snack(
+      state.statusMessage.isNotEmpty
+          ? state.statusMessage
+          : 'DevWorkDoc 하위 폴더로 전환했습니다.',
+    );
+  }
+
   Future<void> _pickDevWorkDocFolder() async {
     final state = await _devWorkDoc.pickRootFolder();
     if (!mounted) return;
@@ -988,24 +1038,150 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
+  DevWorkDocMigrateItemResult _buildMigrateItemResult({
+    required BusinessPlanDocument plan,
+    required String artifact,
+    required DevWorkDocWriteResult result,
+  }) {
+    final title = plan.input.topic.isEmpty
+        ? plan.stableInstructionId
+        : plan.input.topic;
+    final iid = plan.stableInstructionId;
+    final v = plan.version;
+
+    if (result.mode == 'download' ||
+        result.outcome == DevWorkDocSaveOutcome.downloadOnly) {
+      return DevWorkDocMigrateItemResult(
+        title: title,
+        instructionId: iid,
+        artifactType: artifact,
+        outcome: DevWorkDocSaveOutcome.downloadOnly,
+        summary: '다운로드만: $title (폴더 저장 아님)',
+        failureReason: result.message ?? '폴더 직접 저장 불가',
+        nextAction: 'DevWorkDoc 폴더를 설정한 뒤 다시 마이그레이션하세요.',
+      );
+    }
+
+    if (result.isFolderCompleteSuccess) {
+      return DevWorkDocMigrateItemResult(
+        title: title,
+        instructionId: iid,
+        artifactType: artifact,
+        outcome: DevWorkDocSaveOutcome.completeSuccess,
+        summary: '완전 성공: $title / Active 저장·검증 완료 / Versions v$v 저장·검증 완료',
+        activeResult: 'Active 저장·검증 완료 (${result.activeBytes}B)',
+        versionsResult: 'Versions v$v 저장·검증 완료 (${result.versionsBytes}B)',
+        verifyResult: result.message ?? 'Active·Versions 재읽기 검증 완료',
+      );
+    }
+
+    if (result.outcome == DevWorkDocSaveOutcome.alreadyExists &&
+        result.activeVerified &&
+        result.versionsVerified) {
+      return DevWorkDocMigrateItemResult(
+        title: title,
+        instructionId: iid,
+        artifactType: artifact,
+        outcome: DevWorkDocSaveOutcome.alreadyExists,
+        summary: '기존 파일 확인: $title / Active·Versions v$v 동일 checksum',
+        activeResult: 'Active 기존 파일 확인 (${result.activeBytes}B)',
+        versionsResult: 'Versions v$v 기존 파일 확인 (${result.versionsBytes}B)',
+        verifyResult: result.message ?? '다시 쓰지 않음',
+      );
+    }
+
+    if (result.outcome == DevWorkDocSaveOutcome.partialSuccess) {
+      final activeLine = result.activeVerified
+          ? 'Active 저장·검증 완료'
+          : 'Active 실패';
+      final versionsLine = result.versionsVerified
+          ? 'Versions v$v 저장·검증 완료'
+          : 'Versions v$v 실패';
+      return DevWorkDocMigrateItemResult(
+        title: title,
+        instructionId: iid,
+        artifactType: artifact,
+        outcome: DevWorkDocSaveOutcome.partialSuccess,
+        summary: '부분 성공: $title / $activeLine / $versionsLine',
+        activeResult: activeLine,
+        versionsResult: versionsLine,
+        verifyResult: result.message ?? '',
+        failureReason: result.message ?? '',
+        nextAction: '폴더 권한·경로를 확인한 뒤 다시 시도하세요.',
+      );
+    }
+
+    if (result.outcome == DevWorkDocSaveOutcome.conflict) {
+      return DevWorkDocMigrateItemResult(
+        title: title,
+        instructionId: iid,
+        artifactType: artifact,
+        outcome: DevWorkDocSaveOutcome.conflict,
+        summary: '충돌: $title — 기존 파일과 내용이 다릅니다',
+        failureReason: result.message ?? '충돌',
+        nextAction: '기존 DevWorkDoc 파일을 확인한 뒤 수동으로 정리하세요.',
+      );
+    }
+
+    if (result.outcome == DevWorkDocSaveOutcome.permissionNeeded) {
+      return DevWorkDocMigrateItemResult(
+        title: title,
+        instructionId: iid,
+        artifactType: artifact,
+        outcome: DevWorkDocSaveOutcome.permissionNeeded,
+        summary: '권한 필요: $title',
+        failureReason: result.message ?? '권한 재승인 필요',
+        nextAction: '「작업지시서 관리 폴더 설정」에서 권한을 다시 허용하세요.',
+      );
+    }
+
+    return DevWorkDocMigrateItemResult(
+      title: title,
+      instructionId: iid,
+      artifactType: artifact,
+      outcome: DevWorkDocSaveOutcome.failed,
+      summary: '실패: $title',
+      failureReason: result.message ?? result.errorCode ?? '저장 실패',
+      nextAction: '오류를 확인한 뒤 다시 시도하세요.',
+    );
+  }
+
   Future<void> _migratePlansToDevWorkDoc() async {
+    final devDoc = _devDocState;
+    if (devDoc == null ||
+        !devDoc.readyToWrite ||
+        !devDoc.hasRoot ||
+        !devDoc.permissionGranted ||
+        devDoc.selectionKind != DevWorkDocSelectionKind.devWorkDocRoot) {
+      _snack(
+        'DevWorkDoc 저장 준비가 되지 않았습니다. '
+        'DevWorkDoc 폴더 자체를 선택하고 쓰기 권한·경로 구조를 확인하세요.',
+      );
+      return;
+    }
+
     final withInstruction = _allPlans.where((p) => p.hasInstruction).toList();
     if (withInstruction.isEmpty) {
       _snack('마이그레이션할 작업지시서가 없습니다.');
       return;
     }
 
-    var success = 0;
-    var skipped = 0;
-    var failed = 0;
+    final items = <DevWorkDocMigrateItemResult>[];
     final seenIds = <String>{};
-    final reports = <String>[];
 
     for (final plan in withInstruction) {
       final iid = plan.stableInstructionId;
       if (seenIds.contains(iid)) {
-        skipped++;
-        reports.add('건너뜀 (중복 ID): $iid');
+        items.add(
+          DevWorkDocMigrateItemResult(
+            title: plan.input.topic.isEmpty ? iid : plan.input.topic,
+            instructionId: iid,
+            artifactType: plan.instruction!.artifactType,
+            outcome: DevWorkDocSaveOutcome.failed,
+            summary: '건너뜀 (중복 ID): $iid',
+            failureReason: '동일 instructionId 중복',
+          ),
+        );
         continue;
       }
       seenIds.add(iid);
@@ -1020,8 +1196,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           title: '「${plan.input.topic.isEmpty ? iid : plan.input.topic}」 제작 형태',
         );
         if (picked == null) {
-          skipped++;
-          reports.add('건너뜀 (유형 미선택): $iid');
+          items.add(
+            DevWorkDocMigrateItemResult(
+              title: plan.input.topic.isEmpty ? iid : plan.input.topic,
+              instructionId: iid,
+              artifactType: ArtifactType.undecided,
+              outcome: DevWorkDocSaveOutcome.awaitingArtifact,
+              summary:
+                  '유형 선택 대기: ${plan.input.topic.isEmpty ? iid : plan.input.topic}',
+              nextAction: '나중에 다시 마이그레이션하여 유형을 선택하세요.',
+            ),
+          );
           continue;
         }
         artifact = picked;
@@ -1037,14 +1222,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         jsonText: jsonText,
         isNewVersion: plan.version > 1,
       );
-      if (result.ok) {
-        success++;
-        reports.add('성공: $iid → ${result.activePathHint ?? artifact}');
-      } else {
-        failed++;
-        reports.add('실패: $iid — ${result.message ?? result.errorCode}');
-      }
+      items.add(
+        _buildMigrateItemResult(plan: plan, artifact: artifact, result: result),
+      );
     }
+
+    final report = DevWorkDocMigrateReport(items: items);
 
     if (!mounted) return;
     await showDialog<void>(
@@ -1052,9 +1235,53 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       builder: (ctx) => AlertDialog(
         title: const Text('DevWorkDoc 마이그레이션 결과'),
         content: SingleChildScrollView(
-          child: Text(
-            '성공 $success · 건너뜀 $skipped · 실패 $failed\n\n'
-            '${reports.join('\n')}',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '완전 성공 ${report.completeSuccessCount} · '
+                '기존 확인 ${report.alreadyExistsCount} · '
+                '부분 ${report.partialSuccessCount} · '
+                '유형 대기 ${report.awaitingCount} · '
+                '권한 ${report.permissionCount} · '
+                '충돌 ${report.conflictCount} · '
+                '다운로드만 ${report.downloadOnlyCount} · '
+                '실패 ${report.failedCount}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              for (final item in items) ...[
+                Text(
+                  '${outcomeLabelKo(item.outcome)}: ${item.summary}',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                if (item.activeResult.isNotEmpty)
+                  Text(
+                    '  · ${item.activeResult}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: ControlColors.textMuted,
+                    ),
+                  ),
+                if (item.versionsResult.isNotEmpty)
+                  Text(
+                    '  · ${item.versionsResult}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: ControlColors.textMuted,
+                    ),
+                  ),
+                if (item.failureReason.isNotEmpty)
+                  Text(
+                    '  · ${item.failureReason}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: ControlColors.textMuted,
+                    ),
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ],
           ),
         ),
         actions: [
@@ -1072,23 +1299,26 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
-        content: SingleChildScrollView(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final type in ArtifactType.allSelectable)
-                ActionChip(
-                  label: Text(ArtifactType.labelKo(type)),
-                  onPressed: () => Navigator.pop(ctx, type),
-                ),
-            ],
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final type in ArtifactType.allSelectable)
+                  ActionChip(
+                    label: Text(ArtifactType.labelShortKo(type)),
+                    onPressed: () => Navigator.pop(ctx, type),
+                  ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
+            child: const Text('나중에 선택'),
           ),
         ],
       ),
@@ -2072,13 +2302,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _buildDevWorkDocStatusBanner(),
             const SizedBox(height: 10),
             const Text(
-              'SotongWareControl 폴더 안에 DevWorkDoc 폴더를 만들거나 선택해 주세요.',
+              '폴더 선택 시 DevWorkDoc 폴더 자체를 선택하세요 '
+              '(저장소 루트나 상위 폴더가 아닙니다). '
+              '경로 힌트만으로는 저장 성공으로 간주하지 않습니다.',
               style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
             ),
-            const SizedBox(height: 6),
-            if (devDoc != null &&
-                devDoc.hasRoot &&
-                devDoc.rootFolderName != null)
+            const SizedBox(height: 8),
+            if (devDoc != null && devDoc.rootFolderName != null)
               Text(
                 '선택된 폴더: ${devDoc.rootFolderName}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
@@ -2094,6 +2324,20 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 '폴더가 선택되지 않았습니다.',
                 style: TextStyle(color: ControlColors.textMuted),
               ),
+            if (devDoc != null) ...[
+              const SizedBox(height: 8),
+              _buildDevWorkDocReadinessRows(devDoc),
+              if (devDoc.statusMessage.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  devDoc.statusMessage,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: ControlColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -2106,9 +2350,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   icon: const Icon(Icons.folder_open, size: 18),
                   label: const Text('작업지시서 관리 폴더 설정'),
                 ),
+                if (devDoc?.selectionKind ==
+                    DevWorkDocSelectionKind.repoRootWithDevWorkDoc)
+                  OutlinedButton.icon(
+                    onPressed: _useNestedDevWorkDocFolder,
+                    icon: const Icon(Icons.subdirectory_arrow_right, size: 18),
+                    label: const Text('DevWorkDoc 하위 폴더 사용'),
+                  ),
                 ..._buildDevWorkDocSaveActions(),
                 OutlinedButton.icon(
-                  onPressed: _migratePlansToDevWorkDoc,
+                  onPressed: _devWorkDocFolderReady
+                      ? _migratePlansToDevWorkDoc
+                      : null,
                   icon: const Icon(Icons.sync_alt, size: 18),
                   label: const Text('기존 작업지시서를 DevWorkDoc으로 정리'),
                 ),
@@ -2116,6 +2369,46 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDevWorkDocReadinessRows(DevWorkDocState devDoc) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _devWorkDocReadinessRow(
+          '선택 기준',
+          _selectionKindLabel(devDoc.selectionKind),
+        ),
+        _devWorkDocReadinessRow(
+          '쓰기 권한',
+          devDoc.permissionGranted ? '허용' : '미허용',
+        ),
+        _devWorkDocReadinessRow('경로 구조', _boolLabel(devDoc.structureOk)),
+        _devWorkDocReadinessRow('실제 저장 준비', _boolLabel(devDoc.readyToWrite)),
+      ],
+    );
+  }
+
+  Widget _devWorkDocReadinessRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: ControlColors.textMuted,
+              ),
+            ),
+          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
+        ],
       ),
     );
   }

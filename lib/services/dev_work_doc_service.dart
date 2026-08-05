@@ -13,6 +13,9 @@ class DevWorkDocService {
 
   Future<DevWorkDocState> pickRootFolder() => impl.pickRootFolder();
 
+  Future<DevWorkDocState> useNestedDevWorkDocFolder() =>
+      impl.useNestedDevWorkDocFolder();
+
   Future<DevWorkDocWriteResult> ensureStructure() => impl.ensureStructure();
 
   Future<DevWorkDocWriteResult> downloadInstructionJson({

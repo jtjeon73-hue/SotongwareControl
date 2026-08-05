@@ -32,41 +32,49 @@ void main() {
     return const JsonEncoder.withIndent('  ').convert(instruction.toJson());
   }
 
-  test('stub saveInstruction returns download mode with path hints', () async {
-    final devWorkDoc = DevWorkDocService();
-    final result = await devWorkDoc.saveInstruction(
-      artifactType: ArtifactType.ebook,
-      instructionId: iid,
-      version: 1,
-      jsonText: sampleJson(),
-    );
+  test(
+    'stub saveInstruction returns failed (not fake download success)',
+    () async {
+      final devWorkDoc = DevWorkDocService();
+      final result = await devWorkDoc.saveInstruction(
+        artifactType: ArtifactType.ebook,
+        instructionId: iid,
+        version: 1,
+        jsonText: sampleJson(),
+      );
 
-    expect(result.ok, isTrue);
-    expect(result.mode, 'download');
-    expect(
-      result.activePathHint,
-      DevWorkDocPaths.activeRelative(ArtifactType.ebook, iid),
-    );
-    expect(
-      result.versionPathHint,
-      DevWorkDocPaths.versionRelative(ArtifactType.ebook, iid, 1),
-    );
-  });
+      expect(result.ok, isFalse);
+      expect(result.mode, 'failed');
+      expect(result.outcome, DevWorkDocSaveOutcome.failed);
+      expect(
+        result.activePathHint,
+        DevWorkDocPaths.activeRelative(ArtifactType.ebook, iid),
+      );
+      expect(
+        result.versionPathHint,
+        DevWorkDocPaths.versionRelative(ArtifactType.ebook, iid, 1),
+      );
+    },
+  );
 
-  test('downloadInstructionJson is explicit download-only', () async {
-    final devWorkDoc = DevWorkDocService();
-    final result = await devWorkDoc.downloadInstructionJson(
-      artifactType: ArtifactType.ebook,
-      instructionId: iid,
-      version: 1,
-      jsonText: sampleJson(),
-    );
+  test(
+    'downloadInstructionJson is explicit download-only with ok false',
+    () async {
+      final devWorkDoc = DevWorkDocService();
+      final result = await devWorkDoc.downloadInstructionJson(
+        artifactType: ArtifactType.ebook,
+        instructionId: iid,
+        version: 1,
+        jsonText: sampleJson(),
+      );
 
-    expect(result.ok, isTrue);
-    expect(result.mode, 'download');
-    expect(result.errorCode, 'download_only');
-    expect(result.message, contains('DevWorkDoc 직접 저장 아님'));
-  });
+      expect(result.ok, isFalse);
+      expect(result.mode, 'download');
+      expect(result.outcome, DevWorkDocSaveOutcome.downloadOnly);
+      expect(result.errorCode, 'download_only');
+      expect(result.message, contains('DevWorkDoc 직접 저장 아님'));
+    },
+  );
 
   test('DevWorkDocStatus.resolve for folder-not-set vs download complete', () {
     const unsupported = DevWorkDocState(supported: false, hasRoot: false);
@@ -83,10 +91,11 @@ void main() {
 
     final downloaded = DevWorkDocStatus.resolve(
       devDocState: unsupported,
-      lastSaveResult: const DevWorkDocWriteResult(
-        ok: true,
-        mode: 'download',
+      lastSaveResult: DevWorkDocWriteResult.download(
+        fileName: 'WI_test_v1.json',
         message: '브라우저 다운로드 완료 (DevWorkDoc 직접 저장 아님)',
+        activePathHint: 'Ebook/Active/WI_test.json',
+        versionPathHint: 'Ebook/Versions/test/WI_test_v1.json',
       ),
       instruction: null,
       activeDoc: null,
@@ -111,11 +120,18 @@ void main() {
         supported: true,
         hasRoot: true,
         rootFolderName: 'DevWorkDoc',
+        permissionGranted: true,
+        selectionKind: DevWorkDocSelectionKind.devWorkDocRoot,
+        structureOk: true,
+        readyToWrite: true,
       ),
       lastSaveResult: DevWorkDocWriteResult(
         ok: true,
         mode: 'folder',
+        outcome: DevWorkDocSaveOutcome.completeSuccess,
         activePathHint: DevWorkDocPaths.activeRelative(ArtifactType.ebook, iid),
+        activeVerified: true,
+        versionsVerified: true,
       ),
       instruction: instruction,
       activeDoc: BusinessPlanDocument(
