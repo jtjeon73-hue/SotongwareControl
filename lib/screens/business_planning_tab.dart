@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../models/business_planning.dart';
 import '../models/dev_work_doc_status.dart';
 import '../models/planning_wizard_state.dart';
+import '../services/browser_json_download_service.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
 import '../services/dev_work_doc_paths.dart';
@@ -65,6 +66,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   bool _loading = true;
   bool _transferBusy = false;
+  String? _lastTransferDiagnosis;
   bool _inputModeQuick = true;
   String _statusFilter = 'all';
   FolderPermissionState? _folderState;
@@ -484,10 +486,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Future<void> _downloadInstructionJson() async {
+    if (_transferBusy) {
+      _snack('Inbox 직접 전달 중에는 수동 다운로드를 실행할 수 없습니다.');
+      return;
+    }
     if (!_canCreateInstruction) {
       _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
       return;
     }
+    // 수동 다운로드 전용 경로 (Inbox writeJsonFile과 분리)
     await _saveInstructionInternal(
       version: _instruction == null ? 1 : _version,
       isNewVersion: false,
@@ -1083,7 +1090,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
 
     setState(() => _transferBusy = true);
+    browserJsonDownloadBlocked = true;
+    final downloadsBefore = browserJsonDownloadCallCount;
     try {
+      ensureBrowserJsonDownloadRegistered();
       await _savePlan(silent: true);
 
       // 항상 확정 Active 스냅샷만 전달 (재생성 스냅샷·다른 기획 금지)
@@ -1130,10 +1140,28 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         expectedChecksum: checksum,
       );
 
+      final downloadsAfter = browserJsonDownloadCallCount;
+      final diagnosis = _formatTransferDiagnosis(
+        result: result,
+        downloadsBefore: downloadsBefore,
+        downloadsAfter: downloadsAfter,
+        expectedFileName: fileName,
+        expectedChecksum: checksum,
+        folderName: _folderState?.folderName ?? 'Inbox',
+      );
+      if (mounted) {
+        setState(() => _lastTransferDiagnosis = diagnosis);
+      }
+
       // 직접 전달 경로에서는 다운로드가 발생하지 않음. 실패도 다운로드로 대체하지 않음.
-      if (result.outcome == TransferOutcome.downloadOnly ||
-          result.mode == PlanProgressStatus.downloadMode) {
-        _snack('전달 경로에서 다운로드가 감지되어 중단했습니다. 수동 다운로드 버튼을 사용하세요.');
+      if (downloadsAfter != downloadsBefore ||
+          result.outcome == TransferOutcome.downloadOnly ||
+          result.mode == PlanProgressStatus.downloadMode ||
+          result.downloadCallsDuringTransfer > 0) {
+        if (!mounted) return;
+        await _showTransferFailedDialog(
+          'Inbox 직접 전달 중 브라우저 다운로드가 감지·차단되었습니다.\n$diagnosis',
+        );
         return;
       }
 
@@ -1145,7 +1173,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
       if (!result.isFolderSuccess) {
         if (!mounted) return;
-        await _showTransferFailedDialog(result.message ?? '직접 전달에 실패했습니다.');
+        await _showTransferFailedDialog(
+          '${result.message ?? '직접 전달에 실패했습니다.'}\n$diagnosis',
+        );
         return;
       }
 
@@ -1177,9 +1207,51 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       } else {
         _snack('소통24워크 Inbox 전달 완료');
       }
+      if (mounted) {
+        await _showTransferSuccessDiagnosis(diagnosis);
+      }
     } finally {
+      browserJsonDownloadBlocked = false;
       if (mounted) setState(() => _transferBusy = false);
     }
+  }
+
+  String _formatTransferDiagnosis({
+    required TransferWriteResult result,
+    required int downloadsBefore,
+    required int downloadsAfter,
+    required String expectedFileName,
+    required String expectedChecksum,
+    required String folderName,
+  }) {
+    return [
+      '경로: ${result.pathId ?? 'inbox_write'}',
+      '대상 폴더: ${result.folderName ?? folderName}',
+      '파일명: ${result.fileName ?? expectedFileName}',
+      'size: ${result.bytes}B',
+      'instructionId: ${result.instructionId ?? '-'}',
+      'version: ${result.version ?? '-'}',
+      'contentChecksum: ${result.checksum ?? expectedChecksum}',
+      'verified: ${result.verified}',
+      'outcome: ${result.outcome.name}',
+      'downloadCalls: ${downloadsAfter - downloadsBefore} (누적 $downloadsAfter)',
+    ].join('\n');
+  }
+
+  Future<void> _showTransferSuccessDiagnosis(String diagnosis) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Inbox 전달 검증'),
+        content: SingleChildScrollView(child: Text(diagnosis)),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<bool?> _confirmInboxTransfer({
@@ -2840,7 +2912,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           label: Text(_needsVersionRecovery ? '기존 버전 확인 및 복구' : 'Versions 진단'),
         ),
       OutlinedButton.icon(
-        onPressed: _canCreateInstruction ? _downloadInstructionJson : null,
+        onPressed: (_canCreateInstruction && !_transferBusy)
+            ? _downloadInstructionJson
+            : null,
         icon: const Icon(Icons.download_outlined, size: 18),
         label: const Text('수동 가져오기용 JSON 다운로드'),
       ),
@@ -3056,6 +3130,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               icon: const Icon(Icons.folder_open, size: 18),
               label: Text(ready ? '전달 폴더 다시 선택' : '전달 폴더 선택'),
             ),
+            if (_lastTransferDiagnosis != null) ...[
+              const SizedBox(height: 10),
+              const Text(
+                '최근 Inbox 전달 진단',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _lastTransferDiagnosis!,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: ControlColors.textMuted,
+                ),
+              ),
+            ],
           ],
         ),
       ),

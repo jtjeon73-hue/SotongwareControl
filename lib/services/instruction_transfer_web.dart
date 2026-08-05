@@ -6,13 +6,17 @@ import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web/web.dart' as web;
 
+import 'browser_json_download_service.dart';
 import 'instruction_content_checksum.dart';
 import 'instruction_transfer_core.dart';
 import 'instruction_transfer_types.dart';
 
 const _folderNameKey = 'sotong24_transfer_folder_name_v1';
 
-JSObject? _directoryHandle;
+/// 빌드·운영 진단용 경로 식별자 (다운로드 경로와 구분).
+const inboxTransferPathId = 'inbox_fsa_typed_v1';
+
+web.FileSystemDirectoryHandle? _directoryHandle;
 String? _folderName;
 
 JSObject _jsOpts(Map<String, Object> map) {
@@ -30,22 +34,8 @@ JSObject _jsOpts(Map<String, Object> map) {
   return o;
 }
 
-/// DevWorkDoc와 동일: callMethod 인자는 개별 전달 (List.toJS 한 덩어리 금지).
-Future<JSAny?> _call0(JSObject target, String method) async {
-  return (target.callMethod(method.toJS) as JSPromise).toDart;
-}
-
 Future<JSAny?> _call1(JSObject target, String method, JSAny? a1) async {
   return (target.callMethod(method.toJS, a1) as JSPromise).toDart;
-}
-
-Future<JSAny?> _call2(
-  JSObject target,
-  String method,
-  JSAny? a1,
-  JSAny? a2,
-) async {
-  return (target.callMethod(method.toJS, a1, a2) as JSPromise).toDart;
 }
 
 bool _isSupported() {
@@ -56,7 +46,7 @@ bool _isSupported() {
   }
 }
 
-Future<bool> _hasPermission(JSObject handle) async {
+Future<bool> _hasPermission(web.FileSystemDirectoryHandle handle) async {
   try {
     final status = await _call1(
       handle,
@@ -69,7 +59,7 @@ Future<bool> _hasPermission(JSObject handle) async {
   }
 }
 
-Future<bool> _requestPermission(JSObject handle) async {
+Future<bool> _requestPermission(web.FileSystemDirectoryHandle handle) async {
   try {
     final status = await _call1(
       handle,
@@ -83,6 +73,7 @@ Future<bool> _requestPermission(JSObject handle) async {
 }
 
 Future<FolderPermissionState> currentState() async {
+  ensureBrowserJsonDownloadRegistered();
   final prefs = await SharedPreferences.getInstance();
   _folderName ??= prefs.getString(_folderNameKey);
   final supported = _isSupported();
@@ -100,6 +91,7 @@ Future<FolderPermissionState> currentState() async {
 }
 
 Future<FolderPermissionState> pickFolder() async {
+  ensureBrowserJsonDownloadRegistered();
   if (!_isSupported()) {
     return buildInboxFolderState(
       supported: false,
@@ -113,7 +105,7 @@ Future<FolderPermissionState> pickFolder() async {
                   'showDirectoryPicker'.toJS,
                   _jsOpts({'mode': 'readwrite', 'id': 'sotong24work-inbox'}),
                 )
-                as JSPromise<JSObject>)
+                as JSPromise<web.FileSystemDirectoryHandle>)
             .toDart;
     final granted = await _requestPermission(handle);
     if (!granted) {
@@ -126,8 +118,7 @@ Future<FolderPermissionState> pickFolder() async {
       );
     }
     _directoryHandle = handle;
-    final nameProp = handle.getProperty('name'.toJS);
-    _folderName = nameProp == null ? 'Inbox' : (nameProp as JSString).toDart;
+    _folderName = handle.name.isEmpty ? 'Inbox' : handle.name;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_folderNameKey, _folderName ?? 'Inbox');
     return buildInboxFolderState(
@@ -137,79 +128,54 @@ Future<FolderPermissionState> pickFolder() async {
       permissionGranted: true,
     );
   } catch (_) {
+    final existing = _directoryHandle;
     return buildInboxFolderState(
       supported: true,
-      hasHandle: _directoryHandle != null,
+      hasHandle: existing != null,
       folderName: _folderName,
-      permissionGranted: _directoryHandle != null
-          ? await _hasPermission(_directoryHandle!)
+      permissionGranted: existing != null
+          ? await _hasPermission(existing)
           : false,
     );
   }
 }
 
-/// 수동 가져오기용 — 이 함수만 브라우저 다운로드를 실행한다.
-void _triggerManualDownload(String fileName, String jsonText) {
-  recordInstructionTransferManualDownloadCall();
-  final bytes = Uint8List.fromList(utf8.encode(jsonText));
-  final blobParts = [bytes.toJS].toJS;
-  final blob = web.Blob(
-    blobParts,
-    web.BlobPropertyBag(type: 'application/json'),
-  );
-  final url = web.URL.createObjectURL(blob);
-  final anchor = web.HTMLAnchorElement()
-    ..href = url
-    ..setAttribute('download', fileName);
-  web.document.body?.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  web.URL.revokeObjectURL(url);
-}
-
 Future<({String? text, int size})> _readExistingFile(
-  JSObject dir,
+  web.FileSystemDirectoryHandle dir,
   String fileName,
 ) async {
   try {
-    final fileHandle =
-        await _call1(dir, 'getFileHandle', fileName.toJS) as JSObject;
-    final file = await _call0(fileHandle, 'getFile') as JSObject;
-    final sizeProp = file.getProperty('size'.toJS);
-    final size = sizeProp == null ? 0 : (sizeProp as JSNumber).toDartInt;
+    final fileHandle = await dir.getFileHandle(fileName).toDart;
+    final file = await fileHandle.getFile().toDart;
+    final size = file.size;
     if (size <= 0) return (text: '', size: 0);
-    final textJs = await _call0(file, 'text');
-    if (textJs == null) return (text: null, size: size);
-    return (text: (textJs as JSString).toDart, size: size);
+    final textJs = await file.text().toDart;
+    return (text: textJs.toDart, size: size);
   } catch (_) {
     return (text: null, size: 0);
   }
 }
 
+/// typed FSA: getFileHandle(name, {create:true}) → createWritable → write(Blob) → close
 Future<void> _writeUtf8File(
-  JSObject dir,
+  web.FileSystemDirectoryHandle dir,
   String fileName,
   String jsonText,
 ) async {
-  final fileHandle =
-      await _call2(
-            dir,
-            'getFileHandle',
-            fileName.toJS,
-            _jsOpts({'create': true}),
-          )
-          as JSObject;
-  final writable = await _call0(fileHandle, 'createWritable') as JSObject;
+  final fileHandle = await dir
+      .getFileHandle(fileName, web.FileSystemGetFileOptions(create: true))
+      .toDart;
+  final writable = await fileHandle.createWritable().toDart;
   final bytes = Uint8List.fromList(utf8.encode(jsonText));
   final blob = web.Blob(
     [bytes.toJS].toJS,
     web.BlobPropertyBag(type: 'application/json;charset=utf-8'),
   );
-  await _call1(writable, 'write', blob);
-  await _call0(writable, 'close');
+  await writable.write(blob).toDart;
+  await writable.close().toDart;
 }
 
-/// Inbox 직접 전달. 실패해도 다운로드로 대체하지 않는다.
+/// Inbox 직접 전달. 이 함수 안에는 다운로드 코드가 없다.
 Future<TransferWriteResult> writeJsonFile({
   required String fileName,
   required String jsonText,
@@ -217,6 +183,9 @@ Future<TransferWriteResult> writeJsonFile({
   int? version,
   String? expectedChecksum,
 }) async {
+  ensureBrowserJsonDownloadRegistered();
+  final downloadsBefore = browserJsonDownloadCallCount;
+
   if (!_isSupported()) {
     return TransferWriteResult.failed(
       message:
@@ -259,21 +228,63 @@ Future<TransferWriteResult> writeJsonFile({
         ? expectedChecksum!.trim()
         : stableContentChecksum(jsonText);
 
-    return performInboxDirectTransfer(
+    final result = await performInboxDirectTransfer(
       fileName: fileName,
       jsonText: jsonText,
       instructionId: id,
       version: ver,
       expectedChecksum: checksum,
-      folderLabel: _folderName ?? 'Inbox',
+      folderLabel: _folderName ?? handle.name,
       readExisting: (name) => _readExistingFile(handle, name),
       writeFile: (name, content) => _writeUtf8File(handle, name, content),
     );
+
+    if (browserJsonDownloadCallCount != downloadsBefore) {
+      return TransferWriteResult.failed(
+        message:
+            '직접 전달 경로에서 브라우저 다운로드가 감지되어 중단했습니다 '
+            '(before=$downloadsBefore after=$browserJsonDownloadCallCount).\n'
+            '경로: $inboxTransferPathId',
+        errorCode: 'download_guard',
+        fileName: fileName,
+      );
+    }
+
+    return TransferWriteResult(
+      ok: result.ok,
+      mode: result.mode,
+      outcome: result.outcome,
+      fileName: result.fileName,
+      message: result.message == null
+          ? null
+          : '${result.message}\n경로: $inboxTransferPathId · 폴더: ${_folderName ?? handle.name}',
+      errorCode: result.errorCode,
+      checksum: result.checksum,
+      instructionId: result.instructionId,
+      version: result.version,
+      verified: result.verified,
+      bytes: result.bytes,
+      conflictDiffSummary: result.conflictDiffSummary,
+      pathId: inboxTransferPathId,
+      folderName: _folderName ?? handle.name,
+      downloadCallsDuringTransfer:
+          browserJsonDownloadCallCount - downloadsBefore,
+    );
   } catch (e) {
+    if (browserJsonDownloadCallCount != downloadsBefore) {
+      return TransferWriteResult.failed(
+        message:
+            '직접 전달 실패 중 다운로드가 감지되어 차단했습니다. ($e)\n'
+            '경로: $inboxTransferPathId',
+        errorCode: 'download_guard',
+        fileName: fileName,
+      );
+    }
     return TransferWriteResult.failed(
       message:
           '직접 전달 실패: $e\n'
           '다운로드로 대체하지 않았습니다.\n'
+          '경로: $inboxTransferPathId\n'
           '다음 행동: 「전달 폴더 다시 선택」 또는 「수동 가져오기용 JSON 다운로드」를 사용하세요.',
       errorCode: 'write_failed',
       fileName: fileName,
@@ -281,12 +292,13 @@ Future<TransferWriteResult> writeJsonFile({
   }
 }
 
-/// 수동 가져오기용 JSON 다운로드 전용 (전달됨으로 표시하지 않음).
+/// 수동 가져오기용 JSON 다운로드 전용.
 Future<TransferWriteResult> downloadJsonFile({
   required String fileName,
   required String jsonText,
 }) async {
-  _triggerManualDownload(fileName, jsonText);
+  ensureBrowserJsonDownloadRegistered();
+  triggerBrowserJsonDownload(fileName: fileName, jsonText: jsonText);
   final checksum = stableContentChecksum(jsonText);
   return TransferWriteResult.downloadOnly(
     fileName: fileName,

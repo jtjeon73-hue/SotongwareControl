@@ -12,6 +12,7 @@ import 'dev_work_doc_paths.dart';
 import 'dev_work_doc_save_pipeline.dart';
 import 'dev_work_doc_types.dart';
 import 'dev_work_doc_verify.dart';
+import 'browser_json_download_service.dart';
 import 'instruction_content_checksum.dart';
 import 'work_instruction_validator.dart';
 
@@ -500,19 +501,8 @@ Future<List<String>> _listEntryNames(JSObject dirHandle) async {
 }
 
 void _triggerDownload(String fileName, String jsonText) {
-  final bytes = Uint8List.fromList(utf8.encode(jsonText));
-  final blob = web.Blob(
-    [bytes.toJS].toJS,
-    web.BlobPropertyBag(type: 'application/json'),
-  );
-  final url = web.URL.createObjectURL(blob);
-  final anchor = web.HTMLAnchorElement()
-    ..href = url
-    ..setAttribute('download', fileName);
-  web.document.body?.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  web.URL.revokeObjectURL(url);
+  ensureBrowserJsonDownloadRegistered();
+  triggerBrowserJsonDownload(fileName: fileName, jsonText: jsonText);
 }
 
 /// 정적 폴더 create·임시 파일 쓰기/삭제 프로브 (흔적 남기지 않음).

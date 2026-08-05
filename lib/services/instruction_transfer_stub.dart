@@ -1,8 +1,10 @@
+import 'browser_json_download_service.dart';
 import 'instruction_content_checksum.dart';
 import 'instruction_transfer_core.dart';
 import 'instruction_transfer_types.dart';
 
 Future<FolderPermissionState> currentState() async {
+  ensureBrowserJsonDownloadRegistered();
   return buildInboxFolderState(
     supported: false,
     hasHandle: false,
@@ -11,6 +13,7 @@ Future<FolderPermissionState> currentState() async {
 }
 
 Future<FolderPermissionState> pickFolder() async {
+  ensureBrowserJsonDownloadRegistered();
   return buildInboxFolderState(
     supported: false,
     hasHandle: false,
@@ -26,21 +29,32 @@ Future<TransferWriteResult> writeJsonFile({
   int? version,
   String? expectedChecksum,
 }) async {
-  return TransferWriteResult.failed(
+  ensureBrowserJsonDownloadRegistered();
+  final before = browserJsonDownloadCallCount;
+  final result = TransferWriteResult.failed(
     message:
         '이 환경에서는 폴더 직접 저장을 지원하지 않습니다.\n'
         '다음 행동: 「수동 가져오기용 JSON 다운로드」를 사용하세요.',
     errorCode: 'unsupported',
     fileName: fileName,
   );
+  if (browserJsonDownloadCallCount != before) {
+    return TransferWriteResult.failed(
+      message: '직접 전달 경로에서 다운로드가 감지되어 차단했습니다.',
+      errorCode: 'download_guard',
+      fileName: fileName,
+    );
+  }
+  return result;
 }
 
-/// 수동 다운로드만 기록 (실제 브라우저 다운로드는 웹 전용).
+/// 수동 다운로드만 기록.
 Future<TransferWriteResult> downloadJsonFile({
   required String fileName,
   required String jsonText,
 }) async {
-  recordInstructionTransferManualDownloadCall();
+  ensureBrowserJsonDownloadRegistered();
+  triggerBrowserJsonDownload(fileName: fileName, jsonText: jsonText);
   return TransferWriteResult.downloadOnly(
     fileName: fileName,
     checksum: stableContentChecksum(jsonText),

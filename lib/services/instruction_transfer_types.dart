@@ -62,6 +62,9 @@ class TransferWriteResult {
     this.verified = false,
     this.bytes = 0,
     this.conflictDiffSummary,
+    this.pathId,
+    this.folderName,
+    this.downloadCallsDuringTransfer = 0,
   });
 
   /// folder | download | failed
@@ -80,6 +83,11 @@ class TransferWriteResult {
   final bool verified;
   final int bytes;
   final String? conflictDiffSummary;
+
+  /// 예: inbox_fsa_typed_v1
+  final String? pathId;
+  final String? folderName;
+  final int downloadCallsDuringTransfer;
 
   bool get isFolderSuccess =>
       ok &&
@@ -115,6 +123,7 @@ class TransferWriteResult {
       fileName: fileName,
       checksum: checksum,
       message: message ?? 'JSON 다운로드 완료 · 수동 가져오기 대기',
+      pathId: 'browser_download',
     );
   }
 }

@@ -4,21 +4,22 @@ library;
 import 'dart:convert';
 
 import 'dev_work_doc_paths.dart';
+import 'browser_json_download.dart';
 import 'instruction_content_checksum.dart';
 import 'instruction_transfer_types.dart';
 
 /// 테스트에서 수동 다운로드 호출 횟수를 집계한다.
 @pragma('vm:entry-point')
-int instructionTransferManualDownloadCalls = 0;
+int get instructionTransferManualDownloadCalls => browserJsonDownloadCallCount;
 
 @pragma('vm:entry-point')
 void resetInstructionTransferManualDownloadCalls() {
-  instructionTransferManualDownloadCalls = 0;
+  resetBrowserJsonDownloadCallCount();
 }
 
 @pragma('vm:entry-point')
 void recordInstructionTransferManualDownloadCall() {
-  instructionTransferManualDownloadCalls++;
+  // 호환용 — 실제 카운트는 triggerBrowserJsonDownload에서만 증가
 }
 
 /// Inbox 루트 직하 파일명: `WI_<instructionId>_v<version>.json`
