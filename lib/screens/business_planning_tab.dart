@@ -15,6 +15,7 @@ import '../services/dev_work_doc_paths.dart';
 import '../services/dev_work_doc_service.dart';
 import '../services/dev_work_doc_verify.dart';
 import '../services/instruction_transfer_service.dart';
+import '../services/plan_library_management.dart';
 import '../services/plan_progress_status.dart';
 import '../services/instruction_contract_validator.dart';
 import '../services/project_design_engine.dart';
@@ -352,8 +353,19 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     String? lastTransferFileName,
     String? lastTransferChecksum,
     String? lastTransferMode,
+    bool? favorite,
+    String? libraryFolder,
+    List<String>? tags,
+    String? libraryState,
+    bool? isProtected,
+    String? trashedAt,
+    bool clearTrashedAt = false,
   }) {
     final iid = instructionId ?? _instructionId ?? _stableInstructionId(id);
+    final existing = _allPlans.cast<BusinessPlanDocument?>().firstWhere(
+      (p) => p?.id == id,
+      orElse: () => null,
+    );
     return BusinessPlanDocument(
       id: id,
       input: input,
@@ -373,6 +385,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           lastTransferChecksum ?? _activeDoc?.lastTransferChecksum,
       lastTransferMode: lastTransferMode ?? _activeDoc?.lastTransferMode,
       versionHistory: versionHistory ?? _activeDoc?.versionHistory ?? const [],
+      favorite: favorite ?? existing?.favorite ?? false,
+      libraryFolder: libraryFolder ?? existing?.libraryFolder ?? '',
+      tags: tags ?? existing?.tags ?? const [],
+      libraryState:
+          libraryState ?? existing?.libraryState ?? PlanLibraryState.active,
+      isProtected: isProtected ?? existing?.isProtected ?? false,
+      trashedAt: clearTrashedAt
+          ? null
+          : (trashedAt ?? existing?.trashedAt),
     );
   }
 
@@ -2203,6 +2224,84 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return BusinessPlanningStore.latestByInstructionId(_allPlans);
   }
 
+  Future<void> _onLibraryBulkAction(
+    PlanLibraryBulkAction action,
+    List<BusinessPlanDocument> selected,
+  ) async {
+    if (selected.isEmpty) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    if (action == PlanLibraryBulkAction.permanentDelete) {
+      // 기획 라이브러리 레코드만 삭제 — DevWorkDoc/Inbox/외부 파일은 호출하지 않음.
+      await _store.deletePlans(selected.map((p) => p.id));
+      await _refreshPlans();
+      if (!mounted) return;
+      if (_activePlanId != null &&
+          selected.any((p) => p.id == _activePlanId)) {
+        setState(() {
+          _activePlanId = null;
+          _activeDoc = null;
+        });
+      } else {
+        setState(() {});
+      }
+      _snack('기획 라이브러리에서 ${selected.length}건을 영구 삭제했습니다.');
+      return;
+    }
+
+    final updates = <BusinessPlanDocument>[];
+    for (final p in selected) {
+      switch (action) {
+        case PlanLibraryBulkAction.favorite:
+          updates.add(p.copyWith(favorite: true, updatedAt: now));
+        case PlanLibraryBulkAction.unfavorite:
+          updates.add(p.copyWith(favorite: false, updatedAt: now));
+        case PlanLibraryBulkAction.archive:
+          updates.add(PlanLibraryManagement.archive(p, updatedAt: now));
+        case PlanLibraryBulkAction.unarchive:
+          updates.add(PlanLibraryManagement.unarchive(p, updatedAt: now));
+        case PlanLibraryBulkAction.trash:
+          if (!PlanLibraryManagement.canMoveToTrash(p)) continue;
+          updates.add(
+            PlanLibraryManagement.moveToTrash(
+              p,
+              updatedAt: now,
+              trashedAt: now,
+            ),
+          );
+        case PlanLibraryBulkAction.restore:
+          updates.add(PlanLibraryManagement.restore(p, updatedAt: now));
+        case PlanLibraryBulkAction.protect:
+          updates.add(p.copyWith(isProtected: true, updatedAt: now));
+        case PlanLibraryBulkAction.unprotect:
+          updates.add(p.copyWith(isProtected: false, updatedAt: now));
+        case PlanLibraryBulkAction.permanentDelete:
+          break;
+      }
+    }
+
+    if (updates.isEmpty) {
+      _snack('적용할 항목이 없습니다.');
+      return;
+    }
+    await _store.upsertPlans(updates);
+    await _refreshPlans();
+    if (!mounted) return;
+    setState(() {});
+    final label = switch (action) {
+      PlanLibraryBulkAction.favorite => '즐겨찾기',
+      PlanLibraryBulkAction.unfavorite => '즐겨찾기 해제',
+      PlanLibraryBulkAction.archive => '보관',
+      PlanLibraryBulkAction.unarchive => '보관 해제',
+      PlanLibraryBulkAction.trash => '휴지통 이동',
+      PlanLibraryBulkAction.restore => '복원',
+      PlanLibraryBulkAction.protect => '보호',
+      PlanLibraryBulkAction.unprotect => '보호 해제',
+      PlanLibraryBulkAction.permanentDelete => '영구 삭제',
+    };
+    _snack('$label ${updates.length}건 완료');
+  }
+
   List<BusinessPlanDocument> _similarPlans(BusinessPlanDocument plan) {
     final topic = plan.input.topic.trim().toLowerCase();
     if (topic.isEmpty) return const [];
@@ -2344,7 +2443,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           _buildFolderSettings(),
           const SizedBox(height: 20),
           PlanLibraryPanel(
-            plans: _latestPlans,
+            plans: _allPlans,
             activePlanId: _activePlanId,
             folderFilter: _libraryFolder,
             searchQuery: _searchCtrl.text,
@@ -2363,8 +2462,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               final next = p.copyWith(favorite: !p.favorite);
               await _store.upsertPlan(next);
               await _refreshPlans();
+              if (mounted) setState(() {});
             },
             onStartNew: _startNewPlan,
+            onBulkAction: _onLibraryBulkAction,
           ),
         ],
       ),

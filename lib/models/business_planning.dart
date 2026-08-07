@@ -132,6 +132,7 @@ class PlanningStatus {
   static const inProgress = 'in_progress';
   static const completed = 'completed';
   static const archived = 'archived';
+  static const trashed = 'trashed';
 
   // 레거시 상수 (읽기 호환)
   static const idea = 'idea';
@@ -167,6 +168,8 @@ class PlanningStatus {
         return completed;
       case archived:
         return archived;
+      case trashed:
+        return trashed;
       default:
         return draft;
     }
@@ -194,6 +197,8 @@ class PlanningStatus {
         return '완료';
       case archived:
         return '보관';
+      case trashed:
+        return '휴지통';
       default:
         return id;
     }
@@ -214,6 +219,40 @@ class PlanningStatus {
   static String filterLabel(String id) {
     if (id == 'all') return '전체';
     return labelKo(id);
+  }
+}
+
+/// 기획 라이브러리 수명주기 — 워크플로 status와 분리.
+class PlanLibraryState {
+  static const active = 'active';
+  static const archived = 'archived';
+  static const trashed = 'trashed';
+
+  static String normalize(String raw) {
+    switch (raw) {
+      case archived:
+      case 'archive':
+        return archived;
+      case trashed:
+      case 'trash':
+        return trashed;
+      case active:
+      case '':
+        return active;
+      default:
+        return active;
+    }
+  }
+
+  static String labelKo(String id) {
+    switch (normalize(id)) {
+      case archived:
+        return '보관';
+      case trashed:
+        return '휴지통';
+      default:
+        return '활성';
+    }
   }
 }
 
@@ -911,6 +950,9 @@ class BusinessPlanDocument {
     this.favorite = false,
     this.libraryFolder = '',
     this.tags = const [],
+    this.libraryState = PlanLibraryState.active,
+    this.isProtected = false,
+    this.trashedAt,
   });
 
   final String id;
@@ -933,7 +975,18 @@ class BusinessPlanDocument {
   final String libraryFolder;
   final List<String> tags;
 
+  /// 라이브러리 수명주기 (active / archived / trashed). 워크플로 status와 독립.
+  final String libraryState;
+  final bool isProtected;
+  final String? trashedAt;
+
   bool get hasInstruction => instruction != null;
+  bool get isLibraryArchived =>
+      PlanLibraryState.normalize(libraryState) == PlanLibraryState.archived;
+  bool get isLibraryTrashed =>
+      PlanLibraryState.normalize(libraryState) == PlanLibraryState.trashed;
+  bool get isLibraryActive =>
+      PlanLibraryState.normalize(libraryState) == PlanLibraryState.active;
 
   String get stableInstructionId => instructionId.isNotEmpty
       ? instructionId
@@ -985,6 +1038,10 @@ class BusinessPlanDocument {
     bool? favorite,
     String? libraryFolder,
     List<String>? tags,
+    String? libraryState,
+    bool? isProtected,
+    String? trashedAt,
+    bool clearTrashedAt = false,
   }) {
     return BusinessPlanDocument(
       id: id,
@@ -1006,6 +1063,9 @@ class BusinessPlanDocument {
       favorite: favorite ?? this.favorite,
       libraryFolder: libraryFolder ?? this.libraryFolder,
       tags: tags ?? this.tags,
+      libraryState: libraryState ?? this.libraryState,
+      isProtected: isProtected ?? this.isProtected,
+      trashedAt: clearTrashedAt ? null : (trashedAt ?? this.trashedAt),
     );
   }
 
@@ -1031,7 +1091,29 @@ class BusinessPlanDocument {
     'favorite': favorite,
     if (libraryFolder.isNotEmpty) 'libraryFolder': libraryFolder,
     if (tags.isNotEmpty) 'tags': tags,
+    'libraryState': PlanLibraryState.normalize(libraryState),
+    'protected': isProtected,
+    if (trashedAt != null) 'trashedAt': trashedAt,
   };
+
+  /// 레거시 JSON에서 libraryState 추론 (필드 없으면 데이터 소실 없이 기본값).
+  static String resolveLibraryStateFromJson(Map<String, dynamic> json) {
+    final raw = '${json['libraryState'] ?? ''}';
+    if (raw.isNotEmpty) return PlanLibraryState.normalize(raw);
+    final folder = '${json['libraryFolder'] ?? ''}';
+    if (folder == 'trashed' || folder == PlanLibraryState.trashed) {
+      return PlanLibraryState.trashed;
+    }
+    if (folder == 'archived' || folder == PlanLibraryState.archived) {
+      return PlanLibraryState.archived;
+    }
+    final status = PlanningStatus.normalize(
+      '${json['status'] ?? PlanningStatus.draft}',
+    );
+    if (status == PlanningStatus.trashed) return PlanLibraryState.trashed;
+    if (status == PlanningStatus.archived) return PlanLibraryState.archived;
+    return PlanLibraryState.active;
+  }
 
   factory BusinessPlanDocument.fromJson(Map<String, dynamic> json) {
     final input = BusinessPlanInput.fromJson(
@@ -1044,12 +1126,17 @@ class BusinessPlanDocument {
           );
     final id = '${json['id'] ?? ''}';
     final rawInstructionId = '${json['instructionId'] ?? ''}';
+    var status = PlanningStatus.normalize(
+      '${json['status'] ?? PlanningStatus.draft}',
+    );
+    // 워크플로 status에 trashed가 들어와도 libraryState로 분리 유지.
+    if (status == PlanningStatus.trashed) {
+      status = PlanningStatus.draft;
+    }
     return BusinessPlanDocument(
       id: id,
       input: input,
-      status: PlanningStatus.normalize(
-        '${json['status'] ?? PlanningStatus.draft}',
-      ),
+      status: status,
       createdAt: '${json['createdAt'] ?? ''}',
       updatedAt: '${json['updatedAt'] ?? ''}',
       analysis: json['analysis'] == null
@@ -1097,6 +1184,9 @@ class BusinessPlanDocument {
       favorite: json['favorite'] == true,
       libraryFolder: '${json['libraryFolder'] ?? ''}',
       tags: (json['tags'] as List?)?.map((e) => '$e').toList() ?? const [],
+      libraryState: resolveLibraryStateFromJson(json),
+      isProtected: json['protected'] == true,
+      trashedAt: json['trashedAt'] == null ? null : '${json['trashedAt']}',
     );
   }
 }

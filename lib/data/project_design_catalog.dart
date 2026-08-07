@@ -352,15 +352,21 @@ class ProjectDesignCatalog {
   }
 
   static const libraryFolders = <String>[
+    'all',
+    'in_progress',
+    'instruction_created',
+    'transferred',
+    'completed',
+    'archived',
+    'trashed',
+    'duplicate_candidates',
+    'stale',
     'ebook',
     'app',
     'contents',
     'site',
     'promo_site',
     'favorite',
-    'completed',
-    'archived',
-    'all',
   ];
 
   static String libraryFolderLabel(String id) {
@@ -381,6 +387,18 @@ class ProjectDesignCatalog {
         return '완료';
       case 'archived':
         return '보관';
+      case 'trashed':
+        return '휴지통';
+      case 'in_progress':
+        return '진행중';
+      case 'instruction_created':
+        return '작업지시 생성';
+      case 'transferred':
+        return '전달 완료';
+      case 'duplicate_candidates':
+        return '중복 후보';
+      case 'stale':
+        return '오래된 기획';
       case 'all':
         return '전체';
       default:

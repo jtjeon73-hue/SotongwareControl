@@ -3,14 +3,27 @@ import 'package:intl/intl.dart';
 
 import '../../data/project_design_catalog.dart';
 import '../../models/business_planning.dart';
+import '../../services/plan_library_management.dart';
 import '../../theme/control_theme.dart';
 
 enum PlanLibraryViewMode { cards, list, table }
 
 enum PlanLibrarySort { newest, name, updated, status, artifact }
 
-/// 저장된 기획 관리 — 폴더·검색·보기·정렬.
-class PlanLibraryPanel extends StatelessWidget {
+enum PlanLibraryBulkAction {
+  favorite,
+  unfavorite,
+  archive,
+  unarchive,
+  trash,
+  restore,
+  protect,
+  unprotect,
+  permanentDelete,
+}
+
+/// 저장된 기획 관리 — 폴더·검색·보기·정렬·관리모드.
+class PlanLibraryPanel extends StatefulWidget {
   const PlanLibraryPanel({
     super.key,
     required this.plans,
@@ -26,6 +39,7 @@ class PlanLibraryPanel extends StatelessWidget {
     required this.onOpenPlan,
     required this.onToggleFavorite,
     required this.onStartNew,
+    required this.onBulkAction,
     this.duplicateTopics = const {},
   });
 
@@ -42,40 +56,60 @@ class PlanLibraryPanel extends StatelessWidget {
   final ValueChanged<BusinessPlanDocument> onOpenPlan;
   final ValueChanged<BusinessPlanDocument> onToggleFavorite;
   final VoidCallback onStartNew;
+  final Future<void> Function(
+    PlanLibraryBulkAction action,
+    List<BusinessPlanDocument> selected,
+  )
+  onBulkAction;
   final Set<String> duplicateTopics;
 
+  @override
+  State<PlanLibraryPanel> createState() => _PlanLibraryPanelState();
+}
+
+class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
+  bool _manageMode = false;
+  bool _showDuplicates = false;
+  final Set<String> _selectedIds = {};
+
+  List<PlanDuplicateGroup> get _duplicateGroups =>
+      PlanLibraryManagement.findDuplicateGroups(widget.plans);
+
+  Set<String> get _duplicateIds =>
+      PlanLibraryManagement.duplicateCandidateIdSet(_duplicateGroups);
+
   List<BusinessPlanDocument> get _filtered {
-    var list = List<BusinessPlanDocument>.from(plans);
-    switch (folderFilter) {
-      case 'favorite':
-        list = list.where((p) => p.favorite).toList();
-      case 'completed':
-        list = list
-            .where(
-              (p) =>
-                  PlanningStatus.normalize(p.status) ==
-                  PlanningStatus.completed,
-            )
-            .toList();
-      case 'archived':
-        list = list
-            .where(
-              (p) =>
-                  PlanningStatus.normalize(p.status) == PlanningStatus.archived,
-            )
-            .toList();
-      case 'all':
-        break;
-      default:
-        list = list.where((p) {
-          final folder = p.libraryFolder.isNotEmpty
-              ? p.libraryFolder
-              : ArtifactType.normalize(p.input.resolvedArtifactType);
-          return folder == folderFilter;
-        }).toList();
+    var list = List<BusinessPlanDocument>.from(widget.plans);
+    final manageFilters = {
+      'all',
+      'in_progress',
+      'instruction_created',
+      'transferred',
+      'completed',
+      'archived',
+      'trashed',
+      'duplicate_candidates',
+      'stale',
+      'favorite',
+    };
+
+    if (manageFilters.contains(widget.folderFilter)) {
+      list = PlanLibraryManagement.applyManageFilter(
+        list,
+        widget.folderFilter,
+        duplicateCandidateIds: _duplicateIds,
+      );
+    } else {
+      list = list.where((p) => !p.isLibraryTrashed).toList();
+      list = list.where((p) {
+        final folder = p.libraryFolder.isNotEmpty
+            ? p.libraryFolder
+            : ArtifactType.normalize(p.input.resolvedArtifactType);
+        return folder == widget.folderFilter;
+      }).toList();
     }
 
-    final q = searchQuery.trim().toLowerCase();
+    final q = widget.searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list.where((p) {
         final status = PlanningStatus.labelKo(p.status).toLowerCase();
@@ -83,19 +117,21 @@ class PlanLibraryPanel extends StatelessWidget {
           p.input.resolvedArtifactType,
         ).toLowerCase();
         final tags = p.tags.join(' ').toLowerCase();
+        final iid = p.stableInstructionId.toLowerCase();
         return p.input.topic.toLowerCase().contains(q) ||
             p.input.targetCustomer.toLowerCase().contains(q) ||
             p.input.customerProblem.toLowerCase().contains(q) ||
             status.contains(q) ||
             artifact.contains(q) ||
             tags.contains(q) ||
+            iid.contains(q) ||
             p.createdAt.toLowerCase().contains(q) ||
             p.updatedAt.toLowerCase().contains(q);
       }).toList();
     }
 
     list.sort((a, b) {
-      switch (sort) {
+      switch (widget.sort) {
         case PlanLibrarySort.name:
           return a.input.topic.compareTo(b.input.topic);
         case PlanLibrarySort.updated:
@@ -112,6 +148,16 @@ class PlanLibraryPanel extends StatelessWidget {
     });
     return list;
   }
+
+  List<BusinessPlanDocument> get _selectedPlans {
+    final byId = {for (final p in widget.plans) p.id: p};
+    return _selectedIds
+        .map((id) => byId[id])
+        .whereType<BusinessPlanDocument>()
+        .toList();
+  }
+
+  bool get _inTrashView => widget.folderFilter == 'trashed';
 
   Color _statusColor(String status) {
     switch (PlanningStatus.normalize(status)) {
@@ -130,6 +176,8 @@ class PlanLibraryPanel extends StatelessWidget {
   }
 
   String _statusBadge(BusinessPlanDocument p) {
+    if (p.isLibraryTrashed) return '휴지통';
+    if (p.isLibraryArchived) return '보관';
     final s = PlanningStatus.normalize(p.status);
     if (s == PlanningStatus.draft) return '기획중';
     if (s == PlanningStatus.instructionReady ||
@@ -139,7 +187,7 @@ class PlanLibraryPanel extends StatelessWidget {
     }
     if (s == PlanningStatus.inProgress) return '진행중';
     if (s == PlanningStatus.transferred || s == PlanningStatus.imported) {
-      return '승인대기';
+      return '전달 완료';
     }
     if (s == PlanningStatus.completed) return '완료';
     if (s == PlanningStatus.archived) return '보관';
@@ -150,6 +198,177 @@ class PlanLibraryPanel extends StatelessWidget {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
     return DateFormat('yyyy-MM-dd HH:mm').format(dt.toLocal());
+  }
+
+  void _toggleSelect(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _selectAllVisible() {
+    setState(() {
+      _selectedIds
+        ..clear()
+        ..addAll(_filtered.map((p) => p.id));
+    });
+  }
+
+  void _clearSelection() {
+    setState(() => _selectedIds.clear());
+  }
+
+  Future<void> _runBulk(PlanLibraryBulkAction action) async {
+    final selected = _selectedPlans;
+    if (selected.isEmpty) return;
+
+    if (action == PlanLibraryBulkAction.trash) {
+      final protected = selected.where((p) => p.isProtected).toList();
+      if (protected.isNotEmpty) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('보호된 기획'),
+            content: Text(
+              '보호됨 상태인 기획 ${protected.length}건은 휴지통으로 이동할 수 없습니다.\n'
+              '보호 해제 후 다시 시도하세요.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
+
+    if (action == PlanLibraryBulkAction.permanentDelete) {
+      final ok = await _confirmPermanentDelete(selected);
+      if (!ok) return;
+    }
+
+    await widget.onBulkAction(action, selected);
+    if (mounted) {
+      setState(() => _selectedIds.clear());
+    }
+  }
+
+  Future<bool> _confirmPermanentDelete(
+    List<BusinessPlanDocument> selected,
+  ) async {
+    final warnings = <String>[];
+    for (final p in selected) {
+      final w = PlanLibraryManagement.permanentDeleteWarnings(
+        p,
+        activePlanId: widget.activePlanId,
+      );
+      if (w.hasStrongWarning) {
+        final title = p.input.topic.isEmpty ? '(주제 미입력)' : p.input.topic;
+        warnings.add('· $title — ${w.reasons.join(', ')}');
+      }
+    }
+
+    if (!mounted) return false;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('영구 삭제 확인'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '선택한 ${selected.length}개의 기획안을 영구 삭제합니다.\n'
+                '이 작업은 되돌릴 수 없습니다.\n\n'
+                '※ 기획 라이브러리 레코드만 삭제됩니다.\n'
+                'DevWorkDoc · Inbox · 작업지시 JSON · 외부 파일은 삭제되지 않습니다.',
+              ),
+              if (warnings.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  '주의가 필요한 항목:',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Text(warnings.join('\n')),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: ControlColors.accentRose,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('영구 삭제'),
+          ),
+        ],
+      ),
+    );
+    return confirmed == true;
+  }
+
+  Widget _badge(BusinessPlanDocument p) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: _statusColor(p.status).withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: _statusColor(p.status)),
+      ),
+      child: Text(
+        _statusBadge(p),
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Widget _metaChip(String label) {
+    return Text(
+      label,
+      style: const TextStyle(fontSize: 11, color: ControlColors.textMuted),
+    );
+  }
+
+  List<Widget> _cardMeta(BusinessPlanDocument p) {
+    final iid = PlanLibraryManagement.shortId(p.stableInstructionId);
+    return [
+      Text(
+        '고객: ${p.input.targetCustomer.isEmpty ? '-' : p.input.targetCustomer}',
+        style: const TextStyle(fontSize: 12),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      Text(
+        '수정 ${_formatIso(p.updatedAt)} · v${p.version}',
+        style: const TextStyle(fontSize: 11, color: ControlColors.textMuted),
+      ),
+      Wrap(
+        spacing: 8,
+        runSpacing: 2,
+        children: [
+          _metaChip('ID $iid'),
+          _metaChip(p.hasInstruction ? '작업지시 있음' : '작업지시 없음'),
+          _metaChip(p.wasTransferred ? 'Inbox 전달됨' : 'Inbox 미전달'),
+          if (p.isProtected) _metaChip('보호됨'),
+          if (p.favorite) _metaChip('★ 즐겨찾기'),
+        ],
+      ),
+    ];
   }
 
   @override
@@ -166,8 +385,25 @@ class PlanLibraryPanel extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _manageMode = !_manageMode;
+                  if (!_manageMode) {
+                    _selectedIds.clear();
+                    _showDuplicates = false;
+                  }
+                });
+              },
+              icon: Icon(
+                _manageMode ? Icons.close : Icons.tune,
+                size: 18,
+              ),
+              label: Text(_manageMode ? '관리 종료' : '관리'),
+            ),
+            const SizedBox(width: 8),
             FilledButton.tonalIcon(
-              onPressed: onStartNew,
+              onPressed: widget.onStartNew,
               icon: const Icon(Icons.add, size: 18),
               label: const Text('새 기획'),
             ),
@@ -183,18 +419,25 @@ class PlanLibraryPanel extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 6),
                   child: ChoiceChip(
                     label: Text(ProjectDesignCatalog.libraryFolderLabel(id)),
-                    selected: folderFilter == id,
-                    onSelected: (_) => onFolderChanged(id),
+                    selected: widget.folderFilter == id,
+                    onSelected: (_) {
+                      widget.onFolderChanged(id);
+                      _clearSelection();
+                    },
                   ),
                 ),
             ],
           ),
         ),
+        if (_manageMode) ...[
+          const SizedBox(height: 10),
+          _buildManageToolbar(visible),
+        ],
         const SizedBox(height: 10),
         TextField(
-          onChanged: onSearchChanged,
+          onChanged: widget.onSearchChanged,
           decoration: const InputDecoration(
-            hintText: '제목·태그·고객·날짜·상태·결과물 검색',
+            hintText: '제목·태그·고객·날짜·상태·결과물·ID 검색',
             prefixIcon: Icon(Icons.search),
             border: OutlineInputBorder(),
             isDense: true,
@@ -223,12 +466,12 @@ class PlanLibraryPanel extends StatelessWidget {
                     label: Text('테이블'),
                   ),
                 ],
-                selected: {viewMode},
-                onSelectionChanged: (s) => onViewModeChanged(s.first),
+                selected: {widget.viewMode},
+                onSelectionChanged: (s) => widget.onViewModeChanged(s.first),
               ),
               const SizedBox(width: 12),
               DropdownButton<PlanLibrarySort>(
-                value: sort,
+                value: widget.sort,
                 underline: const SizedBox.shrink(),
                 items: const [
                   DropdownMenuItem(
@@ -253,12 +496,16 @@ class PlanLibraryPanel extends StatelessWidget {
                   ),
                 ],
                 onChanged: (v) {
-                  if (v != null) onSortChanged(v);
+                  if (v != null) widget.onSortChanged(v);
                 },
               ),
             ],
           ),
         ),
+        if (_showDuplicates) ...[
+          const SizedBox(height: 12),
+          _buildDuplicatePanel(),
+        ],
         const SizedBox(height: 12),
         if (visible.isEmpty)
           const Padding(
@@ -269,7 +516,7 @@ class PlanLibraryPanel extends StatelessWidget {
             ),
           )
         else
-          switch (viewMode) {
+          switch (widget.viewMode) {
             PlanLibraryViewMode.cards => _buildCards(visible),
             PlanLibraryViewMode.list => _buildList(visible),
             PlanLibraryViewMode.table => _buildTable(visible),
@@ -278,17 +525,198 @@ class PlanLibraryPanel extends StatelessWidget {
     );
   }
 
-  Widget _badge(BusinessPlanDocument p) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: _statusColor(p.status).withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _statusColor(p.status)),
+  Widget _buildManageToolbar(List<BusinessPlanDocument> visible) {
+    return Material(
+      color: ControlColors.surfaceMuted,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  '선택 ${_selectedIds.length}개',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextButton(
+                  onPressed: visible.isEmpty ? null : _selectAllVisible,
+                  child: const Text('전체 선택'),
+                ),
+                TextButton(
+                  onPressed: _selectedIds.isEmpty ? null : _clearSelection,
+                  child: const Text('선택 해제'),
+                ),
+                OutlinedButton(
+                  onPressed: () {
+                    setState(() => _showDuplicates = !_showDuplicates);
+                    if (_showDuplicates) {
+                      widget.onFolderChanged('duplicate_candidates');
+                    }
+                  },
+                  child: Text(_showDuplicates ? '중복 패널 닫기' : '중복 정리'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (!_inTrashView) ...[
+                  FilledButton.tonal(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.archive),
+                    child: const Text('보관'),
+                  ),
+                  FilledButton.tonal(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.unarchive),
+                    child: const Text('보관 해제'),
+                  ),
+                  FilledButton(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.trash),
+                    child: const Text('휴지통으로 이동'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.favorite),
+                    child: const Text('즐겨찾기'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.unfavorite),
+                    child: const Text('즐겨찾기 해제'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.protect),
+                    child: const Text('보호'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.unprotect),
+                    child: const Text('보호 해제'),
+                  ),
+                ] else ...[
+                  FilledButton.tonal(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.restore),
+                    child: const Text('복원'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ControlColors.accentRose,
+                    ),
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () =>
+                            _runBulk(PlanLibraryBulkAction.permanentDelete),
+                    child: const Text('영구 삭제'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
-      child: Text(
-        _statusBadge(p),
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+    );
+  }
+
+  Widget _buildDuplicatePanel() {
+    final groups = _duplicateGroups;
+    if (groups.isEmpty) {
+      return const Text(
+        '중복 후보가 없습니다.',
+        style: TextStyle(color: ControlColors.textMuted),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '중복 후보 ${_duplicateGroups.length}그룹 (자동 삭제하지 않습니다)',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        for (var i = 0; i < groups.length; i++)
+          _duplicateGroupCard(i + 1, groups[i]),
+      ],
+    );
+  }
+
+  Widget _duplicateGroupCard(int index, PlanDuplicateGroup group) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: ControlColors.border),
+        borderRadius: BorderRadius.circular(8),
+        color: ControlColors.surface,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '중복 후보 그룹 $index'
+            '${group.strongChecksumMatch ? ' · 동일 checksum' : ' · 제목·결과물·고객 유사'}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          Text(group.title, style: const TextStyle(fontSize: 15)),
+          const SizedBox(height: 6),
+          for (final p in group.plans)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text(
+                '· ${_formatIso(p.updatedAt)}'
+                ' · ${PlanLibraryManagement.shortId(p.stableInstructionId)}'
+                ' · ${_statusBadge(p)}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedIds
+                      ..clear()
+                      ..add(group.newest.id);
+                    _manageMode = true;
+                  });
+                },
+                child: const Text('최신 선택'),
+              ),
+              OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedIds
+                      ..clear()
+                      ..addAll(group.plans.map((p) => p.id));
+                    _manageMode = true;
+                  });
+                },
+                child: const Text('직접 선택(전체)'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -305,24 +733,40 @@ class PlanLibraryPanel extends StatelessWidget {
               SizedBox(
                 width: wide ? (c.maxWidth - 10) / 2 : c.maxWidth,
                 child: Material(
-                  color: p.id == activePlanId
+                  color: p.id == widget.activePlanId
                       ? ControlColors.tealSoft.withValues(alpha: 0.35)
                       : ControlColors.surface,
                   borderRadius: BorderRadius.circular(10),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(10),
-                    onTap: () => onOpenPlan(p),
+                    onTap: () {
+                      if (_manageMode) {
+                        _toggleSelect(p.id);
+                      } else {
+                        widget.onOpenPlan(p);
+                      }
+                    },
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: ControlColors.border),
+                        border: Border.all(
+                          color: _selectedIds.contains(p.id)
+                              ? ControlColors.teal
+                              : ControlColors.border,
+                          width: _selectedIds.contains(p.id) ? 2 : 1,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
+                              if (_manageMode)
+                                Checkbox(
+                                  value: _selectedIds.contains(p.id),
+                                  onChanged: (_) => _toggleSelect(p.id),
+                                ),
                               Expanded(
                                 child: Text(
                                   p.input.topic.isEmpty
@@ -335,17 +779,21 @@ class PlanLibraryPanel extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              IconButton(
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () => onToggleFavorite(p),
-                                icon: Icon(
-                                  p.favorite ? Icons.star : Icons.star_border,
-                                  size: 20,
-                                  color: p.favorite
-                                      ? ControlColors.sandBeige
-                                      : ControlColors.textMuted,
+                              if (!_manageMode)
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () =>
+                                      widget.onToggleFavorite(p),
+                                  icon: Icon(
+                                    p.favorite
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    size: 20,
+                                    color: p.favorite
+                                        ? ControlColors.sandBeige
+                                        : ControlColors.textMuted,
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -363,11 +811,12 @@ class PlanLibraryPanel extends StatelessWidget {
                                   color: ControlColors.textMuted,
                                 ),
                               ),
-                              if (duplicateTopics.contains(
-                                p.input.topic.trim().toLowerCase(),
-                              ))
+                              if (widget.duplicateTopics.contains(
+                                    p.input.topic.trim().toLowerCase(),
+                                  ) ||
+                                  _duplicateIds.contains(p.id))
                                 const Text(
-                                  '유사 주제',
+                                  '유사/중복 후보',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: ControlColors.textMuted,
@@ -376,19 +825,7 @@ class PlanLibraryPanel extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            '고객: ${p.input.targetCustomer.isEmpty ? '-' : p.input.targetCustomer}',
-                            style: const TextStyle(fontSize: 12),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '수정 ${_formatIso(p.updatedAt)} · v${p.version}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: ControlColors.textMuted,
-                            ),
-                          ),
+                          ..._cardMeta(p),
                         ],
                       ),
                     ),
@@ -407,7 +844,13 @@ class PlanLibraryPanel extends StatelessWidget {
         for (final p in list)
           ListTile(
             contentPadding: EdgeInsets.zero,
-            selected: p.id == activePlanId,
+            selected: p.id == widget.activePlanId,
+            leading: _manageMode
+                ? Checkbox(
+                    value: _selectedIds.contains(p.id),
+                    onChanged: (_) => _toggleSelect(p.id),
+                  )
+                : null,
             title: Text(
               p.input.topic.isEmpty ? '(주제 미입력)' : p.input.topic,
               maxLines: 1,
@@ -415,14 +858,25 @@ class PlanLibraryPanel extends StatelessWidget {
             ),
             subtitle: Text(
               '${ArtifactType.labelKo(p.input.resolvedArtifactType)} · '
-              '${_statusBadge(p)} · ${_formatIso(p.updatedAt)}',
+              '${_statusBadge(p)} · ${_formatIso(p.updatedAt)} · '
+              'ID ${PlanLibraryManagement.shortId(p.stableInstructionId)} · '
+              '${p.hasInstruction ? '작업지시O' : '작업지시X'} · '
+              '${p.wasTransferred ? 'InboxO' : 'InboxX'}',
               style: const TextStyle(fontSize: 12),
             ),
-            trailing: IconButton(
-              onPressed: () => onToggleFavorite(p),
-              icon: Icon(p.favorite ? Icons.star : Icons.star_border),
-            ),
-            onTap: () => onOpenPlan(p),
+            trailing: _manageMode
+                ? null
+                : IconButton(
+                    onPressed: () => widget.onToggleFavorite(p),
+                    icon: Icon(p.favorite ? Icons.star : Icons.star_border),
+                  ),
+            onTap: () {
+              if (_manageMode) {
+                _toggleSelect(p.id);
+              } else {
+                widget.onOpenPlan(p);
+              }
+            },
           ),
       ],
     );
@@ -432,20 +886,39 @@ class PlanLibraryPanel extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        columns: const [
-          DataColumn(label: Text('주제')),
-          DataColumn(label: Text('결과물')),
-          DataColumn(label: Text('상태')),
-          DataColumn(label: Text('고객')),
-          DataColumn(label: Text('수정')),
-          DataColumn(label: Text('★')),
+        columns: [
+          if (_manageMode) const DataColumn(label: Text('선택')),
+          const DataColumn(label: Text('주제')),
+          const DataColumn(label: Text('결과물')),
+          const DataColumn(label: Text('상태')),
+          const DataColumn(label: Text('고객')),
+          const DataColumn(label: Text('버전')),
+          const DataColumn(label: Text('수정')),
+          const DataColumn(label: Text('ID')),
+          const DataColumn(label: Text('지시')),
+          const DataColumn(label: Text('Inbox')),
+          if (!_manageMode) const DataColumn(label: Text('★')),
         ],
         rows: [
           for (final p in list)
             DataRow(
-              selected: p.id == activePlanId,
-              onSelectChanged: (_) => onOpenPlan(p),
+              selected: p.id == widget.activePlanId ||
+                  _selectedIds.contains(p.id),
+              onSelectChanged: (_) {
+                if (_manageMode) {
+                  _toggleSelect(p.id);
+                } else {
+                  widget.onOpenPlan(p);
+                }
+              },
               cells: [
+                if (_manageMode)
+                  DataCell(
+                    Checkbox(
+                      value: _selectedIds.contains(p.id),
+                      onChanged: (_) => _toggleSelect(p.id),
+                    ),
+                  ),
                 DataCell(
                   Text(
                     p.input.topic.isEmpty ? '(미입력)' : p.input.topic,
@@ -464,16 +937,23 @@ class PlanLibraryPanel extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                DataCell(Text('v${p.version}')),
                 DataCell(Text(_formatIso(p.updatedAt))),
                 DataCell(
-                  IconButton(
-                    onPressed: () => onToggleFavorite(p),
-                    icon: Icon(
-                      p.favorite ? Icons.star : Icons.star_border,
-                      size: 18,
+                  Text(PlanLibraryManagement.shortId(p.stableInstructionId)),
+                ),
+                DataCell(Text(p.hasInstruction ? 'Y' : 'N')),
+                DataCell(Text(p.wasTransferred ? 'Y' : 'N')),
+                if (!_manageMode)
+                  DataCell(
+                    IconButton(
+                      onPressed: () => widget.onToggleFavorite(p),
+                      icon: Icon(
+                        p.favorite ? Icons.star : Icons.star_border,
+                        size: 18,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
         ],

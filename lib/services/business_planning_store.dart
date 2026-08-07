@@ -80,15 +80,20 @@ class BusinessPlanningStore {
     await savePlans(plans);
   }
 
-  /// instructionId별 최신 버전만 반환 (보관 제외 옵션).
+  /// instructionId별 최신 버전만 반환 (보관·휴지통 제외 옵션).
   static List<BusinessPlanDocument> latestByInstructionId(
     List<BusinessPlanDocument> plans, {
     bool includeArchived = false,
+    bool includeTrashed = false,
   }) {
     final map = <String, BusinessPlanDocument>{};
     for (final plan in plans) {
+      if (!includeTrashed && plan.isLibraryTrashed) continue;
       final status = PlanningStatus.normalize(plan.status);
-      if (!includeArchived && status == PlanningStatus.archived) continue;
+      if (!includeArchived &&
+          (status == PlanningStatus.archived || plan.isLibraryArchived)) {
+        continue;
+      }
       final key = plan.stableInstructionId;
       final existing = map[key];
       if (existing == null ||
@@ -106,6 +111,24 @@ class BusinessPlanningStore {
     final plans = await loadPlans();
     plans.removeWhere((p) => p.id == id);
     await savePlans(plans);
+  }
+
+  /// 기획 라이브러리 레코드만 영구 삭제. DevWorkDoc/Inbox/외부 파일은 건드리지 않는다.
+  Future<void> deletePlans(Iterable<String> ids) async {
+    final idSet = ids.toSet();
+    if (idSet.isEmpty) return;
+    final plans = await loadPlans();
+    plans.removeWhere((p) => idSet.contains(p.id));
+    await savePlans(plans);
+  }
+
+  Future<void> upsertPlans(Iterable<BusinessPlanDocument> updates) async {
+    final plans = await loadPlans();
+    final byId = {for (final p in plans) p.id: p};
+    for (final u in updates) {
+      byId[u.id] = u;
+    }
+    await savePlans(byId.values.toList());
   }
 
   Future<BusinessPlanInput?> loadDraftInput() async {
