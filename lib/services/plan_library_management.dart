@@ -23,10 +23,7 @@ class PlanDuplicateGroup {
 
 /// 영구삭제 전 강한 경고가 필요한 사유.
 class PlanDeleteWarning {
-  const PlanDeleteWarning({
-    required this.planId,
-    required this.reasons,
-  });
+  const PlanDeleteWarning({required this.planId, required this.reasons});
 
   final String planId;
   final List<String> reasons;
@@ -62,9 +59,7 @@ class PlanLibraryManagement {
     final clock = now ?? DateTime.now();
     switch (filter) {
       case 'all':
-        return plans
-            .where((p) => !p.isLibraryTrashed)
-            .toList();
+        return plans.where((p) => !p.isLibraryTrashed).toList();
       case 'in_progress':
         return plans
             .where(
@@ -75,27 +70,22 @@ class PlanLibraryManagement {
             )
             .toList();
       case 'instruction_created':
-        return plans
-            .where((p) {
-              if (p.isLibraryTrashed) return false;
-              final s = PlanningStatus.normalize(p.status);
-              return p.hasInstruction ||
-                  s == PlanningStatus.instructionReady ||
-                  s == PlanningStatus.readyToTransfer ||
-                  s == PlanningStatus.validationRequired;
-            })
-            .toList();
+        return plans.where((p) {
+          if (p.isLibraryTrashed) return false;
+          final s = PlanningStatus.normalize(p.status);
+          return p.hasInstruction ||
+              s == PlanningStatus.instructionReady ||
+              s == PlanningStatus.readyToTransfer ||
+              s == PlanningStatus.validationRequired;
+        }).toList();
       case 'transferred':
-        return plans
-            .where((p) {
-              if (p.isLibraryTrashed) return false;
-              return p.wasTransferred ||
-                  PlanningStatus.normalize(p.status) ==
-                      PlanningStatus.transferred ||
-                  PlanningStatus.normalize(p.status) ==
-                      PlanningStatus.imported;
-            })
-            .toList();
+        return plans.where((p) {
+          if (p.isLibraryTrashed) return false;
+          return p.wasTransferred ||
+              PlanningStatus.normalize(p.status) ==
+                  PlanningStatus.transferred ||
+              PlanningStatus.normalize(p.status) == PlanningStatus.imported;
+        }).toList();
       case 'completed':
         return plans
             .where(
@@ -114,7 +104,8 @@ class PlanLibraryManagement {
       case 'trashed':
         return plans.where((p) => p.isLibraryTrashed).toList();
       case 'duplicate_candidates':
-        final ids = duplicateCandidateIds ??
+        final ids =
+            duplicateCandidateIds ??
             duplicateCandidateIdSet(findDuplicateGroups(plans));
         return plans
             .where((p) => !p.isLibraryTrashed && ids.contains(p.id))
@@ -127,16 +118,17 @@ class PlanLibraryManagement {
           return clock.difference(dt) >= staleAfter;
         }).toList();
       case 'favorite':
-        return plans
-            .where((p) => !p.isLibraryTrashed && p.favorite)
-            .toList();
+        return plans.where((p) => !p.isLibraryTrashed && p.favorite).toList();
       default:
         return plans.where((p) => !p.isLibraryTrashed).toList();
     }
   }
 
   static Set<String> duplicateCandidateIdSet(List<PlanDuplicateGroup> groups) {
-    return {for (final g in groups) for (final p in g.plans) p.id};
+    return {
+      for (final g in groups)
+        for (final p in g.plans) p.id,
+    };
   }
 
   /// 중복 후보 탐지.

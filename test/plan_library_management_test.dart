@@ -247,21 +247,9 @@ void main() {
   test('필터: 전체/보관/휴지통/중복 후보/진행중', () {
     final plans = [
       _plan(id: 'active1', status: PlanningStatus.draft),
-      _plan(
-        id: 'prog',
-        status: PlanningStatus.inProgress,
-        topic: '진행',
-      ),
-      _plan(
-        id: 'arch',
-        libraryState: PlanLibraryState.archived,
-        topic: '보관됨',
-      ),
-      _plan(
-        id: 'trash',
-        libraryState: PlanLibraryState.trashed,
-        topic: '휴지',
-      ),
+      _plan(id: 'prog', status: PlanningStatus.inProgress, topic: '진행'),
+      _plan(id: 'arch', libraryState: PlanLibraryState.archived, topic: '보관됨'),
+      _plan(id: 'trash', libraryState: PlanLibraryState.trashed, topic: '휴지'),
       _plan(
         id: 'd1',
         instruction: _wi(id: 'wi_d1', checksum: 'dup'),
@@ -323,7 +311,11 @@ void main() {
 
   test('latestByInstructionId는 휴지통 제외', () {
     final plans = [
-      _plan(id: 'a', instructionId: 'wi_same', updatedAt: '2026-08-06T00:00:00Z'),
+      _plan(
+        id: 'a',
+        instructionId: 'wi_same',
+        updatedAt: '2026-08-06T00:00:00Z',
+      ),
       _plan(
         id: 'b',
         instructionId: 'wi_same',

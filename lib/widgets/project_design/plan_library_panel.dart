@@ -395,10 +395,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                   }
                 });
               },
-              icon: Icon(
-                _manageMode ? Icons.close : Icons.tune,
-                size: 18,
-              ),
+              icon: Icon(_manageMode ? Icons.close : Icons.tune, size: 18),
               label: Text(_manageMode ? '관리 종료' : '관리'),
             ),
             const SizedBox(width: 8),
@@ -623,8 +620,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                     ),
                     onPressed: _selectedIds.isEmpty
                         ? null
-                        : () =>
-                            _runBulk(PlanLibraryBulkAction.permanentDelete),
+                        : () => _runBulk(PlanLibraryBulkAction.permanentDelete),
                     child: const Text('영구 삭제'),
                   ),
                 ],
@@ -782,12 +778,9 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                               if (!_manageMode)
                                 IconButton(
                                   visualDensity: VisualDensity.compact,
-                                  onPressed: () =>
-                                      widget.onToggleFavorite(p),
+                                  onPressed: () => widget.onToggleFavorite(p),
                                   icon: Icon(
-                                    p.favorite
-                                        ? Icons.star
-                                        : Icons.star_border,
+                                    p.favorite ? Icons.star : Icons.star_border,
                                     size: 20,
                                     color: p.favorite
                                         ? ControlColors.sandBeige
@@ -902,8 +895,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         rows: [
           for (final p in list)
             DataRow(
-              selected: p.id == widget.activePlanId ||
-                  _selectedIds.contains(p.id),
+              selected:
+                  p.id == widget.activePlanId || _selectedIds.contains(p.id),
               onSelectChanged: (_) {
                 if (_manageMode) {
                   _toggleSelect(p.id);

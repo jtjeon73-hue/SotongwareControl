@@ -391,9 +391,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       libraryState:
           libraryState ?? existing?.libraryState ?? PlanLibraryState.active,
       isProtected: isProtected ?? existing?.isProtected ?? false,
-      trashedAt: clearTrashedAt
-          ? null
-          : (trashedAt ?? existing?.trashedAt),
+      trashedAt: clearTrashedAt ? null : (trashedAt ?? existing?.trashedAt),
     );
   }
 
@@ -2236,8 +2234,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       await _store.deletePlans(selected.map((p) => p.id));
       await _refreshPlans();
       if (!mounted) return;
-      if (_activePlanId != null &&
-          selected.any((p) => p.id == _activePlanId)) {
+      if (_activePlanId != null && selected.any((p) => p.id == _activePlanId)) {
         setState(() {
           _activePlanId = null;
           _activeDoc = null;
