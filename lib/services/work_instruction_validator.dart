@@ -97,12 +97,13 @@ class WorkInstructionValidator {
       }
     }
 
-    if (instruction.schemaVersion != '1.0') {
+    if (!isSupportedInstructionSchema(instruction.schemaVersion)) {
       issues.add(
-        const ValidationIssue(
+        ValidationIssue(
           field: 'schemaVersion',
           reason: '지원하지 않는 schemaVersion 입니다.',
-          fix: 'schemaVersion을 1.0으로 생성하세요.',
+          fix:
+              'schemaVersion을 $instructionSchemaVersionCurrent 또는 $instructionSchemaVersionLegacy 로 생성하세요.',
         ),
       );
     }

@@ -119,11 +119,12 @@ class ArtifactType {
 class ContentSubtype {
   static const song = 'song';
   static const shorts = 'shorts';
+  static const video = 'video';
   static const songAndShorts = 'song_and_shorts';
   static const other = 'other';
   static const undecided = 'undecided';
 
-  static const allSelectable = [song, shorts, songAndShorts, other];
+  static const allSelectable = [song, shorts, video, songAndShorts, other];
 
   static String labelKo(String id) {
     switch (id) {
@@ -131,6 +132,8 @@ class ContentSubtype {
         return '노래';
       case shorts:
         return '유튜브 쇼츠';
+      case video:
+        return '영상';
       case songAndShorts:
         return '노래와 쇼츠 연계';
       case other:
@@ -151,12 +154,14 @@ class ContentSubtype {
       case shorts:
       case 'youtube_shorts':
         return shorts;
+      case video:
+      case 'youtube_video':
+        return video;
       case songAndShorts:
         return songAndShorts;
       case other:
       case 'education_content':
       case 'content':
-      case 'youtube_video':
         return other;
       default:
         return undecided;

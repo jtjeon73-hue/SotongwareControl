@@ -188,8 +188,9 @@ void main() {
     );
     expect(v1.instructionId, 'wi_plan_rural');
     expect(v1.primaryTrack, 'ebook_dev');
-    expect(v1.schemaVersion, '1.0');
+    expect(v1.schemaVersion, '1.1');
     expect(v1.workflowSteps.length, 18);
+    expect(v1.contract, isNotNull);
 
     final v2 = service.buildInstruction(
       planId: 'plan_rural',
@@ -244,7 +245,7 @@ void main() {
     expect(latest.single.version, 2);
   });
 
-  testWidgets('화면 제목과 빠른 선택 기본 진입', (tester) async {
+  testWidgets('화면 제목과 설계 엔진 기본 진입', (tester) async {
     tester.view.physicalSize = const Size(1366, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -254,10 +255,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('사업기획 및 작업지시 관리'), findsOneWidget);
-    expect(find.textContaining('소통24워크 Inbox'), findsWidgets);
-    expect(find.text('빠른 선택으로 만들기'), findsOneWidget);
+    expect(find.text('사업기획 · 작업지시'), findsOneWidget);
+    expect(find.textContaining('Project Design Engine'), findsWidgets);
+    expect(find.text('설계 엔진'), findsOneWidget);
     expect(find.text('전자책'), findsWidgets);
+    expect(find.text('결과물 선택'), findsOneWidget);
     // 긴 텍스트 입력 라벨이 기본 노출되지 않음
     expect(find.text('사업 주제 *'), findsNothing);
   });
@@ -287,7 +289,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.tap(find.text('운영 분석'));
+      await tester.tap(find.byKey(const ValueKey('artifact-ebook')));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

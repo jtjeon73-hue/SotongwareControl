@@ -3,11 +3,11 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../models/business_planning.dart';
 import '../models/dev_work_doc_status.dart';
 import '../models/planning_wizard_state.dart';
+import '../models/project_design_state.dart';
 import '../services/browser_json_download_service.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
@@ -16,11 +16,14 @@ import '../services/dev_work_doc_service.dart';
 import '../services/dev_work_doc_verify.dart';
 import '../services/instruction_transfer_service.dart';
 import '../services/plan_progress_status.dart';
-import '../services/planning_sentence_composer.dart';
+import '../services/instruction_contract_validator.dart';
+import '../services/project_design_engine.dart';
 import '../services/work_instruction_validator.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
-import '../widgets/planning_wizard_panel.dart';
+import '../widgets/project_design/instruction_preview_panel.dart';
+import '../widgets/project_design/plan_library_panel.dart';
+import '../widgets/project_design/project_design_wizard.dart';
 
 /// AI 사업분석 내 「사업 기획·작업지시」 탭 (로컬 규칙 기반, 외부 AI 없음).
 class BusinessPlanningTab extends StatefulWidget {
@@ -35,8 +38,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _store = BusinessPlanningStore();
   final _transfer = InstructionTransferService();
   final _devWorkDoc = DevWorkDocService();
-  final _validator = WorkInstructionValidator();
-  final _composer = const PlanningSentenceComposer();
+  final _contractValidator = InstructionContractValidator();
+  final _designEngine = ProjectDesignEngine();
 
   final _topicCtrl = TextEditingController();
   final _problemCtrl = TextEditingController();
@@ -54,6 +57,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _searchCtrl = TextEditingController();
 
   PlanningWizardState _wizardState = PlanningWizardState(mode: 'quick');
+  ProjectDesignState _designState = ProjectDesignState();
   String _artifactType = ArtifactType.undecided;
   String _contentSubtype = '';
   List<BusinessPlanDocument> _allPlans = const [];
@@ -68,7 +72,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   bool _transferBusy = false;
   String? _lastTransferDiagnosis;
   bool _inputModeQuick = true;
-  String _statusFilter = 'all';
+  String _libraryFolder = 'all';
+  PlanLibraryViewMode _libraryView = PlanLibraryViewMode.cards;
+  PlanLibrarySort _librarySort = PlanLibrarySort.newest;
   FolderPermissionState? _folderState;
   DevWorkDocState? _devDocState;
   DevWorkDocWriteResult? _lastDevWorkDocResult;
@@ -155,6 +161,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _wizardState = PlanningWizardState.fromJson(
               draft.wizardSelections!,
             );
+            _designState = ProjectDesignState.fromWizardState(_wizardState);
             _inputModeQuick = _wizardState.mode != 'advanced';
           }
         }
@@ -166,27 +173,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   BusinessPlanInput get _currentInput {
     if (_inputModeQuick) {
-      final composed = _composer.toBusinessPlanInput(_wizardState);
-      final artifact = _wizardState.effectiveArtifactType;
-      if (artifact != null && artifact != ArtifactType.undecided) {
-        return composed.copyWith(
-          artifactType: artifact,
-          contentSubtype: _wizardState.contentSubtype == null
-              ? ''
-              : ContentSubtype.normalize(_wizardState.contentSubtype!),
-          artifactAnswers: Map<String, List<String>>.from(
-            _wizardState.artifactAnswers,
-          ),
-          deliverableTypes: [artifact],
-          wizardSelections: _wizardState.toJson(),
-        );
-      }
-      return composed.copyWith(
-        wizardSelections: _wizardState.toJson(),
-        artifactAnswers: Map<String, List<String>>.from(
-          _wizardState.artifactAnswers,
-        ),
-      );
+      return _designEngine.toBusinessPlanInput(_designState);
     }
     return BusinessPlanInput(
       topic: _topicCtrl.text,
@@ -241,14 +228,28 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ? ContentSubtype.undecided
             : input.contentSubtype,
       );
-      return sub != ContentSubtype.undecided;
+      if (sub == ContentSubtype.undecided) return false;
     }
+    if (_inputModeQuick && !_designState.planningConfirmed) return false;
     return true;
   }
 
-  bool get _canTransfer =>
-      _instruction != null &&
-      _validator.validate(input: _currentInput, instruction: _instruction!).ok;
+  bool get _canTransfer {
+    if (_instruction == null) return false;
+    final result = _contractValidator.validate(
+      input: _currentInput,
+      instruction: _instruction!,
+    );
+    return result.canTransfer;
+  }
+
+  ContractValidationResult? get _contractValidation {
+    if (_instruction == null) return null;
+    return _contractValidator.validate(
+      input: _currentInput,
+      instruction: _instruction!,
+    );
+  }
 
   bool get _inboxTransferReady => _folderState?.readyToWrite == true;
 
@@ -270,8 +271,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _contentSubtype = input.contentSubtype;
   }
 
-  void _onWizardChanged(PlanningWizardState state) {
-    _wizardState = state;
+  void _onDesignChanged(ProjectDesignState state) {
+    _designState = state;
+    _wizardState = state.toWizardState();
     _wizardTimer?.cancel();
     _wizardTimer = Timer(const Duration(milliseconds: 500), _persistDraft);
     setState(() {});
@@ -982,13 +984,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       return;
     }
 
-    final validation = _validator.validate(
+    final validation = _contractValidator.validate(
       input: input,
       instruction: instruction,
     );
     final status = isDownloadComplete
         ? PlanningStatus.downloadedPendingImport
-        : validation.ok
+        : validation.canTransfer
         ? PlanningStatus.instructionReady
         : PlanningStatus.validationRequired;
 
@@ -1048,10 +1050,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             : 'DevWorkDoc 기존 파일 확인 (동일 핵심 checksum). v$version\n'
                   'Active·Versions v$version 검증 완료',
       );
-    } else if (validation.ok) {
-      _snack('작업지시서를 생성했습니다. (v$version)');
+    } else if (validation.canTransfer) {
+      _snack(
+        validation.level == ContractValidationLevel.warning
+            ? '작업지시서를 생성했습니다. (v$version, WARNING — 전달 전 확인 필요)'
+            : '작업지시서를 생성했습니다. (v$version)',
+      );
     } else {
-      _snack('작업지시서를 생성했으나 검증 이슈가 있습니다. 「기타 작업」에서 확인하세요.');
+      _snack('작업지시서를 생성했으나 BLOCKED입니다. 「기타 작업」에서 검증을 확인하세요.');
     }
   }
 
@@ -1071,13 +1077,49 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       return;
     }
 
-    final validation = _validator.validate(
+    final validation = _contractValidator.validate(
       input: _currentInput,
       instruction: _instruction!,
     );
-    if (!validation.ok) {
-      _snack('전달 전 검증 오류: ${validation.issues.first.reason}');
+    if (!validation.canTransfer) {
+      _snack(
+        '전달 차단(BLOCKED): ${validation.blockers.isNotEmpty ? validation.blockers.first.reason : validation.issues.first.reason}',
+      );
       return;
+    }
+    if (validation.level == ContractValidationLevel.warning) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('WARNING — 전달 전 확인'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('경고가 있습니다. 내용을 확인한 뒤 전달할 수 있습니다.'),
+                const SizedBox(height: 12),
+                for (final issue in validation.warnings.take(6))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text('· ${issue.field}: ${issue.reason}'),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('확인하고 전달'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
     }
 
     final iid = _instruction!.instructionId.trim().isNotEmpty
@@ -1946,10 +1988,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _wizardState = PlanningWizardState.fromJson(
           plan.input.wizardSelections!,
         );
+        _designState = ProjectDesignState.fromWizardState(_wizardState);
         _inputModeQuick = _wizardState.mode != 'advanced';
       } else {
         _inputModeQuick = false;
         _wizardState = PlanningWizardState(mode: 'advanced', step: 4);
+        _designState = ProjectDesignState();
       }
     });
     _persistDraft();
@@ -1969,6 +2013,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _activeDoc = null;
       _inputModeQuick = true;
       _wizardState = PlanningWizardState(mode: 'quick');
+      _designState = ProjectDesignState();
       _applyInput(const BusinessPlanInput());
     });
     _persistDraft();
@@ -1979,23 +2024,30 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('작업지시서가 없습니다.');
       return;
     }
-    final result = _validator.validate(
+    final result = _contractValidator.validate(
       input: _currentInput,
       instruction: _instruction!,
     );
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(result.ok ? '검증 통과' : '검증 이슈'),
+        title: Text('검증 ${result.levelLabel}'),
         content: SingleChildScrollView(
           child: result.ok
               ? const Text('소통24워크 전달에 필요한 항목이 모두 충족됩니다.')
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      result.isBlocked
+                          ? 'BLOCKED — Inbox 전달이 비활성화됩니다.'
+                          : 'WARNING — 확인 후 전달할 수 있습니다.',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
                     for (final issue in result.issues) ...[
                       Text(
-                        issue.field,
+                        '[${issue.level.name.toUpperCase()}] ${issue.field}',
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       Text(issue.reason),
@@ -2026,12 +2078,20 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('작업지시서가 없습니다.');
       return;
     }
-    final text = _service.buildReadableInstruction(_instruction!);
+    final validation = _contractValidation;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('작업지시서 v${_instruction!.instructionVersion}'),
-        content: SingleChildScrollView(child: Text(text)),
+        title: Text('작업지시서 최종 검토 v${_instruction!.instructionVersion}'),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(
+            child: InstructionPreviewPanel(
+              instruction: _instruction!,
+              validation: validation,
+            ),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -2106,12 +2166,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
-  String _formatIso(String iso) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return iso;
-    return DateFormat('yyyy-MM-dd HH:mm').format(dt.toLocal());
-  }
-
   PlanProgressView _progressFor(BusinessPlanDocument? plan) {
     return PlanProgressStatus.resolve(
       plan,
@@ -2145,28 +2199,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return _progressFor(plan).badgeLabel;
   }
 
-  Color _planListBadgeColor(BusinessPlanDocument plan) {
-    return _progressBadgeColor(_progressFor(plan));
-  }
-
   List<BusinessPlanDocument> get _latestPlans {
-    var list = BusinessPlanningStore.latestByInstructionId(_allPlans);
-    if (_statusFilter != 'all') {
-      list = list
-          .where((p) => PlanningStatus.normalize(p.status) == _statusFilter)
-          .toList();
-    }
-    final q = _searchCtrl.text.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      list = list
-          .where(
-            (p) =>
-                p.input.topic.toLowerCase().contains(q) ||
-                p.input.customerProblem.toLowerCase().contains(q),
-          )
-          .toList();
-    }
-    return list;
+    return BusinessPlanningStore.latestByInstructionId(_allPlans);
   }
 
   List<BusinessPlanDocument> _similarPlans(BusinessPlanDocument plan) {
@@ -2288,10 +2322,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           _buildModeToggle(),
           const SizedBox(height: 12),
           if (_inputModeQuick)
-            PlanningWizardPanel(
-              initial: _wizardState,
-              onChanged: _onWizardChanged,
-              onSavePlan: () => _savePlan(),
+            ProjectDesignWizard(
+              initial: _designState,
+              onChanged: _onDesignChanged,
+              onRequestSavePlan: () => _savePlan(),
+              onRequestCreateInstruction: () => _createOrPromptInstruction(),
             )
           else
             _buildAdvancedForm(),
@@ -2308,7 +2343,29 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           const SizedBox(height: 12),
           _buildFolderSettings(),
           const SizedBox(height: 20),
-          _buildSavedPlansSection(),
+          PlanLibraryPanel(
+            plans: _latestPlans,
+            activePlanId: _activePlanId,
+            folderFilter: _libraryFolder,
+            searchQuery: _searchCtrl.text,
+            viewMode: _libraryView,
+            sort: _librarySort,
+            duplicateTopics: _duplicateTopics,
+            onFolderChanged: (f) => setState(() => _libraryFolder = f),
+            onSearchChanged: (q) {
+              _searchCtrl.text = q;
+              setState(() {});
+            },
+            onViewModeChanged: (m) => setState(() => _libraryView = m),
+            onSortChanged: (s) => setState(() => _librarySort = s),
+            onOpenPlan: _onPlanTileTap,
+            onToggleFavorite: (p) async {
+              final next = p.copyWith(favorite: !p.favorite);
+              await _store.upsertPlan(next);
+              await _refreshPlans();
+            },
+            onStartNew: _startNewPlan,
+          ),
         ],
       ),
     );
@@ -2454,29 +2511,35 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         border: Border.all(color: ControlColors.border),
       ),
       child: const Text(
-        '로컬 규칙 기반 기획 도우미입니다. 외부 AI 생성·자동 실행은 없으며, '
-        '실제 제작·배포는 소통24워크에서 진행합니다.',
+        'Project Design Engine — 선택과 승인 중심으로 기획합니다. '
+        '외부 AI 자동 실행은 없으며, 실제 제작·배포는 소통24워크에서 진행합니다.',
         style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
       ),
     );
   }
 
   Widget _buildModeToggle() {
-    return SegmentedButton<bool>(
-      segments: const [
-        ButtonSegment(value: true, label: Text('빠른 선택')),
-        ButtonSegment(value: false, label: Text('직접 입력')),
-      ],
-      selected: {_inputModeQuick},
-      onSelectionChanged: (s) {
-        setState(() {
-          _inputModeQuick = s.first;
-          _wizardState = _wizardState.copyWith(
-            mode: _inputModeQuick ? 'quick' : 'advanced',
-          );
-        });
-        _persistDraft();
-      },
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(value: true, label: Text('설계 엔진')),
+            ButtonSegment(value: false, label: Text('직접 입력')),
+          ],
+          selected: {_inputModeQuick},
+          onSelectionChanged: (s) {
+            setState(() {
+              _inputModeQuick = s.first;
+              _wizardState = _wizardState.copyWith(
+                mode: _inputModeQuick ? 'quick' : 'advanced',
+              );
+            });
+            _persistDraft();
+          },
+        ),
+      ),
     );
   }
 
@@ -2617,6 +2680,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 softWrap: true,
                 style: const TextStyle(color: ControlColors.textSecondary),
               ),
+              const SizedBox(height: 12),
+              InstructionPreviewPanel(
+                instruction: _instruction!,
+                validation: _contractValidation,
+              ),
             ],
           ],
         ),
@@ -2707,7 +2775,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Icon(Icons.upload_outlined, size: 18),
-        label: Text(_transferBusy ? '전달 중…' : '소통24워크 Inbox로 전달'),
+        label: Text(
+          _transferBusy
+              ? '전달 중…'
+              : (_contractValidation?.isBlocked == true
+                    ? '전달 차단(BLOCKED)'
+                    : '소통24워크 Inbox로 전달'),
+        ),
       ),
     ];
   }
@@ -3147,157 +3221,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSavedPlansSection() {
-    final visible = _latestPlans;
-    final dupTopics = _duplicateTopics;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                '저장된 기획안',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            FilledButton.tonalIcon(
-              onPressed: _startNewPlan,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('새 기획'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _searchCtrl,
-          decoration: const InputDecoration(
-            hintText: '주제·문제 검색',
-            prefixIcon: Icon(Icons.search),
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final tab in PlanningStatus.filterTabs)
-              FilterChip(
-                label: Text(PlanningStatus.filterLabel(tab)),
-                selected: _statusFilter == tab,
-                onSelected: (_) => setState(() => _statusFilter = tab),
-              ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (visible.isEmpty)
-          const EmptyStatePanel(
-            title: '저장된 기획안 없음',
-            message: '기획 저장 후 목록에 표시됩니다.',
-          )
-        else
-          for (final plan in visible) _buildPlanTile(plan, dupTopics),
-      ],
-    );
-  }
-
-  Widget _buildPlanTile(BusinessPlanDocument plan, Set<String> dupTopics) {
-    final isDup = dupTopics.contains(plan.input.topic.trim().toLowerCase());
-    final isActive = plan.id == _activePlanId;
-    final history = plan.versionHistory;
-    final progress = _progressFor(plan);
-
-    return Card(
-      key: ValueKey('plan-${plan.id}'),
-      color: isActive ? ControlColors.tealSoft.withValues(alpha: 0.35) : null,
-      child: Column(
-        children: [
-          ListTile(
-            onTap: () => _onPlanTileTap(plan),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    plan.input.topic.isEmpty ? '(주제 미입력)' : plan.input.topic,
-                    maxLines: 2,
-                    softWrap: true,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (isDup)
-                  const StatusBadge(
-                    label: '유사 주제',
-                    color: ControlColors.accentWarm,
-                  ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${ArtifactType.labelKo(plan.input.resolvedArtifactType)} · v${plan.version}',
-                  style: const TextStyle(fontSize: 12.5),
-                ),
-                Text(
-                  progress.devWorkDocLine,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                Text(
-                  progress.transferLine,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                Text(
-                  '수정: ${_formatIso(plan.updatedAt)}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: ControlColors.textMuted,
-                  ),
-                ),
-                Text(
-                  progress.nextAction,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: ControlColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            isThreeLine: false,
-            trailing: StatusBadge(
-              label: progress.badgeLabel,
-              color: _planListBadgeColor(plan),
-            ),
-          ),
-          if (history.isNotEmpty)
-            ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-              title: const Text('버전 이력', style: TextStyle(fontSize: 13)),
-              children: [
-                for (final snap in history.reversed)
-                  ListTile(
-                    dense: true,
-                    title: Text(
-                      'v${snap.version} · ${PlanningStatus.labelKo(snap.status)}',
-                    ),
-                    subtitle: Text(
-                      '${_formatIso(snap.createdAt)}'
-                      '${snap.transferFileName != null ? ' · ${snap.transferFileName}' : ''}',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ),
-              ],
-            ),
-        ],
       ),
     );
   }

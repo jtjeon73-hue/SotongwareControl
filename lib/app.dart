@@ -3,6 +3,7 @@ import 'data/sample_business_data.dart';
 import 'screens/action_items_screen.dart';
 import 'screens/admin_data_screen.dart';
 import 'screens/ai_business_analysis_screen.dart';
+import 'screens/operations_analysis_screen.dart';
 import 'screens/ai_ops_department_screen.dart';
 import 'screens/business_division_progress_screen.dart';
 import 'screens/business_overview_screen.dart';
@@ -173,6 +174,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         );
       case ControlDestination.aiBusinessAnalysis:
         return const AiBusinessAnalysisScreen();
+      case ControlDestination.operationsAnalysis:
+        return const OperationsAnalysisScreen();
       case ControlDestination.portfolioHub:
         return PortfolioHubScreen(
           onOpenPlanning: () =>

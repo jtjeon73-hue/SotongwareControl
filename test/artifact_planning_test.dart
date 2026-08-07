@@ -37,10 +37,11 @@ void main() {
       version: 1,
       now: DateTime.utc(2026, 8, 4),
     );
-    expect(v1.schemaVersion, '1.0');
+    expect(v1.schemaVersion, '1.1');
     expect(v1.artifactType, artifact);
     expect(v1.primaryTrack, expectedTrack);
     expect(v1.workflowSteps.length, 18);
+    expect(v1.contract, isNotNull);
     expect(
       validator.validate(input: input, instruction: v1).ok,
       isTrue,

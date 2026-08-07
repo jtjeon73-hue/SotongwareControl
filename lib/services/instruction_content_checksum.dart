@@ -62,6 +62,16 @@ const instructionCoreKeys = <String>{
   'followUpTracks',
   'artifactType',
   'contentSubtype',
+  'identity',
+  'projectDefinition',
+  'positioning',
+  'scope',
+  'productionSpec',
+  'qualityCriteria',
+  'aiGuards',
+  'workflow',
+  'approval',
+  'validation',
 };
 
 const _sortableStringListKeys = <String>{

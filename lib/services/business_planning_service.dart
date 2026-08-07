@@ -1,8 +1,12 @@
 import '../models/business_planning.dart';
+import 'instruction_contract_builder.dart';
 
 /// 로컬 규칙 기반 사업 기획 분석. 외부 AI API를 사용하지 않는다.
 class BusinessPlanningService {
-  BusinessPlanningService();
+  BusinessPlanningService({InstructionContractBuilder? contractBuilder})
+    : _contractBuilder = contractBuilder ?? const InstructionContractBuilder();
+
+  final InstructionContractBuilder _contractBuilder;
 
   static const standardWorkflowTitles = <(String, String)>[
     ('idea_clarify', '아이디어 정리'),
@@ -163,9 +167,24 @@ class BusinessPlanningService {
     final fileName = sourceFileName.isNotEmpty
         ? sourceFileName
         : 'WI_$stableId.json';
+    final qualityChecks = _qualityFor(artifact, subtype: subtype);
+    final completion = _completionFor(artifact, subtype: subtype);
+
+    final contract = _contractBuilder.build(
+      input: input,
+      planId: planId,
+      instructionId: stableId,
+      version: version,
+      createdAt: createdAt ?? iso,
+      updatedAt: updatedAt ?? iso,
+      legacySteps: steps,
+      legacyQualityChecks: qualityChecks,
+      legacyCompletion: completion,
+    );
+    final valueProp = _contractBuilder.legacyValueProposition(contract);
 
     return WorkInstruction(
-      schemaVersion: '1.0',
+      schemaVersion: instructionSchemaVersionCurrent,
       instructionId: stableId,
       projectId: planId,
       instructionVersion: '$version',
@@ -177,13 +196,11 @@ class BusinessPlanningService {
       targetCustomer: input.targetCustomer.trim(),
       deliverableTypes: types,
       recommendedSequence: types,
-      valueProposition:
-          '${input.targetCustomer.trim()}의 ${input.customerProblem.trim()}을(를) '
-          '줄이기 위해 ${ArtifactType.labelKo(artifact)}부터 검증한다.',
+      valueProposition: valueProp,
       requiredMaterials: _materialsFor(artifact, input, subtype: subtype),
       workflowSteps: steps,
-      completionCriteria: _completionFor(artifact, subtype: subtype),
-      qualityChecks: _qualityFor(artifact, subtype: subtype),
+      completionCriteria: completion,
+      qualityChecks: qualityChecks,
       risks: [
         ...analysis.criteria
             .where((c) => c.score <= 2)
@@ -214,6 +231,7 @@ class BusinessPlanningService {
       checksum: checksum,
       sourceFileName: fileName,
       status: status,
+      contract: contract,
     );
   }
 

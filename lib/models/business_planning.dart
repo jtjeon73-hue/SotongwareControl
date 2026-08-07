@@ -2,8 +2,10 @@
 library;
 
 import 'artifact_type.dart';
+import 'instruction_contract.dart';
 
 export 'artifact_type.dart';
+export 'instruction_contract.dart';
 
 class DeliverableType {
   static const app = 'app';
@@ -653,6 +655,7 @@ class WorkInstruction {
     this.checksum = '',
     this.sourceFileName = '',
     this.status = '',
+    this.contract,
   });
 
   final String schemaVersion;
@@ -687,6 +690,9 @@ class WorkInstruction {
   final String sourceFileName;
   final String status;
 
+  /// schema 1.1+ 표준 Contract (레거시 1.0은 null 가능).
+  final InstructionContract? contract;
+
   Map<String, dynamic> toJson() => {
     'schemaVersion': schemaVersion,
     'instructionId': instructionId,
@@ -720,6 +726,7 @@ class WorkInstruction {
     'checksum': checksum,
     'sourceFileName': sourceFileName,
     if (status.isNotEmpty) 'status': status,
+    if (contract != null) ...contract!.toNestedJson(),
   };
 
   factory WorkInstruction.fromJson(
@@ -781,6 +788,7 @@ class WorkInstruction {
     checksum: '${json['checksum'] ?? ''}',
     sourceFileName: '${json['sourceFileName'] ?? ''}',
     status: '${json['status'] ?? ''}',
+    contract: InstructionContract.tryParse(json),
   );
 }
 
@@ -900,6 +908,9 @@ class BusinessPlanDocument {
     this.lastTransferChecksum,
     this.lastTransferMode,
     this.versionHistory = const [],
+    this.favorite = false,
+    this.libraryFolder = '',
+    this.tags = const [],
   });
 
   final String id;
@@ -918,6 +929,9 @@ class BusinessPlanDocument {
   final String? lastTransferChecksum;
   final String? lastTransferMode;
   final List<PlanVersionSnapshot> versionHistory;
+  final bool favorite;
+  final String libraryFolder;
+  final List<String> tags;
 
   bool get hasInstruction => instruction != null;
 
@@ -968,6 +982,9 @@ class BusinessPlanDocument {
     String? lastTransferChecksum,
     String? lastTransferMode,
     List<PlanVersionSnapshot>? versionHistory,
+    bool? favorite,
+    String? libraryFolder,
+    List<String>? tags,
   }) {
     return BusinessPlanDocument(
       id: id,
@@ -986,6 +1003,9 @@ class BusinessPlanDocument {
       lastTransferChecksum: lastTransferChecksum ?? this.lastTransferChecksum,
       lastTransferMode: lastTransferMode ?? this.lastTransferMode,
       versionHistory: versionHistory ?? this.versionHistory,
+      favorite: favorite ?? this.favorite,
+      libraryFolder: libraryFolder ?? this.libraryFolder,
+      tags: tags ?? this.tags,
     );
   }
 
@@ -1008,6 +1028,9 @@ class BusinessPlanDocument {
       'lastTransferChecksum': lastTransferChecksum,
     if (lastTransferMode != null) 'lastTransferMode': lastTransferMode,
     'versionHistory': versionHistory.map((e) => e.toJson()).toList(),
+    'favorite': favorite,
+    if (libraryFolder.isNotEmpty) 'libraryFolder': libraryFolder,
+    if (tags.isNotEmpty) 'tags': tags,
   };
 
   factory BusinessPlanDocument.fromJson(Map<String, dynamic> json) {
@@ -1071,6 +1094,9 @@ class BusinessPlanDocument {
               )
               .toList() ??
           const [],
+      favorite: json['favorite'] == true,
+      libraryFolder: '${json['libraryFolder'] ?? ''}',
+      tags: (json['tags'] as List?)?.map((e) => '$e').toList() ?? const [],
     );
   }
 }

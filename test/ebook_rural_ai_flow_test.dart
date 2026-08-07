@@ -75,10 +75,11 @@ void main() {
 
     expect(v1.instructionId, iid);
     expect(v1.instructionVersion, '1');
-    expect(v1.schemaVersion, '1.0');
+    expect(v1.schemaVersion, '1.1');
     expect(v1.artifactType, ArtifactType.ebook);
     expect(v1.primaryTrack, 'ebook_dev');
     expect(v1.followUpTracks, isNotEmpty);
+    expect(v1.contract, isNotNull);
 
     final provisional = Map<String, dynamic>.from(v1.toJson())
       ..remove('checksum');
@@ -207,9 +208,10 @@ void main() {
 
     expect(json['instructionId'], 'wi_test_rural_ai');
     expect(json['instructionVersion'], '1');
-    expect(json['schemaVersion'], '1.0');
+    expect(json['schemaVersion'], '1.1');
     expect(json['artifactType'], ArtifactType.ebook);
     expect(json['primaryTrack'], 'ebook_dev');
+    expect(json['projectDefinition'], isA<Map>());
     expect(json['status'], isNotEmpty);
     expect(json['checksum'], 'abc123');
   });
