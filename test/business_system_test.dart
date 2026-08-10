@@ -126,14 +126,14 @@ void main() {
   test('통합 메뉴 목적지', () {
     expect(ControlDestination.dashboardOverview.label, '전체 사업 현황');
     expect(ControlDestination.divisionProgress.label, '사업부별 진행상태');
-    expect(ControlDestination.aiBusinessAnalysis.label, '사업기획·작업지시');
-    expect(ControlDestination.businessStudy.label, '사업전략연구실');
-    expect(ControlDestination.webMarketing.label, '웹마케팅개발사업부');
-    expect(ControlDestination.siteManager.label, '소통사이트매니저개발사업부');
-    expect(ControlDestination.industrialAutomation.label, '산업자동화SW개발사업부');
-    expect(ControlDestination.appDevelopment.label, '앱개발사업부');
-    expect(ControlDestination.ebook.label, '전자책개발사업부');
-    expect(ControlDestination.youtubeContent.label, '콘텐츠개발사업부');
+    expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
+    expect(ControlDestination.businessStudy.label, '사업 전략연구실');
+    expect(ControlDestination.webMarketing.label, '마케팅사이트 개발부');
+    expect(ControlDestination.siteManager.label, '지식사이트 개발부');
+    expect(ControlDestination.industrialAutomation.label, '산업자동화SW개발부');
+    expect(ControlDestination.appDevelopment.label, '앱 개발부');
+    expect(ControlDestination.ebook.label, '전자책 개발부');
+    expect(ControlDestination.youtubeContent.label, '컨텐츠 개발부');
   });
 
   for (final width in [360.0, 390.0, 430.0, 768.0, 1024.0, 1440.0]) {

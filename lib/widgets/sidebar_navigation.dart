@@ -38,6 +38,14 @@ enum ControlDestination {
   businessStudy,
   publicServices,
   adminData,
+  // Canonical IA 재구성 — 신규
+  productWorkshop,
+  autoPromotion,
+  autoSales,
+  autoFinance,
+  systemSettings,
+  alertCenter,
+  ideaBank,
 }
 
 extension ControlDestinationX on ControlDestination {
@@ -72,7 +80,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.aiTaxAccountingDept:
         return 'AI세무회계부';
       case ControlDestination.aiBusinessAnalysis:
-        return '사업기획·작업지시';
+        return '작업지시 제작소';
       case ControlDestination.operationsAnalysis:
         return '운영 분석';
       case ControlDestination.portfolioHub:
@@ -96,23 +104,37 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.sotong24work:
         return '소통24워크';
       case ControlDestination.industrialAutomation:
-        return '산업자동화SW개발사업부';
+        return '산업자동화SW개발부';
       case ControlDestination.appDevelopment:
-        return '앱개발사업부';
+        return '앱 개발부';
       case ControlDestination.youtubeContent:
-        return '콘텐츠개발사업부';
+        return '컨텐츠 개발부';
       case ControlDestination.ebook:
-        return '전자책개발사업부';
+        return '전자책 개발부';
       case ControlDestination.onlineExpansion:
         return '온라인판매/확장(보관)';
       case ControlDestination.webMarketing:
-        return '웹마케팅개발사업부';
+        return '마케팅사이트 개발부';
       case ControlDestination.siteManager:
-        return '소통사이트매니저개발사업부';
+        return '지식사이트 개발부';
       case ControlDestination.businessStudy:
-        return '사업전략연구실';
+        return '사업 전략연구실';
       case ControlDestination.publicServices:
         return '공개 서비스';
+      case ControlDestination.productWorkshop:
+        return '제품제작 공작실';
+      case ControlDestination.autoPromotion:
+        return '자동 홍보 전략실';
+      case ControlDestination.autoSales:
+        return '자동판매전략실';
+      case ControlDestination.autoFinance:
+        return '수익세금 자동 재무실';
+      case ControlDestination.systemSettings:
+        return '시스템 설정';
+      case ControlDestination.alertCenter:
+        return '알람센터';
+      case ControlDestination.ideaBank:
+        return '뉴 아이디어 뱅크';
     }
   }
 
@@ -188,6 +210,20 @@ extension ControlDestinationX on ControlDestination {
         return Icons.menu_book_outlined;
       case ControlDestination.publicServices:
         return Icons.public_outlined;
+      case ControlDestination.productWorkshop:
+        return Icons.handyman_outlined;
+      case ControlDestination.autoPromotion:
+        return Icons.campaign_outlined;
+      case ControlDestination.autoSales:
+        return Icons.storefront_outlined;
+      case ControlDestination.autoFinance:
+        return Icons.account_balance_outlined;
+      case ControlDestination.systemSettings:
+        return Icons.settings_outlined;
+      case ControlDestination.alertCenter:
+        return Icons.notifications_outlined;
+      case ControlDestination.ideaBank:
+        return Icons.lightbulb_outline;
     }
   }
 
@@ -248,27 +284,23 @@ class SidebarNavigation extends StatelessWidget {
   final ValueChanged<ControlDestination> onDestinationSelected;
   final VoidCallback? onClose;
 
-  static const _commandHub = [
-    ControlDestination.dashboardOverview,
-    ControlDestination.divisionProgress,
-    ControlDestination.deployedSites,
-  ];
-
-  static const _aiDepartments = [
-    ControlDestination.aiBusinessAnalysis,
-    ControlDestination.operationsAnalysis,
-    ControlDestination.portfolioHub,
-  ];
-
-  static const _study = [ControlDestination.businessStudy];
-
-  static const _divisions = [
+  /// Canonical IA — 섹션 구분 없이 이 순서만 노출.
+  static const canonicalDestinations = <ControlDestination>[
     ControlDestination.industrialAutomation,
-    ControlDestination.appDevelopment,
     ControlDestination.ebook,
-    ControlDestination.youtubeContent,
-    ControlDestination.webMarketing,
+    ControlDestination.appDevelopment,
     ControlDestination.siteManager,
+    ControlDestination.webMarketing,
+    ControlDestination.youtubeContent,
+    ControlDestination.aiBusinessAnalysis,
+    ControlDestination.productWorkshop,
+    ControlDestination.autoPromotion,
+    ControlDestination.autoSales,
+    ControlDestination.autoFinance,
+    ControlDestination.systemSettings,
+    ControlDestination.alertCenter,
+    ControlDestination.businessStudy,
+    ControlDestination.ideaBank,
   ];
 
   @override
@@ -285,44 +317,38 @@ class SidebarNavigation extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SotongBrandIcon(size: 44),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '소통총관제',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '데이터 기반 운영 관제',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  fontSize: 11,
-                                  color: ControlColors.textMuted,
-                                ),
-                          ),
-                        ],
+                const SotongBrandIcon(size: 40),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '소통총관제',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
                       ),
-                    ),
-                    if (onClose != null)
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: onClose,
-                        visualDensity: VisualDensity.compact,
+                      const SizedBox(height: 2),
+                      Text(
+                        'AI 사업 운영 본부',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: 11,
+                          color: ControlColors.textMuted,
+                        ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
+                if (onClose != null)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: onClose,
+                    visualDensity: VisualDensity.compact,
+                  ),
               ],
             ),
           ),
@@ -331,9 +357,8 @@ class SidebarNavigation extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
               children: [
-                const _SectionLabel(label: '소통총관제'),
-                ..._commandHub.map(
-                  (d) => _NavItem(
+                for (final d in canonicalDestinations)
+                  _NavItem(
                     destination: d,
                     isSelected: d == selected,
                     onTap: () {
@@ -341,103 +366,22 @@ class SidebarNavigation extends StatelessWidget {
                       onClose?.call();
                     },
                   ),
-                ),
-                const SizedBox(height: 8),
-                const _SectionLabel(label: '소통AI대표부'),
-                ..._aiDepartments.map(
-                  (d) => _NavItem(
-                    destination: d,
-                    isSelected: d == selected,
-                    onTap: () {
-                      onDestinationSelected(d);
-                      onClose?.call();
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const _SectionLabel(label: '소통사업스터디부'),
-                ..._study.map(
-                  (d) => _NavItem(
-                    destination: d,
-                    isSelected: d == selected,
-                    onTap: () {
-                      onDestinationSelected(d);
-                      onClose?.call();
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const _SectionLabel(label: '소통사업부'),
-                ..._divisions.map(
-                  (d) => _NavItem(
-                    destination: d,
-                    isSelected: d == selected,
-                    onTap: () {
-                      onDestinationSelected(d);
-                      onClose?.call();
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const _SectionLabel(label: '운영 도구'),
-                _NavItem(
-                  destination: ControlDestination.adminData,
-                  isSelected: selected == ControlDestination.adminData,
-                  onTap: () {
-                    onDestinationSelected(ControlDestination.adminData);
-                    onClose?.call();
-                  },
-                ),
               ],
             ),
           ),
           const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 12,
-                  color: ControlColors.textMuted,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Sotong Control · AI 관제',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontSize: 10,
-                      color: ControlColors.textMuted,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.all(14),
+            child: Text(
+              'Sotong Control · AI 관제',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 10,
+                color: ControlColors.textMuted,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontSize: 10,
-          color: ControlColors.textMuted,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.6,
-        ),
       ),
     );
   }
@@ -457,7 +401,7 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1),
       child: Material(
         color: isSelected ? ControlColors.tealSoft : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
@@ -465,7 +409,7 @@ class _NavItem extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             child: Row(
               children: [
                 Icon(
@@ -475,7 +419,7 @@ class _NavItem extends StatelessWidget {
                       ? ControlColors.teal
                       : ControlColors.textSecondary,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     destination.label,

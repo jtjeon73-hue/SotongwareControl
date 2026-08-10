@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../models/business_planning.dart';
 import '../models/dev_work_doc_status.dart';
+import '../models/idea_bank.dart';
 import '../models/planning_wizard_state.dart';
 import '../models/project_design_state.dart';
 import '../services/browser_json_download_service.dart';
@@ -26,9 +27,12 @@ import '../widgets/project_design/instruction_preview_panel.dart';
 import '../widgets/project_design/plan_library_panel.dart';
 import '../widgets/project_design/project_design_wizard.dart';
 
-/// AI 사업분석 내 「사업 기획·작업지시」 탭 (로컬 규칙 기반, 외부 AI 없음).
+/// 작업지시 제작소 본문 (로컬 규칙 기반, 외부 AI 없음).
 class BusinessPlanningTab extends StatefulWidget {
-  const BusinessPlanningTab({super.key});
+  const BusinessPlanningTab({super.key, this.ideaSeed});
+
+  /// 뉴 아이디어 뱅크에서 전달. 새 기획으로만 적용(기존 active 덮어쓰지 않음).
+  final IdeaToPlanningSeed? ideaSeed;
 
   @override
   State<BusinessPlanningTab> createState() => _BusinessPlanningTabState();
@@ -167,8 +171,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           }
         }
       });
+      _consumeIdeaSeedIfNeeded();
     } catch (_) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant BusinessPlanningTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.ideaSeed != oldWidget.ideaSeed) {
+      _appliedIdeaSeedId = null;
+      _consumeIdeaSeedIfNeeded();
     }
   }
 
@@ -2021,8 +2035,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
-  void _startNewPlan() {
+  void _startNewPlan({IdeaToPlanningSeed? seed}) {
     FocusManager.instance.primaryFocus?.unfocus();
+    final s = seed ?? widget.ideaSeed;
     setState(() {
       _activePlanId = null;
       _instructionId = null;
@@ -2033,9 +2048,38 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _inputModeQuick = true;
       _wizardState = PlanningWizardState(mode: 'quick');
       _designState = ProjectDesignState();
-      _applyInput(const BusinessPlanInput());
+      if (s != null && s.title.trim().isNotEmpty) {
+        final notes = [
+          if (s.description.trim().isNotEmpty) s.description.trim(),
+          if (s.field.trim().isNotEmpty) '상품/분야: ${s.field.trim()}',
+          if (s.memo.trim().isNotEmpty) s.memo.trim(),
+        ].join('\n');
+        _applyInput(
+          BusinessPlanInput(
+            topic: s.title.trim(),
+            targetCustomer: s.targetCustomer.trim(),
+            notes: notes,
+          ),
+        );
+      } else {
+        _applyInput(const BusinessPlanInput());
+      }
     });
     _persistDraft();
+    if (s != null && s.title.trim().isNotEmpty) {
+      _snack('아이디어「${s.title}」을(를) 새 기획으로 불러왔습니다.');
+    }
+  }
+
+  String? _appliedIdeaSeedId;
+
+  void _consumeIdeaSeedIfNeeded() {
+    final s = widget.ideaSeed;
+    if (s == null || s.title.trim().isEmpty) return;
+    final key = '${s.title}|${s.targetCustomer}|${s.memo}';
+    if (_appliedIdeaSeedId == key) return;
+    _appliedIdeaSeedId = key;
+    _startNewPlan(seed: s);
   }
 
   void _showValidationIssues() {

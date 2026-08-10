@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
+import 'data/business_departments/business_department_catalog.dart';
 import 'data/sample_business_data.dart';
+import 'models/idea_bank.dart';
 import 'screens/action_items_screen.dart';
 import 'screens/admin_data_screen.dart';
 import 'screens/ai_business_analysis_screen.dart';
+import 'screens/alert_center_screen.dart';
+import 'screens/auto_finance_screen.dart';
+import 'screens/auto_promotion_screen.dart';
+import 'screens/auto_sales_screen.dart';
 import 'screens/operations_analysis_screen.dart';
 import 'screens/ai_ops_department_screen.dart';
+import 'screens/business_department/business_department_screen.dart';
 import 'screens/business_division_progress_screen.dart';
 import 'screens/business_overview_screen.dart';
 import 'screens/business_study_screen.dart';
 import 'screens/business_unit_ops_screen.dart';
 import 'screens/deployed_sites_screen.dart';
+import 'screens/idea_bank_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
+import 'screens/product_workshop_screen.dart';
 import 'screens/public_services_screen.dart';
 import 'screens/portfolio_hub_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
@@ -20,6 +29,7 @@ import 'screens/study/study_ai_teacher_screen.dart';
 import 'screens/study/study_courses_screen.dart';
 import 'screens/study/study_dashboard_screen.dart';
 import 'screens/study/study_notes_and_more_screens.dart';
+import 'screens/system_settings_screen.dart';
 import 'services/auth_service.dart';
 import 'state/control_scope.dart';
 import 'state/control_state.dart';
@@ -66,11 +76,24 @@ class ControlCenterShell extends StatefulWidget {
 }
 
 class _ControlCenterShellState extends State<ControlCenterShell> {
-  ControlDestination _selected = ControlDestination.dashboardOverview;
+  ControlDestination _selected = ControlDestination.aiBusinessAnalysis;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  IdeaToPlanningSeed? _ideaSeed;
 
   void _onDestinationSelected(ControlDestination destination) {
-    setState(() => _selected = destination);
+    setState(() {
+      _selected = destination;
+      if (destination != ControlDestination.aiBusinessAnalysis) {
+        _ideaSeed = null;
+      }
+    });
+  }
+
+  void _sendIdeaToWorkInstruction(IdeaToPlanningSeed seed) {
+    setState(() {
+      _ideaSeed = seed;
+      _selected = ControlDestination.aiBusinessAnalysis;
+    });
   }
 
   String get _pageTitle => _selected.label;
@@ -94,25 +117,13 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       ),
     );
     if (confirmed == true) {
-      setState(() => _selected = ControlDestination.dashboardOverview);
+      setState(() {
+        _selected = ControlDestination.aiBusinessAnalysis;
+        _ideaSeed = null;
+      });
       await widget.authService.signOut();
     }
   }
-
-  static const _ebookPlan = [
-    '전자책 주제 선정',
-    '목표 독자 설정',
-    '제목 후보 작성',
-    '목차 구성',
-    '자료 수집',
-    '본문 초안 작성',
-    'AI 검토 및 보완',
-    '표지 제작',
-    'PDF 및 EPUB 제작',
-    '가격 및 판매 채널 결정',
-    '상품 소개 페이지 제작',
-    '판매 등록 및 홍보',
-  ];
 
   Widget _buildContent() {
     switch (_selected) {
@@ -173,7 +184,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           roleSummary: '실제 등록 금액만 표시합니다. 확정 신고 결과가 아닌 관리 참고 정보입니다.',
         );
       case ControlDestination.aiBusinessAnalysis:
-        return const AiBusinessAnalysisScreen();
+        return AiBusinessAnalysisScreen(
+          key: ValueKey(_ideaSeed?.title ?? 'wi_default'),
+          ideaSeed: _ideaSeed,
+        );
       case ControlDestination.operationsAnalysis:
         return const OperationsAnalysisScreen();
       case ControlDestination.portfolioHub:
@@ -200,25 +214,20 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.sotong24work:
         return const Sotong24WorkScreen();
       case ControlDestination.industrialAutomation:
-        return const BusinessUnitOpsScreen(
-          businessUnitId: 'industrial_automation',
-          fallbackTitle: '산업자동화SW개발사업부',
+        return BusinessDepartmentScreen(
+          config: BusinessDepartmentCatalog.industrial,
         );
       case ControlDestination.appDevelopment:
-        return const BusinessUnitOpsScreen(
-          businessUnitId: 'app_development',
-          fallbackTitle: '앱개발사업부',
+        return BusinessDepartmentScreen(
+          config: BusinessDepartmentCatalog.app,
         );
       case ControlDestination.youtubeContent:
-        return const BusinessUnitOpsScreen(
-          businessUnitId: 'content_music',
-          fallbackTitle: '콘텐츠개발사업부',
+        return BusinessDepartmentScreen(
+          config: BusinessDepartmentCatalog.contents,
         );
       case ControlDestination.ebook:
-        return const BusinessUnitOpsScreen(
-          businessUnitId: 'ebook',
-          fallbackTitle: '전자책개발사업부',
-          recommendedPlan: _ebookPlan,
+        return BusinessDepartmentScreen(
+          config: BusinessDepartmentCatalog.ebook,
         );
       case ControlDestination.onlineExpansion:
         return const BusinessUnitOpsScreen(
@@ -226,19 +235,33 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           fallbackTitle: '온라인판매/확장',
         );
       case ControlDestination.webMarketing:
-        return const BusinessUnitOpsScreen(
-          businessUnitId: 'web_marketing',
-          fallbackTitle: '웹마케팅개발사업부',
+        return BusinessDepartmentScreen(
+          config: BusinessDepartmentCatalog.marketingSite,
         );
       case ControlDestination.siteManager:
-        return const BusinessUnitOpsScreen(
-          businessUnitId: 'site_manager',
-          fallbackTitle: '소통사이트매니저개발사업부',
+        return BusinessDepartmentScreen(
+          config: BusinessDepartmentCatalog.knowledgeSite,
         );
       case ControlDestination.businessStudy:
         return const BusinessStudyScreen();
       case ControlDestination.publicServices:
         return const PublicServicesScreen();
+      case ControlDestination.productWorkshop:
+        return const ProductWorkshopScreen();
+      case ControlDestination.autoPromotion:
+        return const AutoPromotionScreen();
+      case ControlDestination.autoSales:
+        return const AutoSalesScreen();
+      case ControlDestination.autoFinance:
+        return const AutoFinanceScreen();
+      case ControlDestination.systemSettings:
+        return SystemSettingsScreen(onNavigate: _onDestinationSelected);
+      case ControlDestination.alertCenter:
+        return AlertCenterScreen(onNavigate: _onDestinationSelected);
+      case ControlDestination.ideaBank:
+        return IdeaBankScreen(
+          onSendToWorkInstruction: _sendIdeaToWorkInstruction,
+        );
     }
   }
 
@@ -318,76 +341,69 @@ class _ControlHeader extends StatelessWidget {
     final showStatusBadge = screenWidth >= 420;
     final showSiteName = screenWidth >= 720;
 
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        color: ControlColors.surface,
-        border: Border(
-          bottom: BorderSide(color: ControlColors.border, width: 1),
+    return Material(
+      color: ControlColors.surface,
+      elevation: 0,
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: ControlColors.border)),
         ),
-      ),
-      child: Row(
-        children: [
-          if (showMenuButton)
-            IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: onMenuPressed,
-              visualDensity: VisualDensity.compact,
-            ),
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (showStatusBadge) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: ControlColors.tealSoft,
-                borderRadius: BorderRadius.circular(20),
+        child: Row(
+          children: [
+            if (showMenuButton)
+              IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: onMenuPressed,
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SotongBrandIcon(compact: true, size: 18, padding: 0),
-                  SizedBox(width: 6),
-                  Text(
-                    '소통총관제',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: ControlColors.teal,
-                      fontWeight: FontWeight.w600,
-                    ),
+            const SotongBrandIcon(size: 28),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (showSiteName)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  SampleBusinessData.siteTitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: ControlColors.textMuted,
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          if (showSiteName) ...[
-            Text(
-              '관리자',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontSize: 12,
-                color: ControlColors.textMuted,
+            if (showStatusBadge)
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: ControlColors.tealSoft,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  '운영',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                ),
               ),
+            IconButton(
+              tooltip: '로그아웃',
+              onPressed: onSignOut,
+              icon: const Icon(Icons.logout),
             ),
-            const SizedBox(width: 4),
+            TextButton(
+              onPressed: onSignOut,
+              child: const Text('로그아웃'),
+            ),
           ],
-          TextButton.icon(
-            onPressed: onSignOut,
-            icon: const Icon(Icons.logout, size: 16),
-            label: const Text('로그아웃'),
-            style: TextButton.styleFrom(
-              foregroundColor: ControlColors.textSecondary,
-              textStyle: const TextStyle(fontSize: 12),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

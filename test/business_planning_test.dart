@@ -25,8 +25,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('메뉴 라벨은 사업기획·작업지시이다', () {
-    expect(ControlDestination.aiBusinessAnalysis.label, '사업기획·작업지시');
+  test('메뉴 라벨은 작업지시 제작소이다', () {
+    expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
   });
 
   test('사업부 숫자는 카탈로그에서 자동 계산된다', () {
@@ -255,7 +255,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('사업기획 · 작업지시'), findsOneWidget);
+    expect(find.text('작업지시 제작소'), findsOneWidget);
     expect(find.textContaining('Project Design Engine'), findsWidgets);
     expect(find.text('설계 엔진'), findsOneWidget);
     expect(find.text('전자책'), findsWidgets);

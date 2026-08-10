@@ -49,6 +49,8 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
   var _quickFilter = _QuickFilter.recommend;
   var _loading = true;
   var _tocExpanded = true;
+  var _listCollapsed = false;
+  var _fullscreenReading = false;
   double? _savedListOffset;
 
   @override
@@ -323,22 +325,23 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
           },
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              isWide ? 24 : 16,
-              16,
-              isWide ? 24 : 16,
-              16,
+              isWide ? (_fullscreenReading ? 12 : 24) : 12,
+              _fullscreenReading ? 8 : (isWide ? 12 : 8),
+              isWide ? (_fullscreenReading ? 12 : 24) : 12,
+              8,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ReadingHeader(
-                  total: allStrategyArticles.length,
-                  reading: _readingCount,
-                  reviewed: _reviewedCount,
-                  favorites: _favorites.length,
-                ),
-                if (showList) ...[
-                  const SizedBox(height: 12),
+                if (!_fullscreenReading)
+                  _ReadingHeader(
+                    total: allStrategyArticles.length,
+                    reading: _readingCount,
+                    reviewed: _reviewedCount,
+                    favorites: _favorites.length,
+                  ),
+                if (showList && !_fullscreenReading) ...[
+                  const SizedBox(height: 8),
                   _FilterRow(
                     searchController: _searchController,
                     categoryFilter: _categoryFilter,
@@ -349,25 +352,59 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
                         setState(() => _quickFilter = v),
                   ),
                 ],
-                const SizedBox(height: 12),
+                if (isWide && selected != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () =>
+                            setState(() => _listCollapsed = !_listCollapsed),
+                        icon: Icon(
+                          _listCollapsed
+                              ? Icons.view_sidebar_outlined
+                              : Icons.view_sidebar,
+                          size: 18,
+                        ),
+                        label: Text(_listCollapsed ? '목록 펼치기' : '목록 접기'),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => setState(
+                          () => _fullscreenReading = !_fullscreenReading,
+                        ),
+                        icon: Icon(
+                          _fullscreenReading
+                              ? Icons.fullscreen_exit
+                              : Icons.fullscreen,
+                          size: 18,
+                        ),
+                        label: Text(
+                          _fullscreenReading ? '일반 보기' : '전체화면 읽기',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 8),
                 Expanded(
                   child: isWide
                       ? Row(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            SizedBox(
-                              width: 340,
-                              child: _ArticleList(
-                                articles: _filteredArticles,
-                                selectedId: selected?.id,
-                                statuses: _statuses,
-                                favorites: _favorites,
-                                scrollController: _listScrollController,
-                                onSelect: (id) =>
-                                    _selectArticle(id, isWide: true),
+                            if (!_listCollapsed && !_fullscreenReading) ...[
+                              SizedBox(
+                                width: 300,
+                                child: _ArticleList(
+                                  articles: _filteredArticles,
+                                  selectedId: selected?.id,
+                                  statuses: _statuses,
+                                  favorites: _favorites,
+                                  scrollController: _listScrollController,
+                                  onSelect: (id) =>
+                                      _selectArticle(id, isWide: true),
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 20),
+                              const SizedBox(width: 12),
+                            ],
                             Expanded(
                               child: selected == null
                                   ? const SizedBox.shrink()
@@ -383,7 +420,8 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
                                       memo: _memos[selected.id] ?? '',
                                       applyNote: _applyNotes[selected.id] ?? '',
                                       actionChecks: _actionChecks,
-                                      tocExpanded: _tocExpanded,
+                                      tocExpanded:
+                                          _fullscreenReading ? false : _tocExpanded,
                                       onTocExpanded: (v) =>
                                           setState(() => _tocExpanded = v),
                                       onBack: null,
@@ -394,6 +432,7 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
                                       onToggleAction: _toggleAction,
                                       onNavigate: _navigateArticle,
                                       onScrollToSection: _scrollToSection,
+                                      compactChrome: _fullscreenReading,
                                     ),
                             ),
                           ],
@@ -419,6 +458,7 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
                           onToggleAction: _toggleAction,
                           onNavigate: _navigateArticle,
                           onScrollToSection: _scrollToSection,
+                          compactChrome: true,
                         )
                       : _ArticleList(
                           articles: _filteredArticles,
@@ -848,6 +888,7 @@ class _ReadingPane extends StatefulWidget {
     required this.onToggleAction,
     required this.onNavigate,
     required this.onScrollToSection,
+    this.compactChrome = false,
   });
 
   final StrategyArticle article;
@@ -868,6 +909,7 @@ class _ReadingPane extends StatefulWidget {
   final Future<void> Function(String id, int index, bool value) onToggleAction;
   final void Function(int delta) onNavigate;
   final void Function(String sectionId) onScrollToSection;
+  final bool compactChrome;
 
   @override
   State<_ReadingPane> createState() => _ReadingPaneState();
@@ -927,11 +969,13 @@ class _ReadingPaneState extends State<_ReadingPane> {
 
     return Material(
       color: ControlColors.surface,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(widget.compactChrome ? 0 : 14),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: ControlColors.border),
+          borderRadius: BorderRadius.circular(widget.compactChrome ? 0 : 14),
+          border: widget.compactChrome
+              ? null
+              : Border.all(color: ControlColors.border),
         ),
         child: Column(
           children: [
@@ -947,10 +991,17 @@ class _ReadingPaneState extends State<_ReadingPane> {
             Expanded(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 920),
+                  constraints: BoxConstraints(
+                    maxWidth: widget.compactChrome ? 1100 : 920,
+                  ),
                   child: ListView(
                     controller: widget.scrollController,
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                    padding: EdgeInsets.fromLTRB(
+                      widget.compactChrome ? 12 : 20,
+                      widget.compactChrome ? 8 : 12,
+                      widget.compactChrome ? 12 : 20,
+                      widget.compactChrome ? 20 : 32,
+                    ),
                     children: [
                       Text(
                         article.title,
