@@ -130,10 +130,7 @@ void main() {
 
     expect(find.text('목록으로 돌아가기'), findsOneWidget);
     expect(find.text('사업전략연구실'), findsNothing);
-    expect(
-      find.text('엄선된 전략 글을 읽고, 판단하고, 내 사업에 적용하는 독서 공간'),
-      findsNothing,
-    );
+    expect(find.text('엄선된 전략 글을 읽고, 판단하고, 내 사업에 적용하는 독서 공간'), findsNothing);
 
     await tester.tap(find.text('목록으로 돌아가기'));
     await tester.pumpAndSettle();

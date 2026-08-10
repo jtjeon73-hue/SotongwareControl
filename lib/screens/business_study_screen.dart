@@ -546,13 +546,14 @@ class _ReadingHeader extends StatelessWidget {
       children: [
         Text(
           '사업전략연구실',
-          style: (compact
-                  ? Theme.of(context).textTheme.titleLarge
-                  : Theme.of(context).textTheme.headlineSmall)
-              ?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: ControlColors.textPrimary,
-          ),
+          style:
+              (compact
+                      ? Theme.of(context).textTheme.titleLarge
+                      : Theme.of(context).textTheme.headlineSmall)
+                  ?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: ControlColors.textPrimary,
+                  ),
         ),
         if (!compact) ...[
           const SizedBox(height: 4),
@@ -1045,13 +1046,14 @@ class _ReadingPaneState extends State<_ReadingPane> {
                     children: [
                       Text(
                         article.title,
-                        style: (widget.compactChrome
-                                ? Theme.of(context).textTheme.titleLarge
-                                : Theme.of(context).textTheme.headlineSmall)
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              height: 1.35,
-                            ),
+                        style:
+                            (widget.compactChrome
+                                    ? Theme.of(context).textTheme.titleLarge
+                                    : Theme.of(context).textTheme.headlineSmall)
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.35,
+                                ),
                       ),
                       SizedBox(height: widget.compactChrome ? 6 : 10),
                       Text(
