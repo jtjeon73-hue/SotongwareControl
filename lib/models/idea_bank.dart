@@ -115,25 +115,25 @@ class IdeaBankItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'oneLiner': oneLiner,
-        'targetCustomer': targetCustomer,
-        'product': product,
-        'aiUse': aiUse,
-        'revenueMethod': revenueMethod,
-        'difficulty': difficulty,
-        'initialCost': initialCost,
-        'automationPotential': automationPotential,
-        'recommendReason': recommendReason,
-        'status': status,
-        'memo': memo,
-        'createdAt': createdAt,
-        'updatedAt': updatedAt,
-        'year': year,
-        'month': month,
-        'favorite': favorite,
-      };
+    'id': id,
+    'title': title,
+    'oneLiner': oneLiner,
+    'targetCustomer': targetCustomer,
+    'product': product,
+    'aiUse': aiUse,
+    'revenueMethod': revenueMethod,
+    'difficulty': difficulty,
+    'initialCost': initialCost,
+    'automationPotential': automationPotential,
+    'recommendReason': recommendReason,
+    'status': status,
+    'memo': memo,
+    'createdAt': createdAt,
+    'updatedAt': updatedAt,
+    'year': year,
+    'month': month,
+    'favorite': favorite,
+  };
 
   factory IdeaBankItem.fromJson(Map<String, dynamic> json) {
     return IdeaBankItem(

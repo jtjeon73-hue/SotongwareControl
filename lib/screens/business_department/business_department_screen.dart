@@ -17,9 +17,9 @@ class BusinessDepartmentScreen extends StatelessWidget {
       children: [
         Text(
           config.title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 4),
         Text(
@@ -65,9 +65,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
     );
   }
 }
@@ -79,8 +79,10 @@ class _LinkedSites extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (sites.isEmpty) {
-      return const Text('등록된 연동 사이트가 없습니다.',
-          style: TextStyle(color: ControlColors.textMuted));
+      return const Text(
+        '등록된 연동 사이트가 없습니다.',
+        style: TextStyle(color: ControlColors.textMuted),
+      );
     }
     if (sites.length == 1) {
       final s = sites.first;
@@ -127,12 +129,7 @@ class _AccordCard extends StatelessWidget {
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(body),
-          ),
-        ],
+        children: [Align(alignment: Alignment.centerLeft, child: Text(body))],
       ),
     );
   }
@@ -156,24 +153,36 @@ class _SiteStatusCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(site.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-          Text('${site.serviceName} · ${site.status}',
-              style: const TextStyle(
-                  fontSize: 12, color: ControlColors.textMuted)),
+          Text(
+            '${site.serviceName} · ${site.status}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: ControlColors.textMuted,
+            ),
+          ),
           if (site.lastChecked.isNotEmpty)
-            Text('마지막 확인: ${site.lastChecked}',
-                style: const TextStyle(fontSize: 12)),
+            Text(
+              '마지막 확인: ${site.lastChecked}',
+              style: const TextStyle(fontSize: 12),
+            ),
           if (site.contentStatus.isNotEmpty)
-            Text('콘텐츠: ${site.contentStatus}',
-                style: const TextStyle(fontSize: 12)),
+            Text(
+              '콘텐츠: ${site.contentStatus}',
+              style: const TextStyle(fontSize: 12),
+            ),
           if (site.mainFeatures.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text('주요 기능: ${site.mainFeatures.join(', ')}',
-                style: const TextStyle(fontSize: 12)),
+            Text(
+              '주요 기능: ${site.mainFeatures.join(', ')}',
+              style: const TextStyle(fontSize: 12),
+            ),
           ],
           if (site.improvements.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text('개선 필요: ${site.improvements.join(', ')}',
-                style: const TextStyle(fontSize: 12)),
+            Text(
+              '개선 필요: ${site.improvements.join(', ')}',
+              style: const TextStyle(fontSize: 12),
+            ),
           ],
           const SizedBox(height: 8),
           TextButton.icon(

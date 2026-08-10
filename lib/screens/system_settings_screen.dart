@@ -10,10 +10,7 @@ import 'public_services_screen.dart';
 
 /// 시스템 설정 허브 — 기존 관리 화면을 섹션으로 흡수.
 class SystemSettingsScreen extends StatelessWidget {
-  const SystemSettingsScreen({
-    super.key,
-    required this.onNavigate,
-  });
+  const SystemSettingsScreen({super.key, required this.onNavigate});
 
   final ValueChanged<ControlDestination> onNavigate;
 
@@ -29,11 +26,12 @@ class SystemSettingsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('시스템 설정',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  '시스템 설정',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 4),
                 const Text(
                   '소통총관제 운영에 필요한 설정·연결·점검 정보를 모읍니다.',
@@ -102,7 +100,9 @@ class _GeneralTab extends StatelessWidget {
         ),
         const ListTile(
           title: Text('브라우저 권한'),
-          subtitle: Text('File System Access는 Chromium 계열에서 DevWorkDoc/Inbox에 사용'),
+          subtitle: Text(
+            'File System Access는 Chromium 계열에서 DevWorkDoc/Inbox에 사용',
+          ),
         ),
       ],
     );
@@ -129,8 +129,10 @@ class _SitesTab extends StatelessWidget {
             ),
           ),
         const Divider(),
-        const Text('전체 배포사이트 화면',
-            style: TextStyle(fontWeight: FontWeight.w600)),
+        const Text(
+          '전체 배포사이트 화면',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
         const SizedBox(height: 360, child: DeployedSitesScreen()),
       ],
@@ -147,7 +149,10 @@ class _StatusTab extends StatelessWidget {
     Widget row(String name, String status, Color color) {
       return ListTile(
         title: Text(name),
-        trailing: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+        trailing: Text(
+          status,
+          style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        ),
       );
     }
 

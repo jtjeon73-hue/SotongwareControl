@@ -40,9 +40,9 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen>
             children: [
               Text(
                 '제품제작 공작실',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               const Text(
@@ -54,9 +54,9 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen>
               const SizedBox(height: 14),
               Text(
                 '상품 Lifecycle',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -74,17 +74,20 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen>
                       side: const BorderSide(color: ControlColors.border),
                     ),
                     if (i < ProductLifecycle.stages.length - 1)
-                      const Icon(Icons.arrow_forward, size: 14,
-                          color: ControlColors.textMuted),
+                      const Icon(
+                        Icons.arrow_forward,
+                        size: 14,
+                        color: ControlColors.textMuted,
+                      ),
                   ],
                 ],
               ),
               const SizedBox(height: 16),
               Text(
                 '사업부별 제작단계',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               TabBar(
@@ -123,13 +126,19 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('소통24워크 현재 개발 상태',
-              style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text(
+            '소통24워크 현재 개발 상태',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 6),
           Text('자동화 수준: ${Sotong24WorkStatusCatalog.automationLevel}'),
-          Text('버전/상태: ${Sotong24WorkStatusCatalog.versionNote}',
-              style: const TextStyle(
-                  fontSize: 12, color: ControlColors.textMuted)),
+          Text(
+            '버전/상태: ${Sotong24WorkStatusCatalog.versionNote}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: ControlColors.textMuted,
+            ),
+          ),
           const SizedBox(height: 8),
           _bullet('지원 artifact', Sotong24WorkStatusCatalog.supportedArtifacts),
           _bullet('구현 완료', Sotong24WorkStatusCatalog.completed),
@@ -143,8 +152,10 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen>
   Widget _bullet(String title, List<String> items) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Text('$title: ${items.join(' · ')}',
-          style: const TextStyle(fontSize: 12)),
+      child: Text(
+        '$title: ${items.join(' · ')}',
+        style: const TextStyle(fontSize: 12),
+      ),
     );
   }
 }
@@ -159,9 +170,13 @@ class _PlaybookView extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8, bottom: 16),
       children: [
         if (playbook.notes.isNotEmpty)
-          Text(playbook.notes,
-              style: const TextStyle(
-                  fontSize: 12, color: ControlColors.textMuted)),
+          Text(
+            playbook.notes,
+            style: const TextStyle(
+              fontSize: 12,
+              color: ControlColors.textMuted,
+            ),
+          ),
         for (final s in playbook.steps)
           Card(
             margin: const EdgeInsets.only(bottom: 8),
@@ -171,10 +186,14 @@ class _PlaybookView extends StatelessWidget {
               side: const BorderSide(color: ControlColors.border),
             ),
             child: ExpansionTile(
-              title: Text('${s.number}. ${s.name}',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text('자동화: ${s.automationLevel}',
-                  style: const TextStyle(fontSize: 12)),
+              title: Text(
+                '${s.number}. ${s.name}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                '자동화: ${s.automationLevel}',
+                style: const TextStyle(fontSize: 12),
+              ),
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
               children: [
                 _kv('목적', s.purpose),
@@ -192,19 +211,20 @@ class _PlaybookView extends StatelessWidget {
   }
 
   Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text.rich(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: Text.rich(
+        TextSpan(
+          children: [
             TextSpan(
-              children: [
-                TextSpan(
-                    text: '$k: ',
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                TextSpan(text: v),
-              ],
+              text: '$k: ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-          ),
+            TextSpan(text: v),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }

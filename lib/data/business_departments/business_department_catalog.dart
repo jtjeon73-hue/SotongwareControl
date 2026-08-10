@@ -6,10 +6,7 @@ class BusinessDepartmentCatalog {
   BusinessDepartmentCatalog._();
 
   static BusinessDepartmentConfig byId(String id) {
-    return all.firstWhere(
-      (c) => c.id == id,
-      orElse: () => industrial,
-    );
+    return all.firstWhere((c) => c.id == id, orElse: () => industrial);
   }
 
   static final all = <BusinessDepartmentConfig>[
@@ -39,12 +36,31 @@ class BusinessDepartmentCatalog {
       ),
     ],
     knowledge: [
-      KnowledgeItem(title: '사업 정의', body: '생산라인 모니터링, PLC/MES 연동, Vision 검사, 데이터 수집·설비 통신을 포함한 산업용 소프트웨어 개발.'),
-      KnowledgeItem(title: '주요 고객', body: '제조업체, 시스템 통합업체, 설비·자동화 업체, 스마트공장 구축업체.'),
-      KnowledgeItem(title: '해결하는 문제', body: '현장 데이터 파편화, 품질 이력 미비, 설비 장애 대응 지연, OT/IT 단절.'),
-      KnowledgeItem(title: '핵심 기술', body: 'Modbus, OPC UA, MES, Vision, 생산이력, 품질 데이터, 유지보수.'),
-      KnowledgeItem(title: '핵심 상품', body: '모니터링 솔루션, 조립툴/검사 SW, 데이터 수집 게이트웨이, 관제 대시보드.'),
-      KnowledgeItem(title: '수익이 발생하는 방식', body: '프로젝트 개발비, 설비당 라이선스, 유지보수·연간 계약, 업그레이드·현장 지원.'),
+      KnowledgeItem(
+        title: '사업 정의',
+        body:
+            '생산라인 모니터링, PLC/MES 연동, Vision 검사, 데이터 수집·설비 통신을 포함한 산업용 소프트웨어 개발.',
+      ),
+      KnowledgeItem(
+        title: '주요 고객',
+        body: '제조업체, 시스템 통합업체, 설비·자동화 업체, 스마트공장 구축업체.',
+      ),
+      KnowledgeItem(
+        title: '해결하는 문제',
+        body: '현장 데이터 파편화, 품질 이력 미비, 설비 장애 대응 지연, OT/IT 단절.',
+      ),
+      KnowledgeItem(
+        title: '핵심 기술',
+        body: 'Modbus, OPC UA, MES, Vision, 생산이력, 품질 데이터, 유지보수.',
+      ),
+      KnowledgeItem(
+        title: '핵심 상품',
+        body: '모니터링 솔루션, 조립툴/검사 SW, 데이터 수집 게이트웨이, 관제 대시보드.',
+      ),
+      KnowledgeItem(
+        title: '수익이 발생하는 방식',
+        body: '프로젝트 개발비, 설비당 라이선스, 유지보수·연간 계약, 업그레이드·현장 지원.',
+      ),
       KnowledgeItem(title: '주요 경쟁 요소', body: '현장 적합성, 안정성, 통신 호환, 납품·유지보수 신뢰.'),
     ],
     trends: TrendSummary(
@@ -93,9 +109,15 @@ class BusinessDepartmentCatalog {
       ),
     ],
     knowledge: const [
-      KnowledgeItem(title: '사업 정의', body: '주제 선정부터 집필·검수·PDF·표지·판매·홍보·업데이트까지 전자책 전 주기.'),
+      KnowledgeItem(
+        title: '사업 정의',
+        body: '주제 선정부터 집필·검수·PDF·표지·판매·홍보·업데이트까지 전자책 전 주기.',
+      ),
       KnowledgeItem(title: '주요 고객', body: '귀촌·부업·실무 학습 등 구체 문제를 가진 독자.'),
-      KnowledgeItem(title: '해결하는 문제', body: '정보가 흩어져 실행이 어려운 독자에게 검증된 실행 가이드 제공.'),
+      KnowledgeItem(
+        title: '해결하는 문제',
+        body: '정보가 흩어져 실행이 어려운 독자에게 검증된 실행 가이드 제공.',
+      ),
       KnowledgeItem(title: '핵심 기술', body: '목차 설계, AI 집필 보조, 편집·디자인, PDF/EPUB.'),
       KnowledgeItem(title: '핵심 상품', body: '단권 전자책, 패키지, 강의 연계 콘텐츠.'),
       KnowledgeItem(title: '수익이 발생하는 방식', body: '단권 판매, 패키지, 상담·강의 연계, 라이선스.'),
@@ -139,12 +161,24 @@ class BusinessDepartmentCatalog {
       ),
     ],
     knowledge: const [
-      KnowledgeItem(title: '사업 정의', body: '고객 문제 → 기능설계 → UI/UX → Flutter/Firebase → 스토어 → 운영.'),
+      KnowledgeItem(
+        title: '사업 정의',
+        body: '고객 문제 → 기능설계 → UI/UX → Flutter/Firebase → 스토어 → 운영.',
+      ),
       KnowledgeItem(title: '주요 고객', body: '일반 사용자, 소상공인, 기업용·니치 앱 수요.'),
-      KnowledgeItem(title: '해결하는 문제', body: '반복 업무·정보 관리·현장 기록 등 모바일로 해결 가능한 문제.'),
-      KnowledgeItem(title: '핵심 기술', body: 'Flutter, Firebase, Android, 수익화, 스토어 등록.'),
+      KnowledgeItem(
+        title: '해결하는 문제',
+        body: '반복 업무·정보 관리·현장 기록 등 모바일로 해결 가능한 문제.',
+      ),
+      KnowledgeItem(
+        title: '핵심 기술',
+        body: 'Flutter, Firebase, Android, 수익화, 스토어 등록.',
+      ),
       KnowledgeItem(title: '핵심 상품', body: '니치앱, 구독형 앱, 기업용 앱, 광고 기반 무료앱.'),
-      KnowledgeItem(title: '수익이 발생하는 방식', body: '광고, 유료 다운로드, 인앱, 구독, 기업 라이선스, 개발대행.'),
+      KnowledgeItem(
+        title: '수익이 발생하는 방식',
+        body: '광고, 유료 다운로드, 인앱, 구독, 기업 라이선스, 개발대행.',
+      ),
       KnowledgeItem(title: '주요 경쟁 요소', body: '문제 적합성, UX, 안정성, 업데이트 속도.'),
     ],
     trends: const TrendSummary(
@@ -192,7 +226,10 @@ class BusinessDepartmentCatalog {
       ),
     ],
     knowledge: const [
-      KnowledgeItem(title: '사업 정의', body: '전문분야 선정, 콘텐츠 구조, 검색·카테고리·SEO, 학습·정보 갱신.'),
+      KnowledgeItem(
+        title: '사업 정의',
+        body: '전문분야 선정, 콘텐츠 구조, 검색·카테고리·SEO, 학습·정보 갱신.',
+      ),
       KnowledgeItem(title: '주요 고객', body: '특정 분야를 학습·검색하는 사용자, 전문 서비스 리드.'),
       KnowledgeItem(title: '해결하는 문제', body: '흩어진 전문 정보의 구조화와 신뢰 가능한 진입점.'),
       KnowledgeItem(title: '핵심 기술', body: '정보 구조, SEO, 검색, 콘텐츠 운영.'),
@@ -238,12 +275,18 @@ class BusinessDepartmentCatalog {
       ),
     ],
     knowledge: const [
-      KnowledgeItem(title: '사업 정의', body: '랜딩페이지, CTA, 고객 전환, 상품 설명, 후기, 신뢰 요소, 문의·분석.'),
+      KnowledgeItem(
+        title: '사업 정의',
+        body: '랜딩페이지, CTA, 고객 전환, 상품 설명, 후기, 신뢰 요소, 문의·분석.',
+      ),
       KnowledgeItem(title: '주요 고객', body: '상품·서비스를 홍보하려는 사업자, 자체 상품 런칭.'),
       KnowledgeItem(title: '해결하는 문제', body: '방문은 있으나 전환이 약한 홍보·판매 페이지.'),
       KnowledgeItem(title: '핵심 기술', body: '카피, 레이아웃, 분석, A/B, 리드 관리.'),
       KnowledgeItem(title: '핵심 상품', body: '랜딩 제작, 관리, 광고대행, 월구독형 운영.'),
-      KnowledgeItem(title: '수익이 발생하는 방식', body: '제작비, 관리비, 광고대행, 성과 수수료, SaaS 월구독.'),
+      KnowledgeItem(
+        title: '수익이 발생하는 방식',
+        body: '제작비, 관리비, 광고대행, 성과 수수료, SaaS 월구독.',
+      ),
       KnowledgeItem(title: '주요 경쟁 요소', body: '전환율, 메시지 명확성, 속도.'),
     ],
     trends: const TrendSummary(
@@ -284,12 +327,18 @@ class BusinessDepartmentCatalog {
       ),
     ],
     knowledge: const [
-      KnowledgeItem(title: '사업 정의', body: '아이디어·가사·음악·영상·쇼츠·썸네일·제목·SEO·업로드·저작권.'),
+      KnowledgeItem(
+        title: '사업 정의',
+        body: '아이디어·가사·음악·영상·쇼츠·썸네일·제목·SEO·업로드·저작권.',
+      ),
       KnowledgeItem(title: '주요 고객', body: '시청자, 브랜드 홍보 수요, 자체 상품 유입.'),
       KnowledgeItem(title: '해결하는 문제', body: '메시지가 없는 홍보, 반복 제작 비용.'),
       KnowledgeItem(title: '핵심 기술', body: 'AI 음악/영상/음성, 편집, Shorts SEO.'),
       KnowledgeItem(title: '핵심 상품', body: '쇼츠, 일반 영상, 음원, 홍보 콘텐츠.'),
-      KnowledgeItem(title: '수익이 발생하는 방식', body: 'YouTube 광고, 음원, 콘텐츠 판매, 제휴, 상품 유입, 제작 대행.'),
+      KnowledgeItem(
+        title: '수익이 발생하는 방식',
+        body: 'YouTube 광고, 음원, 콘텐츠 판매, 제휴, 상품 유입, 제작 대행.',
+      ),
       KnowledgeItem(title: '주요 경쟁 요소', body: '훅, 썸네일, 꾸준한 업로드, 저작권 안전.'),
     ],
     trends: const TrendSummary(
@@ -311,15 +360,7 @@ class BusinessDepartmentCatalog {
       offline: ['행사·공연 연계'],
     ),
     revenue: const RevenueModelSummary(
-      items: [
-        'YouTube 광고',
-        '음원',
-        '콘텐츠 판매',
-        '홍보 수익',
-        '제휴',
-        '상품 유입',
-        '제작 대행',
-      ],
+      items: ['YouTube 광고', '음원', '콘텐츠 판매', '홍보 수익', '제휴', '상품 유입', '제작 대행'],
     ),
   );
 }

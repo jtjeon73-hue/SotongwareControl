@@ -34,22 +34,24 @@ class AutoSalesScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        Text('자동판매전략실',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          '자동판매전략실',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 4),
         const Text(
           '상품 완성 후 판매 전략을 체계적으로 관리합니다. 결제 API 연동은 이번 범위가 아닙니다.',
           style: TextStyle(color: ControlColors.textSecondary),
         ),
         const SizedBox(height: 16),
-        Text('기본 구성',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          '기본 구성',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 6,
@@ -64,11 +66,12 @@ class AutoSalesScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        Text('artifact별 판매 채널',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          'artifact별 판매 채널',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         for (final e in _byArtifact.entries)
           Card(
@@ -79,7 +82,10 @@ class AutoSalesScreen extends StatelessWidget {
               side: const BorderSide(color: ControlColors.border),
             ),
             child: ListTile(
-              title: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w600)),
+              title: Text(
+                e.key,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
               subtitle: Text(e.value.join(' · ')),
             ),
           ),

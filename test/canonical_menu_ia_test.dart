@@ -35,10 +35,7 @@ void main() {
   });
 
   test('작업지시 제작소 라벨은 aiBusinessAnalysis에 매핑된다', () {
-    expect(
-      ControlDestination.aiBusinessAnalysis.label,
-      '작업지시 제작소',
-    );
+    expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
   });
 
   test('6개 사업부 config가 로드되고 필수 섹션을 가진다', () {

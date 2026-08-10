@@ -218,9 +218,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           config: BusinessDepartmentCatalog.industrial,
         );
       case ControlDestination.appDevelopment:
-        return BusinessDepartmentScreen(
-          config: BusinessDepartmentCatalog.app,
-        );
+        return BusinessDepartmentScreen(config: BusinessDepartmentCatalog.app);
       case ControlDestination.youtubeContent:
         return BusinessDepartmentScreen(
           config: BusinessDepartmentCatalog.contents,
@@ -364,9 +362,9 @@ class _ControlHeader extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
             ),
             if (showSiteName)
@@ -382,8 +380,7 @@ class _ControlHeader extends StatelessWidget {
             if (showStatusBadge)
               Container(
                 margin: const EdgeInsets.only(right: 8),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: ControlColors.tealSoft,
                   borderRadius: BorderRadius.circular(999),
@@ -398,10 +395,7 @@ class _ControlHeader extends StatelessWidget {
               onPressed: onSignOut,
               icon: const Icon(Icons.logout),
             ),
-            TextButton(
-              onPressed: onSignOut,
-              child: const Text('로그아웃'),
-            ),
+            TextButton(onPressed: onSignOut, child: const Text('로그아웃')),
           ],
         ),
       ),

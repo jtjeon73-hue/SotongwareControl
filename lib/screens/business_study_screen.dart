@@ -377,9 +377,7 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
                               : Icons.fullscreen,
                           size: 18,
                         ),
-                        label: Text(
-                          _fullscreenReading ? '일반 보기' : '전체화면 읽기',
-                        ),
+                        label: Text(_fullscreenReading ? '일반 보기' : '전체화면 읽기'),
                       ),
                     ],
                   ),
@@ -420,8 +418,9 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
                                       memo: _memos[selected.id] ?? '',
                                       applyNote: _applyNotes[selected.id] ?? '',
                                       actionChecks: _actionChecks,
-                                      tocExpanded:
-                                          _fullscreenReading ? false : _tocExpanded,
+                                      tocExpanded: _fullscreenReading
+                                          ? false
+                                          : _tocExpanded,
                                       onTocExpanded: (v) =>
                                           setState(() => _tocExpanded = v),
                                       onBack: null,

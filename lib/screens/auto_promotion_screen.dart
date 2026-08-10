@@ -15,13 +15,7 @@ class AutoPromotionScreen extends StatelessWidget {
     '산업자동화 제품/서비스',
   ];
 
-  static const _channels = [
-    'SNS',
-    'YouTube',
-    'Blog',
-    'SEO',
-    '광고',
-  ];
+  static const _channels = ['SNS', 'YouTube', 'Blog', 'SEO', '광고'];
 
   static const _remedies = [
     ('유입 부족', '제목 변경'),
@@ -35,11 +29,12 @@ class AutoPromotionScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        Text('자동 홍보 전략실',
-            style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          '자동 홍보 전략실',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 4),
         const Text(
           '상품 완성 후 자동·반자동 홍보 전략을 설계·관리합니다. 실제 광고 API 집행은 하지 않습니다.',
@@ -59,11 +54,12 @@ class AutoPromotionScreen extends StatelessWidget {
           '개선대책',
         ]),
         const SizedBox(height: 12),
-        Text('홍보 보완대책',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          '홍보 보완대책',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 8),
         for (final r in _remedies)
           Card(
@@ -117,11 +113,12 @@ class AutoPromotionScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 6),
         for (final i in items)
           ListTile(

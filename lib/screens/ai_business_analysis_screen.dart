@@ -19,8 +19,7 @@ class AiBusinessAnalysisScreen extends StatelessWidget {
         children: [
           const PageHero(
             title: '작업지시 제작소',
-            subtitle:
-                '아이디어를 선택하면 AI 설계 엔진이 고객·주제·제작·검토까지 도와 최고의 작업지시서를 만듭니다.',
+            subtitle: '아이디어를 선택하면 AI 설계 엔진이 고객·주제·제작·검토까지 도와 최고의 작업지시서를 만듭니다.',
             badge: 'Project Design Engine',
             compact: true,
           ),

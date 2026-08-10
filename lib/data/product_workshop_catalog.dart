@@ -58,10 +58,7 @@ class Sotong24WorkStatusCatalog {
     'DevWorkDoc Active/Versions',
     'Sotong24Work Inbox 전달',
   ];
-  static const partial = [
-    '전자책 다단계 제작 파이프라인',
-    'checksum·버전 복구',
-  ];
+  static const partial = ['전자책 다단계 제작 파이프라인', 'checksum·버전 복구'];
   static const upcoming = [
     'artifact별 전문가급 제작 단계 자동화',
     '검수·승인 UI 연동',

@@ -5,10 +5,7 @@ import '../services/idea_bank_store.dart';
 import '../theme/control_theme.dart';
 
 class IdeaBankScreen extends StatefulWidget {
-  const IdeaBankScreen({
-    super.key,
-    this.onSendToWorkInstruction,
-  });
+  const IdeaBankScreen({super.key, this.onSendToWorkInstruction});
 
   final ValueChanged<IdeaToPlanningSeed>? onSendToWorkInstruction;
 
@@ -61,10 +58,12 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
     }
     if (_topOnly) {
       list = list
-          .where((e) =>
-              e.favorite ||
-              e.status == IdeaBankStatuses.planningCandidate ||
-              e.status == IdeaBankStatuses.sentToWorkOrder)
+          .where(
+            (e) =>
+                e.favorite ||
+                e.status == IdeaBankStatuses.planningCandidate ||
+                e.status == IdeaBankStatuses.sentToWorkOrder,
+          )
           .toList();
     }
     if (_recentOnly) {
@@ -244,7 +243,10 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
                       value: _yearFilter,
                       hint: const Text('연도'),
                       items: [
-                        const DropdownMenuItem(value: null, child: Text('전체 연도')),
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('전체 연도'),
+                        ),
                         for (final y in _years)
                           DropdownMenuItem(value: y, child: Text('$y')),
                       ],
@@ -258,12 +260,12 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
                       value: _monthFilter,
                       hint: const Text('월'),
                       items: [
-                        const DropdownMenuItem(value: null, child: Text('전체 월')),
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('전체 월'),
+                        ),
                         for (var m = 1; m <= 12; m++)
-                          DropdownMenuItem(
-                            value: m,
-                            child: Text('$m월'),
-                          ),
+                          DropdownMenuItem(value: m, child: Text('$m월')),
                       ],
                       onChanged: (v) => setState(() => _monthFilter = v),
                     ),
@@ -296,85 +298,81 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : visible.isEmpty
-                  ? const Center(
-                      child: Text(
-                        '아이디어가 없습니다. 추가 버튼으로 시작하세요.',
-                        style: TextStyle(color: ControlColors.textMuted),
+              ? const Center(
+                  child: Text(
+                    '아이디어가 없습니다. 추가 버튼으로 시작하세요.',
+                    style: TextStyle(color: ControlColors.textMuted),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: visible.length,
+                  itemBuilder: (context, i) {
+                    final item = visible[i];
+                    return Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: const BorderSide(color: ControlColors.border),
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(12),
-                      itemCount: visible.length,
-                      itemBuilder: (context, i) {
-                        final item = visible[i];
-                        return Card(
-                          elevation: 0,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: const BorderSide(color: ControlColors.border),
-                          ),
-                          child: ListTile(
-                            title: Text(
-                              item.title,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              '${item.year}-${item.month.toString().padLeft(2, '0')} · '
-                              '${IdeaBankStatuses.labelKo(item.status)} · '
-                              '${item.oneLiner.isEmpty ? (item.product.isEmpty ? '-' : item.product) : item.oneLiner}',
-                            ),
-                            trailing: Wrap(
-                              spacing: 0,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    item.favorite
-                                        ? Icons.star
-                                        : Icons.star_border,
+                      child: ListTile(
+                        title: Text(
+                          item.title,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          '${item.year}-${item.month.toString().padLeft(2, '0')} · '
+                          '${IdeaBankStatuses.labelKo(item.status)} · '
+                          '${item.oneLiner.isEmpty ? (item.product.isEmpty ? '-' : item.product) : item.oneLiner}',
+                        ),
+                        trailing: Wrap(
+                          spacing: 0,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                item.favorite ? Icons.star : Icons.star_border,
+                              ),
+                              onPressed: () async {
+                                await _store.upsert(
+                                  item.copyWith(
+                                    favorite: !item.favorite,
+                                    updatedAt: DateTime.now()
+                                        .toUtc()
+                                        .toIso8601String(),
                                   ),
-                                  onPressed: () async {
-                                    await _store.upsert(
-                                      item.copyWith(
-                                        favorite: !item.favorite,
-                                        updatedAt: DateTime.now()
-                                            .toUtc()
-                                            .toIso8601String(),
-                                      ),
-                                    );
-                                    await _reload();
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined),
-                                  onPressed: () => _editIdea(item),
-                                ),
-                                IconButton(
-                                  tooltip: '작업지시 제작소로 보내기',
-                                  icon: const Icon(Icons.send_outlined),
-                                  onPressed: widget.onSendToWorkInstruction ==
-                                          null
-                                      ? null
-                                      : () {
-                                          widget.onSendToWorkInstruction!(
-                                            IdeaToPlanningSeed(
-                                              title: item.title,
-                                              targetCustomer:
-                                                  item.targetCustomer,
-                                              field: item.product,
-                                              description: item.oneLiner,
-                                              memo: item.memo,
-                                            ),
-                                          );
-                                        },
-                                ),
-                              ],
+                                );
+                                await _reload();
+                              },
                             ),
-                            onTap: () => _editIdea(item),
-                          ),
-                        );
-                      },
-                    ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () => _editIdea(item),
+                            ),
+                            IconButton(
+                              tooltip: '작업지시 제작소로 보내기',
+                              icon: const Icon(Icons.send_outlined),
+                              onPressed: widget.onSendToWorkInstruction == null
+                                  ? null
+                                  : () {
+                                      widget.onSendToWorkInstruction!(
+                                        IdeaToPlanningSeed(
+                                          title: item.title,
+                                          targetCustomer: item.targetCustomer,
+                                          field: item.product,
+                                          description: item.oneLiner,
+                                          memo: item.memo,
+                                        ),
+                                      );
+                                    },
+                            ),
+                          ],
+                        ),
+                        onTap: () => _editIdea(item),
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
