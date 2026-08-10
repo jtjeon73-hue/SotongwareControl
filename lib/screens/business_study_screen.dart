@@ -48,7 +48,7 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
   var _searchQuery = '';
   var _quickFilter = _QuickFilter.recommend;
   var _loading = true;
-  var _tocExpanded = true;
+  var _tocExpanded = false;
   var _listCollapsed = false;
   var _fullscreenReading = false;
   double? _savedListOffset;
@@ -181,7 +181,11 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
           ? _listScrollController.offset
           : null;
     }
-    setState(() => _selectedId = id);
+    setState(() {
+      _selectedId = id;
+      // 모바일 본문에서는 목차를 접어 첫 화면부터 읽기 공간을 확보한다.
+      if (!isWide) _tocExpanded = false;
+    });
     await _store.saveLastOpenedId(id);
     final status = _statuses[id] ?? 'unread';
     if (status == 'unread') {
@@ -306,6 +310,9 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
         // 데스크톱: 항상 본문 표시. 모바일: 선택 시에만 상세.
         final showDetail = isWide || selected != null;
         final showList = isWide || selected == null;
+        // 모바일 본문 읽기 중에는 통계 헤더를 숨겨 읽기 영역을 확보한다.
+        final readingOnMobile = !isWide && showDetail && selected != null;
+        final showReadingHeader = !_fullscreenReading && !readingOnMobile;
 
         return Focus(
           autofocus: true,
@@ -326,22 +333,25 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               isWide ? (_fullscreenReading ? 12 : 24) : 12,
-              _fullscreenReading ? 8 : (isWide ? 12 : 8),
+              readingOnMobile
+                  ? 4
+                  : (_fullscreenReading ? 8 : (isWide ? 12 : 8)),
               isWide ? (_fullscreenReading ? 12 : 24) : 12,
               8,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (!_fullscreenReading)
+                if (showReadingHeader)
                   _ReadingHeader(
                     total: allStrategyArticles.length,
                     reading: _readingCount,
                     reviewed: _reviewedCount,
                     favorites: _favorites.length,
+                    compact: !isWide,
                   ),
                 if (showList && !_fullscreenReading) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: isWide ? 8 : 6),
                   _FilterRow(
                     searchController: _searchController,
                     categoryFilter: _categoryFilter,
@@ -382,7 +392,7 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
                     ],
                   ),
                 ],
-                const SizedBox(height: 8),
+                if (!readingOnMobile) const SizedBox(height: 8),
                 Expanded(
                   child: isWide
                       ? Row(
@@ -483,68 +493,94 @@ class _ReadingHeader extends StatelessWidget {
     required this.reading,
     required this.reviewed,
     required this.favorites,
+    this.compact = false,
   });
 
   final int total;
   final int reading;
   final int reviewed;
   final int favorites;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final progress = total == 0 ? 0.0 : reviewed / total;
+    final progressLabel = '진행 ${(progress * 100).round()}%';
+    final stats = <Widget>[
+      _StatChip(label: '전체', value: '$total편'),
+      _StatChip(label: '읽는 중', value: '$reading'),
+      _StatChip(label: '읽기 완료', value: '$reviewed'),
+      _StatChip(label: '즐겨찾기', value: '$favorites'),
+      if (compact)
+        _StatChip(label: '진행', value: '${(progress * 100).round()}%')
+      else
+        SizedBox(
+          width: 140,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                progressLabel,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textMuted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 6,
+                  backgroundColor: ControlColors.border,
+                  color: ControlColors.teal,
+                ),
+              ),
+            ],
+          ),
+        ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '사업전략연구실',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          style: (compact
+                  ? Theme.of(context).textTheme.titleLarge
+                  : Theme.of(context).textTheme.headlineSmall)
+              ?.copyWith(
             fontWeight: FontWeight.w800,
             color: ControlColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          '엄선된 전략 글을 읽고, 판단하고, 내 사업에 적용하는 독서 공간',
-          style: TextStyle(color: ControlColors.textSecondary, height: 1.4),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            _StatChip(label: '전체', value: '$total편'),
-            _StatChip(label: '읽는 중', value: '$reading'),
-            _StatChip(label: '읽기 완료', value: '$reviewed'),
-            _StatChip(label: '즐겨찾기', value: '$favorites'),
-            SizedBox(
-              width: 140,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '진행 ${(progress * 100).round()}%',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: ControlColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: ControlColors.border,
-                      color: ControlColors.teal,
-                    ),
-                  ),
+        if (!compact) ...[
+          const SizedBox(height: 4),
+          const Text(
+            '엄선된 전략 글을 읽고, 판단하고, 내 사업에 적용하는 독서 공간',
+            style: TextStyle(color: ControlColors.textSecondary, height: 1.4),
+          ),
+        ],
+        SizedBox(height: compact ? 8 : 12),
+        if (compact)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (var i = 0; i < stats.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  stats[i],
                 ],
-              ),
+              ],
             ),
-          ],
-        ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: stats,
+          ),
       ],
     );
   }
@@ -985,6 +1021,11 @@ class _ReadingPaneState extends State<_ReadingPane> {
                   onPressed: widget.onBack,
                   icon: const Icon(Icons.arrow_back, size: 18),
                   label: const Text('목록으로 돌아가기'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                 ),
               ),
             Expanded(
@@ -997,28 +1038,31 @@ class _ReadingPaneState extends State<_ReadingPane> {
                     controller: widget.scrollController,
                     padding: EdgeInsets.fromLTRB(
                       widget.compactChrome ? 12 : 20,
-                      widget.compactChrome ? 8 : 12,
+                      widget.compactChrome ? 4 : 12,
                       widget.compactChrome ? 12 : 20,
                       widget.compactChrome ? 20 : 32,
                     ),
                     children: [
                       Text(
                         article.title,
-                        style: Theme.of(context).textTheme.headlineSmall
+                        style: (widget.compactChrome
+                                ? Theme.of(context).textTheme.titleLarge
+                                : Theme.of(context).textTheme.headlineSmall)
                             ?.copyWith(
                               fontWeight: FontWeight.w800,
                               height: 1.35,
                             ),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: widget.compactChrome ? 6 : 10),
                       Text(
                         article.whyRead,
                         style: _bodyStyle.copyWith(
                           color: ControlColors.textSecondary,
-                          fontSize: 15,
+                          fontSize: widget.compactChrome ? 14 : 15,
+                          height: widget.compactChrome ? 1.55 : 1.75,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: widget.compactChrome ? 8 : 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 6,
@@ -1035,16 +1079,17 @@ class _ReadingPaneState extends State<_ReadingPane> {
                             icon: Icons.signal_cellular_alt,
                             label: article.difficulty,
                           ),
-                          _MetaPill(
-                            icon: Icons.person_outline,
-                            label: article.audience,
-                          ),
+                          if (!widget.compactChrome)
+                            _MetaPill(
+                              icon: Icons.person_outline,
+                              label: article.audience,
+                            ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: widget.compactChrome ? 12 : 16),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(14),
+                        padding: EdgeInsets.all(widget.compactChrome ? 10 : 14),
                         decoration: BoxDecoration(
                           color: ControlColors.surfaceMuted,
                           borderRadius: BorderRadius.circular(10),
@@ -1061,19 +1106,29 @@ class _ReadingPaneState extends State<_ReadingPane> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Text(article.keyQuestion, style: _bodyStyle),
+                            Text(
+                              article.keyQuestion,
+                              style: _bodyStyle.copyWith(
+                                fontSize: widget.compactChrome ? 15 : 16.5,
+                                height: widget.compactChrome ? 1.55 : 1.75,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: widget.compactChrome ? 8 : 16),
                       Theme(
                         data: Theme.of(
                           context,
                         ).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
+                          key: ValueKey('toc-${article.id}'),
                           initiallyExpanded: widget.tocExpanded,
                           onExpansionChanged: widget.onTocExpanded,
                           tilePadding: EdgeInsets.zero,
+                          visualDensity: widget.compactChrome
+                              ? VisualDensity.compact
+                              : VisualDensity.standard,
                           title: const Text(
                             '목차',
                             style: TextStyle(fontWeight: FontWeight.w700),
@@ -1115,7 +1170,7 @@ class _ReadingPaneState extends State<_ReadingPane> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: widget.compactChrome ? 4 : 8),
                       for (final section in article.readingSections) ...[
                         KeyedSubtree(
                           key: widget.sectionKeys[section.id],

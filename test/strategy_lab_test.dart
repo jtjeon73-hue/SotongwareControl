@@ -109,7 +109,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('사업전략연구실'), findsOneWidget);
     expect(find.textContaining('연구 주제를 선택하세요'), findsNothing);
     expect(find.textContaining('왼쪽에서'), findsNothing);
     // 추천/첫 글 본문 제목 중 하나가 보여야 함
@@ -117,6 +116,28 @@ void main() {
       (t) => find.text(t).evaluate().isNotEmpty,
     );
     expect(anyTitleVisible, isTrue);
+  });
+
+  testWidgets('모바일 본문 읽기 중에는 통계 헤더를 숨긴다', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: BusinessStudyScreen())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('목록으로 돌아가기'), findsOneWidget);
+    expect(find.text('사업전략연구실'), findsNothing);
+    expect(
+      find.text('엄선된 전략 글을 읽고, 판단하고, 내 사업에 적용하는 독서 공간'),
+      findsNothing,
+    );
+
+    await tester.tap(find.text('목록으로 돌아가기'));
+    await tester.pumpAndSettle();
+    expect(find.text('사업전략연구실'), findsOneWidget);
   });
 
   testWidgets('검색과 카테고리 필터가 동작한다', (tester) async {
