@@ -4,7 +4,7 @@
  * Firestore upsert (Admin SDK).
  * - allowlist 필드만 merge
  * - 동일 projectId/stageId 재전송 idempotent
- * - requests 컬렉션은 읽기/쓰기하지 않음 (이번 단계)
+ * - requests 쓰기는 하지 않음 (request_poll은 reader.js 읽기 전용)
  */
 async function upsertProject(db, project) {
   const ref = db.collection("sotong24work_projects").doc(project.projectId);

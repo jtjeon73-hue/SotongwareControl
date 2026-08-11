@@ -4,10 +4,16 @@ const { assertRelayAuth } = require("./auth");
 const {
   pickProjectAllowlist,
   pickStageAllowlist,
+  pickRequestAllowlist,
+  parseRequestPollInput,
+  assertProjectStageAlignment,
   assertOperations,
+  sortRequestsNewestFirst,
   reject,
+  REQUEST_POLL_MAX_READ,
 } = require("./validate");
 const { upsertProject, upsertStages } = require("./writer");
+const { getProjectDoc, listRequestDocs } = require("./reader");
 const { createRateLimiter } = require("./rate_limit");
 
 const MAX_BODY_BYTES = 100 * 1024;
@@ -81,12 +87,62 @@ async function handleRelayRequest(req, res, deps) {
       return;
     }
 
+    // --- request_poll: read-only (no project/stage/request writes) ---
+    if (operation === "request_poll") {
+      const poll = parseRequestPollInput(body);
+      const projectData = await getProjectDoc(db, poll.projectId);
+      if (!projectData) {
+        reject("not-found", "project_not_found", 404);
+      }
+      if (projectData.isDemo === true) {
+        reject("permission-denied", "demo_project_blocked", 403);
+      }
+      assertProjectStageAlignment(
+        projectData,
+        poll.currentStageId,
+        poll.productType
+      );
+
+      const rawDocs = await listRequestDocs(db, poll.projectId, {
+        maxRead: REQUEST_POLL_MAX_READ,
+      });
+      const requests = rawDocs
+        .map((row) =>
+          pickRequestAllowlist(row.data, {
+            docId: row.id,
+            expectedProjectId: poll.projectId,
+            currentStageId: poll.currentStageId,
+          })
+        )
+        .filter(Boolean)
+        .sort(sortRequestsNewestFirst)
+        .slice(0, poll.limit);
+
+      safeLog({
+        op: operation,
+        projectId: poll.projectId,
+        result: "ok",
+      });
+      res.status(200).json({
+        ok: true,
+        operation,
+        projectId: poll.projectId,
+        currentStageId: poll.currentStageId,
+        requests,
+        serverReceivedAt: serverNowIso,
+        elapsedMs: Date.now() - started,
+      });
+      return;
+    }
+
     let projectInput = body.project;
     if (!projectInput && body.projectId) {
       projectInput = { ...body };
       delete projectInput.operation;
       delete projectInput.stages;
       delete projectInput.stage;
+      delete projectInput.currentStageId;
+      delete projectInput.limit;
     }
 
     if (operation === "heartbeat") {

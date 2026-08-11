@@ -16,7 +16,34 @@ const MAX_STR = {
   stageName: 120,
   iso: 40,
   generic: 200,
+  /** Flutter 보완 메시지 — UI maxLength 없음, summary와 동일 상한 */
+  message: 2000,
 };
+
+/** Flutter Sotong24RemoteRequest.requestType */
+const REQUEST_TYPES = new Set(["approve", "revision_request"]);
+
+/**
+ * PC가 처리할 수 있는 request.status.
+ * 실기기 제출: approved | revision_requested
+ * 데모/구형: pending 포함
+ */
+const REQUEST_ACTIONABLE_STATUS = new Set([
+  "pending",
+  "approved",
+  "revision_requested",
+]);
+
+const REQUEST_POLL_DEFAULT_LIMIT = 5;
+const REQUEST_POLL_MAX_LIMIT = 20;
+const REQUEST_POLL_MAX_READ = 40;
+const REQUEST_POLL_ALLOWED_KEYS = new Set([
+  "operation",
+  "projectId",
+  "currentStageId",
+  "limit",
+  "productType",
+]);
 
 function isPlainObject(v) {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -256,16 +283,185 @@ function assertOperations(op) {
     "project_sync",
     "stage_sync",
     "full_sync",
+    "request_poll",
   ]);
   if (!allowed.has(op)) reject("invalid_argument", "operation invalid");
   return op;
 }
 
+/**
+ * request_poll 입력 — top-level만, 경로 주입 금지, 알 수 없는 필드 거부.
+ */
+function parseRequestPollInput(body) {
+  if (!isPlainObject(body)) reject("invalid_argument", "body required");
+  for (const key of Object.keys(body)) {
+    if (!REQUEST_POLL_ALLOWED_KEYS.has(key)) {
+      reject("invalid_argument", `unexpected_field:${key}`);
+    }
+  }
+
+  const projectId = assertSafeId(body.projectId, "projectId");
+  const currentStageId = assertSafeId(body.currentStageId, "currentStageId");
+  const productType =
+    assertEnum(body.productType, "productType", PRODUCT_TYPES) || "ebook";
+
+  if (productType === "ebook") {
+    if (!EBOOK_STAGE_BY_ID.has(currentStageId)) {
+      reject("invalid_argument", "currentStageId unknown_ebook_stageId");
+    }
+  }
+
+  let limit = REQUEST_POLL_DEFAULT_LIMIT;
+  if (body.limit !== undefined && body.limit !== null && body.limit !== "") {
+    limit = assertInt(body.limit, "limit", {
+      min: 1,
+      max: REQUEST_POLL_MAX_LIMIT,
+      required: true,
+    });
+  }
+
+  return { projectId, currentStageId, productType, limit };
+}
+
+/**
+ * 프로젝트 currentStage ↔ poll currentStageId 교차검증.
+ * currentStage/currentStageId가 없으면 통과(요청 stage 필터만 적용).
+ */
+function assertProjectStageAlignment(projectData, currentStageId, productType) {
+  if (!isPlainObject(projectData)) return;
+  if (projectData.currentStageId) {
+    const pid = String(projectData.currentStageId).trim();
+    if (pid && pid !== currentStageId) {
+      reject("invalid_argument", "currentStageId mismatch_project");
+    }
+  } else if (
+    productType === "ebook" &&
+    projectData.currentStage !== undefined &&
+    projectData.currentStage !== null &&
+    projectData.currentStage !== ""
+  ) {
+    const meta = EBOOK_STAGE_BY_ID.get(currentStageId);
+    const n = Number(projectData.currentStage);
+    if (meta && Number.isFinite(n) && n !== meta.order) {
+      reject("invalid_argument", "currentStageId mismatch_project");
+    }
+  }
+}
+
+function toIsoStringMaybe(value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "string") {
+    if (value.length > MAX_STR.iso) return null;
+    return value;
+  }
+  // Firestore Timestamp-like
+  if (typeof value.toDate === "function") {
+    try {
+      return value.toDate().toISOString();
+    } catch (_) {
+      return null;
+    }
+  }
+  if (typeof value === "object" && typeof value._seconds === "number") {
+    return new Date(value._seconds * 1000).toISOString();
+  }
+  return null;
+}
+
+/**
+ * Firestore request 문서 → PC 응답 allowlist.
+ * 비정상/과대 message/필수 누락 → null (제외).
+ */
+function pickRequestAllowlist(raw, { docId, expectedProjectId, currentStageId }) {
+  if (!isPlainObject(raw)) return null;
+  const requestId = assertSafeIdLoose(
+    raw.requestId || docId,
+    "requestId"
+  );
+  if (!requestId) return null;
+
+  const projectId = String(raw.projectId ?? "").trim();
+  if (projectId !== expectedProjectId) return null;
+  if (
+    projectId.includes("/") ||
+    projectId.includes("..") ||
+    !ID_RE.test(projectId)
+  ) {
+    return null;
+  }
+
+  const stageId = String(raw.stageId ?? "").trim();
+  if (!stageId || stageId !== currentStageId) return null;
+  if (
+    stageId.includes("/") ||
+    stageId.includes("..") ||
+    !ID_RE.test(stageId)
+  ) {
+    return null;
+  }
+
+  const requestType = String(raw.requestType ?? "").trim();
+  if (!REQUEST_TYPES.has(requestType)) return null;
+
+  const status = String(raw.status ?? "").trim();
+  if (!REQUEST_ACTIONABLE_STATUS.has(status)) return null;
+
+  if (typeof raw.message !== "string" && raw.message != null) return null;
+  const message = raw.message == null ? "" : String(raw.message);
+  if (message.length > MAX_STR.message) return null;
+
+  const createdAt = toIsoStringMaybe(raw.createdAt);
+  const updatedAt = toIsoStringMaybe(raw.updatedAt);
+  const processedAt = toIsoStringMaybe(raw.processedAt);
+  if (createdAt === null || updatedAt === null || processedAt === null) {
+    return null;
+  }
+
+  return {
+    requestId,
+    projectId,
+    stageId,
+    requestType,
+    status,
+    message,
+    createdAt,
+    updatedAt,
+    processedAt,
+  };
+}
+
+/** throw 대신 null — poll 필터용 */
+function assertSafeIdLoose(value) {
+  const s = String(value ?? "").trim();
+  if (!s) return null;
+  if (s.includes("/") || s.includes("..") || /[\x00-\x1f\x7f]/.test(s)) {
+    return null;
+  }
+  if (!ID_RE.test(s)) return null;
+  return s;
+}
+
+function sortRequestsNewestFirst(a, b) {
+  const ac = a.createdAt || "";
+  const bc = b.createdAt || "";
+  if (ac === bc) return 0;
+  return ac < bc ? 1 : -1;
+}
+
 module.exports = {
   pickProjectAllowlist,
   pickStageAllowlist,
+  pickRequestAllowlist,
+  parseRequestPollInput,
+  assertProjectStageAlignment,
   assertOperations,
   assertSafeId,
   reject,
+  sortRequestsNewestFirst,
   MAX_STR,
+  REQUEST_TYPES,
+  REQUEST_ACTIONABLE_STATUS,
+  REQUEST_POLL_DEFAULT_LIMIT,
+  REQUEST_POLL_MAX_LIMIT,
+  REQUEST_POLL_MAX_READ,
 };

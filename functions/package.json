@@ -6,7 +6,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "lint": "node -c index.js && node -c sotong24/relay.js && node -c sotong24/validate.js && node -c sotong24/auth.js && node -c sotong24/writer.js && node -c sotong24/canonical.js && node -c sotong24/rate_limit.js",
+    "lint": "node -c index.js && node -c sotong24/relay.js && node -c sotong24/validate.js && node -c sotong24/auth.js && node -c sotong24/writer.js && node -c sotong24/reader.js && node -c sotong24/canonical.js && node -c sotong24/rate_limit.js",
     "build": "npm run lint",
     "test": "node --test test/relay.test.js"
   },

@@ -41,9 +41,59 @@ function mockReq({ body, headers = {}, method = "POST" }) {
 
 function createMockDb() {
   const store = new Map();
+  const writes = [];
+
   function key(path) {
     return path.join("/");
   }
+
+  function listChildren(parentParts, collectionName) {
+    const prefix = [...parentParts, collectionName].join("/") + "/";
+    const docs = [];
+    for (const [k, v] of store.entries()) {
+      if (!k.startsWith(prefix)) continue;
+      const rest = k.slice(prefix.length);
+      if (!rest || rest.includes("/")) continue; // only direct children
+      docs.push({
+        id: rest,
+        data: () => ({ ...v }),
+      });
+    }
+    return docs;
+  }
+
+  function collectionRef(parentParts, name) {
+    const parts = [...parentParts, name];
+    return {
+      doc(id) {
+        return docRef([...parts, id]);
+      },
+      orderBy() {
+        return {
+          limit(n) {
+            return {
+              async get() {
+                const docs = listChildren(parentParts, name).slice(0, n);
+                return { docs };
+              },
+            };
+          },
+        };
+      },
+      limit(n) {
+        return {
+          async get() {
+            const docs = listChildren(parentParts, name).slice(0, n);
+            return { docs };
+          },
+        };
+      },
+      async get() {
+        return { docs: listChildren(parentParts, name) };
+      },
+    };
+  }
+
   function docRef(parts) {
     const path = parts.slice();
     return {
@@ -56,31 +106,54 @@ function createMockDb() {
       },
       async set(data, opts) {
         const k = key(path);
+        writes.push({ op: "set", path: k, data: { ...data }, opts });
         if (opts && opts.merge && store.has(k)) {
           store.set(k, { ...store.get(k), ...data });
         } else {
           store.set(k, { ...data });
         }
       },
+      async update(data) {
+        const k = key(path);
+        writes.push({ op: "update", path: k, data: { ...data } });
+        store.set(k, { ...(store.get(k) || {}), ...data });
+      },
+      async delete() {
+        const k = key(path);
+        writes.push({ op: "delete", path: k });
+        store.delete(k);
+      },
       collection(name) {
-        return {
-          doc(id) {
-            return docRef([...path, name, id]);
-          },
-        };
+        return collectionRef(path, name);
       },
     };
   }
+
   return {
     store,
+    writes,
     collection(name) {
-      return {
-        doc(id) {
-          return docRef([name, id]);
-        },
-      };
+      return collectionRef([], name);
     },
   };
+}
+
+function seedProject(db, projectId, data = {}) {
+  db.store.set(`sotong24work_projects/${projectId}`, {
+    projectId,
+    productType: "ebook",
+    currentStage: 15,
+    currentStageId: "launch",
+    isDemo: false,
+    ...data,
+  });
+}
+
+function seedRequest(db, projectId, requestId, data) {
+  db.store.set(
+    `sotong24work_projects/${projectId}/requests/${requestId}`,
+    data
+  );
 }
 
 async function call(body, { auth = true, db, headers = {} } = {}) {
@@ -354,5 +427,362 @@ describe("relay HTTP handler", () => {
       project: { ...sampleProject, status: "hacking" },
     });
     assert.equal(res.statusCode, 400);
+  });
+});
+
+describe("request_poll", () => {
+  const projectId = sampleProject.projectId;
+
+  beforeEach(() => {
+    rateLimiter.reset();
+  });
+
+  it("valid auth + no requests → 200 []", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    const res = await call(
+      {
+        operation: "request_poll",
+        projectId,
+        currentStageId: "launch",
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.operation, "request_poll");
+    assert.deepEqual(res.body.requests, []);
+  });
+
+  it("returns valid approval request", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    seedRequest(db, projectId, "req_approve_1", {
+      requestId: "req_approve_1",
+      projectId,
+      stageId: "launch",
+      requestType: "approve",
+      status: "approved",
+      message: "",
+      createdAt: "2026-08-11T05:00:00.000Z",
+      updatedAt: "2026-08-11T05:00:00.000Z",
+      processedAt: "2026-08-11T05:00:00.000Z",
+    });
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.requests.length, 1);
+    assert.equal(res.body.requests[0].requestType, "approve");
+    assert.equal(res.body.requests[0].status, "approved");
+    assert.ok(!("workReport" in res.body.requests[0]));
+  });
+
+  it("returns valid revision request", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    seedRequest(db, projectId, "req_rev_1", {
+      requestId: "req_rev_1",
+      projectId,
+      stageId: "launch",
+      requestType: "revision_request",
+      status: "revision_requested",
+      message: "표지 문구 수정",
+      createdAt: "2026-08-11T05:01:00.000Z",
+      updatedAt: "2026-08-11T05:01:00.000Z",
+      processedAt: "2026-08-11T05:01:00.000Z",
+    });
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.requests[0].requestType, "revision_request");
+    assert.equal(res.body.requests[0].message, "표지 문구 수정");
+  });
+
+  it("returns multiple requests newest first within limit", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    seedRequest(db, projectId, "req_old", {
+      requestId: "req_old",
+      projectId,
+      stageId: "launch",
+      requestType: "approve",
+      status: "approved",
+      message: "",
+      createdAt: "2026-08-11T04:00:00.000Z",
+      updatedAt: "2026-08-11T04:00:00.000Z",
+      processedAt: "2026-08-11T04:00:00.000Z",
+    });
+    seedRequest(db, projectId, "req_new", {
+      requestId: "req_new",
+      projectId,
+      stageId: "launch",
+      requestType: "revision_request",
+      status: "revision_requested",
+      message: "new",
+      createdAt: "2026-08-11T06:00:00.000Z",
+      updatedAt: "2026-08-11T06:00:00.000Z",
+      processedAt: "2026-08-11T06:00:00.000Z",
+    });
+    const res = await call(
+      {
+        operation: "request_poll",
+        projectId,
+        currentStageId: "launch",
+        limit: 1,
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.requests.length, 1);
+    assert.equal(res.body.requests[0].requestId, "req_new");
+  });
+
+  it("rejects path injection projectId", async () => {
+    const res = await call({
+      operation: "request_poll",
+      projectId: "../test",
+      currentStageId: "launch",
+    });
+    assert.equal(res.statusCode, 400);
+    assert.match(String(res.body.message), /path_injection|invalid_format/);
+  });
+
+  it("rejects wrong currentStageId (unknown)", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    const res = await call(
+      {
+        operation: "request_poll",
+        projectId,
+        currentStageId: "not_a_stage",
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 400);
+  });
+
+  it("excludes old stage requests", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    seedRequest(db, projectId, "req_old_stage", {
+      requestId: "req_old_stage",
+      projectId,
+      stageId: "deploy",
+      requestType: "approve",
+      status: "approved",
+      message: "",
+      createdAt: "2026-08-11T05:00:00.000Z",
+      updatedAt: "2026-08-11T05:00:00.000Z",
+      processedAt: "2026-08-11T05:00:00.000Z",
+    });
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body.requests, []);
+  });
+
+  it("excludes future stage requests", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    seedRequest(db, projectId, "req_future", {
+      requestId: "req_future",
+      projectId,
+      stageId: "measure",
+      requestType: "approve",
+      status: "approved",
+      message: "",
+      createdAt: "2026-08-11T05:00:00.000Z",
+      updatedAt: "2026-08-11T05:00:00.000Z",
+      processedAt: "2026-08-11T05:00:00.000Z",
+    });
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.requests.length, 0);
+  });
+
+  it("excludes malformed request safely", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    seedRequest(db, projectId, "req_bad", {
+      projectId,
+      stageId: "launch",
+      // missing requestType/status
+      message: "x",
+    });
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body.requests, []);
+  });
+
+  it("excludes oversized message", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    seedRequest(db, projectId, "req_huge", {
+      requestId: "req_huge",
+      projectId,
+      stageId: "launch",
+      requestType: "revision_request",
+      status: "revision_requested",
+      message: "x".repeat(2001),
+      createdAt: "2026-08-11T05:00:00.000Z",
+      updatedAt: "2026-08-11T05:00:00.000Z",
+      processedAt: "2026-08-11T05:00:00.000Z",
+    });
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body.requests, []);
+  });
+
+  it("rejects unauthenticated", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { auth: false, db }
+    );
+    assert.equal(res.statusCode, 401);
+  });
+
+  it("rejects wrong token", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    const res = mockRes();
+    const req = mockReq({
+      body: {
+        operation: "request_poll",
+        projectId,
+        currentStageId: "launch",
+      },
+      headers: { Authorization: "Bearer wrong" },
+    });
+    await handleRelayRequest(req, res, { getSecret: () => SECRET, db });
+    assert.equal(res.statusCode, 403);
+  });
+
+  it("rejects unknown operation still", async () => {
+    const res = await call({
+      operation: "drop_all_tables",
+      projectId,
+      currentStageId: "launch",
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.message, "operation invalid");
+  });
+
+  it("returns 404 when project not found", async () => {
+    const db = createMockDb();
+    const res = await call(
+      {
+        operation: "request_poll",
+        projectId: "wi_plan_missing_999",
+        currentStageId: "launch",
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 404);
+  });
+
+  it("blocks isDemo project", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId, { isDemo: true });
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.message, "demo_project_blocked");
+  });
+
+  it("does not write on request_poll", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId, {
+      approvalStatus: "pending",
+      status: "awaiting_approval",
+    });
+    seedRequest(db, projectId, "req_a", {
+      requestId: "req_a",
+      projectId,
+      stageId: "launch",
+      requestType: "approve",
+      status: "approved",
+      message: "",
+      createdAt: "2026-08-11T05:00:00.000Z",
+      updatedAt: "2026-08-11T05:00:00.000Z",
+      processedAt: "2026-08-11T05:00:00.000Z",
+    });
+    const before = JSON.stringify([...db.store.entries()]);
+    const res = await call(
+      { operation: "request_poll", projectId, currentStageId: "launch" },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(db.writes.length, 0);
+    assert.equal(JSON.stringify([...db.store.entries()]), before);
+    const reqDoc = db.store.get(
+      `sotong24work_projects/${projectId}/requests/req_a`
+    );
+    assert.equal(reqDoc.processedAt, "2026-08-11T05:00:00.000Z");
+  });
+
+  it("rejects unexpected fields", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    const res = await call(
+      {
+        operation: "request_poll",
+        projectId,
+        currentStageId: "launch",
+        firestorePath: "evil/path",
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 400);
+    assert.match(String(res.body.message), /unexpected_field/);
+  });
+
+  it("rejects currentStageId mismatch with project", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId, {
+      currentStageId: "launch",
+      currentStage: 15,
+    });
+    const res = await call(
+      {
+        operation: "request_poll",
+        projectId,
+        currentStageId: "deploy",
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 400);
+    assert.match(String(res.body.message), /mismatch_project/);
+  });
+
+  it("rate limits excessive request_poll", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId);
+    let last = null;
+    for (let i = 0; i < 31; i++) {
+      last = await call(
+        { operation: "request_poll", projectId, currentStageId: "launch" },
+        { db }
+      );
+    }
+    assert.equal(last.statusCode, 429);
   });
 });

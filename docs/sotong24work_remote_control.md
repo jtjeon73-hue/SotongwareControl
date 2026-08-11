@@ -37,7 +37,7 @@ sotong24work_projects/{projectId}
 ```
 
 승인해도 배포·판매 등록·Git push는 자동 실행하지 않습니다.
-PC가 `requests`를 읽고 다음 단계를 진행합니다. (relay 1차 범위에서는 request 소비 없음)
+PC가 `request_poll`로 `requests`를 **읽기 전용**으로 수신합니다. (소비/status 변경은 별도 operation)
 
 ## PC → Relay → Firestore (권장)
 
@@ -57,7 +57,11 @@ SotongWareControl (기존 Admin Auth 읽기/승인)
 
 - 단일 HTTP 함수: `sotong24Relay`
 - `POST` only
-- Body: `{ "operation": "heartbeat"|"project_sync"|"stage_sync"|"full_sync", "project": {...}, "stage"|"stages": ... }`
+- Body: `{ "operation": "heartbeat"|"project_sync"|"stage_sync"|"full_sync"|"request_poll", ... }`
+- `request_poll` 입력: `{ "operation":"request_poll", "projectId", "currentStageId", "limit?" }`
+  - 고정 경로: `sotong24work_projects/{projectId}/requests` (클라이언트 path 불가)
+  - 응답: `{ ok, operation, projectId, currentStageId, requests:[], serverReceivedAt }`
+  - **쓰기 없음** (status/processedAt 변경 금지). `isDemo=true` 차단.
 
 ### 인증
 
@@ -66,11 +70,11 @@ SotongWareControl (기존 Admin Auth 읽기/승인)
 - Secret 미설정 시 **fail-closed** (503)
 - Secret을 소스/Git에 커밋하지 않음
 
-### 배포 전 사용자 작업 (아직 미배포)
+### 배포
 
 ```bash
 firebase functions:secrets:set SOTONG24_RELAY_SECRET --project sotongware-control
-# 이후 functions deploy (이번 작업에서는 수행하지 않음)
+firebase deploy --only functions:sotong24Relay --project sotongware-control
 ```
 
 PC에는 동일 secret만 로컬 보안 저장소에 두고, Firestore 광범위 권한은 부여하지 않습니다.
