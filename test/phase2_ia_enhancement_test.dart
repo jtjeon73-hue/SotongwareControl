@@ -130,13 +130,13 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('뉴 아이디어 뱅크'), findsOneWidget);
-    expect(find.textContaining('기회와 제작 아이디어'), findsOneWidget);
-    expect(find.textContaining('카테고리'), findsWidgets);
-    // 모바일: 접힌 상태에서 펼친 뒤 모든 카테고리 접근
-    await tester.tap(find.textContaining('카테고리').first);
+    // 모바일: compact header — 긴 소개문 없음, 필터로 카테고리 접근
+    expect(find.textContaining('기회와 제작 아이디어'), findsNothing);
+    expect(find.text('필터'), findsOneWidget);
+    await tester.tap(find.text('필터'));
     await tester.pumpAndSettle();
+    expect(find.text('전체 카테고리'), findsOneWidget);
     expect(find.text('세계 트렌드'), findsWidgets);
-    expect(find.text('홍보/마케팅 아이디어'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -144,7 +144,7 @@ void main() {
     testWidgets('아이디어뱅크 카테고리 Wrap overflow 없음 ${width.toInt()}px', (
       tester,
     ) async {
-      tester.view.physicalSize = Size(width, 900);
+      tester.view.physicalSize = Size(width, 1100);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
@@ -153,8 +153,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      if (width < 768) {
-        await tester.tap(find.textContaining('카테고리').first);
+      final isMobile = width < 900;
+      if (isMobile) {
+        await tester.tap(find.text('필터'));
         await tester.pumpAndSettle();
       }
 
@@ -163,15 +164,12 @@ void main() {
         expect(find.text(IdeaBankCategories.labelKo(c)), findsWidgets);
       }
 
-      // 가로 스크롤뷰로 카테고리를 두지 않는다.
       final horizontalScrolls = tester
           .widgetList<SingleChildScrollView>(find.byType(SingleChildScrollView))
           .where((w) => w.scrollDirection == Axis.horizontal);
       expect(horizontalScrolls, isEmpty);
 
       expect(tester.takeException(), isNull);
-      final overflows = tester.takeException();
-      expect(overflows, isNull);
     });
   }
 

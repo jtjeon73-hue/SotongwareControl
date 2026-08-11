@@ -273,6 +273,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.ideaBank:
         return IdeaBankScreen(
           onSendToWorkInstruction: _sendIdeaToWorkInstruction,
+          onImmersiveModeChanged: _onStudyImmersiveChanged,
+          onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
         );
     }
   }
