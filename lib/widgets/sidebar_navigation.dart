@@ -102,7 +102,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.studyAdmin:
         return '스터디 관리';
       case ControlDestination.sotong24work:
-        return '소통24워크';
+        return '소통24워크 사업부';
       case ControlDestination.industrialAutomation:
         return '산업자동화SW개발부';
       case ControlDestination.appDevelopment:
@@ -122,7 +122,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.publicServices:
         return '공개 서비스';
       case ControlDestination.productWorkshop:
-        return '제품제작 공작실';
+        return '소통24워크';
       case ControlDestination.autoPromotion:
         return '자동 홍보 전략실';
       case ControlDestination.autoSales:

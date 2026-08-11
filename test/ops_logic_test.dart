@@ -123,7 +123,7 @@ void main() {
   });
 
   test('사업부 메뉴에 소통24워크 포함', () {
-    expect(ControlDestination.sotong24work.label, '소통24워크');
+    expect(ControlDestination.sotong24work.label, '소통24워크 사업부');
   });
 
   test('Firebase 미준비 시 false', () {

@@ -22,7 +22,7 @@ class Sotong24WorkScreen extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.all(24),
         child: EmptyStatePanel(
-          title: '소통24워크',
+          title: '소통24워크 사업부',
           message: 'Firebase 연결 후 개발 영역 상태를 확인할 수 있습니다.',
         ),
       );

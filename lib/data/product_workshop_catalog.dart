@@ -1,4 +1,4 @@
-/// 제품제작 공작실 — 로컬 단계/상태 카탈로그 (실시간 연동 전).
+/// 소통24워크 제작 가이드 — 로컬 단계/상태 카탈로그 (원격 관제와 병행).
 class ProductionStep {
   const ProductionStep({
     required this.number,
@@ -60,11 +60,11 @@ class Sotong24WorkStatusCatalog {
   ];
   static const partial = ['전자책 다단계 제작 파이프라인', 'checksum·버전 복구'];
   static const upcoming = [
+    'PC Sotong24Work heartbeat·단계 동기화',
     'artifact별 전문가급 제작 단계 자동화',
-    '검수·승인 UI 연동',
     '출시·홍보·판매 이벤트 연결',
   ];
-  static const versionNote = '로컬 상태 요약 (실시간 API 미연결)';
+  static const versionNote = '원격 관제 UI 1차 · PC heartbeat 연동은 후속';
 }
 
 class ProductLifecycle {
