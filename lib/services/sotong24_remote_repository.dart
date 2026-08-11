@@ -13,12 +13,11 @@ import 'firebase_ready.dart';
 /// 실제 제품 문서를 삭제·마이그레이션하지 않는다.
 class Sotong24RemoteRepository {
   Sotong24RemoteRepository({
-    FirebaseFirestore? db,
+    this._db,
     Sotong24RemoteApprovalGuard? guard,
     List<Sotong24RemoteProject>? memorySeed,
     bool? forceMemory,
-  }) : _db = db,
-       _guard = guard ?? const Sotong24RemoteApprovalGuard(),
+  }) : _guard = guard ?? const Sotong24RemoteApprovalGuard(),
        _forceMemory = forceMemory ?? false {
     _memory = List<Sotong24RemoteProject>.from(
       memorySeed ?? Sotong24RemoteDemoCatalog.demoProjects(),
