@@ -26,6 +26,8 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
   bool _recentOnly = false;
   bool _topOnly = false;
   String? _categoryFilter;
+  /// 모바일에서 카테고리 Wrap을 접기/펼치기. PC는 항상 펼침.
+  bool _categoryExpanded = false;
 
   @override
   void initState() {
@@ -245,83 +247,59 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    DropdownButton<int?>(
-                      value: _yearFilter,
-                      hint: const Text('연도'),
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('전체 연도'),
-                        ),
-                        for (final y in _years)
-                          DropdownMenuItem(value: y, child: Text('$y')),
-                      ],
-                      onChanged: (v) => setState(() {
-                        _yearFilter = v;
-                        _monthFilter = null;
-                      }),
-                    ),
-                    const SizedBox(width: 8),
-                    DropdownButton<int?>(
-                      value: _monthFilter,
-                      hint: const Text('월'),
-                      items: [
-                        const DropdownMenuItem(
-                          value: null,
-                          child: Text('전체 월'),
-                        ),
-                        for (var m = 1; m <= 12; m++)
-                          DropdownMenuItem(value: m, child: Text('$m월')),
-                      ],
-                      onChanged: (v) => setState(() => _monthFilter = v),
-                    ),
-                    const SizedBox(width: 8),
-                    FilterChip(
-                      label: const Text('즐겨찾기'),
-                      selected: _favoritesOnly,
-                      onSelected: (v) => setState(() => _favoritesOnly = v),
-                    ),
-                    const SizedBox(width: 6),
-                    FilterChip(
-                      label: const Text('TOP'),
-                      selected: _topOnly,
-                      onSelected: (v) => setState(() => _topOnly = v),
-                    ),
-                    const SizedBox(width: 6),
-                    FilterChip(
-                      label: const Text('최근'),
-                      selected: _recentOnly,
-                      onSelected: (v) => setState(() => _recentOnly = v),
-                    ),
-                  ],
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  DropdownButton<int?>(
+                    value: _yearFilter,
+                    hint: const Text('연도'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('전체 연도'),
+                      ),
+                      for (final y in _years)
+                        DropdownMenuItem(value: y, child: Text('$y')),
+                    ],
+                    onChanged: (v) => setState(() {
+                      _yearFilter = v;
+                      _monthFilter = null;
+                    }),
+                  ),
+                  DropdownButton<int?>(
+                    value: _monthFilter,
+                    hint: const Text('월'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('전체 월'),
+                      ),
+                      for (var m = 1; m <= 12; m++)
+                        DropdownMenuItem(value: m, child: Text('$m월')),
+                    ],
+                    onChanged: (v) => setState(() => _monthFilter = v),
+                  ),
+                  FilterChip(
+                    label: const Text('즐겨찾기'),
+                    selected: _favoritesOnly,
+                    onSelected: (v) => setState(() => _favoritesOnly = v),
+                  ),
+                  FilterChip(
+                    label: const Text('TOP'),
+                    selected: _topOnly,
+                    onSelected: (v) => setState(() => _topOnly = v),
+                  ),
+                  FilterChip(
+                    label: const Text('최근'),
+                    selected: _recentOnly,
+                    onSelected: (v) => setState(() => _recentOnly = v),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    FilterChip(
-                      label: const Text('전체 카테고리'),
-                      selected: _categoryFilter == null,
-                      onSelected: (_) => setState(() => _categoryFilter = null),
-                    ),
-                    const SizedBox(width: 6),
-                    for (final c in IdeaBankCategories.all) ...[
-                      FilterChip(
-                        label: Text(IdeaBankCategories.labelKo(c)),
-                        selected: _categoryFilter == c,
-                        onSelected: (_) => setState(() => _categoryFilter = c),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                  ],
-                ),
-              ),
+              _buildCategoryFilters(context),
             ],
           ),
         ),
@@ -507,6 +485,73 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
           if (item.memo.isNotEmpty) item.memo,
         ].join('\n'),
       ),
+    );
+  }
+
+  Widget _buildCategoryFilters(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 768;
+    final wrap = Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        FilterChip(
+          label: const Text('전체 카테고리'),
+          selected: _categoryFilter == null,
+          onSelected: (_) => setState(() => _categoryFilter = null),
+        ),
+        for (final c in IdeaBankCategories.all)
+          FilterChip(
+            label: Text(IdeaBankCategories.labelKo(c)),
+            selected: _categoryFilter == c,
+            onSelected: (_) => setState(() => _categoryFilter = c),
+          ),
+      ],
+    );
+
+    if (!isMobile) return wrap;
+
+    final selectedLabel = _categoryFilter == null
+        ? '전체 카테고리'
+        : IdeaBankCategories.labelKo(_categoryFilter!);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () =>
+                setState(() => _categoryExpanded = !_categoryExpanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _categoryExpanded
+                          ? '카테고리'
+                          : '카테고리 · $selectedLabel',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _categoryExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    size: 22,
+                    color: ControlColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_categoryExpanded) ...[const SizedBox(height: 6), wrap],
+      ],
     );
   }
 

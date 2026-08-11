@@ -131,7 +131,67 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('뉴 아이디어 뱅크'), findsOneWidget);
     expect(find.textContaining('기회와 제작 아이디어'), findsOneWidget);
+    expect(find.textContaining('카테고리'), findsWidgets);
+    // 모바일: 접힌 상태에서 펼친 뒤 모든 카테고리 접근
+    await tester.tap(find.textContaining('카테고리').first);
+    await tester.pumpAndSettle();
     expect(find.text('세계 트렌드'), findsWidgets);
+    expect(find.text('홍보/마케팅 아이디어'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in [390.0, 768.0, 1280.0, 1600.0]) {
+    testWidgets('아이디어뱅크 카테고리 Wrap overflow 없음 ${width.toInt()}px', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: IdeaBankScreen())),
+      );
+      await tester.pumpAndSettle();
+
+      if (width < 768) {
+        await tester.tap(find.textContaining('카테고리').first);
+        await tester.pumpAndSettle();
+      }
+
+      expect(find.text('전체 카테고리'), findsOneWidget);
+      for (final c in IdeaBankCategories.all) {
+        expect(find.text(IdeaBankCategories.labelKo(c)), findsWidgets);
+      }
+
+      // 가로 스크롤뷰로 카테고리를 두지 않는다.
+      final horizontalScrolls = tester
+          .widgetList<SingleChildScrollView>(find.byType(SingleChildScrollView))
+          .where((w) => w.scrollDirection == Axis.horizontal);
+      expect(horizontalScrolls, isEmpty);
+
+      expect(tester.takeException(), isNull);
+      final overflows = tester.takeException();
+      expect(overflows, isNull);
+    });
+  }
+
+  testWidgets('아이디어뱅크 카테고리 필터 선택 유지', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: IdeaBankScreen())),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('세계 트렌드'));
+    await tester.pumpAndSettle();
+
+    final chip = tester.widget<FilterChip>(
+      find.widgetWithText(FilterChip, '세계 트렌드'),
+    );
+    expect(chip.selected, isTrue);
     expect(tester.takeException(), isNull);
   });
 }
