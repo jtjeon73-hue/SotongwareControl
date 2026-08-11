@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../data/product_workshop_catalog.dart';
 import '../data/sotong24_workflows.dart';
 import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../theme/control_theme.dart';
 import '../utils/external_url.dart';
+import '../widgets/sotong24_production_guide_panel.dart';
 import '../widgets/sotong24_stage_widgets.dart';
 
 /// 소통24워크 — PC Sotong24Work 원격 관제·승인 화면.
@@ -132,7 +132,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                 const SizedBox(height: 10),
               ],
             const SizedBox(height: 8),
-            const _GuideSection(),
+            Sotong24ProductionGuidePanel(focusProject: focus),
           ],
         );
       },
@@ -692,43 +692,6 @@ class _ResultPanel extends StatelessWidget {
 
   Future<void> _open(String url) async {
     await ExternalUrl.open(url);
-  }
-}
-
-class _GuideSection extends StatelessWidget {
-  const _GuideSection();
-
-  @override
-  Widget build(BuildContext context) {
-    return ExpansionTile(
-      tilePadding: EdgeInsets.zero,
-      title: const Text(
-        '제작 가이드 (기존 설명)',
-        style: TextStyle(fontWeight: FontWeight.w700),
-      ),
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            Sotong24WorkStatusCatalog.versionNote,
-            style: const TextStyle(
-              color: ControlColors.textMuted,
-              fontSize: 13,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        for (final p in ProductWorkshopCatalog.playbooks)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              p.title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text('${p.steps.length}단계 · ${p.notes}'),
-          ),
-      ],
-    );
   }
 }
 

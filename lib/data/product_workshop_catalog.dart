@@ -1,4 +1,8 @@
-/// 소통24워크 제작 가이드 — 로컬 단계/상태 카탈로그 (원격 관제와 병행).
+/// 소통24워크 제작 가이드 — 레거시 로컬 플레이북.
+///
+/// 사업별 표준 제작 가이드는 sotong24_production_guides /
+/// sotong24_workflows 를 Single Source of Truth로 사용한다.
+/// 아래 playbooks는 하위 호환·참고용이며 UI에서는 더 이상 표시하지 않는다.
 class ProductionStep {
   const ProductionStep({
     required this.number,
