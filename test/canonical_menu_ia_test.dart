@@ -16,14 +16,14 @@ void main() {
     final menus = SidebarNavigation.canonicalDestinations;
     expect(menus.length, 15);
     expect(menus.map((e) => e.label).toList(), [
+      '작업지시 제작소',
+      '소통24워크',
       '산업자동화SW개발부',
       '전자책 개발부',
       '앱 개발부',
       '지식사이트 개발부',
       '마케팅사이트 개발부',
       '컨텐츠 개발부',
-      '작업지시 제작소',
-      '소통24워크',
       '자동 홍보 전략실',
       '자동판매전략실',
       '수익세금 자동 재무실',
@@ -74,7 +74,7 @@ void main() {
       month: 1,
     );
     await store.saveAll([a, b]);
-    final loaded = await store.load();
+    final loaded = await store.load(includeSeeds: false);
     expect(loaded.length, 2);
     expect(loaded.where((e) => e.year == 2026 && e.month == 3).length, 1);
     expect(

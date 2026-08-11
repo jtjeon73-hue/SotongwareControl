@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../data/product_workshop_catalog.dart';
+import '../data/sotong24_workflows.dart';
 import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../theme/control_theme.dart';
 import '../utils/external_url.dart';
+import '../widgets/sotong24_stage_widgets.dart';
 
 /// 소통24워크 — PC Sotong24Work 원격 관제·승인 화면.
 /// 내부 destination key는 `productWorkshop`을 유지한다.
@@ -74,7 +76,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'PC의 소통24워크 제작 시스템을 원격으로 확인하고 관리합니다.',
+              '선택된 제품을 실제로 제작하는 곳입니다. PC 소통24워크 상태를 확인하고 승인·보완을 요청합니다.',
               style: TextStyle(
                 color: ControlColors.textSecondary,
                 fontSize: 15,
@@ -204,6 +206,15 @@ class _Sotong24RemoteDetailScreenState
               (stage != null &&
                   (stage.status == Sotong24WorkStatus.awaitingApproval ||
                       stage.approvalStatus == ApprovalStatus.pending));
+          final workflow = Sotong24WorkflowCatalog.forProduct(
+            project.productType,
+            contentSubtype: project.contentSubtype,
+          );
+          final stageDef = stage == null
+              ? null
+              : (workflow.byId(stage.stageId) ??
+                    workflow.byOrder(stage.stageNumber));
+          final stats = Sotong24StageStats.fromProject(project);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
@@ -218,6 +229,14 @@ class _Sotong24RemoteDetailScreenState
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                   height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                workflow.title,
+                style: const TextStyle(
+                  color: ControlColors.teal,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 10),
@@ -235,22 +254,43 @@ class _Sotong24RemoteDetailScreenState
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
                   value: (project.progress.clamp(0, 100)) / 100,
-                  minHeight: 10,
+                  minHeight: 12,
                   backgroundColor: ControlColors.border,
                 ),
               ),
+              const SizedBox(height: 10),
+              Sotong24StatsRow(stats: stats),
+              if (showApprovalActions && stage != null) ...[
+                const SizedBox(height: 16),
+                Sotong24NowTodoPanel(
+                  project: project,
+                  stage: stage,
+                  def: stageDef,
+                ),
+              ],
               const SizedBox(height: 20),
               Text(
-                '전체 제작 단계',
+                '전체 제작 단계 (${workflow.totalStages})',
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
+              const SizedBox(height: 4),
+              Text(
+                workflow.summary,
+                style: const TextStyle(
+                  color: ControlColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(height: 8),
               for (final s in project.stages)
-                _StageTile(
+                Sotong24ExpandableStageTile(
                   stage: s,
                   isCurrent: s.stageNumber == project.currentStage,
+                  def:
+                      workflow.byId(s.stageId) ??
+                      workflow.byOrder(s.stageNumber),
                 ),
               if (stage != null) ...[
                 const SizedBox(height: 16),
@@ -422,6 +462,15 @@ class _CurrentWorkCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
+            project.productTypeLabel,
+            style: const TextStyle(
+              color: ControlColors.teal,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
             project.title,
             style: const TextStyle(
               fontSize: 17,
@@ -430,21 +479,32 @@ class _CurrentWorkCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _Kv('제작유형', project.productTypeLabel),
-          _Kv('진행단계', '${project.currentStage} / ${project.totalStages}'),
-          _Kv('진행률', '${project.progress}%'),
-          _Kv('상태', Sotong24WorkStatus.labelKo(project.status)),
-          _Kv('PC상태', Sotong24PcLinkStatus.labelKo(project.resolvedPcStatus)),
-          _Kv('마지막 연결', _formatTime(project.lastHeartbeat)),
-          _Kv('마지막 업데이트', _formatTime(project.updatedAt)),
-          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: (project.progress.clamp(0, 100)) / 100,
-              minHeight: 10,
+              minHeight: 12,
               backgroundColor: ControlColors.border,
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${project.progress}% · ${project.currentStage} / ${project.totalStages} 단계'
+            '${project.currentStageDoc == null ? '' : ' · ${project.currentStageDoc!.stageName}'}',
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+          const SizedBox(height: 10),
+          Sotong24StatsRow(stats: Sotong24StageStats.fromProject(project)),
+          const SizedBox(height: 10),
+          _Kv('상태', Sotong24WorkStatus.labelKo(project.status)),
+          _Kv('PC상태', Sotong24PcLinkStatus.labelKo(project.resolvedPcStatus)),
+          _Kv('마지막 동기화', _formatTime(project.lastHeartbeat)),
+          _Kv(
+            '워크플로',
+            Sotong24WorkflowCatalog.forProduct(
+              project.productType,
+              contentSubtype: project.contentSubtype,
+            ).title,
           ),
         ],
       ),
@@ -522,62 +582,6 @@ class _ProjectCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StageTile extends StatelessWidget {
-  const _StageTile({required this.stage, required this.isCurrent});
-
-  final Sotong24RemoteStage stage;
-  final bool isCurrent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isCurrent ? ControlColors.tealSoft : ControlColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isCurrent ? ControlColors.teal : ControlColors.border,
-          width: isCurrent ? 1.5 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 36,
-            child: Text(
-              '${stage.stageNumber}',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: isCurrent ? ControlColors.teal : ControlColors.textMuted,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              stage.stageName,
-              style: TextStyle(
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 15,
-              ),
-            ),
-          ),
-          Text(
-            Sotong24WorkStatus.labelKo(stage.status),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isCurrent
-                  ? ControlColors.teal
-                  : ControlColors.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }

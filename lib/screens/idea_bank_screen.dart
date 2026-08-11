@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../data/idea_bank_seed.dart';
 import '../models/idea_bank.dart';
 import '../services/idea_bank_store.dart';
 import '../theme/control_theme.dart';
+import '../utils/external_url.dart';
 
 class IdeaBankScreen extends StatefulWidget {
   const IdeaBankScreen({super.key, this.onSendToWorkInstruction});
@@ -23,6 +25,7 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
   bool _favoritesOnly = false;
   bool _recentOnly = false;
   bool _topOnly = false;
+  String? _categoryFilter;
 
   @override
   void initState() {
@@ -55,6 +58,9 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
     }
     if (_favoritesOnly) {
       list = list.where((e) => e.favorite).toList();
+    }
+    if (_categoryFilter != null && _categoryFilter!.isNotEmpty) {
+      list = list.where((e) => e.category == _categoryFilter).toList();
     }
     if (_topOnly) {
       list = list
@@ -220,8 +226,12 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
               ),
               const SizedBox(height: 4),
               const Text(
-                'AI로 온라인에서 수익을 낼 수 있는 사업 아이디어를 축적합니다.',
-                style: TextStyle(color: ControlColors.textSecondary),
+                '새로운 기회와 제작 아이디어를 발견하는 곳입니다. '
+                '(사업전략연구실=공부·판단, 작업지시제작소=지시 전환, 소통24워크=실제 제작)',
+                style: TextStyle(
+                  color: ControlColors.textSecondary,
+                  height: 1.35,
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -290,6 +300,28 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('전체 카테고리'),
+                      selected: _categoryFilter == null,
+                      onSelected: (_) => setState(() => _categoryFilter = null),
+                    ),
+                    const SizedBox(width: 6),
+                    for (final c in IdeaBankCategories.all) ...[
+                      FilterChip(
+                        label: Text(IdeaBankCategories.labelKo(c)),
+                        selected: _categoryFilter == c,
+                        onSelected: (_) => setState(() => _categoryFilter = c),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -316,65 +348,185 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
                         borderRadius: BorderRadius.circular(8),
                         side: const BorderSide(color: ControlColors.border),
                       ),
-                      child: ListTile(
+                      child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          12,
+                          0,
+                          12,
+                          12,
+                        ),
                         title: Text(
                           item.title,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                         subtitle: Text(
-                          '${item.year}-${item.month.toString().padLeft(2, '0')} · '
-                          '${IdeaBankStatuses.labelKo(item.status)} · '
-                          '${item.oneLiner.isEmpty ? (item.product.isEmpty ? '-' : item.product) : item.oneLiner}',
+                          [
+                            if (item.category.isNotEmpty)
+                              IdeaBankCategories.labelKo(item.category),
+                            if (item.isSeed) '시드',
+                            IdeaBankStatuses.labelKo(item.status),
+                            if (item.oneLiner.isNotEmpty) item.oneLiner,
+                          ].join(' · '),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: Wrap(
-                          spacing: 0,
-                          children: [
-                            IconButton(
-                              icon: Icon(
-                                item.favorite ? Icons.star : Icons.star_border,
+                        children: [
+                          if (item.whyNow.isNotEmpty ||
+                              item.recommendReason.isNotEmpty)
+                            _ideaLine(
+                              '왜 지금',
+                              item.whyNow.isNotEmpty
+                                  ? item.whyNow
+                                  : item.recommendReason,
+                            ),
+                          if (item.targetCustomer.isNotEmpty)
+                            _ideaLine('누구에게', item.targetCustomer),
+                          if (item.howToBusiness.isNotEmpty ||
+                              item.revenueMethod.isNotEmpty)
+                            _ideaLine(
+                              '사업 연결',
+                              item.howToBusiness.isNotEmpty
+                                  ? item.howToBusiness
+                                  : item.revenueMethod,
+                            ),
+                          if (item.difficulty.isNotEmpty)
+                            _ideaLine('난이도/규모', item.difficulty),
+                          if (item.infoAsOf.isNotEmpty ||
+                              item.lastCheckedAt.isNotEmpty)
+                            _ideaLine(
+                              '정보 기준',
+                              '기준 ${item.infoAsOf.isEmpty ? '-' : item.infoAsOf} · 확인 ${item.lastCheckedAt.isEmpty ? '-' : item.lastCheckedAt}',
+                            ),
+                          if (item.memo.isNotEmpty)
+                            _ideaLine('메모/평가', item.memo),
+                          for (final s in item.sources)
+                            if (IdeaBankSourceRef.isTrustedHttpUrl(s.sourceUrl))
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () =>
+                                      ExternalUrl.open(s.sourceUrl),
+                                  icon: const Icon(Icons.link, size: 18),
+                                  label: Text(s.sourceTitle),
+                                ),
                               ),
-                              onPressed: () async {
-                                await _store.upsert(
-                                  item.copyWith(
-                                    favorite: !item.favorite,
-                                    updatedAt: DateTime.now()
-                                        .toUtc()
-                                        .toIso8601String(),
+                          const SizedBox(height: 6),
+                          const Text(
+                            '이 아이디어로 무엇을 만들까?',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              ActionChip(
+                                label: const Text('전자책으로 검토'),
+                                onPressed: () => _sendAs(item, 'ebook'),
+                              ),
+                              ActionChip(
+                                label: const Text('앱으로 검토'),
+                                onPressed: () => _sendAs(item, 'app'),
+                              ),
+                              ActionChip(
+                                label: const Text('콘텐츠로 검토'),
+                                onPressed: () => _sendAs(item, 'contents'),
+                              ),
+                              ActionChip(
+                                label: const Text('사이트로 검토'),
+                                onPressed: () => _sendAs(item, 'site'),
+                              ),
+                              ActionChip(
+                                label: const Text('홍보사업으로 검토'),
+                                onPressed: () => _sendAs(item, 'promo_site'),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  item.favorite
+                                      ? Icons.star
+                                      : Icons.star_border,
+                                ),
+                                onPressed: () async {
+                                  await _store.upsert(
+                                    item.copyWith(
+                                      favorite: !item.favorite,
+                                      updatedAt: DateTime.now()
+                                          .toUtc()
+                                          .toIso8601String(),
+                                    ),
+                                  );
+                                  await _reload();
+                                },
+                              ),
+                              TextButton(
+                                onPressed: () => _editIdea(item),
+                                child: const Text('편집'),
+                              ),
+                              if (widget.onSendToWorkInstruction != null)
+                                TextButton.icon(
+                                  onPressed: () => _sendAs(
+                                    item,
+                                    item.product.isEmpty
+                                        ? 'ebook'
+                                        : item.product,
                                   ),
-                                );
-                                await _reload();
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined),
-                              onPressed: () => _editIdea(item),
-                            ),
-                            IconButton(
-                              tooltip: '작업지시 제작소로 보내기',
-                              icon: const Icon(Icons.send_outlined),
-                              onPressed: widget.onSendToWorkInstruction == null
-                                  ? null
-                                  : () {
-                                      widget.onSendToWorkInstruction!(
-                                        IdeaToPlanningSeed(
-                                          title: item.title,
-                                          targetCustomer: item.targetCustomer,
-                                          field: item.product,
-                                          description: item.oneLiner,
-                                          memo: item.memo,
-                                        ),
-                                      );
-                                    },
-                            ),
-                          ],
-                        ),
-                        onTap: () => _editIdea(item),
+                                  icon: const Icon(
+                                    Icons.send_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('작업지시 제작소로'),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     );
                   },
                 ),
         ),
       ],
+    );
+  }
+
+  void _sendAs(IdeaBankItem item, String product) {
+    widget.onSendToWorkInstruction?.call(
+      IdeaToPlanningSeed(
+        title: item.title,
+        targetCustomer: item.targetCustomer,
+        field: product,
+        description: item.oneLiner.isNotEmpty
+            ? item.oneLiner
+            : item.howToBusiness,
+        memo: [
+          if (item.whyNow.isNotEmpty) item.whyNow,
+          if (item.memo.isNotEmpty) item.memo,
+        ].join('\n'),
+      ),
+    );
+  }
+
+  Widget _ideaLine(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              color: ControlColors.textMuted,
+            ),
+          ),
+          Text(value, style: const TextStyle(fontSize: 14, height: 1.35)),
+        ],
+      ),
     );
   }
 }

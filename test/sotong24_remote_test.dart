@@ -162,7 +162,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('소통24워크'), findsWidgets);
-    expect(find.textContaining('PC의 소통24워크 제작 시스템을 원격으로'), findsOneWidget);
+    expect(find.textContaining('선택된 제품을 실제로 제작하는 곳'), findsOneWidget);
     expect(find.textContaining('현재 제작'), findsOneWidget);
     expect(find.textContaining('50대 초보도'), findsWidgets);
     expect(find.text('승인 대기'), findsWidgets);

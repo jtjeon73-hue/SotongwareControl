@@ -53,6 +53,18 @@ class IdeaBankItem {
     required this.year,
     required this.month,
     this.favorite = false,
+    this.category = '',
+    this.whyNow = '',
+    this.howToBusiness = '',
+    this.businessUnits = '',
+    this.estimatedScale = '',
+    this.infoAsOf = '',
+    this.lastCheckedAt = '',
+    this.isSeed = false,
+    this.sources = const [],
+    this.scoreTrend = 0,
+    this.scoreMarket = 0,
+    this.scoreFit = 0,
   });
 
   final String id;
@@ -74,6 +86,22 @@ class IdeaBankItem {
   final int month;
   final bool favorite;
 
+  /// IdeaBankCategories id (optional).
+  final String category;
+  final String whyNow;
+  final String howToBusiness;
+  final String businessUnits;
+  final String estimatedScale;
+  final String infoAsOf;
+  final String lastCheckedAt;
+  final bool isSeed;
+  final List<IdeaBankSourceLite> sources;
+
+  /// 0이면 미평가. 1~5 참고 지표 (사실 단정 아님).
+  final int scoreTrend;
+  final int scoreMarket;
+  final int scoreFit;
+
   IdeaBankItem copyWith({
     String? title,
     String? oneLiner,
@@ -91,6 +119,18 @@ class IdeaBankItem {
     int? year,
     int? month,
     bool? favorite,
+    String? category,
+    String? whyNow,
+    String? howToBusiness,
+    String? businessUnits,
+    String? estimatedScale,
+    String? infoAsOf,
+    String? lastCheckedAt,
+    bool? isSeed,
+    List<IdeaBankSourceLite>? sources,
+    int? scoreTrend,
+    int? scoreMarket,
+    int? scoreFit,
   }) {
     return IdeaBankItem(
       id: id,
@@ -111,6 +151,18 @@ class IdeaBankItem {
       year: year ?? this.year,
       month: month ?? this.month,
       favorite: favorite ?? this.favorite,
+      category: category ?? this.category,
+      whyNow: whyNow ?? this.whyNow,
+      howToBusiness: howToBusiness ?? this.howToBusiness,
+      businessUnits: businessUnits ?? this.businessUnits,
+      estimatedScale: estimatedScale ?? this.estimatedScale,
+      infoAsOf: infoAsOf ?? this.infoAsOf,
+      lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
+      isSeed: isSeed ?? this.isSeed,
+      sources: sources ?? this.sources,
+      scoreTrend: scoreTrend ?? this.scoreTrend,
+      scoreMarket: scoreMarket ?? this.scoreMarket,
+      scoreFit: scoreFit ?? this.scoreFit,
     );
   }
 
@@ -133,9 +185,34 @@ class IdeaBankItem {
     'year': year,
     'month': month,
     'favorite': favorite,
+    'category': category,
+    'whyNow': whyNow,
+    'howToBusiness': howToBusiness,
+    'businessUnits': businessUnits,
+    'estimatedScale': estimatedScale,
+    'infoAsOf': infoAsOf,
+    'lastCheckedAt': lastCheckedAt,
+    'isSeed': isSeed,
+    'sources': sources.map((e) => e.toJson()).toList(),
+    'scoreTrend': scoreTrend,
+    'scoreMarket': scoreMarket,
+    'scoreFit': scoreFit,
   };
 
   factory IdeaBankItem.fromJson(Map<String, dynamic> json) {
+    final rawSources = json['sources'];
+    final sources = <IdeaBankSourceLite>[];
+    if (rawSources is List) {
+      for (final e in rawSources) {
+        if (e is Map<String, dynamic>) {
+          sources.add(IdeaBankSourceLite.fromJson(e));
+        } else if (e is Map) {
+          sources.add(
+            IdeaBankSourceLite.fromJson(Map<String, dynamic>.from(e)),
+          );
+        }
+      }
+    }
     return IdeaBankItem(
       id: '${json['id'] ?? ''}',
       title: '${json['title'] ?? ''}',
@@ -155,6 +232,48 @@ class IdeaBankItem {
       year: (json['year'] as num?)?.toInt() ?? DateTime.now().year,
       month: (json['month'] as num?)?.toInt() ?? DateTime.now().month,
       favorite: json['favorite'] == true,
+      category: '${json['category'] ?? ''}',
+      whyNow: '${json['whyNow'] ?? ''}',
+      howToBusiness: '${json['howToBusiness'] ?? ''}',
+      businessUnits: '${json['businessUnits'] ?? ''}',
+      estimatedScale: '${json['estimatedScale'] ?? ''}',
+      infoAsOf: '${json['infoAsOf'] ?? ''}',
+      lastCheckedAt: '${json['lastCheckedAt'] ?? ''}',
+      isSeed: json['isSeed'] == true,
+      sources: sources,
+      scoreTrend: (json['scoreTrend'] as num?)?.toInt() ?? 0,
+      scoreMarket: (json['scoreMarket'] as num?)?.toInt() ?? 0,
+      scoreFit: (json['scoreFit'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class IdeaBankSourceLite {
+  const IdeaBankSourceLite({
+    required this.sourceTitle,
+    required this.sourceUrl,
+    this.sourceType = 'official',
+    this.checkedAt = '',
+  });
+
+  final String sourceTitle;
+  final String sourceUrl;
+  final String sourceType;
+  final String checkedAt;
+
+  Map<String, dynamic> toJson() => {
+    'sourceTitle': sourceTitle,
+    'sourceUrl': sourceUrl,
+    'sourceType': sourceType,
+    'checkedAt': checkedAt,
+  };
+
+  factory IdeaBankSourceLite.fromJson(Map<String, dynamic> json) {
+    return IdeaBankSourceLite(
+      sourceTitle: '${json['sourceTitle'] ?? ''}',
+      sourceUrl: '${json['sourceUrl'] ?? ''}',
+      sourceType: '${json['sourceType'] ?? 'official'}',
+      checkedAt: '${json['checkedAt'] ?? ''}',
     );
   }
 }

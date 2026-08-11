@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../data/menu_divisions.dart';
 import '../theme/control_theme.dart';
 import 'sotong_brand_icon.dart';
 
@@ -272,7 +274,7 @@ extension ControlDestinationX on ControlDestination {
   }
 }
 
-class SidebarNavigation extends StatelessWidget {
+class SidebarNavigation extends StatefulWidget {
   const SidebarNavigation({
     super.key,
     required this.selected,
@@ -284,27 +286,39 @@ class SidebarNavigation extends StatelessWidget {
   final ValueChanged<ControlDestination> onDestinationSelected;
   final VoidCallback? onClose;
 
-  /// Canonical IA — 섹션 구분 없이 이 순서만 노출.
-  static const canonicalDestinations = <ControlDestination>[
-    ControlDestination.industrialAutomation,
-    ControlDestination.ebook,
-    ControlDestination.appDevelopment,
-    ControlDestination.siteManager,
-    ControlDestination.webMarketing,
-    ControlDestination.youtubeContent,
-    ControlDestination.aiBusinessAnalysis,
-    ControlDestination.productWorkshop,
-    ControlDestination.autoPromotion,
-    ControlDestination.autoSales,
-    ControlDestination.autoFinance,
-    ControlDestination.systemSettings,
-    ControlDestination.alertCenter,
-    ControlDestination.businessStudy,
-    ControlDestination.ideaBank,
-  ];
+  /// Canonical IA — 5개 부문 순서의 flat 목록 (route/key 보존).
+  static List<ControlDestination> get canonicalDestinations =>
+      MenuDivisionCatalog.flattenedDestinations;
+
+  @override
+  State<SidebarNavigation> createState() => _SidebarNavigationState();
+}
+
+class _SidebarNavigationState extends State<SidebarNavigation> {
+  late Set<String> _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    // 기본은 전부 펼침. 사용자는 그룹을 접을 수 있고, 선택 메뉴 그룹은 닫히지 않는다.
+    _expanded = {for (final d in MenuDivisionCatalog.all) d.id};
+  }
+
+  @override
+  void didUpdateWidget(covariant SidebarNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected) {
+      final div = MenuDivisionCatalog.divisionOf(widget.selected);
+      if (div != null && !_expanded.contains(div.id)) {
+        setState(() => _expanded = {..._expanded, div.id});
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 900;
+
     return Container(
       width: 268,
       decoration: const BoxDecoration(
@@ -317,7 +331,7 @@ class SidebarNavigation extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+            padding: EdgeInsets.fromLTRB(20, isCompact ? 12 : 20, 16, 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -343,10 +357,10 @@ class SidebarNavigation extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (onClose != null)
+                if (widget.onClose != null)
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: onClose,
+                    onPressed: widget.onClose,
                     visualDensity: VisualDensity.compact,
                   ),
               ],
@@ -355,17 +369,37 @@ class SidebarNavigation extends StatelessWidget {
           const Divider(height: 1),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
               children: [
-                for (final d in canonicalDestinations)
-                  _NavItem(
-                    destination: d,
-                    isSelected: d == selected,
-                    onTap: () {
-                      onDestinationSelected(d);
-                      onClose?.call();
+                for (final division in MenuDivisionCatalog.all) ...[
+                  _DivisionHeader(
+                    title: division.title,
+                    expanded: _expanded.contains(division.id),
+                    containsSelected: division.contains(widget.selected),
+                    onToggle: () {
+                      setState(() {
+                        if (_expanded.contains(division.id)) {
+                          // 선택 메뉴가 있는 그룹은 닫지 않음
+                          if (division.contains(widget.selected)) return;
+                          _expanded = {..._expanded}..remove(division.id);
+                        } else {
+                          _expanded = {..._expanded, division.id};
+                        }
+                      });
                     },
                   ),
+                  if (_expanded.contains(division.id))
+                    for (final d in division.destinations)
+                      _NavItem(
+                        destination: d,
+                        isSelected: d == widget.selected,
+                        onTap: () {
+                          widget.onDestinationSelected(d);
+                          widget.onClose?.call();
+                        },
+                      ),
+                  const SizedBox(height: 4),
+                ],
               ],
             ),
           ),
@@ -382,6 +416,53 @@ class SidebarNavigation extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DivisionHeader extends StatelessWidget {
+  const _DivisionHeader({
+    required this.title,
+    required this.expanded,
+    required this.containsSelected,
+    required this.onToggle,
+  });
+
+  final String title;
+  final bool expanded;
+  final bool containsSelected;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onToggle,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 4, 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                  color: containsSelected
+                      ? ControlColors.teal
+                      : ControlColors.textMuted,
+                ),
+              ),
+            ),
+            Icon(
+              expanded ? Icons.expand_less : Icons.expand_more,
+              size: 18,
+              color: ControlColors.textMuted,
+            ),
+          ],
+        ),
       ),
     );
   }
