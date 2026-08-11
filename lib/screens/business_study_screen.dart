@@ -24,7 +24,17 @@ const _sectionTitleStyle = TextStyle(
 );
 
 class BusinessStudyScreen extends StatefulWidget {
-  const BusinessStudyScreen({super.key});
+  const BusinessStudyScreen({
+    super.key,
+    this.onImmersiveModeChanged,
+    this.onOpenDrawer,
+  });
+
+  /// 모바일 읽기/전체화면 시 총관제 셸 헤더를 숨기도록 알림.
+  final ValueChanged<bool>? onImmersiveModeChanged;
+
+  /// 셸 헤더가 숨겨진 모바일에서 사이드 메뉴(드로어)를 연다.
+  final VoidCallback? onOpenDrawer;
 
   @override
   State<BusinessStudyScreen> createState() => _BusinessStudyScreenState();
@@ -51,7 +61,7 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
   var _tocExpanded = true;
   var _listCollapsed = false;
   var _fullscreenReading = false;
-  double? _savedListOffset;
+  var _shellImmersiveRequested = false;
 
   @override
   void initState() {
@@ -62,14 +72,6 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
       );
     });
     _loadAll();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _listScrollController.dispose();
-    _detailScrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadAll() async {
@@ -176,20 +178,193 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
   }
 
   Future<void> _selectArticle(String id, {required bool isWide}) async {
-    if (!isWide) {
-      _savedListOffset = _listScrollController.hasClients
-          ? _listScrollController.offset
-          : null;
-    }
+    final same = _selectedId == id;
     setState(() => _selectedId = id);
     await _store.saveLastOpenedId(id);
     final status = _statuses[id] ?? 'unread';
     if (status == 'unread') {
       await _setStatus(id, 'reading');
     }
-    if (_detailScrollController.hasClients) {
+    if (!same && _detailScrollController.hasClients) {
       _detailScrollController.jumpTo(0);
     }
+  }
+
+  void _setFullscreen(bool value) {
+    setState(() => _fullscreenReading = value);
+  }
+
+  void _syncShellImmersive(bool isWide) {
+    // 모바일 사업전략연구실: 셸 헤더를 숨겨 본문 높이를 확보한다.
+    final hide = !isWide;
+    if (_shellImmersiveRequested == hide) return;
+    _shellImmersiveRequested = hide;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onImmersiveModeChanged?.call(hide);
+    });
+  }
+
+  Future<void> _openMobileArticleSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: ControlColors.surface,
+      builder: (ctx) {
+        final height = MediaQuery.sizeOf(ctx).height * 0.88;
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return SizedBox(
+              height: height,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 8, 4),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '연구주제 목록',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '닫기',
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: _FilterRow(
+                      searchController: _searchController,
+                      categoryFilter: _categoryFilter,
+                      quickFilter: _quickFilter,
+                      onCategoryChanged: (v) {
+                        setState(() => _categoryFilter = v);
+                        setModalState(() {});
+                      },
+                      onQuickFilterChanged: (v) {
+                        setState(() => _quickFilter = v);
+                        setModalState(() {});
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _ArticleList(
+                      articles: _filteredArticles,
+                      selectedId: _selectedId,
+                      statuses: _statuses,
+                      favorites: _favorites,
+                      scrollController: _listScrollController,
+                      onSelect: (id) async {
+                        Navigator.pop(ctx);
+                        await _selectArticle(id, isWide: false);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _mobileCompactBar({required bool fullscreen}) {
+    const barHeight = 52.0;
+    if (fullscreen) {
+      return SizedBox(
+        height: barHeight,
+        child: Material(
+          color: ControlColors.surface,
+          child: Row(
+            children: [
+              TextButton(
+                onPressed: () => _setFullscreen(false),
+                child: const Text('전체화면 종료'),
+              ),
+              const Spacer(),
+            ],
+          ),
+        ),
+      );
+    }
+    return SizedBox(
+      height: barHeight,
+      child: Material(
+        color: ControlColors.surface,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: widget.onOpenDrawer != null ? '메뉴' : '목록',
+                onPressed: widget.onOpenDrawer ?? _openMobileArticleSheet,
+                icon: Icon(
+                  widget.onOpenDrawer != null ? Icons.menu : Icons.arrow_back,
+                ),
+              ),
+              const Expanded(
+                child: Text(
+                  '사업전략연구실',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+              ),
+              TextButton(
+                onPressed: _openMobileArticleSheet,
+                child: const Text('목록'),
+              ),
+              IconButton(
+                tooltip: '전체화면 읽기',
+                onPressed: () => _setFullscreen(true),
+                icon: const Icon(Icons.fullscreen),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadingPane(
+    StrategyArticle selected, {
+    required bool compactChrome,
+    required bool tocExpanded,
+    VoidCallback? onBack,
+  }) {
+    return _ReadingPane(
+      article: selected,
+      scrollController: _detailScrollController,
+      sectionKeys: _sectionKeys,
+      status: _statuses[selected.id] ?? 'unread',
+      isFavorite: _favorites.contains(selected.id),
+      memo: _memos[selected.id] ?? '',
+      applyNote: _applyNotes[selected.id] ?? '',
+      actionChecks: _actionChecks,
+      tocExpanded: tocExpanded,
+      onTocExpanded: (v) => setState(() => _tocExpanded = v),
+      onBack: onBack,
+      onSetStatus: _setStatus,
+      onToggleFavorite: _toggleFavorite,
+      onSaveMemo: _saveMemo,
+      onSaveApplyNote: _saveApplyNote,
+      onToggleAction: _toggleAction,
+      onNavigate: _navigateArticle,
+      onScrollToSection: _scrollToSection,
+      compactChrome: compactChrome,
+    );
   }
 
   Future<void> _setStatus(String articleId, String status) async {
@@ -257,7 +432,8 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
         : list.indexWhere((a) => a.id == current.id);
     final safeIndex = currentIndex < 0 ? 0 : currentIndex;
     final nextIndex = (safeIndex + delta).clamp(0, list.length - 1);
-    _selectArticle(list[nextIndex].id, isWide: true);
+    final isWide = MediaQuery.sizeOf(context).width >= 900;
+    _selectArticle(list[nextIndex].id, isWide: isWide);
   }
 
   void _scrollToSection(String key) {
@@ -271,19 +447,15 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
     );
   }
 
-  void _backToList() {
-    setState(() => _selectedId = null);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_savedListOffset != null && _listScrollController.hasClients) {
-        _listScrollController.jumpTo(
-          _savedListOffset!.clamp(
-            0.0,
-            _listScrollController.position.maxScrollExtent,
-          ),
-        );
-      }
-    });
+  @override
+  void dispose() {
+    if (_shellImmersiveRequested) {
+      widget.onImmersiveModeChanged?.call(false);
+    }
+    _searchController.dispose();
+    _listScrollController.dispose();
+    _detailScrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -302,10 +474,7 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 900;
         final selected = _selectedArticle;
-
-        // 데스크톱: 항상 본문 표시. 모바일: 선택 시에만 상세.
-        final showDetail = isWide || selected != null;
-        final showList = isWide || selected == null;
+        _syncShellImmersive(isWide);
 
         return Focus(
           autofocus: true,
@@ -323,156 +492,154 @@ class _BusinessStudyScreenState extends State<BusinessStudyScreen> {
             }
             return KeyEventResult.ignored;
           },
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              isWide ? (_fullscreenReading ? 12 : 24) : 12,
-              _fullscreenReading ? 8 : (isWide ? 12 : 8),
-              isWide ? (_fullscreenReading ? 12 : 24) : 12,
-              8,
+          child: isWide ? _buildDesktop(selected) : _buildMobile(selected),
+        );
+      },
+    );
+  }
+
+  Widget _buildMobile(StrategyArticle? selected) {
+    // 모바일: 52px 바만 고정. 목록은 BottomSheet. 본문이 나머지 전체.
+    return ColoredBox(
+      color: ControlColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mobileCompactBar(fullscreen: _fullscreenReading),
+          Expanded(
+            child: selected == null
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                    child: Column(
+                      children: [
+                        _FilterRow(
+                          searchController: _searchController,
+                          categoryFilter: _categoryFilter,
+                          quickFilter: _quickFilter,
+                          onCategoryChanged: (v) =>
+                              setState(() => _categoryFilter = v),
+                          onQuickFilterChanged: (v) =>
+                              setState(() => _quickFilter = v),
+                        ),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: _ArticleList(
+                            articles: _filteredArticles,
+                            selectedId: null,
+                            statuses: _statuses,
+                            favorites: _favorites,
+                            scrollController: _listScrollController,
+                            onSelect: (id) => _selectArticle(id, isWide: false),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _buildReadingPane(
+                    selected,
+                    compactChrome: true,
+                    tocExpanded: _fullscreenReading ? false : _tocExpanded,
+                    onBack: null,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktop(StrategyArticle? selected) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        _fullscreenReading ? 12 : 24,
+        _fullscreenReading ? 8 : 12,
+        _fullscreenReading ? 12 : 24,
+        8,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!_fullscreenReading)
+            _ReadingHeader(
+              total: allStrategyArticles.length,
+              reading: _readingCount,
+              reviewed: _reviewedCount,
+              favorites: _favorites.length,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (!_fullscreenReading) ...[
+            const SizedBox(height: 8),
+            _FilterRow(
+              searchController: _searchController,
+              categoryFilter: _categoryFilter,
+              quickFilter: _quickFilter,
+              onCategoryChanged: (v) => setState(() => _categoryFilter = v),
+              onQuickFilterChanged: (v) => setState(() => _quickFilter = v),
+            ),
+          ],
+          if (selected != null) ...[
+            const SizedBox(height: 6),
+            Row(
               children: [
                 if (!_fullscreenReading)
-                  _ReadingHeader(
-                    total: allStrategyArticles.length,
-                    reading: _readingCount,
-                    reviewed: _reviewedCount,
-                    favorites: _favorites.length,
+                  TextButton.icon(
+                    onPressed: () =>
+                        setState(() => _listCollapsed = !_listCollapsed),
+                    icon: Icon(
+                      _listCollapsed
+                          ? Icons.view_sidebar_outlined
+                          : Icons.view_sidebar,
+                      size: 18,
+                    ),
+                    label: Text(_listCollapsed ? '목록 펼치기' : '목록 접기'),
                   ),
-                if (showList && !_fullscreenReading) ...[
-                  const SizedBox(height: 8),
-                  _FilterRow(
-                    searchController: _searchController,
-                    categoryFilter: _categoryFilter,
-                    quickFilter: _quickFilter,
-                    onCategoryChanged: (v) =>
-                        setState(() => _categoryFilter = v),
-                    onQuickFilterChanged: (v) =>
-                        setState(() => _quickFilter = v),
+                TextButton.icon(
+                  onPressed: () => _setFullscreen(!_fullscreenReading),
+                  icon: Icon(
+                    _fullscreenReading
+                        ? Icons.fullscreen_exit
+                        : Icons.fullscreen,
+                    size: 18,
                   ),
+                  label: Text(_fullscreenReading ? '일반 보기' : '전체화면 읽기'),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!_listCollapsed && !_fullscreenReading) ...[
+                  SizedBox(
+                    width: 300,
+                    child: _ArticleList(
+                      articles: _filteredArticles,
+                      selectedId: selected?.id,
+                      statuses: _statuses,
+                      favorites: _favorites,
+                      scrollController: _listScrollController,
+                      onSelect: (id) => _selectArticle(id, isWide: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                 ],
-                if (isWide && selected != null) ...[
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        onPressed: () =>
-                            setState(() => _listCollapsed = !_listCollapsed),
-                        icon: Icon(
-                          _listCollapsed
-                              ? Icons.view_sidebar_outlined
-                              : Icons.view_sidebar,
-                          size: 18,
-                        ),
-                        label: Text(_listCollapsed ? '목록 펼치기' : '목록 접기'),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => setState(
-                          () => _fullscreenReading = !_fullscreenReading,
-                        ),
-                        icon: Icon(
-                          _fullscreenReading
-                              ? Icons.fullscreen_exit
-                              : Icons.fullscreen,
-                          size: 18,
-                        ),
-                        label: Text(_fullscreenReading ? '일반 보기' : '전체화면 읽기'),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 8),
                 Expanded(
-                  child: isWide
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (!_listCollapsed && !_fullscreenReading) ...[
-                              SizedBox(
-                                width: 300,
-                                child: _ArticleList(
-                                  articles: _filteredArticles,
-                                  selectedId: selected?.id,
-                                  statuses: _statuses,
-                                  favorites: _favorites,
-                                  scrollController: _listScrollController,
-                                  onSelect: (id) =>
-                                      _selectArticle(id, isWide: true),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                            ],
-                            Expanded(
-                              child: selected == null
-                                  ? const SizedBox.shrink()
-                                  : _ReadingPane(
-                                      article: selected,
-                                      scrollController: _detailScrollController,
-                                      sectionKeys: _sectionKeys,
-                                      status:
-                                          _statuses[selected.id] ?? 'unread',
-                                      isFavorite: _favorites.contains(
-                                        selected.id,
-                                      ),
-                                      memo: _memos[selected.id] ?? '',
-                                      applyNote: _applyNotes[selected.id] ?? '',
-                                      actionChecks: _actionChecks,
-                                      tocExpanded: _fullscreenReading
-                                          ? false
-                                          : _tocExpanded,
-                                      onTocExpanded: (v) =>
-                                          setState(() => _tocExpanded = v),
-                                      onBack: null,
-                                      onSetStatus: _setStatus,
-                                      onToggleFavorite: _toggleFavorite,
-                                      onSaveMemo: _saveMemo,
-                                      onSaveApplyNote: _saveApplyNote,
-                                      onToggleAction: _toggleAction,
-                                      onNavigate: _navigateArticle,
-                                      onScrollToSection: _scrollToSection,
-                                      compactChrome: _fullscreenReading,
-                                    ),
-                            ),
-                          ],
-                        )
-                      : showDetail && selected != null
-                      ? _ReadingPane(
-                          article: selected,
-                          scrollController: _detailScrollController,
-                          sectionKeys: _sectionKeys,
-                          status: _statuses[selected.id] ?? 'unread',
-                          isFavorite: _favorites.contains(selected.id),
-                          memo: _memos[selected.id] ?? '',
-                          applyNote: _applyNotes[selected.id] ?? '',
-                          actionChecks: _actionChecks,
-                          tocExpanded: _tocExpanded,
-                          onTocExpanded: (v) =>
-                              setState(() => _tocExpanded = v),
-                          onBack: _backToList,
-                          onSetStatus: _setStatus,
-                          onToggleFavorite: _toggleFavorite,
-                          onSaveMemo: _saveMemo,
-                          onSaveApplyNote: _saveApplyNote,
-                          onToggleAction: _toggleAction,
-                          onNavigate: _navigateArticle,
-                          onScrollToSection: _scrollToSection,
-                          compactChrome: true,
-                        )
-                      : _ArticleList(
-                          articles: _filteredArticles,
-                          selectedId: null,
-                          statuses: _statuses,
-                          favorites: _favorites,
-                          scrollController: _listScrollController,
-                          onSelect: (id) => _selectArticle(id, isWide: false),
+                  child: selected == null
+                      ? const SizedBox.shrink()
+                      : _buildReadingPane(
+                          selected,
+                          compactChrome: _fullscreenReading,
+                          tocExpanded: _fullscreenReading
+                              ? false
+                              : _tocExpanded,
+                          onBack: null,
                         ),
                 ),
               ],
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
@@ -996,9 +1163,9 @@ class _ReadingPaneState extends State<_ReadingPane> {
                   child: ListView(
                     controller: widget.scrollController,
                     padding: EdgeInsets.fromLTRB(
-                      widget.compactChrome ? 12 : 20,
+                      widget.compactChrome ? 8 : 20,
                       widget.compactChrome ? 8 : 12,
-                      widget.compactChrome ? 12 : 20,
+                      widget.compactChrome ? 8 : 20,
                       widget.compactChrome ? 20 : 32,
                     ),
                     children: [

@@ -150,23 +150,57 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 모바일 자동 선택 본문 → 목록으로
-    expect(find.text('목록으로 돌아가기'), findsOneWidget);
-    await tester.tap(find.text('목록으로 돌아가기'));
+    // 모바일: 컴팩트 바 + 본문. 목록은 BottomSheet.
+    expect(find.text('목록으로 돌아가기'), findsNothing);
+    expect(find.text('목록'), findsOneWidget);
+    await tester.tap(find.text('목록'));
     await tester.pumpAndSettle();
+    expect(find.text('연구주제 목록'), findsOneWidget);
 
-    expect(find.text('사업전략연구실'), findsOneWidget);
     final second = allStrategyArticles[1];
     await tester.scrollUntilVisible(
       find.text(second.title),
       200,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.byType(Scrollable).last,
     );
-    await tester.tap(find.text(second.title));
+    await tester.tap(find.text(second.title).last);
     await tester.pumpAndSettle();
-    expect(find.text('목록으로 돌아가기'), findsOneWidget);
+    expect(find.text('연구주제 목록'), findsNothing);
     expect(find.text(second.title), findsWidgets);
+    expect(find.text('목록'), findsOneWidget);
+
+    // 전체화면 읽기
+    await tester.tap(find.byTooltip('전체화면 읽기'));
+    await tester.pumpAndSettle();
+    expect(find.text('전체화면 종료'), findsOneWidget);
+    expect(find.text('목록'), findsNothing);
+    await tester.tap(find.text('전체화면 종료'));
+    await tester.pumpAndSettle();
+    expect(find.text('목록'), findsOneWidget);
   });
+
+  for (final width in [360.0, 390.0, 412.0, 430.0]) {
+    testWidgets('모바일 읽기 영역 비율 $width', (tester) async {
+      const height = 800.0;
+      tester.view.physicalSize = Size(width, height);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        const MaterialApp(home: Scaffold(body: BusinessStudyScreen())),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('사업전략연구실'), findsOneWidget);
+      expect(find.text('목록'), findsOneWidget);
+      // 상단 컴팩트 바(~52)만 — 본문이 뷰포트의 대부분을 사용
+      const bar = 52.0;
+      final bodyShare = (height - bar) / height;
+      expect(bodyShare, greaterThanOrEqualTo(0.85));
+      expect(find.text('목록으로 돌아가기'), findsNothing);
+    });
+  }
 
   for (final width in [360.0, 768.0, 1366.0, 1440.0]) {
     testWidgets('오버플로 없음 $width', (tester) async {

@@ -80,13 +80,24 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   IdeaToPlanningSeed? _ideaSeed;
 
+  /// 사업전략연구실 모바일/전체화면 읽기 시 총관제 상단 헤더 숨김.
+  var _hideShellChrome = false;
+
   void _onDestinationSelected(ControlDestination destination) {
     setState(() {
       _selected = destination;
       if (destination != ControlDestination.aiBusinessAnalysis) {
         _ideaSeed = null;
       }
+      if (destination != ControlDestination.businessStudy) {
+        _hideShellChrome = false;
+      }
     });
+  }
+
+  void _onStudyImmersiveChanged(bool hide) {
+    if (_hideShellChrome == hide) return;
+    setState(() => _hideShellChrome = hide);
   }
 
   void _sendIdeaToWorkInstruction(IdeaToPlanningSeed seed) {
@@ -241,7 +252,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           config: BusinessDepartmentCatalog.knowledgeSite,
         );
       case ControlDestination.businessStudy:
-        return const BusinessStudyScreen();
+        return BusinessStudyScreen(
+          onImmersiveModeChanged: _onStudyImmersiveChanged,
+          onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+        );
       case ControlDestination.publicServices:
         return const PublicServicesScreen();
       case ControlDestination.productWorkshop:
@@ -305,12 +319,13 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           ),
           body: Column(
             children: [
-              _ControlHeader(
-                title: _pageTitle,
-                showMenuButton: true,
-                onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                onSignOut: _confirmSignOut,
-              ),
+              if (!_hideShellChrome)
+                _ControlHeader(
+                  title: _pageTitle,
+                  showMenuButton: true,
+                  onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  onSignOut: _confirmSignOut,
+                ),
               Expanded(child: _buildContent()),
             ],
           ),
