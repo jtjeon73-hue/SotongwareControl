@@ -24,6 +24,7 @@ class MenuDivisionCatalog {
     destinations: [
       ControlDestination.aiBusinessAnalysis,
       ControlDestination.productWorkshop,
+      ControlDestination.sotong24RemoteControl,
     ],
   );
 

@@ -144,3 +144,9 @@ Future<DevWorkDocWriteResult> permanentDelete({
     errorCode: 'unsupported',
   );
 }
+
+Future<List<DevWorkDocActiveEntry>> listActiveInstructions(
+  String artifactType,
+) async {
+  return const [];
+}

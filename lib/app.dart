@@ -21,6 +21,7 @@ import 'screens/idea_bank_screen.dart';
 import 'screens/issues_dashboard_screen.dart';
 import 'screens/product_workshop_screen.dart';
 import 'screens/public_services_screen.dart';
+import 'screens/remote_control_screen.dart';
 import 'screens/portfolio_hub_screen.dart';
 import 'screens/revenue_dashboard_screen.dart';
 import 'screens/sotong24work_screen.dart';
@@ -260,6 +261,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return const PublicServicesScreen();
       case ControlDestination.productWorkshop:
         return const ProductWorkshopScreen();
+      case ControlDestination.sotong24RemoteControl:
+        return const RemoteControlScreen();
       case ControlDestination.autoPromotion:
         return const AutoPromotionScreen();
       case ControlDestination.autoSales:

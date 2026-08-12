@@ -216,3 +216,20 @@ class DevWorkDocMigrateReport {
   int get conflictCount =>
       items.where((e) => e.outcome == DevWorkDocSaveOutcome.conflict).length;
 }
+
+/// Active 폴더의 WI_*.json 목록 항목 (원격 전송 선택용).
+class DevWorkDocActiveEntry {
+  const DevWorkDocActiveEntry({
+    required this.instructionId,
+    required this.jsonText,
+    this.title = '',
+    this.version = 1,
+    this.totalStages = 18,
+  });
+
+  final String instructionId;
+  final String jsonText;
+  final String title;
+  final int version;
+  final int totalStages;
+}

@@ -762,6 +762,58 @@ Future<String?> readActive(String artifactType, String instructionId) async {
   return result.text;
 }
 
+Future<List<DevWorkDocActiveEntry>> listActiveInstructions(
+  String artifactType,
+) async {
+  final root = _rootHandle;
+  if (root == null || !await _hasPermission(root)) return const [];
+  final folder = DevWorkDocPaths.artifactFolder(artifactType);
+  final activeDir = await _resolveDirExisting(root, [folder, 'Active']);
+  if (activeDir == null) return const [];
+  final names = await _listEntryNames(activeDir);
+  final out = <DevWorkDocActiveEntry>[];
+  final pattern = RegExp(r'^WI_(.+)\.json$');
+  for (final name in names) {
+    final m = pattern.firstMatch(name);
+    if (m == null) continue;
+    final rel = '$folder/Active/$name';
+    final read = await _readTextFileExisting(root, rel);
+    final text = read.text;
+    if (text == null || text.isEmpty) continue;
+    var title = '';
+    var version = 1;
+    var total = 18;
+    var instructionId = m.group(1) ?? '';
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is Map) {
+        instructionId =
+            '${decoded['instructionId'] ?? instructionId}'.trim();
+        title =
+            '${decoded['title'] ?? decoded['projectName'] ?? ''}'.trim();
+        version = int.tryParse('${decoded['version'] ?? 1}') ?? 1;
+        final stages = decoded['stages'];
+        if (stages is List && stages.isNotEmpty) total = stages.length;
+        if (decoded['totalStages'] != null) {
+          total = int.tryParse('${decoded['totalStages']}') ?? total;
+        }
+      }
+    } catch (_) {}
+    if (instructionId.isEmpty) continue;
+    out.add(
+      DevWorkDocActiveEntry(
+        instructionId: instructionId,
+        jsonText: text,
+        title: title,
+        version: version,
+        totalStages: total,
+      ),
+    );
+  }
+  out.sort((a, b) => a.title.compareTo(b.title));
+  return out;
+}
+
 Future<String?> readVersionFile({
   required String artifactType,
   required String instructionId,

@@ -1,14 +1,16 @@
 {
   "name": "sotongware-control-functions",
-  "description": "Cloud Functions for Sotongware Control (study AI + Sotong24 relay)",
+  "description": "Cloud Functions for Sotongware Control (study AI + Sotong24 relay + remote agent API)",
   "engines": {
     "node": "20"
   },
   "main": "index.js",
   "scripts": {
-    "lint": "node -c index.js && node -c sotong24/relay.js && node -c sotong24/validate.js && node -c sotong24/auth.js && node -c sotong24/writer.js && node -c sotong24/reader.js && node -c sotong24/canonical.js && node -c sotong24/rate_limit.js",
+    "lint": "node -c index.js && node -c sotong24/relay.js && node -c sotong24/validate.js && node -c sotong24/auth.js && node -c sotong24/writer.js && node -c sotong24/reader.js && node -c sotong24/canonical.js && node -c sotong24/rate_limit.js && node -c remote/router.js && node -c remote/handlers.js && node -c remote/auth.js && node -c remote/constants.js && node -c remote/crypto_util.js && node -c remote/http.js && node -c remote/log.js && node -c remote/memory_db.js",
     "build": "npm run lint",
-    "test": "node --test test/relay.test.js"
+    "test": "node --test test/relay.test.js test/remote_contract.test.js",
+    "test:relay": "node --test test/relay.test.js",
+    "test:remote": "node --test test/remote_contract.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",

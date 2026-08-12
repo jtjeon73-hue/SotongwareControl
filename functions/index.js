@@ -1,15 +1,17 @@
 /**
- * 소통스터디부 AI 생성 + 소통24워크 PC Relay Cloud Functions
+ * 소통스터디부 AI 생성 + 소통24워크 PC Relay + Remote Agent API V1
  *
- * - API Key / Relay Secret 은 Firebase Secret · 환경변수만 사용 (소스·Git 금지)
  * - study*: Firebase Auth + 관리자 UID
- * - sotong24Relay: Shared relay token (Bearer) — PC service account 키 불필요
+ * - sotong24Relay: Shared relay token (Bearer)
+ * - api: Agent/Control HTTPS router (protocol V1)
+ *   Emulator/자동 테스트 우선 — production deploy는 별도 승인
  */
 const functions = require("firebase-functions");
 const { onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { handleRelayRequest } = require("./sotong24/relay");
+const { handleApiRequest } = require("./remote/router");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -81,7 +83,7 @@ exports.studyAiHealth = functions.https.onCall(async (data, context) => {
   };
 });
 
-/** PC Sotong24Work → Firestore 최소 권한 Relay (Hosting/클라이언트 rules 불변) */
+/** PC Sotong24Work → Firestore 최소 권한 Relay (기존 유지) */
 const sotong24RelaySecret = defineSecret("SOTONG24_RELAY_SECRET");
 
 exports.sotong24Relay = onRequest(
@@ -100,7 +102,28 @@ exports.sotong24Relay = onRequest(
   }
 );
 
-// 단위 테스트용 export
+/**
+ * Remote Agent + Control API V1
+ * Paths: /api/agent/*, /api/control/*
+ */
+exports.api = onRequest(
+  {
+    cors: false,
+    maxInstances: 20,
+    timeoutSeconds: 30,
+    memory: "256MiB",
+  },
+  async (req, res) => {
+    await handleApiRequest(req, res, {
+      db: admin.firestore(),
+    });
+  }
+);
+
 exports._sotong24 = {
   handleRelayRequest,
+};
+
+exports._remote = {
+  handleApiRequest,
 };

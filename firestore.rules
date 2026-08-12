@@ -1,16 +1,87 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 관리자 UID/이메일만 접근 (비밀번호 아님 · dart-define과 일치)
-    // study_* 컬렉션 포함 전체 문서에 동일 적용
+    // 기존 관리자 (dart-define과 일치) — 레거시 컬렉션 유지
     function isAdmin() {
       return request.auth != null
         && request.auth.uid == 'YrJNhBlxSeck5qZi5NgHWrx1CjE3'
         && request.auth.token.email.lower() == 'sotongware@naver.com';
     }
 
-    match /{document=**} {
-      allow read, write: if isAdmin();
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // --- Remote Agent V1 (client write 금지, Admin SDK/Functions만 write) ---
+    match /agents/{agentId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /agentTokens/{tokenHash} {
+      allow read, write: if false;
+    }
+
+    match /pairingSessions/{sessionId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /jobs/{jobId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false;
+
+      match /commands/{commandId} {
+        allow read: if isAdmin()
+          || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+        allow write: if false;
+      }
+
+      match /stages/{stageId} {
+        allow read: if isAdmin()
+          || (isSignedIn()
+            && get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid
+              == request.auth.uid);
+        allow write: if false;
+      }
+
+      match /events/{eventId} {
+        allow read: if isAdmin()
+          || (isSignedIn()
+            && get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid
+              == request.auth.uid);
+        allow write: if false;
+      }
+
+      match /artifacts/{artifactId} {
+        allow read: if isAdmin()
+          || (isSignedIn()
+            && get(/databases/$(database)/documents/jobs/$(jobId)).data.ownerUid
+              == request.auth.uid);
+        allow write: if false;
+      }
+    }
+
+    match /users/{uid} {
+      allow read: if isAdmin() || isOwner(uid);
+      allow write: if false;
+    }
+
+    // --- 레거시/기타 컬렉션 (기존 동작 유지) ---
+    match /{collection}/{document=**} {
+      allow read, write: if isAdmin()
+        && collection != 'agents'
+        && collection != 'agentTokens'
+        && collection != 'pairingSessions'
+        && collection != 'jobs'
+        && collection != 'users';
     }
   }
 }

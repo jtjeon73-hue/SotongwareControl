@@ -19,7 +19,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('메뉴 5개 부문과 flattened 15개 일치', () {
+  test('메뉴 5개 부문과 flattened 16개 일치', () {
     expect(MenuDivisionCatalog.all.length, 5);
     expect(MenuDivisionCatalog.all.map((e) => e.title).toList(), [
       '기획실행부',
@@ -28,12 +28,16 @@ void main() {
       '설정부',
       '사업전략부',
     ]);
-    expect(SidebarNavigation.canonicalDestinations.length, 15);
+    expect(SidebarNavigation.canonicalDestinations.length, 16);
     expect(
       SidebarNavigation.canonicalDestinations,
       MenuDivisionCatalog.flattenedDestinations,
     );
     expect(ControlDestination.productWorkshop.label, '소통24워크');
+    expect(
+      ControlDestination.sotong24RemoteControl.label,
+      '소통24워크 원격관제',
+    );
     expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
   });
 

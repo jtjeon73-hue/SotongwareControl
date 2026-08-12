@@ -42,6 +42,7 @@ enum ControlDestination {
   adminData,
   // Canonical IA 재구성 — 신규
   productWorkshop,
+  sotong24RemoteControl,
   autoPromotion,
   autoSales,
   autoFinance,
@@ -125,6 +126,8 @@ extension ControlDestinationX on ControlDestination {
         return '공개 서비스';
       case ControlDestination.productWorkshop:
         return '소통24워크';
+      case ControlDestination.sotong24RemoteControl:
+        return '소통24워크 원격관제';
       case ControlDestination.autoPromotion:
         return '자동 홍보 전략실';
       case ControlDestination.autoSales:
@@ -214,6 +217,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.public_outlined;
       case ControlDestination.productWorkshop:
         return Icons.handyman_outlined;
+      case ControlDestination.sotong24RemoteControl:
+        return Icons.phonelink_setup_outlined;
       case ControlDestination.autoPromotion:
         return Icons.campaign_outlined;
       case ControlDestination.autoSales:

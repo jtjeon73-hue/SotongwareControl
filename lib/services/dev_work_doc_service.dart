@@ -106,4 +106,9 @@ class DevWorkDocService {
     artifactType: artifactType,
     instructionId: instructionId,
   );
+
+  /// Active 폴더의 작업지시 JSON 목록 (원격 START_JOB 선택).
+  Future<List<DevWorkDocActiveEntry>> listActiveInstructions(
+    String artifactType,
+  ) => impl.listActiveInstructions(artifactType);
 }
