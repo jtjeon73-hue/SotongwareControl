@@ -34,10 +34,7 @@ void main() {
       MenuDivisionCatalog.flattenedDestinations,
     );
     expect(ControlDestination.productWorkshop.label, '소통24워크');
-    expect(
-      ControlDestination.sotong24RemoteControl.label,
-      '소통24워크 원격관제',
-    );
+    expect(ControlDestination.sotong24RemoteControl.label, '소통24워크 원격관제');
     expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
   });
 

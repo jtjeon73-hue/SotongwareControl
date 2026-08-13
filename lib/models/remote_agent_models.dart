@@ -30,7 +30,10 @@ class RemoteAgentDoc {
   final DateTime? lastHeartbeatAt;
   final DateTime? updatedAt;
 
-  bool isOnline({DateTime? now, int thresholdSeconds = RemoteControlEnv.onlineThresholdSeconds}) {
+  bool isOnline({
+    DateTime? now,
+    int thresholdSeconds = RemoteControlEnv.onlineThresholdSeconds,
+  }) {
     final hb = lastHeartbeatAt;
     if (hb == null) return false;
     final clock = now ?? DateTime.now().toUtc();
@@ -265,10 +268,10 @@ String formatRelativeKo(DateTime? at, {DateTime? now}) {
   final clock = now ?? DateTime.now().toUtc();
   final sec = clock.difference(at.toUtc()).inSeconds;
   if (sec < 5) return '방금 전';
-  if (sec < 60) return '${sec}초 전';
+  if (sec < 60) return '$sec초 전';
   final min = sec ~/ 60;
-  if (min < 60) return '${min}분 전';
+  if (min < 60) return '$min분 전';
   final hr = min ~/ 60;
-  if (hr < 48) return '${hr}시간 전';
+  if (hr < 48) return '$hr시간 전';
   return '${hr ~/ 24}일 전';
 }

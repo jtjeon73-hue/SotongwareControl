@@ -10,7 +10,9 @@
     "build": "npm run lint",
     "test": "node --test test/relay.test.js test/remote_contract.test.js",
     "test:relay": "node --test test/relay.test.js",
-    "test:remote": "node --test test/remote_contract.test.js"
+    "test:remote": "node --test test/remote_contract.test.js",
+    "test:emulator": "node test/remote_emulator_e2e.js",
+    "test:businessPlansRules": "node test/business_plans_rules_emulator.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",

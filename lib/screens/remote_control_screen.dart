@@ -209,9 +209,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
 
   Future<void> _openAgentDetail(BuildContext context, RemoteAgentDoc agent) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _AgentDetailPage(agent: agent),
-      ),
+      MaterialPageRoute<void>(builder: (_) => _AgentDetailPage(agent: agent)),
     );
   }
 
@@ -223,7 +221,10 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     );
   }
 
-  Future<void> _startSendFlow(BuildContext context, RemoteAgentDoc agent) async {
+  Future<void> _startSendFlow(
+    BuildContext context,
+    RemoteAgentDoc agent,
+  ) async {
     if (!agent.isOnline()) {
       _toast(context, '노트북이 오프라인입니다. Agent가 켜져 있는지 확인해 주세요.');
       return;
@@ -284,11 +285,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
         totalStages: picked.totalStages,
       );
       final idem = 'idem_${picked.instructionId}_v${picked.version}_$jobId';
-      await _api.startJob(
-        jobId: jobId,
-        payload: payload,
-        idempotencyKey: idem,
-      );
+      await _api.startJob(jobId: jobId, payload: payload, idempotencyKey: idem);
       if (!context.mounted) return;
       _toast(context, '작업지시를 전송했습니다. 접수·진행 상태를 확인해 주세요.');
     } on RemoteControlApiException catch (e) {
@@ -567,7 +564,9 @@ class _JobCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text('상태: ${job.statusLabelKo}'),
-            Text('진행: ${job.progress} · ${job.currentStage.isEmpty ? '—' : job.currentStage}'),
+            Text(
+              '진행: ${job.progress} · ${job.currentStage.isEmpty ? '—' : job.currentStage}',
+            ),
             Text('Agent: $agentName'),
             Text('업데이트: ${formatRelativeKo(job.updatedAt)}'),
             Align(
@@ -614,13 +613,13 @@ class _PairingSheetState extends State<_PairingSheet> {
     try {
       final p = await widget.api.createPairing();
       _sub?.cancel();
-      _sub = widget.repo
-          .watchPairingCompletion(sessionId: p.sessionId)
-          .listen((a) {
-            if (a != null && mounted) {
-              setState(() => _linked = a);
-            }
-          });
+      _sub = widget.repo.watchPairingCompletion(sessionId: p.sessionId).listen((
+        a,
+      ) {
+        if (a != null && mounted) {
+          setState(() => _linked = a);
+        }
+      });
       _tick?.cancel();
       _tick = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() {});
@@ -713,9 +712,7 @@ class _PairingSheetState extends State<_PairingSheet> {
               children: [
                 OutlinedButton.icon(
                   onPressed: () async {
-                    await Clipboard.setData(
-                      ClipboardData(text: p.pairingCode),
-                    );
+                    await Clipboard.setData(ClipboardData(text: p.pairingCode));
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('코드를 복사했습니다.')),
@@ -807,7 +804,7 @@ class _PickInstructionSheetState extends State<_PickInstructionSheet> {
             ),
             const SizedBox(height: 8),
             Text(
-              '기존 Active 작업지시를 선택하거나 JSON을 붙여넣습니다. (새 작성 없음)',
+              '원격에 저장된 Active 작업지시를 선택하거나, 비상용으로 JSON을 붙여넣습니다.',
               style: TextStyle(color: ControlColors.textSecondary),
             ),
             const SizedBox(height: 12),
@@ -835,7 +832,8 @@ class _PickInstructionSheetState extends State<_PickInstructionSheet> {
                 final list = snap.data ?? const [];
                 if (list.isEmpty) {
                   return Text(
-                    'Active 목록이 비어 있습니다. DevWorkDoc 폴더를 연결하거나 아래에 JSON을 붙여넣으세요.',
+                    '원격 작업지시서가 없습니다.\n'
+                    'PC의 작업지시 제작소에서 작업지시서를 저장하면 여기에 표시됩니다.',
                     style: TextStyle(color: ControlColors.textMuted),
                   );
                 }
@@ -907,10 +905,7 @@ class _AgentDetailPage extends StatelessWidget {
           _kv('온라인', agent.isOnline() ? '예' : '아니오'),
           _kv('앱 버전', agent.appVersion.isEmpty ? '—' : agent.appVersion),
           _kv('프로토콜', agent.protocolVersion),
-          _kv(
-            '현재 Job',
-            agent.currentJobId.isEmpty ? '없음' : agent.currentJobId,
-          ),
+          _kv('현재 Job', agent.currentJobId.isEmpty ? '없음' : agent.currentJobId),
           _kv(
             '현재 Stage',
             agent.currentStage.isEmpty ? '—' : agent.currentStage,
@@ -935,7 +930,9 @@ class _AgentDetailPage extends StatelessWidget {
           width: 120,
           child: Text(k, style: TextStyle(color: ControlColors.textMuted)),
         ),
-        Expanded(child: Text(v, style: const TextStyle(fontWeight: FontWeight.w600))),
+        Expanded(
+          child: Text(v, style: const TextStyle(fontWeight: FontWeight.w600)),
+        ),
       ],
     ),
   );

@@ -68,3 +68,5 @@ config/admin_auth.local.json
 # DevWorkDoc 실작업 JSON (개인·사업정보) — Git 커밋 금지
 /DevWorkDoc/**/*.json
 !/DevWorkDoc/**/.gitkeep
+
+functions/.secret.local

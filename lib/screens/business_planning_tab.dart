@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,17 +10,22 @@ import '../models/dev_work_doc_status.dart';
 import '../models/idea_bank.dart';
 import '../models/planning_wizard_state.dart';
 import '../models/project_design_state.dart';
+import '../models/remote_agent_models.dart';
 import '../services/browser_json_download_service.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
 import '../services/dev_work_doc_paths.dart';
 import '../services/dev_work_doc_service.dart';
 import '../services/dev_work_doc_verify.dart';
+import '../services/instruction_contract_validator.dart';
 import '../services/instruction_transfer_service.dart';
 import '../services/plan_library_management.dart';
 import '../services/plan_progress_status.dart';
-import '../services/instruction_contract_validator.dart';
+import '../services/plan_user_facing_status.dart';
+import '../services/pc_workspace_ui.dart';
 import '../services/project_design_engine.dart';
+import '../services/remote_agent_repository.dart';
+import '../services/remote_work_instruction_mirror.dart';
 import '../services/work_instruction_validator.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
@@ -43,6 +49,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _store = BusinessPlanningStore();
   final _transfer = InstructionTransferService();
   final _devWorkDoc = DevWorkDocService();
+  final _wiMirror = RemoteWorkInstructionMirrorService();
+  final _agentRepo = RemoteAgentRepository();
   final _contractValidator = InstructionContractValidator();
   final _designEngine = ProjectDesignEngine();
 
@@ -82,6 +90,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   PlanLibrarySort _librarySort = PlanLibrarySort.newest;
   FolderPermissionState? _folderState;
   DevWorkDocState? _devDocState;
+  List<RemoteAgentDoc> _remoteAgents = const [];
+  bool _pcWorkspaceExpanded = false;
   DevWorkDocWriteResult? _lastDevWorkDocResult;
   Timer? _draftTimer;
   Timer? _wizardTimer;
@@ -144,23 +154,48 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   Future<void> _loadInitial() async {
     try {
-      final results = await Future.wait([
-        _store.loadPlans(),
-        _store.loadDraftInput(),
-        _transfer.currentState(),
-        _devWorkDoc.currentState(),
-      ]);
-      final plans = results[0] as List<BusinessPlanDocument>;
-      final draft = results[1] as BusinessPlanInput?;
-      final folder = results[2] as FolderPermissionState;
-      final devDoc = results[3] as DevWorkDocState;
+      // Active context MUST be restored before cleanup (see bootstrapSession).
+      final boot = await BusinessPlanningStore.bootstrapSession(_store);
+      final draft = await _store.loadDraftInput();
+      final folder = await _transfer.currentState();
+      final devDoc = await _devWorkDoc.currentState();
+      var agents = <RemoteAgentDoc>[];
+      try {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        agents = await _agentRepo.watchAgents(ownerUid: uid).first.timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => const <RemoteAgentDoc>[],
+        );
+      } catch (_) {
+        agents = const [];
+      }
       if (!mounted) return;
       setState(() {
-        _allPlans = BusinessPlanningStore.dedupeById(plans);
+        _allPlans = BusinessPlanningStore.dedupeById(boot.plans);
+        _activePlanId = boot.activePlanId;
         _folderState = folder;
         _devDocState = devDoc;
+        _remoteAgents = agents;
         _loading = false;
-        if (draft != null) {
+        if (boot.activePlanId != null) {
+          final match = boot.plans.where((p) => p.id == boot.activePlanId);
+          if (match.isNotEmpty) {
+            final plan = match.first;
+            _instructionId = plan.stableInstructionId;
+            _version = plan.version;
+            _applyInput(plan.input);
+            _analysis = plan.analysis;
+            _instruction = plan.instruction;
+            _activeDoc = plan;
+            if (plan.input.wizardSelections != null) {
+              _wizardState = PlanningWizardState.fromJson(
+                plan.input.wizardSelections!,
+              );
+              _designState = ProjectDesignState.fromWizardState(_wizardState);
+              _inputModeQuick = _wizardState.mode != 'advanced';
+            }
+          }
+        } else if (draft != null) {
           _applyInput(draft);
           if (draft.wizardSelections != null) {
             _wizardState = PlanningWizardState.fromJson(
@@ -343,7 +378,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Future<void> _refreshPlans() async {
-    _allPlans = BusinessPlanningStore.dedupeById(await _store.loadPlans());
+    _allPlans = BusinessPlanningStore.dedupeById(
+      await _store.loadPlans(
+        activePlanId: _activePlanId,
+        activeContextReady: true,
+        runCleanup: true,
+      ),
+    );
   }
 
   String _stableInstructionId(String planId) => 'wi_$planId';
@@ -463,19 +504,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   bool get _devWorkDocFolderReady => _devDocState?.readyToWrite == true;
 
-  String _selectionKindLabel(DevWorkDocSelectionKind kind) {
-    switch (kind) {
-      case DevWorkDocSelectionKind.devWorkDocRoot:
-        return 'DevWorkDoc 루트 (권장)';
-      case DevWorkDocSelectionKind.repoRootWithDevWorkDoc:
-        return '저장소 루트 — DevWorkDoc 하위 필요';
-      case DevWorkDocSelectionKind.ambiguous:
-        return '확인 필요';
-      case DevWorkDocSelectionKind.none:
-        return '미선택';
-    }
-  }
-
   bool _planningInputMatchesInstruction(
     BusinessPlanInput input,
     WorkInstruction wi,
@@ -492,11 +520,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         input.desiredOutcome.trim() == wi.businessPurpose.trim() &&
         ArtifactType.normalize(artifact) == wiArtifact &&
         input.notes.trim() == wi.notes.trim();
-  }
-
-  String _boolLabel(bool? value) {
-    if (value == null) return '—';
-    return value ? '완료' : '미완료';
   }
 
   Future<void> _createInstruction() async {
@@ -773,6 +796,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           version: diagnosis.recommendedVersion!,
         );
         if (verText != null && mounted) {
+          await _mirrorActiveSoft(
+            artifactType: artifact,
+            instructionId: iid,
+            jsonText: verText,
+            version: diagnosis.recommendedVersion!,
+          );
           try {
             final restored = WorkInstruction.fromJson(
               Map<String, dynamic>.from(jsonDecode(verText) as Map),
@@ -1068,6 +1097,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       );
     } else if (saveResult.isFolderCompleteSuccess ||
         saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial) {
+      await _mirrorActiveSoft(
+        artifactType: artifact,
+        instructionId: iid,
+        jsonText: jsonText,
+        version: version,
+        title: instruction.businessIdea.isNotEmpty
+            ? instruction.businessIdea
+            : instruction.projectId,
+      );
       _snack(
         saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial
             ? '부분 저장 복구 완료. v$version\n'
@@ -1077,6 +1115,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   'Versions: v$version 저장·검증 완료 (${saveResult.versionsBytes}B)',
       );
     } else if (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists) {
+      await _mirrorActiveSoft(
+        artifactType: artifact,
+        instructionId: iid,
+        jsonText: jsonText,
+        version: version,
+        title: instruction.businessIdea.isNotEmpty
+            ? instruction.businessIdea
+            : instruction.projectId,
+      );
       _snack(
         saveResult.message?.contains('구형') == true
             ? '${saveResult.message}\nActive·Versions v$version 유지'
@@ -1510,6 +1557,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     final input = _currentInput;
     final analysis =
         _analysis ?? (_canCreateInstruction ? _service.analyze(input) : null);
+    final sourceId = _activePlanId;
+    final lineageTags = <String>[
+      if (sourceId != null && sourceId.isNotEmpty) ...[
+        'cloneOf:$sourceId',
+        'sourcePlanId:$sourceId',
+      ],
+    ];
     final doc = BusinessPlanDocument(
       id: id,
       input: input,
@@ -1518,6 +1572,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       updatedAt: now,
       analysis: analysis,
       instructionId: _stableInstructionId(id),
+      tags: lineageTags,
     );
     await _store.upsertPlan(doc);
     await _refreshPlans();
@@ -1530,6 +1585,25 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _activeDoc = doc;
     });
     _snack('기획안을 복제했습니다.');
+  }
+
+  Future<void> _mirrorActiveSoft({
+    required String artifactType,
+    required String instructionId,
+    required String jsonText,
+    int? version,
+    String? title,
+  }) async {
+    final ok = await _wiMirror.upsertActive(
+      artifactType: artifactType,
+      instructionId: instructionId,
+      jsonText: jsonText,
+      version: version,
+      title: title,
+    );
+    if (!ok && mounted) {
+      _snack('원격 작업지시 동기화에 실패했습니다. 로컬 저장은 유지됩니다.');
+    }
   }
 
   Future<void> _archiveInstruction() async {
@@ -1569,6 +1643,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       return;
     }
 
+    await _wiMirror.markArchived(artifactType: artifact, instructionId: iid);
+
     final id = _activePlanId!;
     final existing = _allPlans.firstWhere((p) => p.id == id);
     final now = DateTime.now().toUtc().toIso8601String();
@@ -1598,6 +1674,22 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (!result.ok) {
       _snack(result.message ?? '복원에 실패했습니다.');
       return;
+    }
+
+    final restoredText = await _devWorkDoc.readActive(artifact, iid);
+    if (restoredText != null && restoredText.isNotEmpty) {
+      await _mirrorActiveSoft(
+        artifactType: artifact,
+        instructionId: iid,
+        jsonText: restoredText,
+        version: _version,
+        title: _instruction?.businessIdea,
+      );
+    } else {
+      await _wiMirror.restoreActive(
+        artifactType: artifact,
+        instructionId: iid,
+      );
     }
 
     final id = _activePlanId!;
@@ -2029,6 +2121,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _designState = ProjectDesignState();
       }
     });
+    unawaited(_store.persistActivePlanId(plan.id));
     _persistDraft();
     _snack(
       '「${plan.input.topic.isEmpty ? '제목 없음' : plan.input.topic}」을(를) 불러왔습니다.',
@@ -2065,6 +2158,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _applyInput(const BusinessPlanInput());
       }
     });
+    unawaited(_store.persistActivePlanId(null));
     _persistDraft();
     if (s != null && s.title.trim().isNotEmpty) {
       _snack('아이디어「${s.title}」을(를) 새 기획으로 불러왔습니다.');
@@ -2259,11 +2353,44 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   String _planListBadge(BusinessPlanDocument plan) {
-    return _progressFor(plan).badgeLabel;
+    return PlanUserFacingStatus.label(plan);
+  }
+
+  String _userFacingProgressLabel() {
+    final doc = _activeDoc;
+    if (doc != null) return PlanUserFacingStatus.label(doc);
+    if (_instruction != null) return PlanUserFacingStatus.instructionReady;
+    if (_planReady) return PlanUserFacingStatus.planning;
+    return PlanUserFacingStatus.planning;
+  }
+
+  String _userFacingProgressHint() {
+    final label = _userFacingProgressLabel();
+    switch (label) {
+      case PlanUserFacingStatus.planning:
+        return '기획을 완성한 뒤 작업지시서를 생성하세요.';
+      case PlanUserFacingStatus.instructionReady:
+        return '작업지시서가 준비되었습니다. 소통24워크로 전달하세요.';
+      case PlanUserFacingStatus.delivered:
+        return '전달이 완료되었습니다. 작업 진행을 확인하세요.';
+      case PlanUserFacingStatus.working:
+        return '소통24워크에서 작업이 진행 중입니다.';
+      case PlanUserFacingStatus.awaitingApproval:
+        return '승인 대기 중입니다.';
+      case PlanUserFacingStatus.completed:
+        return '작업이 완료되었습니다.';
+      case PlanUserFacingStatus.archived:
+        return '보관된 기획입니다.';
+      case PlanUserFacingStatus.cleanup:
+        return '정리 대상입니다. 관리 필터에서 확인하세요.';
+      default:
+        return '기획 → 작업지시 → 전달 → 진행 확인';
+    }
   }
 
   List<BusinessPlanDocument> get _latestPlans {
-    return BusinessPlanningStore.latestByInstructionId(_allPlans);
+    // Duplicate-topic detection helper; list UI uses planId identity.
+    return BusinessPlanningStore.dedupeById(_allPlans);
   }
 
   Future<void> _onLibraryBulkAction(
@@ -2479,9 +2606,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _buildMainActions(),
           ],
           const SizedBox(height: 12),
-          _buildDevWorkDocFolderSettings(),
-          const SizedBox(height: 12),
-          _buildFolderSettings(),
+          _buildWorkspaceStatusStrip(),
           const SizedBox(height: 20),
           PlanLibraryPanel(
             plans: _allPlans,
@@ -2515,6 +2640,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   Widget _buildProgressBanner() {
     final view = _activeProgressView;
+    final label = _userFacingProgressLabel();
     return Material(
       elevation: 1,
       borderRadius: BorderRadius.circular(10),
@@ -2536,7 +2662,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    view.statusLine,
+                    label,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       color: ControlColors.textPrimary,
@@ -2544,7 +2670,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    view.nextAction,
+                    _userFacingProgressHint(),
                     style: const TextStyle(
                       fontSize: 12.5,
                       color: ControlColors.textSecondary,
@@ -2555,7 +2681,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
             const SizedBox(width: 8),
             StatusBadge(
-              label: view.badgeLabel,
+              label: label,
               color: _progressBadgeColor(view),
             ),
           ],
@@ -2567,15 +2693,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   Widget _buildWorkflowStepStrip() {
     final view = _activeProgressView;
     final steps = [
-      _WorkflowStepDef('기획안 완성', _planReady),
-      _WorkflowStepDef('작업지시서 생성', _instruction != null),
+      _WorkflowStepDef('기획', _planReady),
+      _WorkflowStepDef('작업지시', _instruction != null),
+      _WorkflowStepDef('전달', view.isTrulyTransferred ||
+          PlanningStatus.normalize(_activeDoc?.status ?? '') ==
+              PlanningStatus.transferred ||
+          PlanningStatus.normalize(_activeDoc?.status ?? '') ==
+              PlanningStatus.imported),
       _WorkflowStepDef(
-        'DevWorkDoc 저장',
-        _lastDevWorkDocResult?.mode == PlanProgressStatus.folderMode ||
-            (_activeDoc?.hasInstruction == true && _devWorkDocFolderReady),
+        '진행',
+        PlanningStatus.normalize(_activeDoc?.status ?? '') ==
+                PlanningStatus.inProgress ||
+            PlanningStatus.normalize(_activeDoc?.status ?? '') ==
+                PlanningStatus.completed ||
+            view.kind == PlanProgressKind.imported,
       ),
-      _WorkflowStepDef('소통24워크 전달', view.isTrulyTransferred),
-      _WorkflowStepDef('가져오기 확인', view.kind == PlanProgressKind.imported),
     ];
 
     var currentIndex = steps.indexWhere((s) => !s.done);
@@ -2794,7 +2926,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   ),
                 const SizedBox(width: 6),
                 StatusBadge(
-                  label: progress.badgeLabel,
+                  label: _userFacingProgressLabel(),
                   color: _progressBadgeColor(progress),
                 ),
               ],
@@ -3064,48 +3196,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     await _downloadInstructionJson();
   }
 
-  Widget _buildDevWorkDocStatusBanner() {
-    final status = _devWorkDocStatus;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: ControlColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ControlColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(status.icon, size: 18, color: ControlColors.textPrimary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  status.displayLabel,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: ControlColors.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            status.nextAction,
-            style: const TextStyle(
-              fontSize: 12,
-              color: ControlColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   List<Widget> _buildDevWorkDocSaveActions() {
     if (!_planReady || _isInstructionArchived) return const [];
 
@@ -3137,8 +3227,111 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     ];
   }
 
+  Widget _buildWorkspaceStatusStrip() {
+    final width = MediaQuery.sizeOf(context).width;
+    final fsaSupported = _devDocState?.supported == true;
+    final showPcFolderControls = showPcLocalFolderSettings(
+      fsaSupported: fsaSupported,
+      widthPx: width,
+    );
+
+    final onlineAgents = _remoteAgents.where((a) => a.isOnline()).toList();
+    final agentLine = onlineAgents.isEmpty
+        ? (_remoteAgents.isEmpty
+              ? '소통24워크 PC : 상태 없음'
+              : '소통24워크 PC : 오프라인')
+        : '소통24워크 PC : 온라인'
+            '${onlineAgents.length == 1 ? '' : ' (${onlineAgents.length})'}';
+
+    DateTime? lastHb;
+    for (final a in onlineAgents) {
+      final t = a.lastHeartbeatAt;
+      if (t == null) continue;
+      if (lastHb == null || t.isAfter(lastHb)) lastHb = t;
+    }
+    final syncLine = lastHb == null
+        ? '마지막 동기화 : —'
+        : '마지막 동기화 : ${formatRelativeKo(lastHb)}';
+
+    final devStatus = _devWorkDocStatus;
+    final inboxReady = _inboxTransferReady;
+    final envLabel = !fsaSupported
+        ? '원격 작업환경'
+        : (devStatus.kind == DevWorkDocStatusKind.folderReady
+              ? 'PC 작업환경 정상'
+              : 'PC 작업환경 재연결 필요');
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(envLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(agentLine, style: const TextStyle(fontSize: 13)),
+            Text(
+              fsaSupported
+                  ? (devStatus.kind == DevWorkDocStatusKind.folderReady
+                        ? 'DevWorkDoc 연결'
+                        : devStatus.displayLabel)
+                  : '작업지시 전달 : 원격(Firestore)',
+              style: const TextStyle(fontSize: 13),
+            ),
+            if (fsaSupported)
+              Text(
+                inboxReady
+                    ? 'Sotong24Work Inbox 연결 (PC fallback)'
+                    : 'Inbox 로컬 폴더 : 미연결 (원격 전달 우선)',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textMuted,
+                ),
+              ),
+            Text(
+              syncLine,
+              style: const TextStyle(
+                fontSize: 12,
+                color: ControlColors.textMuted,
+              ),
+            ),
+            if (showPcFolderControls) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => setState(
+                  () => _pcWorkspaceExpanded = !_pcWorkspaceExpanded,
+                ),
+                icon: Icon(
+                  _pcWorkspaceExpanded
+                      ? Icons.expand_less
+                      : Icons.expand_more,
+                  size: 18,
+                ),
+                label: Text(
+                  _pcWorkspaceExpanded
+                      ? 'PC 작업환경 설정 닫기'
+                      : '관리 · PC 작업환경 설정',
+                ),
+              ),
+              if (_pcWorkspaceExpanded) ...[
+                const SizedBox(height: 8),
+                _buildDevWorkDocFolderSettings(),
+                const SizedBox(height: 8),
+                _buildFolderSettings(),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDevWorkDocFolderSettings() {
     final devDoc = _devDocState;
+    final ready = devDoc?.readyToWrite == true;
+    final reconnect = !ready &&
+        ((devDoc?.rootFolderName ?? '').trim().isNotEmpty ||
+            devDoc?.hasRoot == true);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -3150,45 +3343,24 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            _buildDevWorkDocStatusBanner(),
-            const SizedBox(height: 10),
-            const Text(
-              '폴더 선택 시 DevWorkDoc 폴더 자체를 선택하세요 '
-              '(저장소 루트나 상위 폴더가 아닙니다). '
-              '경로 힌트만으로는 저장 성공으로 간주하지 않습니다.',
-              style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
+            Text(
+              ready
+                  ? 'PC 저장폴더 연결됨'
+                  : (reconnect
+                        ? 'PC 저장폴더 재연결 필요'
+                        : 'PC 저장폴더 미연결'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 8),
-            if (devDoc != null && devDoc.rootFolderName != null)
-              Text(
-                '선택된 폴더: ${devDoc.rootFolderName}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              )
-            else if (devDoc != null && !devDoc.supported)
-              const Text(
-                '이 환경에서는 폴더 직접 저장을 지원하지 않습니다. '
-                '「JSON 다운로드」로 파일을 받은 뒤 수동으로 배치하세요.',
-                style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
-              )
-            else
-              const Text(
-                '폴더가 선택되지 않았습니다.',
-                style: TextStyle(color: ControlColors.textMuted),
+            const SizedBox(height: 6),
+            Text(
+              ready
+                  ? '작업지시서를 DevWorkDoc Active에 저장할 수 있습니다.'
+                  : '실제 폴더 권한(핸들)이 있을 때만 연결된 것으로 표시합니다.',
+              style: const TextStyle(
+                fontSize: 12,
+                color: ControlColors.textMuted,
               ),
-            if (devDoc != null) ...[
-              const SizedBox(height: 8),
-              _buildDevWorkDocReadinessRows(devDoc),
-              if (devDoc.statusMessage.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(
-                  devDoc.statusMessage,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: ControlColors.textSecondary,
-                  ),
-                ),
-              ],
-            ],
+            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -3199,7 +3371,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                       ? null
                       : _pickDevWorkDocFolder,
                   icon: const Icon(Icons.folder_open, size: 18),
-                  label: const Text('작업지시서 관리 폴더 설정'),
+                  label: Text(ready ? '폴더 다시 선택' : 'DevWorkDoc 폴더 연결'),
                 ),
                 if (devDoc?.selectionKind ==
                     DevWorkDocSelectionKind.repoRootWithDevWorkDoc)
@@ -3224,135 +3396,43 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
-  Widget _buildDevWorkDocReadinessRows(DevWorkDocState devDoc) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _devWorkDocReadinessRow(
-          '선택 기준',
-          _selectionKindLabel(devDoc.selectionKind),
-        ),
-        _devWorkDocReadinessRow(
-          '쓰기 권한',
-          devDoc.permissionGranted ? '허용' : '미허용',
-        ),
-        _devWorkDocReadinessRow('경로 구조', _boolLabel(devDoc.structureOk)),
-        _devWorkDocReadinessRow('실제 저장 준비', _boolLabel(devDoc.readyToWrite)),
-      ],
-    );
-  }
-
-  Widget _devWorkDocReadinessRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 96,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: ControlColors.textMuted,
-              ),
-            ),
-          ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFolderSettings() {
     final folder = _folderState;
-    final name = folder?.folderName;
-    final hasHandle = folder?.hasHandle == true;
-    final granted = folder?.permissionGranted == true;
     final ready = folder?.readyToWrite == true;
+    final nameOnly = !ready &&
+        (folder?.folderName ?? '').trim().isNotEmpty &&
+        folder?.hasHandle != true;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('소통24워크 전달 폴더', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 6),
-            if (name != null && name.isNotEmpty)
-              Text(
-                '선택된 폴더: $name',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              )
-            else
-              const Text(
-                'Inbox 폴더 미선택',
-                style: TextStyle(color: ControlColors.textMuted),
-              ),
+            Text(
+              '소통24워크 Inbox (PC fallback)',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const SizedBox(height: 6),
             Text(
-              '선택 기준: Inbox 폴더',
-              style: TextStyle(
-                fontSize: 12,
-                color: hasHandle
-                    ? ControlColors.textSecondary
-                    : ControlColors.textMuted,
-              ),
+              ready
+                  ? 'PC Inbox 폴더 연결됨'
+                  : (nameOnly ? 'PC Inbox 재연결 필요' : 'PC Inbox 미연결'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            Text(
-              '쓰기 권한: ${!hasHandle
-                  ? '핸들 없음'
-                  : granted
-                  ? '허용'
-                  : '재승인 필요'}',
-              style: TextStyle(
-                fontSize: 12,
-                color: granted
-                    ? ControlColors.textSecondary
-                    : ControlColors.textMuted,
-              ),
-            ),
-            Text(
-              '실제 전달 준비 상태: ${ready
-                  ? '직접 전달 준비 완료'
-                  : folder?.needsReselect == true
-                  ? '전달 폴더 다시 선택 필요'
-                  : '미준비'}',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: ready
-                    ? ControlColors.textPrimary
-                    : ControlColors.textMuted,
-              ),
-            ),
-            if (folder != null && folder.statusMessage.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                folder.statusMessage,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: ControlColors.textMuted,
-                ),
-              ),
-            ],
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             const Text(
-              '권장 위치: Documents\\Sotong24Work\\Instructions\\Inbox',
+              '주 전달 경로는 원격(Firestore Relay)입니다. '
+              '로컬 Inbox는 PC에서만 필요한 fallback입니다.',
               style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: _pickTransferFolder,
               icon: const Icon(Icons.folder_open, size: 18),
-              label: Text(ready ? '전달 폴더 다시 선택' : '전달 폴더 선택'),
+              label: Text(ready ? 'Inbox 폴더 다시 선택' : 'Inbox 폴더 연결'),
             ),
             if (_lastTransferDiagnosis != null) ...[
               const SizedBox(height: 10),
-              const Text(
-                '최근 Inbox 전달 진단',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
               Text(
                 _lastTransferDiagnosis!,
                 style: const TextStyle(

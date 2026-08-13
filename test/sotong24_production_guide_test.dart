@@ -119,9 +119,7 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: SingleChildScrollView(
-              child: Sotong24ProductionGuidePanel(),
-            ),
+            body: SingleChildScrollView(child: Sotong24ProductionGuidePanel()),
           ),
         ),
       );

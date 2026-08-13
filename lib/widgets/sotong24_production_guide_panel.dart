@@ -310,7 +310,10 @@ class _SubtypeNotes extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('유형별 추가 가이드', style: TextStyle(fontWeight: FontWeight.w700)),
+          const Text(
+            '유형별 추가 가이드',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 4),
           for (final n in notes)
             Padding(

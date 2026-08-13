@@ -21,13 +21,11 @@ class RemoteControlApiException implements Exception {
 class RemoteControlApi {
   RemoteControlApi({
     http.Client? httpClient,
-    FirebaseAuth? auth,
+    this._auth,
     String? Function()? baseUrl,
-    Future<String?> Function()? idTokenProvider,
+    this._idTokenProvider,
   }) : _http = httpClient ?? http.Client(),
-       _auth = auth,
-       _baseUrl = baseUrl ?? (() => RemoteControlEnv.baseUrl),
-       _idTokenProvider = idTokenProvider;
+       _baseUrl = baseUrl ?? (() => RemoteControlEnv.baseUrl);
 
   final http.Client _http;
   final FirebaseAuth? _auth;
@@ -39,7 +37,10 @@ class RemoteControlApi {
     if (provider != null) {
       final t = await provider();
       if (t == null || t.isEmpty) {
-        throw RemoteControlApiException('로그인이 필요합니다. 다시 로그인해 주세요.', code: 'auth');
+        throw RemoteControlApiException(
+          '로그인이 필요합니다. 다시 로그인해 주세요.',
+          code: 'auth',
+        );
       }
       return t;
     }
@@ -55,12 +56,18 @@ class RemoteControlApi {
     try {
       final t = await user.getIdToken();
       if (t == null || t.isEmpty) {
-        throw RemoteControlApiException('인증이 만료되었습니다. 다시 로그인해 주세요.', code: 'auth');
+        throw RemoteControlApiException(
+          '인증이 만료되었습니다. 다시 로그인해 주세요.',
+          code: 'auth',
+        );
       }
       return t;
     } catch (e) {
       if (e is RemoteControlApiException) rethrow;
-      throw RemoteControlApiException('인증이 만료되었습니다. 다시 로그인해 주세요.', code: 'auth');
+      throw RemoteControlApiException(
+        '인증이 만료되었습니다. 다시 로그인해 주세요.',
+        code: 'auth',
+      );
     }
   }
 
@@ -176,10 +183,7 @@ class RemoteControlApi {
     required Map<String, dynamic> payload,
     String? idempotencyKey,
   }) async {
-    final body = <String, dynamic>{
-      'jobId': jobId,
-      'payload': payload,
-    };
+    final body = <String, dynamic>{'jobId': jobId, 'payload': payload};
     if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
       body['idempotencyKey'] = idempotencyKey;
     }

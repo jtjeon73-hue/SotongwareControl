@@ -61,17 +61,11 @@ void main() {
     test('state labels', () {
       expect(agent(state: 'idle').stateLabelKo, '작업지시 대기');
       expect(
-        agent(
-          state: 'running',
-          hb: DateTime.now().toUtc(),
-        ).uiKind,
+        agent(state: 'running', hb: DateTime.now().toUtc()).uiKind,
         RemoteAgentUiKind.running,
       );
       expect(
-        agent(
-          state: 'waiting_approval',
-          hb: DateTime.now().toUtc(),
-        ).uiKind,
+        agent(state: 'waiting_approval', hb: DateTime.now().toUtc()).uiKind,
         RemoteAgentUiKind.waitingApproval,
       );
     });
@@ -106,11 +100,7 @@ void main() {
         idTokenProvider: () async => 'tok',
       );
       expect(
-        () => api.createJob(
-          type: 'ebook',
-          title: 't',
-          assignedAgentId: 'a',
-        ),
+        () => api.createJob(type: 'ebook', title: 't', assignedAgentId: 'a'),
         throwsA(
           isA<RemoteControlApiException>().having(
             (e) => e.userMessage,
@@ -162,7 +152,8 @@ void main() {
             artifactType: 'ebook',
             instructionId: 'wi_demo',
             title: '데모 전자책',
-            jsonText: '{"instructionId":"wi_demo","title":"데모 전자책","version":1}',
+            jsonText:
+                '{"instructionId":"wi_demo","title":"데모 전자책","version":1}',
           ),
         ],
       );
@@ -213,7 +204,9 @@ void main() {
       final repo = RemoteAgentRepository(
         forceMemory: true,
         memoryAgents: [
-          agent(hb: DateTime.now().toUtc().subtract(const Duration(seconds: 5))),
+          agent(
+            hb: DateTime.now().toUtc().subtract(const Duration(seconds: 5)),
+          ),
         ],
       );
       await tester.pumpWidget(
@@ -244,7 +237,9 @@ void main() {
       final repo = RemoteAgentRepository(
         forceMemory: true,
         memoryAgents: [
-          agent(hb: DateTime.now().toUtc().subtract(const Duration(minutes: 5))),
+          agent(
+            hb: DateTime.now().toUtc().subtract(const Duration(minutes: 5)),
+          ),
         ],
       );
       await tester.pumpWidget(
@@ -343,10 +338,7 @@ void main() {
     });
 
     testWidgets('menu label exists', (tester) async {
-      expect(
-        ControlDestination.sotong24RemoteControl.label,
-        '소통24워크 원격관제',
-      );
+      expect(ControlDestination.sotong24RemoteControl.label, '소통24워크 원격관제');
       expect(RemoteControlEnv.onlineThresholdSeconds, 90);
     });
 

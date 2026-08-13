@@ -48,10 +48,7 @@ class Sotong24StageGuideEnrichment {
 
 /// workflow 단계 + 가이드 보강 = 화면용 단계 가이드.
 class Sotong24StageGuide {
-  const Sotong24StageGuide({
-    required this.stage,
-    required this.enrichment,
-  });
+  const Sotong24StageGuide({required this.stage, required this.enrichment});
 
   final Sotong24WorkflowStageDef stage;
   final Sotong24StageGuideEnrichment enrichment;

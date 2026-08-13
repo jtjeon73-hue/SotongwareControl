@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../data/project_design_catalog.dart';
 import '../../models/business_planning.dart';
 import '../../services/plan_library_management.dart';
+import '../../services/plan_user_facing_status.dart';
 import '../../theme/control_theme.dart';
 
 enum PlanLibraryViewMode { cards, list, table }
@@ -82,6 +82,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     var list = List<BusinessPlanDocument>.from(widget.plans);
     final manageFilters = {
       'all',
+      'active',
+      'waiting',
       'in_progress',
       'instruction_created',
       'transferred',
@@ -90,6 +92,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
       'trashed',
       'duplicate_candidates',
       'stale',
+      'cleanup',
       'favorite',
     };
 
@@ -102,6 +105,9 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     } else {
       list = list.where((p) => !p.isLibraryTrashed).toList();
       list = list.where((p) {
+        if (p.tags.contains('정리대상') || p.tags.contains('cleanup')) {
+          return false;
+        }
         final folder = p.libraryFolder.isNotEmpty
             ? p.libraryFolder
             : ArtifactType.normalize(p.input.resolvedArtifactType);
@@ -109,10 +115,13 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
       }).toList();
     }
 
+    // 목록 identity = planId (dedupeById). instructionId로 카드를 합치지 않는다.
+    // 동일 plan의 WI 재생성은 같은 plan 문서의 version/history로 유지된다.
+
     final q = widget.searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list.where((p) {
-        final status = PlanningStatus.labelKo(p.status).toLowerCase();
+        final status = PlanUserFacingStatus.label(p).toLowerCase();
         final artifact = ArtifactType.labelKo(
           p.input.resolvedArtifactType,
         ).toLowerCase();
@@ -175,29 +184,12 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     }
   }
 
-  String _statusBadge(BusinessPlanDocument p) {
-    if (p.isLibraryTrashed) return '휴지통';
-    if (p.isLibraryArchived) return '보관';
-    final s = PlanningStatus.normalize(p.status);
-    if (s == PlanningStatus.draft) return '기획중';
-    if (s == PlanningStatus.instructionReady ||
-        s == PlanningStatus.readyToTransfer ||
-        s == PlanningStatus.validationRequired) {
-      return '작업지시 생성';
-    }
-    if (s == PlanningStatus.inProgress) return '진행중';
-    if (s == PlanningStatus.transferred || s == PlanningStatus.imported) {
-      return '전달 완료';
-    }
-    if (s == PlanningStatus.completed) return '완료';
-    if (s == PlanningStatus.archived) return '보관';
-    return PlanningStatus.labelKo(s);
-  }
+  String _statusBadge(BusinessPlanDocument p) => PlanUserFacingStatus.label(p);
 
   String _formatIso(String iso) {
     final dt = DateTime.tryParse(iso);
     if (dt == null) return iso;
-    return DateFormat('yyyy-MM-dd HH:mm').format(dt.toLocal());
+    return DateFormat('yyyy-MM-dd').format(dt.toLocal());
   }
 
   void _toggleSelect(String id) {
@@ -345,29 +337,31 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
   }
 
   List<Widget> _cardMeta(BusinessPlanDocument p) {
-    final iid = PlanLibraryManagement.shortId(p.stableInstructionId);
+    final artifact = ArtifactType.labelKo(p.input.resolvedArtifactType);
+    final status = _statusBadge(p);
     return [
       Text(
-        '고객: ${p.input.targetCustomer.isEmpty ? '-' : p.input.targetCustomer}',
-        style: const TextStyle(fontSize: 12),
+        '$artifact · $status',
+        style: const TextStyle(fontSize: 13, color: ControlColors.textSecondary),
+      ),
+      Text(
+        '최근 수정 ${_formatIso(p.updatedAt)}',
+        style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
+      ),
+      Text(
+        '작업지시 ${p.stableInstructionId.isEmpty ? '없음' : p.stableInstructionId}',
+        style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      Text(
-        '수정 ${_formatIso(p.updatedAt)} · v${p.version}',
-        style: const TextStyle(fontSize: 11, color: ControlColors.textMuted),
-      ),
-      Wrap(
-        spacing: 8,
-        runSpacing: 2,
-        children: [
-          _metaChip('ID $iid'),
-          _metaChip(p.hasInstruction ? '작업지시 있음' : '작업지시 없음'),
-          _metaChip(p.wasTransferred ? 'Inbox 전달됨' : 'Inbox 미전달'),
-          if (p.isProtected) _metaChip('보호됨'),
-          if (p.favorite) _metaChip('★ 즐겨찾기'),
-        ],
-      ),
+      if (p.isProtected || p.favorite)
+        Wrap(
+          spacing: 8,
+          children: [
+            if (p.isProtected) _metaChip('보호됨'),
+            if (p.favorite) _metaChip('★'),
+          ],
+        ),
     ];
   }
 
@@ -396,7 +390,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                 });
               },
               icon: Icon(_manageMode ? Icons.close : Icons.tune, size: 18),
-              label: Text(_manageMode ? '관리 종료' : '관리'),
+              label: Text(_manageMode ? '관리 종료' : '필터'),
             ),
             const SizedBox(width: 8),
             FilledButton.tonalIcon(
@@ -407,26 +401,39 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
           ],
         ),
         const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final id in PlanUserFacingStatus.primaryFilters)
+              ChoiceChip(
+                label: Text(PlanUserFacingStatus.primaryFilterLabel(id)),
+                selected: widget.folderFilter == id ||
+                    (id == 'active' && widget.folderFilter == 'in_progress'),
+                onSelected: (_) {
+                  widget.onFolderChanged(id);
+                  _clearSelection();
+                },
+              ),
+          ],
+        ),
+        if (_manageMode) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
             children: [
-              for (final id in ProjectDesignCatalog.libraryFolders)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(ProjectDesignCatalog.libraryFolderLabel(id)),
-                    selected: widget.folderFilter == id,
-                    onSelected: (_) {
-                      widget.onFolderChanged(id);
-                      _clearSelection();
-                    },
-                  ),
+              for (final id in PlanUserFacingStatus.advancedFilters)
+                FilterChip(
+                  label: Text(PlanUserFacingStatus.advancedFilterLabel(id)),
+                  selected: widget.folderFilter == id,
+                  onSelected: (_) {
+                    widget.onFolderChanged(id);
+                    _clearSelection();
+                  },
                 ),
             ],
           ),
-        ),
-        if (_manageMode) ...[
           const SizedBox(height: 10),
           _buildManageToolbar(visible),
         ],
@@ -434,71 +441,76 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         TextField(
           onChanged: widget.onSearchChanged,
           decoration: const InputDecoration(
-            hintText: '제목·태그·고객·날짜·상태·결과물·ID 검색',
+            hintText: '제목·고객·작업지시 ID 검색',
             prefixIcon: Icon(Icons.search),
             border: OutlineInputBorder(),
             isDense: true,
           ),
         ),
         const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              SegmentedButton<PlanLibraryViewMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: PlanLibraryViewMode.cards,
-                    icon: Icon(Icons.grid_view, size: 16),
-                    label: Text('카드'),
-                  ),
-                  ButtonSegment(
-                    value: PlanLibraryViewMode.list,
-                    icon: Icon(Icons.view_list, size: 16),
-                    label: Text('리스트'),
-                  ),
-                  ButtonSegment(
-                    value: PlanLibraryViewMode.table,
-                    icon: Icon(Icons.table_rows, size: 16),
-                    label: Text('테이블'),
-                  ),
-                ],
-                selected: {widget.viewMode},
-                onSelectionChanged: (s) => widget.onViewModeChanged(s.first),
-              ),
-              const SizedBox(width: 12),
-              DropdownButton<PlanLibrarySort>(
-                value: widget.sort,
-                underline: const SizedBox.shrink(),
-                items: const [
-                  DropdownMenuItem(
-                    value: PlanLibrarySort.newest,
-                    child: Text('최신순'),
-                  ),
-                  DropdownMenuItem(
-                    value: PlanLibrarySort.name,
-                    child: Text('이름순'),
-                  ),
-                  DropdownMenuItem(
-                    value: PlanLibrarySort.updated,
-                    child: Text('수정순'),
-                  ),
-                  DropdownMenuItem(
-                    value: PlanLibrarySort.status,
-                    child: Text('상태순'),
-                  ),
-                  DropdownMenuItem(
-                    value: PlanLibrarySort.artifact,
-                    child: Text('결과물순'),
-                  ),
-                ],
-                onChanged: (v) {
-                  if (v != null) widget.onSortChanged(v);
-                },
-              ),
-            ],
+        if (_manageMode || MediaQuery.sizeOf(context).width >= 700)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                if (_manageMode)
+                  SegmentedButton<PlanLibraryViewMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: PlanLibraryViewMode.cards,
+                        icon: Icon(Icons.grid_view, size: 16),
+                        label: Text('카드'),
+                      ),
+                      ButtonSegment(
+                        value: PlanLibraryViewMode.list,
+                        icon: Icon(Icons.view_list, size: 16),
+                        label: Text('리스트'),
+                      ),
+                      ButtonSegment(
+                        value: PlanLibraryViewMode.table,
+                        icon: Icon(Icons.table_rows, size: 16),
+                        label: Text('테이블'),
+                      ),
+                    ],
+                    selected: {widget.viewMode},
+                    onSelectionChanged: (s) =>
+                        widget.onViewModeChanged(s.first),
+                  )
+                else
+                  const SizedBox.shrink(),
+                const SizedBox(width: 12),
+                DropdownButton<PlanLibrarySort>(
+                  value: widget.sort,
+                  underline: const SizedBox.shrink(),
+                  items: const [
+                    DropdownMenuItem(
+                      value: PlanLibrarySort.newest,
+                      child: Text('최신순'),
+                    ),
+                    DropdownMenuItem(
+                      value: PlanLibrarySort.name,
+                      child: Text('이름순'),
+                    ),
+                    DropdownMenuItem(
+                      value: PlanLibrarySort.updated,
+                      child: Text('수정순'),
+                    ),
+                    DropdownMenuItem(
+                      value: PlanLibrarySort.status,
+                      child: Text('상태순'),
+                    ),
+                    DropdownMenuItem(
+                      value: PlanLibrarySort.artifact,
+                      child: Text('결과물순'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) widget.onSortChanged(v);
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
         if (_showDuplicates) ...[
           const SizedBox(height: 12),
           _buildDuplicatePanel(),
@@ -513,13 +525,20 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             ),
           )
         else
-          switch (widget.viewMode) {
+          switch (_effectiveViewMode(context)) {
             PlanLibraryViewMode.cards => _buildCards(visible),
             PlanLibraryViewMode.list => _buildList(visible),
             PlanLibraryViewMode.table => _buildTable(visible),
           },
       ],
     );
+  }
+
+  PlanLibraryViewMode _effectiveViewMode(BuildContext context) {
+    if (MediaQuery.sizeOf(context).width < 700) {
+      return PlanLibraryViewMode.cards;
+    }
+    return widget.viewMode;
   }
 
   Widget _buildManageToolbar(List<BusinessPlanDocument> visible) {
@@ -790,35 +809,25 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: [
-                              _badge(p),
-                              Text(
-                                ArtifactType.labelKo(
-                                  p.input.resolvedArtifactType,
-                                ),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: ControlColors.textMuted,
-                                ),
-                              ),
-                              if (widget.duplicateTopics.contains(
-                                    p.input.topic.trim().toLowerCase(),
-                                  ) ||
-                                  _duplicateIds.contains(p.id))
-                                const Text(
-                                  '유사/중복 후보',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: ControlColors.textMuted,
-                                  ),
-                                ),
-                            ],
-                          ),
+                          _badge(p),
                           const SizedBox(height: 6),
                           ..._cardMeta(p),
+                          const SizedBox(height: 8),
+                          if (!_manageMode)
+                            Wrap(
+                              spacing: 6,
+                              children: [
+                                TextButton(
+                                  onPressed: () => widget.onOpenPlan(p),
+                                  child: const Text('열기'),
+                                ),
+                                if (p.hasInstruction)
+                                  TextButton(
+                                    onPressed: () => widget.onOpenPlan(p),
+                                    child: const Text('작업지시 보기'),
+                                  ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -851,10 +860,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             ),
             subtitle: Text(
               '${ArtifactType.labelKo(p.input.resolvedArtifactType)} · '
-              '${_statusBadge(p)} · ${_formatIso(p.updatedAt)} · '
-              'ID ${PlanLibraryManagement.shortId(p.stableInstructionId)} · '
-              '${p.hasInstruction ? '작업지시O' : '작업지시X'} · '
-              '${p.wasTransferred ? 'InboxO' : 'InboxX'}',
+              '${_statusBadge(p)} · ${_formatIso(p.updatedAt)}\n'
+              '${p.stableInstructionId.isEmpty ? '작업지시 없음' : p.stableInstructionId}',
               style: const TextStyle(fontSize: 12),
             ),
             trailing: _manageMode

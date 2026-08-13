@@ -2,17 +2,23 @@ import 'dart:convert';
 
 import '../models/artifact_type.dart';
 import '../models/remote_agent_models.dart';
+import 'dev_work_doc_paths.dart';
 import 'dev_work_doc_service.dart';
+import 'remote_work_instruction_mirror.dart';
 
-/// Loads existing Active work-instruction JSON for remote START_JOB.
+/// Loads Active work-instruction JSON for remote START_JOB.
+/// Prefer Firestore mirror (mobile); merge local DevWorkDoc when available (PC).
 class RemoteWorkInstructionSource {
   RemoteWorkInstructionSource({
     DevWorkDocService? docs,
+    RemoteWorkInstructionMirrorService? mirror,
     List<ActiveWorkInstructionRef>? memoryCatalog,
   }) : _docs = docs ?? DevWorkDocService(),
+       _mirror = mirror ?? RemoteWorkInstructionMirrorService(),
        _memory = List<ActiveWorkInstructionRef>.from(memoryCatalog ?? const []);
 
   final DevWorkDocService _docs;
+  final RemoteWorkInstructionMirrorService _mirror;
   final List<ActiveWorkInstructionRef> _memory;
 
   void seedMemory(List<ActiveWorkInstructionRef> items) {
@@ -23,22 +29,42 @@ class RemoteWorkInstructionSource {
 
   Future<List<ActiveWorkInstructionRef>> listActive(String artifactType) async {
     final normalized = ArtifactType.normalize(artifactType);
+
+    final fromCloud = await _mirror.listActive(artifactType: normalized);
     final fromDisk = await _docs.listActiveInstructions(normalized);
-    if (fromDisk.isNotEmpty) {
-      return fromDisk
-          .map(
-            (e) => ActiveWorkInstructionRef(
-              artifactType: normalized,
-              instructionId: e.instructionId,
-              title: e.title.isEmpty ? e.instructionId : e.title,
-              jsonText: e.jsonText,
-              version: e.version,
-              totalStages: e.totalStages,
-            ),
-          )
-          .toList();
+    final diskMapped = fromDisk
+        .map(
+          (e) => ActiveWorkInstructionRef(
+            artifactType: normalized,
+            instructionId: e.instructionId,
+            title: e.title.isEmpty ? e.instructionId : e.title,
+            jsonText: e.jsonText,
+            version: e.version,
+            totalStages: e.totalStages,
+          ),
+        )
+        .toList();
+
+    return _mergeByInstructionId([
+      ...fromCloud,
+      ...diskMapped,
+      ..._memory.where((e) => e.artifactType == normalized),
+    ]);
+  }
+
+  /// Cloud first, then disk/memory fill gaps. Same instructionId = one row (cloud wins).
+  static List<ActiveWorkInstructionRef> _mergeByInstructionId(
+    List<ActiveWorkInstructionRef> items,
+  ) {
+    final map = <String, ActiveWorkInstructionRef>{};
+    for (final item in items) {
+      final key =
+          '${item.artifactType}__${DevWorkDocPaths.sanitizeInstructionId(item.instructionId)}';
+      map.putIfAbsent(key, () => item);
     }
-    return _memory.where((e) => e.artifactType == normalized).toList();
+    final out = map.values.toList()
+      ..sort((a, b) => a.title.compareTo(b.title));
+    return out;
   }
 
   ActiveWorkInstructionRef? parseJsonText(

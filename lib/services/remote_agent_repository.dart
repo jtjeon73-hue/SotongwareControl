@@ -6,13 +6,12 @@ import 'firebase_ready.dart';
 /// Firestore streams for agents / jobs (ownerUid scoped when possible).
 class RemoteAgentRepository {
   RemoteAgentRepository({
-    FirebaseFirestore? db,
+    this._db,
     bool? forceMemory,
     List<RemoteAgentDoc>? memoryAgents,
     List<RemoteJobDoc>? memoryJobs,
     Map<String, List<RemoteStageDoc>>? memoryStages,
-  }) : _db = db,
-       _forceMemory = forceMemory ?? false,
+  }) : _forceMemory = forceMemory ?? false,
        _memoryAgents = List<RemoteAgentDoc>.from(memoryAgents ?? const []),
        _memoryJobs = List<RemoteJobDoc>.from(memoryJobs ?? const []),
        _memoryStages = Map<String, List<RemoteStageDoc>>.from(
@@ -95,40 +94,32 @@ class RemoteAgentRepository {
     if (usesMemory || _jobs == null) {
       return Stream.value(List.of(_memoryStages[jobId] ?? const []));
     }
-    return _jobs!
-        .doc(jobId)
-        .collection('stages')
-        .snapshots()
-        .map((snap) {
-          final list = snap.docs
-              .map((d) => RemoteStageDoc.fromMap(d.data(), id: d.id))
-              .toList();
-          list.sort((a, b) => a.stageNumber.compareTo(b.stageNumber));
-          return list;
-        });
+    return _jobs!.doc(jobId).collection('stages').snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => RemoteStageDoc.fromMap(d.data(), id: d.id))
+          .toList();
+      list.sort((a, b) => a.stageNumber.compareTo(b.stageNumber));
+      return list;
+    });
   }
 
-  Stream<RemoteAgentDoc?> watchPairingCompletion({
-    required String sessionId,
-  }) {
+  Stream<RemoteAgentDoc?> watchPairingCompletion({required String sessionId}) {
     if (usesMemory) {
       return Stream.value(null);
     }
     final db = _fs;
-    return db
-        .collection('pairingSessions')
-        .doc(sessionId)
-        .snapshots()
-        .asyncMap((snap) async {
-          if (!snap.exists) return null;
-          final data = snap.data()!;
-          if (data['used'] != true) return null;
-          final agentId = '${data['agentId'] ?? ''}';
-          if (agentId.isEmpty) return null;
-          final a = await db.collection('agents').doc(agentId).get();
-          if (!a.exists) return null;
-          return RemoteAgentDoc.fromMap(a.data()!, id: a.id);
-        });
+    return db.collection('pairingSessions').doc(sessionId).snapshots().asyncMap(
+      (snap) async {
+        if (!snap.exists) return null;
+        final data = snap.data()!;
+        if (data['used'] != true) return null;
+        final agentId = '${data['agentId'] ?? ''}';
+        if (agentId.isEmpty) return null;
+        final a = await db.collection('agents').doc(agentId).get();
+        if (!a.exists) return null;
+        return RemoteAgentDoc.fromMap(a.data()!, id: a.id);
+      },
+    );
   }
 
   /// Test helper.

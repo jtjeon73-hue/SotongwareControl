@@ -4,7 +4,9 @@ import '../models/sotong24_guide_models.dart';
 class Sotong24GuideEnrichments {
   Sotong24GuideEnrichments._();
 
-  static Map<String, Sotong24StageGuideEnrichment> forProduct(String productId) {
+  static Map<String, Sotong24StageGuideEnrichment> forProduct(
+    String productId,
+  ) {
     switch (productId) {
       case 'ebook':
         return ebook;
@@ -24,9 +26,13 @@ class Sotong24GuideEnrichments {
   }
 
   static final ebook = <String, Sotong24StageGuideEnrichment>{
-  'idea_clarify':     Sotong24StageGuideEnrichment(
+    'idea_clarify': Sotong24StageGuideEnrichment(
       whyNeeded: '전자책으로 풀 문제·독자·약속을 한 문장으로 고정해야 이후 기획·집필이 흔들리지 않는다.',
-      mainTasks: ['주제·독자·약속 결과 한 장 요약', '유사 전자책과 차별점 초안', '만들 결과물 형태(PDF/시리즈) 결정'],
+      mainTasks: [
+        '주제·독자·약속 결과 한 장 요약',
+        '유사 전자책과 차별점 초안',
+        '만들 결과물 형태(PDF/시리즈) 결정',
+      ],
       inputs: ['아이디어 메모', '뉴아이디어뱅크/시장 메모'],
       deliverables: ['아이디어 한 장 요약', '독자 페르소나 초안'],
       qualityCriteria: ['독자가 구체적인가', '전자책으로 해결 가능한가', '과장 약속이 없는가'],
@@ -35,7 +41,7 @@ class Sotong24GuideEnrichments {
       cautions: ['사실 단정·수익 보장 문구 금지'],
       completionConditions: ['한 문장 컨셉과 독자 정의가 문서화됨'],
     ),
-  'problem_validate':     Sotong24StageGuideEnrichment(
+    'problem_validate': Sotong24StageGuideEnrichment(
       whyNeeded: '독자가 실제로 겪는 문제인지 검증하지 않으면 팔리지 않는 전자책이 된다.',
       mainTasks: ['문제 문장 작성', '대안(무료 자료/경쟁책) 비교', '구매 이유·지불 의사 점검'],
       inputs: ['아이디어 요약', '검색/리뷰 단서'],
@@ -46,7 +52,7 @@ class Sotong24GuideEnrichments {
       cautions: ['통계·정책은 출처와 날짜를 남길 것'],
       completionConditions: ['검증 메모에 문제·대안·구매이유가 기록됨'],
     ),
-  'materials_prep':     Sotong24StageGuideEnrichment(
+    'materials_prep': Sotong24StageGuideEnrichment(
       whyNeeded: '집필 전에 자료·사례·출처를 모아야 저작권·사실 리스크를 줄인다.',
       mainTasks: ['참고 자료·사례 목록', '인용/금지 자료 구분', '이미지·아이콘·폰트 라이선스 후보'],
       inputs: ['검증 메모', '주제 키워드'],
@@ -57,7 +63,7 @@ class Sotong24GuideEnrichments {
       cautions: ['특정 저자 문체 과도 모방 금지', '이미지 라이선스 미확인 사용 금지'],
       completionConditions: ['핵심 자료와 출처 목록이 준비됨'],
     ),
-  'planning':     Sotong24StageGuideEnrichment(
+    'planning': Sotong24StageGuideEnrichment(
       whyNeeded: '목차·분량·톤·수익 포인트를 확정해야 초안이 산만해지지 않는다.',
       mainTasks: ['목차·장별 목표', '분량·톤·사례 비중', '독자 여정(문제→해결→실행)'],
       inputs: ['자료 목록', '문제 검증'],
@@ -68,7 +74,7 @@ class Sotong24GuideEnrichments {
       cautions: ['판매 약속과 목차가 어긋나지 않게'],
       completionConditions: ['확정 목차가 저장됨'],
     ),
-  'project_setup':     Sotong24StageGuideEnrichment(
+    'project_setup': Sotong24StageGuideEnrichment(
       whyNeeded: '로컬/Sotong24Work 프로젝트 골격이 없으면 버전·파일 관리가 붕괴한다.',
       mainTasks: ['폴더·버전·파일 규칙', '작업지시/Contract 연결 확인'],
       inputs: ['기획안'],
@@ -79,7 +85,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지'],
       completionConditions: ['프로젝트 경로와 규칙이 문서화됨'],
     ),
-  'prompt_generate':     Sotong24StageGuideEnrichment(
+    'prompt_generate': Sotong24StageGuideEnrichment(
       whyNeeded: '장별 AI 프롬프트가 실제 사용 가능해야 초안 품질이 안정된다.',
       mainTasks: ['장별 프롬프트 템플릿', '금지 규칙(표절·과장·허위) 포함', '출력 형식 지정'],
       inputs: ['목차', '자료 목록'],
@@ -90,7 +96,7 @@ class Sotong24GuideEnrichments {
       cautions: ['프롬프트에 타사 유료 자료 전문 넣지 말 것'],
       completionConditions: ['1장 이상 실행 가능한 프롬프트가 준비됨'],
     ),
-  'draft':     Sotong24StageGuideEnrichment(
+    'draft': Sotong24StageGuideEnrichment(
       whyNeeded: '본문 초안이 있어야 검토·편집·상품화가 가능하다.',
       mainTasks: ['장별 초안 작성', '사례·체크리스트·실행 프롬프트 포함', '반복/AI 문체 정리'],
       inputs: ['프롬프트', '자료'],
@@ -101,7 +107,7 @@ class Sotong24GuideEnrichments {
       cautions: ['웹 문장 과도 복제 금지'],
       completionConditions: ['전 장 초안 파일이 존재함'],
     ),
-  'build_test':     Sotong24StageGuideEnrichment(
+    'build_test': Sotong24StageGuideEnrichment(
       whyNeeded: '전자책에서는 파일 형식·열림·링크 등 경량 검사를 수행한다.',
       mainTasks: ['파일 열림 확인', '목차/링크 점검', '형식 오류 점검'],
       inputs: ['초안 파일'],
@@ -112,7 +118,7 @@ class Sotong24GuideEnrichments {
       cautions: ['앱 전용 빌드 검사와 혼동하지 말 것'],
       completionConditions: ['경량 검사 결과가 기록됨'],
     ),
-  'user_review':     Sotong24StageGuideEnrichment(
+    'user_review': Sotong24StageGuideEnrichment(
       whyNeeded: '사용자가 방향·톤·사례를 승인해야 편집 공수가 낭비되지 않는다.',
       mainTasks: ['핵심 장·표지 후보 검토', '과장·허위 표현 점검', '보완 요청 기록'],
       inputs: ['초안', '검사 로그'],
@@ -123,7 +129,7 @@ class Sotong24GuideEnrichments {
       cautions: ['데모 데이터와 실프로젝트 혼동 금지'],
       completionConditions: ['승인 또는 보완요청이 기록됨'],
     ),
-  'revise':     Sotong24StageGuideEnrichment(
+    'revise': Sotong24StageGuideEnrichment(
       whyNeeded: '피드백을 반영해 본문을 고쳐야 품질검사에 진입할 수 있다.',
       mainTasks: ['수정·추가·삭제', '피드백 반영률 체크'],
       inputs: ['검토 메모'],
@@ -134,9 +140,13 @@ class Sotong24GuideEnrichments {
       cautions: ['무관한 대규모 재작성 지양'],
       completionConditions: ['주요 피드백이 반영됨'],
     ),
-  'quality':     Sotong24StageGuideEnrichment(
+    'quality': Sotong24StageGuideEnrichment(
       whyNeeded: '맞춤법·구조·사실·저작권/출처를 통과해야 판매 준비가 가능하다.',
-      mainTasks: ['오탈자·구조 검사', '사실검증(통계·정책·법률·가격·플랫폼 규정·날짜)', '저작권/출처(복제·인용·이미지·폰트·문체 모방)'],
+      mainTasks: [
+        '오탈자·구조 검사',
+        '사실검증(통계·정책·법률·가격·플랫폼 규정·날짜)',
+        '저작권/출처(복제·인용·이미지·폰트·문체 모방)',
+      ],
       inputs: ['수정본', '출처 표'],
       deliverables: ['품질 리포트'],
       qualityCriteria: ['오탈자', '출처', '금칙어', '사실 날짜·근거', '상업 라이선스'],
@@ -145,7 +155,7 @@ class Sotong24GuideEnrichments {
       cautions: ['법률·의료 조언은 면책/전문가 확인 고지'],
       completionConditions: ['품질 리포트와 미해결 이슈 목록이 있음'],
     ),
-  'publish_prep':     Sotong24StageGuideEnrichment(
+    'publish_prep': Sotong24StageGuideEnrichment(
       whyNeeded: '제목·설명·가격·미리보기·저작권 고지가 있어야 등록·판매가 가능하다.',
       mainTasks: ['상품 메타 작성', '미리보기·목차 공개 범위', '가격·채널 초안'],
       inputs: ['품질 리포트', '최종본'],
@@ -156,7 +166,7 @@ class Sotong24GuideEnrichments {
       cautions: ['플랫폼 규정과 충돌하는 문구 금지'],
       completionConditions: ['등록 필수 항목이 채워짐'],
     ),
-  'deploy':     Sotong24StageGuideEnrichment(
+    'deploy': Sotong24StageGuideEnrichment(
       whyNeeded: '채널 업로드 직전 최종 파일·버전을 확정한다(전자책은 업로드 자체가 수동).',
       mainTasks: ['최종 파일 버전 고정', '배포 체크리스트'],
       inputs: ['등록 패키지'],
@@ -167,7 +177,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지 — 사용자 승인 후'],
       completionConditions: ['최종본 체크섬/버전 기록이 있음'],
     ),
-  'promo':     Sotong24StageGuideEnrichment(
+    'promo': Sotong24StageGuideEnrichment(
       whyNeeded: '홍보 카피·썸네일 문구로 발견·클릭을 만든다.',
       mainTasks: ['짧은 소개·쇼츠 소재', '채널별 메시지'],
       inputs: ['상품 설명'],
@@ -178,7 +188,7 @@ class Sotong24GuideEnrichments {
       cautions: ['보장·의료·투자 확정 표현 금지'],
       completionConditions: ['홍보 초안이 승인 대기 상태'],
     ),
-  'launch':     Sotong24StageGuideEnrichment(
+    'launch': Sotong24StageGuideEnrichment(
       whyNeeded: '공개·공유 시점을 확정하고 채널 권한을 점검한다.',
       mainTasks: ['공개 체크', '공유 채널·권한'],
       inputs: ['최종본', '홍보 초안'],
@@ -189,7 +199,7 @@ class Sotong24GuideEnrichments {
       cautions: ['데모 URL을 실서비스로 안내하지 말 것'],
       completionConditions: ['공개 승인 기록이 남음'],
     ),
-  'measure':     Sotong24StageGuideEnrichment(
+    'measure': Sotong24StageGuideEnrichment(
       whyNeeded: '초기 반응·판매·문의를 기록해야 개선 우선순위가 생긴다.',
       mainTasks: ['지표 정의', '초기 반응 메모'],
       inputs: ['공개 기록'],
@@ -200,7 +210,7 @@ class Sotong24GuideEnrichments {
       cautions: ['개인정보 과도 수집 금지'],
       completionConditions: ['초기 지표가 기록됨'],
     ),
-  'iterate':     Sotong24StageGuideEnrichment(
+    'iterate': Sotong24StageGuideEnrichment(
       whyNeeded: '피드백으로 개정판·추가 장을 계획한다.',
       mainTasks: ['개선 백로그', '우선순위'],
       inputs: ['성과 메모', '리뷰'],
@@ -211,7 +221,7 @@ class Sotong24GuideEnrichments {
       cautions: ['검증 안 된 대규모 변경 주의'],
       completionConditions: ['다음 개선 항목이 선정됨'],
     ),
-  'maintain':     Sotong24StageGuideEnrichment(
+    'maintain': Sotong24StageGuideEnrichment(
       whyNeeded: '버전·백업·문의 대응을 유지해 상품 수명을 관리한다.',
       mainTasks: ['백업', '문의 대응 규칙', '개정 주기'],
       inputs: ['개선 목록'],
@@ -225,7 +235,7 @@ class Sotong24GuideEnrichments {
   };
 
   static final app = <String, Sotong24StageGuideEnrichment>{
-  'app_idea':     Sotong24StageGuideEnrichment(
+    'app_idea': Sotong24StageGuideEnrichment(
       whyNeeded: '앱이 해결할 문제와 형태를 고정한다.',
       mainTasks: ['해결할 문제와 앱 형태를 한 장으로 정리', '핵심 사용 상황 3개'],
       inputs: ['아이디어', '인터뷰/메모'],
@@ -236,7 +246,7 @@ class Sotong24GuideEnrichments {
       cautions: ['기술 스택부터 확정하지 말 것'],
       completionConditions: ['컨셉 문서 존재'],
     ),
-  'app_market':     Sotong24StageGuideEnrichment(
+    'app_market': Sotong24StageGuideEnrichment(
       whyNeeded: '경쟁앱·빈틈을 알아야 MVP 범위가 좁혀진다.',
       mainTasks: ['유사 앱 조사', '차별점·빈틈 정리', '스토어 리뷰 패턴'],
       inputs: ['컨셉'],
@@ -247,7 +257,7 @@ class Sotong24GuideEnrichments {
       cautions: ['베낀 UI/카피 주의'],
       completionConditions: ['조사표 완료'],
     ),
-  'app_user':     Sotong24StageGuideEnrichment(
+    'app_user': Sotong24StageGuideEnrichment(
       whyNeeded: '핵심 사용자와 사용 상황을 정의해야 UX가 흔들리지 않는다.',
       mainTasks: ['페르소나', '핵심 시나리오', '비사용자 경계'],
       inputs: ['경쟁 조사'],
@@ -258,7 +268,7 @@ class Sotong24GuideEnrichments {
       cautions: ['개인정보 과도 수집 계획 금지'],
       completionConditions: ['타깃 확정'],
     ),
-  'app_revenue':     Sotong24StageGuideEnrichment(
+    'app_revenue': Sotong24StageGuideEnrichment(
       whyNeeded: '수익모델이 없으면 출시 후 운영 방향이 없다.',
       mainTasks: ['광고·유료·구독·IAP 검토', '정책 리스크 메모'],
       inputs: ['타깃'],
@@ -269,7 +279,7 @@ class Sotong24GuideEnrichments {
       cautions: ['스토어 결제 정책 위반 주의'],
       completionConditions: ['수익모델 초안 확정'],
     ),
-  'app_features':     Sotong24StageGuideEnrichment(
+    'app_features': Sotong24StageGuideEnrichment(
       whyNeeded: 'MVP 기능을 고정해야 개발이 발산하지 않는다.',
       mainTasks: ['Must/Should/Could', '제외 기능 명시'],
       inputs: ['수익모델', '사용자'],
@@ -280,7 +290,7 @@ class Sotong24GuideEnrichments {
       cautions: ['출시 후 확장과 혼동 금지'],
       completionConditions: ['MVP 목록 확정'],
     ),
-  'app_req':     Sotong24StageGuideEnrichment(
+    'app_req': Sotong24StageGuideEnrichment(
       whyNeeded: '기능·비기능 요구를 문서화해야 구현·테스트 기준이 생긴다.',
       mainTasks: ['기능 요구', '성능·보안·접근성', '에러 처리 요구'],
       inputs: ['MVP'],
@@ -291,7 +301,7 @@ class Sotong24GuideEnrichments {
       cautions: ['보안/개인정보 요구 누락 주의'],
       completionConditions: ['요구사항 v1 확정'],
     ),
-  'app_ux':     Sotong24StageGuideEnrichment(
+    'app_ux': Sotong24StageGuideEnrichment(
       whyNeeded: '화면 흐름·주요 경로가 있어야 UI/개발이 정렬된다.',
       mainTasks: ['사용자 여정', '화면 흐름도', '빈 상태/오류 경로'],
       inputs: ['요구사항'],
@@ -302,7 +312,7 @@ class Sotong24GuideEnrichments {
       cautions: ['접근성 무시 금지'],
       completionConditions: ['핵심 흐름 확정'],
     ),
-  'app_ui':     Sotong24StageGuideEnrichment(
+    'app_ui': Sotong24StageGuideEnrichment(
       whyNeeded: '화면 구성·컴포넌트를 정해 구현 일관성을 확보한다.',
       mainTasks: ['와이어/컴포넌트', '상태별 UI'],
       inputs: ['UX 흐름'],
@@ -313,7 +323,7 @@ class Sotong24GuideEnrichments {
       cautions: ['플랫폼 가이드라인 확인'],
       completionConditions: ['주요 화면 설계 완료'],
     ),
-  'app_arch':     Sotong24StageGuideEnrichment(
+    'app_arch': Sotong24StageGuideEnrichment(
       whyNeeded: 'Flutter/Firebase 등 구조를 정해 확장·보안 기반을 잡는다.',
       mainTasks: ['모듈 구조', '데이터 모델', '인증·권한'],
       inputs: ['요구·UI'],
@@ -324,7 +334,7 @@ class Sotong24GuideEnrichments {
       cautions: ['비밀키 클라이언트 하드코딩 금지'],
       completionConditions: ['구조 문서화'],
     ),
-  'app_project':     Sotong24StageGuideEnrichment(
+    'app_project': Sotong24StageGuideEnrichment(
       whyNeeded: '저장소·환경·기본 골격을 만들어야 협업이 가능하다.',
       mainTasks: ['리포/브랜치', '환경 변수', 'CI 초안'],
       inputs: ['구조'],
@@ -335,7 +345,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 키 커밋 금지'],
       completionConditions: ['로컬 실행 확인'],
     ),
-  'app_dev':     Sotong24StageGuideEnrichment(
+    'app_dev': Sotong24StageGuideEnrichment(
       whyNeeded: '핵심 기능을 구현해 MVP를 실체화한다.',
       mainTasks: ['화면·로직 구현', '상태관리', '기본 오류처리'],
       inputs: ['요구·UI'],
@@ -346,7 +356,7 @@ class Sotong24GuideEnrichments {
       cautions: ['데모 데이터와 운영 데이터 혼용 주의'],
       completionConditions: ['MVP 기능 동작'],
     ),
-  'app_backend':     Sotong24StageGuideEnrichment(
+    'app_backend': Sotong24StageGuideEnrichment(
       whyNeeded: '인증·DB·API를 연결해야 실제 사용이 가능하다.',
       mainTasks: ['Auth', 'Firestore/API', '규칙·인덱스'],
       inputs: ['기능 빌드'],
@@ -357,7 +367,7 @@ class Sotong24GuideEnrichments {
       cautions: ['개인정보 최소 수집'],
       completionConditions: ['인증·CRUD 동작'],
     ),
-  'app_monetize':     Sotong24StageGuideEnrichment(
+    'app_monetize': Sotong24StageGuideEnrichment(
       whyNeeded: '광고/결제를 붙여 수익화를 검증한다.',
       mainTasks: ['광고 SDK/결제', '샌드박스 테스트'],
       inputs: ['연동'],
@@ -368,7 +378,7 @@ class Sotong24GuideEnrichments {
       cautions: ['어린이/민감 카테고리 정책'],
       completionConditions: ['샌드박스 성공'],
     ),
-  'app_test':     Sotong24StageGuideEnrichment(
+    'app_test': Sotong24StageGuideEnrichment(
       whyNeeded: '기능·회귀 테스트로 출시 리스크를 줄인다.',
       mainTasks: ['유닛/위젯/수동', '회귀 목록'],
       inputs: ['빌드'],
@@ -379,7 +389,7 @@ class Sotong24GuideEnrichments {
       cautions: ['실기기 미테스트'],
       completionConditions: ['핵심 테스트 통과'],
     ),
-  'app_fix':     Sotong24StageGuideEnrichment(
+    'app_fix': Sotong24StageGuideEnrichment(
       whyNeeded: '결함을 수정해 품질 기준을 맞춘다.',
       mainTasks: ['버그 수정', '재테스트'],
       inputs: ['리포트'],
@@ -390,7 +400,7 @@ class Sotong24GuideEnrichments {
       cautions: ['임시 우회만 남기지 말 것'],
       completionConditions: ['블로커 이슈 해소'],
     ),
-  'app_privacy':     Sotong24StageGuideEnrichment(
+    'app_privacy': Sotong24StageGuideEnrichment(
       whyNeeded: '정책·권한·약관이 없으면 스토어 거절·법적 리스크가 생긴다.',
       mainTasks: ['개인정보처리방침', '권한 설명', '약관'],
       inputs: ['앱 기능'],
@@ -401,7 +411,7 @@ class Sotong24GuideEnrichments {
       cautions: ['미사용 권한 제거'],
       completionConditions: ['정책 문서 준비'],
     ),
-  'app_store_assets':     Sotong24StageGuideEnrichment(
+    'app_store_assets': Sotong24StageGuideEnrichment(
       whyNeeded: '스토어 설명·키워드·연령 등급이 출시 필수다.',
       mainTasks: ['짧은/긴 설명', '키워드', '연령·콘텐츠 등급'],
       inputs: ['정책·기능'],
@@ -412,7 +422,7 @@ class Sotong24GuideEnrichments {
       cautions: ['타사 상표 오남용 금지'],
       completionConditions: ['등록자료 초안 완료'],
     ),
-  'app_visuals':     Sotong24StageGuideEnrichment(
+    'app_visuals': Sotong24StageGuideEnrichment(
       whyNeeded: '아이콘·스크린샷이 전환과 심사를 좌우한다.',
       mainTasks: ['아이콘', '스크린샷', '피처 그래픽'],
       inputs: ['UI'],
@@ -423,7 +433,7 @@ class Sotong24GuideEnrichments {
       cautions: ['라이선스 없는 이미지 금지'],
       completionConditions: ['필수 이미지 준비'],
     ),
-  'app_internal':     Sotong24StageGuideEnrichment(
+    'app_internal': Sotong24StageGuideEnrichment(
       whyNeeded: '실기기·내부 배포로 실제 사용성을 검증한다.',
       mainTasks: ['내부 테스트 트랙', '크래시 확인'],
       inputs: ['릴리스 후보'],
@@ -434,7 +444,7 @@ class Sotong24GuideEnrichments {
       cautions: ['로그에 개인정보 남기지 말 것'],
       completionConditions: ['내부 테스트 통과'],
     ),
-  'app_approval':     Sotong24StageGuideEnrichment(
+    'app_approval': Sotong24StageGuideEnrichment(
       whyNeeded: '사용자가 출시를 승인해야 스토어 등록을 진행한다.',
       mainTasks: ['출시 체크리스트 검토', '승인 기록'],
       inputs: ['내부 결과'],
@@ -445,7 +455,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 출시 금지'],
       completionConditions: ['승인 기록 존재'],
     ),
-  'app_publish':     Sotong24StageGuideEnrichment(
+    'app_publish': Sotong24StageGuideEnrichment(
       whyNeeded: 'Play Store 등록/출시는 수동 승인 후 진행한다.',
       mainTasks: ['스토어 콘솔 등록', '출시 트랙'],
       inputs: ['승인'],
@@ -456,7 +466,7 @@ class Sotong24GuideEnrichments {
       cautions: ['프로덕션 즉시 강행 주의'],
       completionConditions: ['리스팅 게시 또는 심사중'],
     ),
-  'app_monitor':     Sotong24StageGuideEnrichment(
+    'app_monitor': Sotong24StageGuideEnrichment(
       whyNeeded: '크래시·리뷰·지표를 봐 핫픽스 우선순위를 정한다.',
       mainTasks: ['Crash/Analytics', '리뷰 모니터링'],
       inputs: ['출시'],
@@ -467,7 +477,7 @@ class Sotong24GuideEnrichments {
       cautions: ['PII 로그 금지'],
       completionConditions: ['모니터링 연결'],
     ),
-  'app_ops':     Sotong24StageGuideEnrichment(
+    'app_ops': Sotong24StageGuideEnrichment(
       whyNeeded: '개선·핫픽스를 운영해 앱을 유지한다.',
       mainTasks: ['업데이트 계획', '핫픽스 절차'],
       inputs: ['지표'],
@@ -481,7 +491,7 @@ class Sotong24GuideEnrichments {
   };
 
   static final industrial = <String, Sotong24StageGuideEnrichment>{
-  'ind_req':     Sotong24StageGuideEnrichment(
+    'ind_req': Sotong24StageGuideEnrichment(
       whyNeeded: '현장 문제와 목표를 수집해야 Cycle Time·품질 목표가 정해진다.',
       mainTasks: ['고객 요구사항', '작업자 시나리오', '품질·CT 목표'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -492,7 +502,7 @@ class Sotong24GuideEnrichments {
       cautions: ['PLC 백업 전 요구 합의'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_process':     Sotong24StageGuideEnrichment(
+    'ind_process': Sotong24StageGuideEnrichment(
       whyNeeded: '공정·택트·병목을 파악해야 자동화 범위가 맞는다.',
       mainTasks: ['공정 맵', 'Cycle Time', '병목'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -503,7 +513,7 @@ class Sotong24GuideEnrichments {
       cautions: ['비가동 요인 누락 주의'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_plc':     Sotong24StageGuideEnrichment(
+    'ind_plc': Sotong24StageGuideEnrichment(
       whyNeeded: '제어기·설비 구성을 확인해야 인터페이스가 설계된다.',
       mainTasks: ['PLC/설비 목록', '메이커·버전'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -514,7 +524,7 @@ class Sotong24GuideEnrichments {
       cautions: ['현장 전원/안전 절차'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_comm':     Sotong24StageGuideEnrichment(
+    'ind_comm': Sotong24StageGuideEnrichment(
       whyNeeded: 'PLC·MES·툴·비전 통신 사양이 없으면 연동이 실패한다.',
       mainTasks: ['TCP/IP·Serial·Modbus·OPC', '타임아웃/재시도'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -525,7 +535,7 @@ class Sotong24GuideEnrichments {
       cautions: ['포트 개방 보안 주의'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_io':     Sotong24StageGuideEnrichment(
+    'ind_io': Sotong24StageGuideEnrichment(
       whyNeeded: 'I/O·PLC Address·Recipe·Model이 데이터 계약이다.',
       mainTasks: ['I/O List', 'Address Map', 'Recipe/Model'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -536,7 +546,7 @@ class Sotong24GuideEnrichments {
       cautions: ['실주소와 문서 불일치 주의'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_scenario':     Sotong24StageGuideEnrichment(
+    'ind_scenario': Sotong24StageGuideEnrichment(
       whyNeeded: '정상/이상 시나리오가 없으면 예외처리가 빠진다.',
       mainTasks: ['정상 시퀀스', '알람·정지·재기동'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -547,7 +557,7 @@ class Sotong24GuideEnrichments {
       cautions: ['안전 인터록 우선'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_arch':     Sotong24StageGuideEnrichment(
+    'ind_arch': Sotong24StageGuideEnrichment(
       whyNeeded: '모듈·상태머신 구조로 현장 변경에 견디게 한다.',
       mainTasks: ['모듈 분할', '상태머신', '설정/권한'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -558,7 +568,7 @@ class Sotong24GuideEnrichments {
       cautions: ['매직넘버 금지'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_hmi':     Sotong24StageGuideEnrichment(
+    'ind_hmi': Sotong24StageGuideEnrichment(
       whyNeeded: '모니터링·조작 화면이 작업자 실수를 줄인다.',
       mainTasks: ['상태 모니터', '설정·권한', '알람 표시'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -569,7 +579,7 @@ class Sotong24GuideEnrichments {
       cautions: ['위험 조작 2단 확인'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_iface':     Sotong24StageGuideEnrichment(
+    'ind_iface': Sotong24StageGuideEnrichment(
       whyNeeded: 'PLC/MES/조립툴 인터페이스를 명확히 한다.',
       mainTasks: ['전문 포맷', '핸드셰이크', '재연결'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -580,7 +590,7 @@ class Sotong24GuideEnrichments {
       cautions: ['부분 수신 처리'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_vision':     Sotong24StageGuideEnrichment(
+    'ind_vision': Sotong24StageGuideEnrichment(
       whyNeeded: '비전검사 연동으로 품질 결과를 수집한다.',
       mainTasks: ['트리거/결과', '불량 코드'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -591,7 +601,7 @@ class Sotong24GuideEnrichments {
       cautions: ['조명 조건 기록'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_collect':     Sotong24StageGuideEnrichment(
+    'ind_collect': Sotong24StageGuideEnrichment(
       whyNeeded: '생산실적·검사결과·Traceability를 남긴다.',
       mainTasks: ['실적 수집', '트레이스 키', '저장 주기'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -602,7 +612,7 @@ class Sotong24GuideEnrichments {
       cautions: ['개인식별 최소'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_alarm':     Sotong24StageGuideEnrichment(
+    'ind_alarm': Sotong24StageGuideEnrichment(
       whyNeeded: '알람·이력 체계가 장애 대응의 기본이다.',
       mainTasks: ['알람 코드', '등급', '이력 조회'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -613,7 +623,7 @@ class Sotong24GuideEnrichments {
       cautions: ['치명 알람 무시 금지'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_dev':     Sotong24StageGuideEnrichment(
+    'ind_dev': Sotong24StageGuideEnrichment(
       whyNeeded: '제어·연동 SW를 구현한다.',
       mainTasks: ['로직 구현', '설정·로그', '통신 재연결'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -624,7 +634,7 @@ class Sotong24GuideEnrichments {
       cautions: ['안전 우회 코드 금지'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_sim':     Sotong24StageGuideEnrichment(
+    'ind_sim': Sotong24StageGuideEnrichment(
       whyNeeded: '오프라인/시뮬로 현장 전에 검증한다.',
       mainTasks: ['시뮬 시나리오', '경계값'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -635,7 +645,7 @@ class Sotong24GuideEnrichments {
       cautions: ['시뮬≠현장 명시'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_eq_test':     Sotong24StageGuideEnrichment(
+    'ind_eq_test': Sotong24StageGuideEnrichment(
       whyNeeded: '실장비 연동으로 통신·타이밍을 확인한다.',
       mainTasks: ['연동 테스트', '타임아웃', '비정상 데이터'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -646,7 +656,7 @@ class Sotong24GuideEnrichments {
       cautions: ['LOTO/안전 구역'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_safety':     Sotong24StageGuideEnrichment(
+    'ind_safety': Sotong24StageGuideEnrichment(
       whyNeeded: '안전·인터록·예외처리를 점검한다.',
       mainTasks: ['인터록', '비상정지 연계', '권한'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -657,7 +667,7 @@ class Sotong24GuideEnrichments {
       cautions: ['안전 해제 납품 금지'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_sat':     Sotong24StageGuideEnrichment(
+    'ind_sat': Sotong24StageGuideEnrichment(
       whyNeeded: '현장 시운전으로 실생산 조건을 확인한다.',
       mainTasks: ['시운전 계획', 'CT·품질 실측', '장애 복구'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -668,7 +678,7 @@ class Sotong24GuideEnrichments {
       cautions: ['변경이력 필수'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_accept':     Sotong24StageGuideEnrichment(
+    'ind_accept': Sotong24StageGuideEnrichment(
       whyNeeded: '고객 검수·승인을 받는다.',
       mainTasks: ['검수 항목', '이슈 목록', '승인'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -679,7 +689,7 @@ class Sotong24GuideEnrichments {
       cautions: ['미결 이슈 명시'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_backup':     Sotong24StageGuideEnrichment(
+    'ind_backup': Sotong24StageGuideEnrichment(
       whyNeeded: '프로그램·PLC·설정 백업이 유지보수의 생명선이다.',
       mainTasks: ['앱 백업', 'PLC 백업', '설정/Recipe'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -690,7 +700,7 @@ class Sotong24GuideEnrichments {
       cautions: ['복원 테스트·버전 라벨'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_manual':     Sotong24StageGuideEnrichment(
+    'ind_manual': Sotong24StageGuideEnrichment(
       whyNeeded: '운전·유지 매뉴얼로 현장 자립을 돕는다.',
       mainTasks: ['운전', '알람 대응', '유지보수'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -701,7 +711,7 @@ class Sotong24GuideEnrichments {
       cautions: ['안전 절차 포함'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_delivery':     Sotong24StageGuideEnrichment(
+    'ind_delivery': Sotong24StageGuideEnrichment(
       whyNeeded: '납품·인수인계로 책임을 명확히 한다.',
       mainTasks: ['납품 목록', '변경이력', '교육'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -712,7 +722,7 @@ class Sotong24GuideEnrichments {
       cautions: ['계정 인수 주의'],
       completionConditions: ['산출물 확정 및 인수 가능 상태'],
     ),
-  'ind_maint':     Sotong24StageGuideEnrichment(
+    'ind_maint': Sotong24StageGuideEnrichment(
       whyNeeded: '개선·장애 대응으로 가동률을 유지한다.',
       mainTasks: ['장애 대응', '개선 백로그', '정기 점검'],
       inputs: ['이전 단계 산출물', '현장/고객 자료'],
@@ -726,7 +736,7 @@ class Sotong24GuideEnrichments {
   };
 
   static final site = <String, Sotong24StageGuideEnrichment>{
-  'site_topic':     Sotong24StageGuideEnrichment(
+    'site_topic': Sotong24StageGuideEnrichment(
       whyNeeded: '다룰 지식 영역을 정해 전문성을 만든다.',
       mainTasks: ['주제·범위', '비범위'],
       inputs: ['이전 단계 산출물'],
@@ -737,7 +747,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_audience':     Sotong24StageGuideEnrichment(
+    'site_audience': Sotong24StageGuideEnrichment(
       whyNeeded: '독자·이용 목적이 콘텐츠 깊이를 결정한다.',
       mainTasks: ['독자', '이용 목적'],
       inputs: ['이전 단계 산출물'],
@@ -748,7 +758,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_demand':     Sotong24StageGuideEnrichment(
+    'site_demand': Sotong24StageGuideEnrichment(
       whyNeeded: '검색 수요가 없으면 트래픽이 없다.',
       mainTasks: ['키워드', '검색 의도'],
       inputs: ['이전 단계 산출물'],
@@ -759,7 +769,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_compete':     Sotong24StageGuideEnrichment(
+    'site_compete': Sotong24StageGuideEnrichment(
       whyNeeded: '경쟁사이트를 봐 IA·차별점을 잡는다.',
       mainTasks: ['벤치마크', '차별점'],
       inputs: ['이전 단계 산출물'],
@@ -770,7 +780,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_ia':     Sotong24StageGuideEnrichment(
+    'site_ia': Sotong24StageGuideEnrichment(
       whyNeeded: '콘텐츠 계층(IA)이 탐색·SEO의 뼈대다.',
       mainTasks: ['계층', 'URL 구조'],
       inputs: ['이전 단계 산출물'],
@@ -781,7 +791,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_menu':     Sotong24StageGuideEnrichment(
+    'site_menu': Sotong24StageGuideEnrichment(
       whyNeeded: '네비게이션이 이탈을 좌우한다.',
       mainTasks: ['메뉴', '푸터'],
       inputs: ['이전 단계 산출물'],
@@ -792,7 +802,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_content_plan':     Sotong24StageGuideEnrichment(
+    'site_content_plan': Sotong24StageGuideEnrichment(
       whyNeeded: '초기 콘텐츠 목록으로 제작 우선순위를 정한다.',
       mainTasks: ['콘텐츠 백로그', '출처 기준'],
       inputs: ['이전 단계 산출물'],
@@ -803,7 +813,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_ux':     Sotong24StageGuideEnrichment(
+    'site_ux': Sotong24StageGuideEnrichment(
       whyNeeded: '페이지 레이아웃·가독성을 설계한다.',
       mainTasks: ['템플릿', '타이포'],
       inputs: ['이전 단계 산출물'],
@@ -814,7 +824,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_dev':     Sotong24StageGuideEnrichment(
+    'site_dev': Sotong24StageGuideEnrichment(
       whyNeeded: '사이트를 구현한다.',
       mainTasks: ['페이지·라우팅', '컴포넌트'],
       inputs: ['이전 단계 산출물'],
@@ -825,7 +835,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_write':     Sotong24StageGuideEnrichment(
+    'site_write': Sotong24StageGuideEnrichment(
       whyNeeded: '글을 작성·검수해 신뢰도를 확보한다.',
       mainTasks: ['초안', '출처', '사실확인'],
       inputs: ['이전 단계 산출물'],
@@ -836,7 +846,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_search':     Sotong24StageGuideEnrichment(
+    'site_search': Sotong24StageGuideEnrichment(
       whyNeeded: '사이트 내 검색으로 탐색을 돕는다.',
       mainTasks: ['검색 UI', '결과 품질'],
       inputs: ['이전 단계 산출물'],
@@ -847,7 +857,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_seo':     Sotong24StageGuideEnrichment(
+    'site_seo': Sotong24StageGuideEnrichment(
       whyNeeded: '메타·구조화 데이터로 검색 노출을 준비한다.',
       mainTasks: ['title/description', '구조화 데이터', 'Search Console'],
       inputs: ['이전 단계 산출물'],
@@ -858,7 +868,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_analytics':     Sotong24StageGuideEnrichment(
+    'site_analytics': Sotong24StageGuideEnrichment(
       whyNeeded: '측정 태그로 개선 근거를 만든다.',
       mainTasks: ['Analytics', '이벤트'],
       inputs: ['이전 단계 산출물'],
@@ -869,7 +879,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_mobile':     Sotong24StageGuideEnrichment(
+    'site_mobile': Sotong24StageGuideEnrichment(
       whyNeeded: '모바일에서 읽기·탐색이 가능해야 한다.',
       mainTasks: ['390px 점검', '터치 영역'],
       inputs: ['이전 단계 산출물'],
@@ -880,7 +890,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_perf':     Sotong24StageGuideEnrichment(
+    'site_perf': Sotong24StageGuideEnrichment(
       whyNeeded: '로딩·성능이 이탈을 줄인다.',
       mainTasks: ['LCP/이미지', '캐시'],
       inputs: ['이전 단계 산출물'],
@@ -891,7 +901,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_bug':     Sotong24StageGuideEnrichment(
+    'site_bug': Sotong24StageGuideEnrichment(
       whyNeeded: '링크·표시 오류를 고친다.',
       mainTasks: ['QA', '깨진 링크'],
       inputs: ['이전 단계 산출물'],
@@ -902,7 +912,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_host':     Sotong24StageGuideEnrichment(
+    'site_host': Sotong24StageGuideEnrichment(
       whyNeeded: '호스팅 설정을 준비한다.',
       mainTasks: ['Hosting', '도메인', '리다이렉트'],
       inputs: ['이전 단계 산출물'],
@@ -913,7 +923,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_approve':     Sotong24StageGuideEnrichment(
+    'site_approve': Sotong24StageGuideEnrichment(
       whyNeeded: '사용자가 배포를 승인한다.',
       mainTasks: ['체크리스트', '승인'],
       inputs: ['이전 단계 산출물'],
@@ -924,7 +934,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_launch':     Sotong24StageGuideEnrichment(
+    'site_launch': Sotong24StageGuideEnrichment(
       whyNeeded: '공개 URL을 확정한다.',
       mainTasks: ['공개', 'DNS'],
       inputs: ['이전 단계 산출물'],
@@ -935,7 +945,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_update':     Sotong24StageGuideEnrichment(
+    'site_update': Sotong24StageGuideEnrichment(
       whyNeeded: '주기 업데이트·오래된 정보 관리를 한다.',
       mainTasks: ['개정 주기', '오래된 정보 표시'],
       inputs: ['이전 단계 산출물'],
@@ -946,7 +956,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_traffic':     Sotong24StageGuideEnrichment(
+    'site_traffic': Sotong24StageGuideEnrichment(
       whyNeeded: '유입·체류를 본다.',
       mainTasks: ['유입 채널', '체류'],
       inputs: ['이전 단계 산출물'],
@@ -957,7 +967,7 @@ class Sotong24GuideEnrichments {
       cautions: ['운영 데이터 삭제 금지', '허위 정보 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'site_monetize':     Sotong24StageGuideEnrichment(
+    'site_monetize': Sotong24StageGuideEnrichment(
       whyNeeded: '문의·광고·제휴 등 수익화를 검토한다.',
       mainTasks: ['수익 옵션', '정책'],
       inputs: ['이전 단계 산출물'],
@@ -971,7 +981,7 @@ class Sotong24GuideEnrichments {
   };
 
   static final promoSite = <String, Sotong24StageGuideEnrichment>{
-  'promo_product':     Sotong24StageGuideEnrichment(
+    'promo_product': Sotong24StageGuideEnrichment(
       whyNeeded: '무엇을 팔지/알릴지 정해 메시지 초점을 만든다.',
       mainTasks: ['상품·오퍼', '가격 골격'],
       inputs: ['이전 단계 산출물'],
@@ -982,7 +992,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_customer':     Sotong24StageGuideEnrichment(
+    'promo_customer': Sotong24StageGuideEnrichment(
       whyNeeded: '구매 고객을 정의해야 카피가 날카로워진다.',
       mainTasks: ['고객', '구매 상황'],
       inputs: ['이전 단계 산출물'],
@@ -993,7 +1003,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_pain':     Sotong24StageGuideEnrichment(
+    'promo_pain': Sotong24StageGuideEnrichment(
       whyNeeded: '고객 문제가 곧 헤드라인 재료다.',
       mainTasks: ['문제', '현재 대안'],
       inputs: ['이전 단계 산출물'],
@@ -1004,7 +1014,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_compete':     Sotong24StageGuideEnrichment(
+    'promo_compete': Sotong24StageGuideEnrichment(
       whyNeeded: '대안·경쟁을 봐 USP를 만든다.',
       mainTasks: ['경쟁 비교', '빈틈'],
       inputs: ['이전 단계 산출물'],
@@ -1015,7 +1025,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_usp':     Sotong24StageGuideEnrichment(
+    'promo_usp': Sotong24StageGuideEnrichment(
       whyNeeded: 'USP를 문장으로 고정한다.',
       mainTasks: ['USP 1~3', '증거와 연결'],
       inputs: ['이전 단계 산출물'],
@@ -1026,7 +1036,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_brand':     Sotong24StageGuideEnrichment(
+    'promo_brand': Sotong24StageGuideEnrichment(
       whyNeeded: '톤·메시지로 신뢰를 쌓는다.',
       mainTasks: ['톤', '금지 표현'],
       inputs: ['이전 단계 산출물'],
@@ -1037,7 +1047,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_copy':     Sotong24StageGuideEnrichment(
+    'promo_copy': Sotong24StageGuideEnrichment(
       whyNeeded: '헤드라인·본문 카피로 관심을 만든다.',
       mainTasks: ['Hero', '문제→해결→혜택'],
       inputs: ['이전 단계 산출물'],
@@ -1048,7 +1058,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_structure':     Sotong24StageGuideEnrichment(
+    'promo_structure': Sotong24StageGuideEnrichment(
       whyNeeded: '방문→관심→신뢰→행동 섹션 순서를 설계한다.',
       mainTasks: ['섹션 순서', 'FAQ'],
       inputs: ['이전 단계 산출물'],
@@ -1059,7 +1069,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_cta':     Sotong24StageGuideEnrichment(
+    'promo_cta': Sotong24StageGuideEnrichment(
       whyNeeded: '행동 유도가 전환의 핵심이다.',
       mainTasks: ['CTA 문구·위치', '문의/구매'],
       inputs: ['이전 단계 산출물'],
@@ -1070,7 +1080,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_trust':     Sotong24StageGuideEnrichment(
+    'promo_trust': Sotong24StageGuideEnrichment(
       whyNeeded: '후기·실적·보증으로 신뢰를 만든다.',
       mainTasks: ['증거', 'FAQ'],
       inputs: ['이전 단계 산출물'],
@@ -1081,7 +1091,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_media':     Sotong24StageGuideEnrichment(
+    'promo_media': Sotong24StageGuideEnrichment(
       whyNeeded: '이미지/영상으로 이해를 돕는다.',
       mainTasks: ['히어로 미디어', '데모'],
       inputs: ['이전 단계 산출물'],
@@ -1092,7 +1102,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_dev':     Sotong24StageGuideEnrichment(
+    'promo_dev': Sotong24StageGuideEnrichment(
       whyNeeded: '랜딩페이지를 구현한다.',
       mainTasks: ['페이지', '폼'],
       inputs: ['이전 단계 산출물'],
@@ -1103,7 +1113,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_mobile':     Sotong24StageGuideEnrichment(
+    'promo_mobile': Sotong24StageGuideEnrichment(
       whyNeeded: '휴대폰 전환을 최적화한다.',
       mainTasks: ['390px', '엄지 영역'],
       inputs: ['이전 단계 산출물'],
@@ -1114,7 +1124,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_seo':     Sotong24StageGuideEnrichment(
+    'promo_seo': Sotong24StageGuideEnrichment(
       whyNeeded: '검색·공유 메타를 점검한다.',
       mainTasks: ['OG/메타', '슬러그'],
       inputs: ['이전 단계 산출물'],
@@ -1125,7 +1135,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_analytics':     Sotong24StageGuideEnrichment(
+    'promo_analytics': Sotong24StageGuideEnrichment(
       whyNeeded: '유입 측정을 연결한다.',
       mainTasks: ['Analytics', 'UTM'],
       inputs: ['이전 단계 산출물'],
@@ -1136,7 +1146,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_convert':     Sotong24StageGuideEnrichment(
+    'promo_convert': Sotong24StageGuideEnrichment(
       whyNeeded: '문의/구매 추적으로 개선한다.',
       mainTasks: ['전환 이벤트', '감사 페이지'],
       inputs: ['이전 단계 산출물'],
@@ -1147,7 +1157,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_test':     Sotong24StageGuideEnrichment(
+    'promo_test': Sotong24StageGuideEnrichment(
       whyNeeded: '폼·링크·속도를 시험한다.',
       mainTasks: ['QA', '속도'],
       inputs: ['이전 단계 산출물'],
@@ -1158,7 +1168,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_deploy':     Sotong24StageGuideEnrichment(
+    'promo_deploy': Sotong24StageGuideEnrichment(
       whyNeeded: '배포는 수동 승인 후.',
       mainTasks: ['배포', '캐시'],
       inputs: ['이전 단계 산출물'],
@@ -1169,7 +1179,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_traffic':     Sotong24StageGuideEnrichment(
+    'promo_traffic': Sotong24StageGuideEnrichment(
       whyNeeded: '유입 채널을 가동한다.',
       mainTasks: ['광고/공유', 'UTM'],
       inputs: ['이전 단계 산출물'],
@@ -1180,7 +1190,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_cvr':     Sotong24StageGuideEnrichment(
+    'promo_cvr': Sotong24StageGuideEnrichment(
       whyNeeded: '전환을 분석한다.',
       mainTasks: ['CVR', '이탈'],
       inputs: ['이전 단계 산출물'],
@@ -1191,7 +1201,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_ab':     Sotong24StageGuideEnrichment(
+    'promo_ab': Sotong24StageGuideEnrichment(
       whyNeeded: '카피·CTA A/B로 개선한다.',
       mainTasks: ['가설', '실험'],
       inputs: ['이전 단계 산출물'],
@@ -1202,7 +1212,7 @@ class Sotong24GuideEnrichments {
       cautions: ['다크패턴 금지', '가짜 후기 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'promo_ongoing':     Sotong24StageGuideEnrichment(
+    'promo_ongoing': Sotong24StageGuideEnrichment(
       whyNeeded: '리타게팅·반복 캠페인을 운영한다.',
       mainTasks: ['리타게팅', '콘텐츠 보강'],
       inputs: ['이전 단계 산출물'],
@@ -1216,7 +1226,7 @@ class Sotong24GuideEnrichments {
   };
 
   static final contents = <String, Sotong24StageGuideEnrichment>{
-  'cnt_trend':     Sotong24StageGuideEnrichment(
+    'cnt_trend': Sotong24StageGuideEnrichment(
       whyNeeded: '주제 후보와 유행을 봐 적중률을 높인다.',
       mainTasks: ['트렌드 메모', '금지 주제'],
       inputs: ['이전 단계 산출물'],
@@ -1227,7 +1237,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_topic':     Sotong24StageGuideEnrichment(
+    'cnt_topic': Sotong24StageGuideEnrichment(
       whyNeeded: '이번 콘텐츠 주제를 고른다.',
       mainTasks: ['주제 한 줄', '유형(song/shorts)'],
       inputs: ['이전 단계 산출물'],
@@ -1238,7 +1248,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_target':     Sotong24StageGuideEnrichment(
+    'cnt_target': Sotong24StageGuideEnrichment(
       whyNeeded: '시청/청취 대상을 정한다.',
       mainTasks: ['타깃', '플랫폼'],
       inputs: ['이전 단계 산출물'],
@@ -1249,7 +1259,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_plan':     Sotong24StageGuideEnrichment(
+    'cnt_plan': Sotong24StageGuideEnrichment(
       whyNeeded: '구성·분량·Hook을 기획한다.',
       mainTasks: ['Hook', '스토리 아크', '분량'],
       inputs: ['이전 단계 산출물'],
@@ -1260,7 +1270,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_research':     Sotong24StageGuideEnrichment(
+    'cnt_research': Sotong24StageGuideEnrichment(
       whyNeeded: '사실·레퍼런스를 모은다.',
       mainTasks: ['자료', '출처'],
       inputs: ['이전 단계 산출물'],
@@ -1271,7 +1281,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_script':     Sotong24StageGuideEnrichment(
+    'cnt_script': Sotong24StageGuideEnrichment(
       whyNeeded: '대본 또는 가사를 작성한다.',
       mainTasks: ['대본/가사', '타이밍'],
       inputs: ['이전 단계 산출물'],
@@ -1282,7 +1292,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_rights':     Sotong24StageGuideEnrichment(
+    'cnt_rights': Sotong24StageGuideEnrichment(
       whyNeeded: '음원·영상·폰트·샘플 사용권을 점검한다.',
       mainTasks: ['라이선스', '크레딧'],
       inputs: ['이전 단계 산출물'],
@@ -1293,7 +1303,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_produce':     Sotong24StageGuideEnrichment(
+    'cnt_produce': Sotong24StageGuideEnrichment(
       whyNeeded: '음원/영상 초안을 만든다.',
       mainTasks: ['AI/툴 생성', '테이크'],
       inputs: ['이전 단계 산출물'],
@@ -1304,7 +1314,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_ai_review':     Sotong24StageGuideEnrichment(
+    'cnt_ai_review': Sotong24StageGuideEnrichment(
       whyNeeded: 'AI 산출물을 사람이 검토한다.',
       mainTasks: ['사실·윤리', '어색한 표현'],
       inputs: ['이전 단계 산출물'],
@@ -1315,7 +1325,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_edit':     Sotong24StageGuideEnrichment(
+    'cnt_edit': Sotong24StageGuideEnrichment(
       whyNeeded: '편집·믹싱·자막을 한다.',
       mainTasks: ['컷', '자막', '음량'],
       inputs: ['이전 단계 산출물'],
@@ -1326,7 +1336,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_thumb':     Sotong24StageGuideEnrichment(
+    'cnt_thumb': Sotong24StageGuideEnrichment(
       whyNeeded: '썸네일·커버로 클릭을 만든다.',
       mainTasks: ['썸네일', '텍스트 가독성'],
       inputs: ['이전 단계 산출물'],
@@ -1337,7 +1347,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_meta':     Sotong24StageGuideEnrichment(
+    'cnt_meta': Sotong24StageGuideEnrichment(
       whyNeeded: '제목/설명/태그를 작성한다.',
       mainTasks: ['제목', '설명', '태그'],
       inputs: ['이전 단계 산출물'],
@@ -1348,7 +1358,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_qa':     Sotong24StageGuideEnrichment(
+    'cnt_qa': Sotong24StageGuideEnrichment(
       whyNeeded: '완성도를 검사한다.',
       mainTasks: ['화질·음질', '자막 싱크'],
       inputs: ['이전 단계 산출물'],
@@ -1359,7 +1369,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_policy':     Sotong24StageGuideEnrichment(
+    'cnt_policy': Sotong24StageGuideEnrichment(
       whyNeeded: '플랫폼 업로드 정책을 점검한다.',
       mainTasks: ['커뮤니티 가이드', '음악 정책'],
       inputs: ['이전 단계 산출물'],
@@ -1370,7 +1380,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_upload_prep':     Sotong24StageGuideEnrichment(
+    'cnt_upload_prep': Sotong24StageGuideEnrichment(
       whyNeeded: '파일·일정을 준비한다.',
       mainTasks: ['해상도', '예약'],
       inputs: ['이전 단계 산출물'],
@@ -1381,7 +1391,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_approve':     Sotong24StageGuideEnrichment(
+    'cnt_approve': Sotong24StageGuideEnrichment(
       whyNeeded: '업로드 전 사용자 승인.',
       mainTasks: ['최종 미리보기', '승인'],
       inputs: ['이전 단계 산출물'],
@@ -1392,7 +1402,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_upload':     Sotong24StageGuideEnrichment(
+    'cnt_upload': Sotong24StageGuideEnrichment(
       whyNeeded: '플랫폼 업로드는 수동.',
       mainTasks: ['업로드', '공개범위'],
       inputs: ['이전 단계 산출물'],
@@ -1403,7 +1413,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_promo':     Sotong24StageGuideEnrichment(
+    'cnt_promo': Sotong24StageGuideEnrichment(
       whyNeeded: '공유·홍보한다.',
       mainTasks: ['숏클립', '커뮤니티'],
       inputs: ['이전 단계 산출물'],
@@ -1414,7 +1424,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_analytics':     Sotong24StageGuideEnrichment(
+    'cnt_analytics': Sotong24StageGuideEnrichment(
       whyNeeded: '조회수·유지율·클릭률·반응을 분석한다.',
       mainTasks: ['유지율', 'CTR', '댓글'],
       inputs: ['이전 단계 산출물'],
@@ -1425,7 +1435,7 @@ class Sotong24GuideEnrichments {
       cautions: ['자동 업로드 금지', '표절·미허가 샘플 금지'],
       completionConditions: ['산출물 확정'],
     ),
-  'cnt_next':     Sotong24StageGuideEnrichment(
+    'cnt_next': Sotong24StageGuideEnrichment(
       whyNeeded: '후속 콘텐츠를 기획한다.',
       mainTasks: ['시리즈', '개선점'],
       inputs: ['이전 단계 산출물'],
@@ -1437,5 +1447,4 @@ class Sotong24GuideEnrichments {
       completionConditions: ['산출물 확정'],
     ),
   };
-
 }

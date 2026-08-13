@@ -1,4 +1,5 @@
 import '../models/business_planning.dart';
+import 'plan_user_facing_status.dart';
 
 /// 중복 후보 그룹 (자동 삭제 없음 — UI에서 사용자 승인 필요).
 class PlanDuplicateGroup {
@@ -59,7 +60,14 @@ class PlanLibraryManagement {
     final clock = now ?? DateTime.now();
     switch (filter) {
       case 'all':
-        return plans.where((p) => !p.isLibraryTrashed).toList();
+        return plans
+            .where(
+              (p) =>
+                  !p.isLibraryTrashed &&
+                  !p.tags.contains('정리대상') &&
+                  !p.tags.contains('cleanup'),
+            )
+            .toList();
       case 'in_progress':
         return plans
             .where(
@@ -119,9 +127,178 @@ class PlanLibraryManagement {
         }).toList();
       case 'favorite':
         return plans.where((p) => !p.isLibraryTrashed && p.favorite).toList();
+      case 'active':
+        // 진행중 = 기획중·작업지시준비·작업중·전달완료 (보관/휴지통/정리대상 제외)
+        return plans.where((p) {
+          if (p.isLibraryTrashed || p.isLibraryArchived) return false;
+          if (p.tags.contains('정리대상') || p.tags.contains('cleanup')) {
+            return false;
+          }
+          final s = PlanningStatus.normalize(p.status);
+          return s != PlanningStatus.completed &&
+              s != PlanningStatus.archived;
+        }).toList();
+      case 'waiting':
+        return plans
+            .where(
+              (p) =>
+                  !p.isLibraryTrashed &&
+                  !p.isLibraryArchived &&
+                  (p.tags.contains('승인대기') ||
+                      PlanningStatus.normalize(p.status) ==
+                          PlanningStatus.validationRequired),
+            )
+            .toList();
+      case 'cleanup':
+        return plans
+            .where(
+              (p) =>
+                  p.tags.contains('정리대상') ||
+                  p.tags.contains('cleanup') ||
+                  p.isLibraryTrashed,
+            )
+            .toList();
       default:
         return plans.where((p) => !p.isLibraryTrashed).toList();
     }
+  }
+
+  /// 자동 보관은 **명확한 lineage**가 있는 경우에만 수행한다.
+  /// checksum만 동일한 별도 planId는 후보 표시만 하고 자동 보관하지 않는다.
+  /// 보호 instruction / isProtected / activePlanId / 운영 WI는 제외.
+  /// 영구삭제는 하지 않는다. 기존 cleanup으로 보관된 항목은 복원하지 않는다.
+  static List<BusinessPlanDocument> softMarkDuplicateCleanup(
+    List<BusinessPlanDocument> plans, {
+    Set<String> protectInstructionIds =
+        PlanUserFacingStatus.protectedInstructionIds,
+    String? activePlanId,
+    String? nowIso,
+  }) {
+    final stamp = nowIso ?? DateTime.now().toUtc().toIso8601String();
+    final byId = {for (final p in plans) p.id: p};
+    final active = (activePlanId ?? '').trim();
+
+    // Lineage-linked clusters only (not checksum-only groups).
+    final lineageClusters = _lineageClusters(plans);
+    for (final cluster in lineageClusters) {
+      if (cluster.length < 2) continue;
+      // Prefer same-checksum subgroups inside a lineage cluster.
+      final byCs = <String, List<BusinessPlanDocument>>{};
+      for (final p in cluster) {
+        final cs = contentChecksumOf(p);
+        if (cs.isEmpty) continue;
+        byCs.putIfAbsent(cs, () => []).add(p);
+      }
+      // lineage + same checksum only (checksum alone without lineage never reaches here)
+      final subgroups = byCs.values.where((g) => g.length >= 2).toList();
+      for (final group in subgroups) {
+        final sorted = List<BusinessPlanDocument>.from(group)
+          ..sort((a, b) {
+            final ap = protectInstructionIds.contains(a.stableInstructionId);
+            final bp = protectInstructionIds.contains(b.stableInstructionId);
+            if (ap != bp) return ap ? -1 : 1;
+            if (a.isProtected != b.isProtected) return a.isProtected ? -1 : 1;
+            if (active.isNotEmpty) {
+              final aa = a.id == active;
+              final ba = b.id == active;
+              if (aa != ba) return aa ? -1 : 1;
+            }
+            final ao = PlanUserFacingStatus.isOperationallyProtected(a);
+            final bo = PlanUserFacingStatus.isOperationallyProtected(b);
+            if (ao != bo) return ao ? -1 : 1;
+            if (a.hasInstruction != b.hasInstruction) {
+              return a.hasInstruction ? -1 : 1;
+            }
+            return b.updatedAt.compareTo(a.updatedAt);
+          });
+        final keep = sorted.first;
+        for (final p in sorted.skip(1)) {
+          if (protectInstructionIds.contains(p.stableInstructionId)) continue;
+          if (p.isProtected) continue;
+          if (active.isNotEmpty && p.id == active) continue;
+          if (PlanUserFacingStatus.isOperationallyProtected(p)) continue;
+          if (p.id == keep.id) continue;
+          final tags = {...p.tags, '정리대상', 'cleanup'};
+          byId[p.id] = archive(
+            p.copyWith(tags: tags.toList()),
+            updatedAt: stamp,
+          );
+        }
+      }
+    }
+    return byId.values.toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  /// tags 기반 lineage: sourcePlanId: / cloneOf: / lineage:
+  static String? lineageParentId(BusinessPlanDocument plan) {
+    for (final raw in plan.tags) {
+      final t = raw.trim();
+      for (final prefix in ['sourcePlanId:', 'cloneOf:', 'lineage:']) {
+        if (t.startsWith(prefix)) {
+          final id = t.substring(prefix.length).trim();
+          if (id.isNotEmpty) return id;
+        }
+      }
+    }
+    return null;
+  }
+
+  static bool sharesLineage(BusinessPlanDocument a, BusinessPlanDocument b) {
+    if (a.id == b.id) return true;
+    final ap = lineageParentId(a);
+    final bp = lineageParentId(b);
+    if (ap != null && (ap == b.id || ap == bp)) return true;
+    if (bp != null && (bp == a.id || bp == ap)) return true;
+    return false;
+  }
+
+  /// Connected components by lineage edges.
+  static List<List<BusinessPlanDocument>> _lineageClusters(
+    List<BusinessPlanDocument> plans,
+  ) {
+    final list = plans.where((p) => !p.isLibraryTrashed).toList();
+    final parentOf = <String, String>{};
+    for (final p in list) {
+      final parent = lineageParentId(p);
+      if (parent != null) parentOf[p.id] = parent;
+    }
+    if (parentOf.isEmpty) return const [];
+
+    final byId = {for (final p in list) p.id: p};
+    final adj = <String, Set<String>>{};
+    void link(String a, String b) {
+      adj.putIfAbsent(a, () => {}).add(b);
+      adj.putIfAbsent(b, () => {}).add(a);
+    }
+
+    for (final e in parentOf.entries) {
+      link(e.key, e.value);
+      // Also connect siblings with same parent.
+      for (final other in parentOf.entries) {
+        if (other.key == e.key) continue;
+        if (other.value == e.value) link(e.key, other.key);
+      }
+    }
+
+    final seen = <String>{};
+    final clusters = <List<BusinessPlanDocument>>[];
+    for (final id in adj.keys) {
+      if (seen.contains(id)) continue;
+      final stack = <String>[id];
+      final comp = <String>{};
+      while (stack.isNotEmpty) {
+        final cur = stack.removeLast();
+        if (!comp.add(cur)) continue;
+        seen.add(cur);
+        for (final n in adj[cur] ?? const <String>{}) {
+          if (!comp.contains(n)) stack.add(n);
+        }
+      }
+      final docs = comp.map((i) => byId[i]).whereType<BusinessPlanDocument>().toList();
+      if (docs.length >= 2) clusters.add(docs);
+    }
+    return clusters;
   }
 
   static Set<String> duplicateCandidateIdSet(List<PlanDuplicateGroup> groups) {
@@ -242,6 +419,9 @@ class PlanLibraryManagement {
     }
     if (plan.isProtected) {
       reasons.add('보호됨');
+    }
+    if (PlanUserFacingStatus.isProtectedInstruction(plan.stableInstructionId)) {
+      reasons.add('운영 작업지시 보호');
     }
     return PlanDeleteWarning(planId: plan.id, reasons: reasons);
   }

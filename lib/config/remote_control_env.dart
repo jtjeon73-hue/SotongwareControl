@@ -25,8 +25,7 @@ class RemoteControlEnv {
   static String? overrideBaseUrl;
   static bool? overrideUseEmulator;
 
-  static bool get useEmulator =>
-      overrideUseEmulator ?? useEmulatorFromDefine;
+  static bool get useEmulator => overrideUseEmulator ?? useEmulatorFromDefine;
 
   static String get baseUrl {
     final o = overrideBaseUrl?.trim();

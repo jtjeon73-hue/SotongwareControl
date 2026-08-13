@@ -91,9 +91,7 @@ void main() {
   });
 
   for (final width in [360.0, 390.0, 430.0]) {
-    testWidgets('아이디어뱅크 모바일 읽기 overflow ${width.toInt()}px', (
-      tester,
-    ) async {
+    testWidgets('아이디어뱅크 모바일 읽기 overflow ${width.toInt()}px', (tester) async {
       await pumpBank(tester, width);
       final title = IdeaBankSeedCatalog.seeds().first.title;
       await tester.tap(find.text(title).first);

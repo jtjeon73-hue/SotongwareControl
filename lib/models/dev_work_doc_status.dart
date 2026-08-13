@@ -191,19 +191,11 @@ class DevWorkDocStatus {
     }
 
     final devDoc = devDocState;
+    // readyToWrite만 「연결됨」. 폴더명 문자열만 있는 경우는 재연결 필요로 본다.
     if (devDoc != null && devDoc.readyToWrite) {
       return const DevWorkDocStatus(
         kind: DevWorkDocStatusKind.folderReady,
-        label: '저장 준비 완료',
-        icon: Icons.folder_open,
-        nextAction: '「DevWorkDoc에 저장」으로 작업지시서를 폴더에 저장하세요.',
-      );
-    }
-
-    if (devDoc != null && devDoc.supported && devDoc.hasRoot) {
-      return const DevWorkDocStatus(
-        kind: DevWorkDocStatusKind.folderReady,
-        label: '저장 준비 완료',
+        label: 'PC 저장폴더 연결됨',
         icon: Icons.folder_open,
         nextAction: '「DevWorkDoc에 저장」으로 작업지시서를 폴더에 저장하세요.',
       );
@@ -212,19 +204,38 @@ class DevWorkDocStatus {
     if (devDoc != null && !devDoc.supported) {
       return const DevWorkDocStatus(
         kind: DevWorkDocStatusKind.folderNotSet,
-        label: '저장 폴더 미설정',
+        label: 'PC 저장폴더 미지원',
         icon: Icons.folder_off_outlined,
         nextAction:
             '이 환경에서는 폴더 직접 저장을 지원하지 않습니다. '
-            '「JSON 다운로드」로 파일을 받으세요.',
+            '원격 전달 또는 JSON 다운로드를 사용하세요.',
+      );
+    }
+
+    final rememberedName = (devDoc?.rootFolderName ?? '').trim();
+    if (devDoc != null && rememberedName.isNotEmpty && !devDoc.hasRoot) {
+      return const DevWorkDocStatus(
+        kind: DevWorkDocStatusKind.folderNotSet,
+        label: 'PC 저장폴더 재연결 필요',
+        icon: Icons.folder_off_outlined,
+        nextAction: '관리 → PC 작업환경에서 DevWorkDoc 폴더를 다시 선택하세요.',
+      );
+    }
+
+    if (devDoc != null && devDoc.hasRoot && !devDoc.readyToWrite) {
+      return const DevWorkDocStatus(
+        kind: DevWorkDocStatusKind.folderNotSet,
+        label: 'PC 저장폴더 재연결 필요',
+        icon: Icons.folder_off_outlined,
+        nextAction: '쓰기 권한을 허용하거나 DevWorkDoc 폴더를 다시 선택하세요.',
       );
     }
 
     return const DevWorkDocStatus(
       kind: DevWorkDocStatusKind.folderNotSet,
-      label: '저장 폴더 미설정',
+      label: 'PC 저장폴더 재연결 필요',
       icon: Icons.folder_off_outlined,
-      nextAction: '「작업지시서 관리 폴더를 설정」하세요.',
+      nextAction: '관리 → PC 작업환경에서 DevWorkDoc 폴더를 연결하세요.',
     );
   }
 }

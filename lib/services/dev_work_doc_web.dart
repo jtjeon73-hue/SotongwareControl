@@ -787,10 +787,8 @@ Future<List<DevWorkDocActiveEntry>> listActiveInstructions(
     try {
       final decoded = jsonDecode(text);
       if (decoded is Map) {
-        instructionId =
-            '${decoded['instructionId'] ?? instructionId}'.trim();
-        title =
-            '${decoded['title'] ?? decoded['projectName'] ?? ''}'.trim();
+        instructionId = '${decoded['instructionId'] ?? instructionId}'.trim();
+        title = '${decoded['title'] ?? decoded['projectName'] ?? ''}'.trim();
         version = int.tryParse('${decoded['version'] ?? 1}') ?? 1;
         final stages = decoded['stages'];
         if (stages is List && stages.isNotEmpty) total = stages.length;

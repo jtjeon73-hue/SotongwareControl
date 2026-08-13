@@ -90,8 +90,7 @@ class Sotong24ProductionGuideCatalog {
       case 'ebook':
         return (
           guideTitle: '전자책 표준 제작 가이드',
-          goal:
-              '아이디어를 검증하고 가치 있는 원고를 제작하여 PDF 상품화, 판매 등록, 홍보, 운영까지 연결한다.',
+          goal: '아이디어를 검증하고 가치 있는 원고를 제작하여 PDF 상품화, 판매 등록, 홍보, 운영까지 연결한다.',
           flowOverview: const [
             '아이디어',
             '검증',
@@ -341,11 +340,7 @@ class Sotong24ProductionGuideCatalog {
       '음원과 쇼츠 메시지가 같은 훅·세계관을 공유하는지 확인한다.',
       '쇼츠 CTA가 음원/채널로 자연스럽게 연결되는지 본다.',
     ],
-    ContentSubtype.video: [
-      '영상 길이·챕터·자막·음량 정규화를 점검한다.',
-    ],
-    ContentSubtype.other: [
-      '유형별 플랫폼 정책과 포맷을 별도 체크한다.',
-    ],
+    ContentSubtype.video: ['영상 길이·챕터·자막·음량 정규화를 점검한다.'],
+    ContentSubtype.other: ['유형별 플랫폼 정책과 포맷을 별도 체크한다.'],
   };
 }

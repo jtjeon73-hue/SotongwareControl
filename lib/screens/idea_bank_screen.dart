@@ -643,7 +643,11 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
                         ),
                       ),
                       if (item.favorite)
-                        const Icon(Icons.star, size: 18, color: ControlColors.accentWarm),
+                        const Icon(
+                          Icons.star,
+                          size: 18,
+                          color: ControlColors.accentWarm,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -744,8 +748,7 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
         hint: const Text('연도'),
         items: [
           const DropdownMenuItem(value: null, child: Text('전체 연도')),
-          for (final y in _years)
-            DropdownMenuItem(value: y, child: Text('$y')),
+          for (final y in _years) DropdownMenuItem(value: y, child: Text('$y')),
         ],
         onChanged: (v) => setState(() {
           _yearFilter = v;
@@ -1119,7 +1122,10 @@ class _MetaChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(fontSize: 12, color: ControlColors.textSecondary),
+        style: const TextStyle(
+          fontSize: 12,
+          color: ControlColors.textSecondary,
+        ),
       ),
     );
   }

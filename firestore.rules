@@ -69,6 +69,141 @@ service cloud.firestore {
       }
     }
 
+    // --- Remote WorkInstruction mirror (mobile list; owner R/W) ---
+    match /workInstructions/{docId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+
+      allow create: if isAdmin()
+        || (isSignedIn()
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.instructionId is string
+          && request.resource.data.instructionId.size() > 0
+          && request.resource.data.artifactType is string
+          && request.resource.data.status in ['active', 'archived']
+          && request.resource.data.keys().hasAll([
+            'ownerUid', 'artifactType', 'instructionId', 'status', 'json'
+          ]));
+
+      allow update: if isAdmin()
+        || (isSignedIn()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.status in ['active', 'archived']);
+
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+    }
+
+    // --- Business plan soft mirror (mobile plan library) ---
+    // Authorization (who) is separate from mutation invariants (what).
+    // Admin may read any plan; writes are owner-only and always shape-checked.
+    // Permanent delete = tombstone only; client physical delete is denied.
+    match /businessPlans/{docId} {
+      function bpOwnerUid() {
+        return request.resource.data.ownerUid;
+      }
+      function bpPlanId() {
+        return request.resource.data.planId;
+      }
+      function bpIsRequestOwner() {
+        return isSignedIn() && bpOwnerUid() == request.auth.uid;
+      }
+      function bpIsResourceOwner() {
+        return isSignedIn() && resource.data.ownerUid == request.auth.uid;
+      }
+      function bpNamespaceValid() {
+        return bpOwnerUid() is string
+          && bpPlanId() is string
+          && bpPlanId().size() > 0
+          && docId == bpOwnerUid() + '__' + bpPlanId();
+      }
+      function bpOwnerUnchanged() {
+        return request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.planId == resource.data.planId;
+      }
+      function bpRevisionInt() {
+        return request.resource.data.revision is int;
+      }
+      function bpRevisionCreateValid() {
+        return bpRevisionInt() && request.resource.data.revision == 1;
+      }
+      function bpRevisionUpdateValid() {
+        return bpRevisionInt()
+          && (
+            !('revision' in resource.data)
+              ? request.resource.data.revision == 1
+              : request.resource.data.revision == resource.data.revision + 1
+          );
+      }
+      function bpIsLiveShape() {
+        return request.resource.data.keys().hasAll([
+            'ownerUid', 'planId', 'plan', 'revision'
+          ])
+          && request.resource.data.plan is map
+          && request.resource.data.isDeleted != true
+          && bpRevisionInt();
+      }
+      // Matches markDeleted overwrite shape (no residual live fields).
+      function bpTombstoneKeysOk() {
+        return request.resource.data.keys().hasOnly([
+          'ownerUid', 'planId', 'isDeleted', 'deletedAt',
+          'updatedAt', 'syncedAt', 'revision'
+        ]);
+      }
+      function bpIsTombstoneShape() {
+        return request.resource.data.isDeleted == true
+          && request.resource.data.deletedAt is timestamp
+          && bpRevisionInt()
+          && request.resource.data.keys().hasAll([
+            'ownerUid', 'planId', 'isDeleted', 'deletedAt', 'revision'
+          ])
+          && bpTombstoneKeysOk();
+      }
+      function bpIsTombstoneCreate() {
+        return bpIsTombstoneShape() && bpRevisionCreateValid();
+      }
+      function bpIsNormalCreate() {
+        return bpIsLiveShape() && bpRevisionCreateValid();
+      }
+      function bpNotResurrecting() {
+        return resource.data.isDeleted != true
+          || request.resource.data.isDeleted == true;
+      }
+      function bpIsLiveUpdate() {
+        return bpIsLiveShape() && bpRevisionUpdateValid();
+      }
+      function bpIsTombstoneUpdate() {
+        return bpIsTombstoneShape() && bpRevisionUpdateValid();
+      }
+      function bpMutationShapeValid() {
+        return bpIsLiveUpdate() || bpIsTombstoneUpdate();
+      }
+      function bpCanCreateBusinessPlan() {
+        return bpIsRequestOwner();
+      }
+      function bpCanUpdateBusinessPlan() {
+        return bpIsResourceOwner();
+      }
+
+      allow read: if isAdmin()
+        || bpIsResourceOwner();
+
+      // Invariants always apply — isAdmin() never bypasses shape/revision/tombstone.
+      allow create: if bpCanCreateBusinessPlan()
+        && bpNamespaceValid()
+        && (bpIsNormalCreate() || bpIsTombstoneCreate());
+
+      allow update: if bpCanUpdateBusinessPlan()
+        && bpOwnerUnchanged()
+        && bpNamespaceValid()
+        && bpNotResurrecting()
+        && bpMutationShapeValid();
+
+      // Soft-delete only via tombstone create/update. No client hard delete.
+      allow delete: if false;
+    }
+
     match /users/{uid} {
       allow read: if isAdmin() || isOwner(uid);
       allow write: if false;
@@ -81,7 +216,9 @@ service cloud.firestore {
         && collection != 'agentTokens'
         && collection != 'pairingSessions'
         && collection != 'jobs'
-        && collection != 'users';
+        && collection != 'users'
+        && collection != 'workInstructions'
+        && collection != 'businessPlans';
     }
   }
 }

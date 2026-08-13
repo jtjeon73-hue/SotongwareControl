@@ -180,8 +180,10 @@ async function handleClaim(db, ctx, body) {
   const ref = commandRef(db, jobId, commandId);
   const ts = nowIso();
 
+  // Firestore requires all transaction reads before any writes.
   const result = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
+    const jobRef = db.collection(COL.JOBS).doc(jobId);
+    const [snap, jobSnap] = await Promise.all([tx.get(ref), tx.get(jobRef)]);
     if (!snap.exists) throw httpError(404, "not_found", "command_missing");
     const cmd = snap.data() || {};
     if (cmd.agentId !== ctx.agentId) throw httpError(403, "forbidden", "agent_mismatch");
@@ -200,8 +202,6 @@ async function handleClaim(db, ctx, body) {
       attempt: (cmd.attempt || 0) + 1,
     });
 
-    const jobRef = db.collection(COL.JOBS).doc(jobId);
-    const jobSnap = await tx.get(jobRef);
     if (jobSnap.exists) {
       tx.update(jobRef, {
         status: WORK_STATUS.CLAIMED,

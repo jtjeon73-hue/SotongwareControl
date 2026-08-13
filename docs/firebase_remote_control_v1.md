@@ -1,7 +1,7 @@
 # Firebase 원격 중앙관제 Backend V1
 
 **protocolVersion:** `1.0`  
-**상태:** Emulator / 자동 테스트 완료 · **production deploy 보류**
+**상태:** Emulator Suite E2E 통과 · **Production 배포됨** (`api` + rules + indexes + hosting)
 
 Sotong24Work Agent 계약 SSOT:  
 `Sotong24Work/docs/remote_agent_protocol_v1.md`, `scripts/mock_agent_relay.py`, `AgentProtocol.h`, `AgentModels.h` (`StateKey` 소문자 wire).
