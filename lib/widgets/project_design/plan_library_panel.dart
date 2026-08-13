@@ -103,11 +103,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         duplicateCandidateIds: _duplicateIds,
       );
     } else {
-      list = list.where((p) => !p.isLibraryTrashed).toList();
+      list = list.where((p) => PlanLibraryManagement.isOperationalListEntry(p)).toList();
       list = list.where((p) {
-        if (p.tags.contains('정리대상') || p.tags.contains('cleanup')) {
-          return false;
-        }
         final folder = p.libraryFolder.isNotEmpty
             ? p.libraryFolder
             : ArtifactType.normalize(p.input.resolvedArtifactType);

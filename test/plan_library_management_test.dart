@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sotong_ware_control/models/business_planning.dart';
+import 'package:sotong_ware_control/services/business_plan_mirror.dart';
 import 'package:sotong_ware_control/services/business_planning_store.dart';
 import 'package:sotong_ware_control/services/plan_library_management.dart';
 
@@ -19,6 +20,7 @@ BusinessPlanDocument _plan({
   WorkInstruction? instruction,
   String? lastTransferChecksum,
   String? lastTransferMode,
+  List<String> tags = const [],
 }) {
   return BusinessPlanDocument(
     id: id,
@@ -40,6 +42,7 @@ BusinessPlanDocument _plan({
     isProtected: isProtected,
     lastTransferChecksum: lastTransferChecksum,
     lastTransferMode: lastTransferMode,
+    tags: tags,
   );
 }
 
@@ -261,10 +264,12 @@ void main() {
       ),
     ];
 
-    expect(
-      PlanLibraryManagement.applyManageFilter(plans, 'all').map((p) => p.id),
-      isNot(contains('trash')),
-    );
+    final allIds = PlanLibraryManagement.applyManageFilter(plans, 'all')
+        .map((p) => p.id)
+        .toList();
+    expect(allIds, isNot(contains('trash')));
+    expect(allIds, isNot(contains('arch')));
+    expect(allIds, containsAll(['active1', 'prog', 'd1', 'd2']));
     expect(
       PlanLibraryManagement.applyManageFilter(
         plans,
@@ -326,5 +331,146 @@ void main() {
     final latest = BusinessPlanningStore.latestByInstructionId(plans);
     expect(latest.length, 1);
     expect(latest.first.id, 'a');
+  });
+
+  test('동일 제목+결과물+고객 draft는 자동 archive 되지 않고 유사 후보만', () {
+    final plans = [
+      _plan(
+        id: 'guide_new',
+        topic: '가이드 전자책개발',
+        updatedAt: '2026-08-13T13:48:00.000Z',
+      ),
+      _plan(
+        id: 'guide_old_a',
+        topic: '가이드 전자책개발',
+        updatedAt: '2026-08-05T13:48:00.000Z',
+      ),
+      _plan(
+        id: 'guide_old_b',
+        topic: '가이드 전자책개발',
+        updatedAt: '2026-08-05T13:41:00.000Z',
+      ),
+    ];
+    // Soft title-only auto archive removed — no state mutation.
+    for (final p in plans) {
+      expect(p.isLibraryArchived, isFalse);
+    }
+    final groups = PlanLibraryManagement.findDuplicateGroups(plans);
+    expect(groups.length, 1);
+    expect(groups.first.strongChecksumMatch, isFalse);
+    expect(groups.first.plans.length, 3);
+    final softClean = PlanLibraryManagement.softMarkDuplicateCleanup(plans);
+    for (final p in softClean) {
+      expect(p.isLibraryArchived, isFalse);
+    }
+    final candidateIds = PlanLibraryManagement.applyManageFilter(
+      plans,
+      'duplicate_candidates',
+    ).map((p) => p.id).toSet();
+    expect(candidateIds, {'guide_new', 'guide_old_a', 'guide_old_b'});
+  });
+
+  test('전체 필터는 정리대상 태그 기획 제외', () {
+    final plans = [
+      _plan(id: 'ok'),
+      _plan(id: 'cleanup', tags: const ['cleanup', '정리대상']),
+    ];
+    final all = PlanLibraryManagement.applyManageFilter(plans, 'all');
+    expect(all.map((p) => p.id), ['ok']);
+  });
+
+  test('보관 해제/복원 시 cleanup 태그 제거 후 전체에 재표시', () {
+    final archived = _plan(
+      id: 'a1',
+      libraryState: PlanLibraryState.archived,
+      tags: const ['정리대상', 'cleanup', '보류', 'userNote'],
+    );
+    final unarchived = PlanLibraryManagement.unarchive(
+      archived,
+      updatedAt: '2026-08-13T20:00:00.000Z',
+    );
+    expect(unarchived.isLibraryArchived, isFalse);
+    expect(unarchived.tags, isNot(contains('cleanup')));
+    expect(unarchived.tags, isNot(contains('정리대상')));
+    expect(unarchived.tags, contains('보류'));
+    expect(unarchived.tags, contains('userNote'));
+    expect(
+      PlanLibraryManagement.applyManageFilter([unarchived], 'all').map((p) => p.id),
+      ['a1'],
+    );
+
+    final trashed = _plan(
+      id: 't1',
+      libraryState: PlanLibraryState.trashed,
+      tags: const ['cleanup', '정리대상', 'favorite-ish'],
+    );
+    final restored = PlanLibraryManagement.restore(
+      trashed,
+      updatedAt: '2026-08-13T20:00:00.000Z',
+    );
+    expect(restored.isLibraryTrashed, isFalse);
+    expect(restored.tags, isNot(contains('cleanup')));
+    expect(restored.tags, contains('favorite-ish'));
+    expect(
+      PlanLibraryManagement.isOperationalListEntry(restored),
+      isTrue,
+    );
+  });
+
+  test('수동 보관/보관 해제는 upsertPlan cloud OCC(memory mirror)로 반영', () async {
+    SharedPreferences.setMockInitialValues({});
+    final memory = <String, Map<String, dynamic>>{};
+    final mirror = BusinessPlanMirrorService(
+      memory: memory,
+      ownerUidResolver: () => 'owner_test',
+    );
+    final store = BusinessPlanningStore(mirror: mirror);
+    final plan = _plan(id: 'cloud_arch', topic: '보관동기화');
+
+    final created = await mirror.upsertPlan(plan, ownerUid: 'owner_test');
+    expect(created.succeeded, isTrue);
+    expect(mirror.knownRevisions['cloud_arch'], 1);
+
+    final archived = PlanLibraryManagement.archive(
+      plan,
+      updatedAt: '2026-08-13T21:00:00.000Z',
+    );
+    // Bulk archive path: local save + OCC enqueue (await the same enqueue).
+    await store.savePlans([archived]);
+    final archResult = await mirror.enqueueUpsert(
+      archived,
+      ownerUid: 'owner_test',
+    );
+    expect(archResult.succeeded, isTrue);
+    final archivedDoc = mirror.debugMemoryDoc('owner_test', 'cloud_arch');
+    expect(
+      (archivedDoc!['plan'] as Map)['libraryState'],
+      PlanLibraryState.archived,
+    );
+
+    final restored = PlanLibraryManagement.unarchive(
+      archived.copyWith(tags: const ['cleanup', '정리대상', '보류']),
+      updatedAt: '2026-08-13T21:05:00.000Z',
+    );
+    expect(restored.tags, isNot(contains('cleanup')));
+    expect(restored.tags, contains('보류'));
+    await store.savePlans([restored]);
+    final restoreResult = await mirror.enqueueUpsert(
+      restored,
+      ownerUid: 'owner_test',
+    );
+    expect(restoreResult.succeeded, isTrue);
+    final liveDoc = mirror.debugMemoryDoc('owner_test', 'cloud_arch');
+    expect((liveDoc!['plan'] as Map)['libraryState'], PlanLibraryState.active);
+    expect(
+      List<String>.from((liveDoc['plan'] as Map)['tags'] as List? ?? const []),
+      isNot(contains('cleanup')),
+    );
+
+    final reloaded = await store.loadPlans(runCleanup: false);
+    final local = reloaded.firstWhere((p) => p.id == 'cloud_arch');
+    expect(local.isLibraryArchived, isFalse);
+    expect(local.tags, isNot(contains('cleanup')));
+    expect(PlanLibraryManagement.isOperationalListEntry(local), isTrue);
   });
 }

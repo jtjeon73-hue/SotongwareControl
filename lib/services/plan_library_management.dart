@@ -49,6 +49,29 @@ class PlanLibraryManagement {
     return '${t.substring(0, 8)}…';
   }
 
+  /// 기본 「전체」 목록 — 현재 운영 가능한 기획만 (보관·정리대상·휴지통 제외).
+  static bool isOperationalListEntry(BusinessPlanDocument plan) {
+    if (plan.isLibraryTrashed) return false;
+    if (plan.isLibraryArchived) return false;
+    if (PlanningStatus.normalize(plan.status) == PlanningStatus.archived) {
+      return false;
+    }
+    if (plan.tags.contains('정리대상') || plan.tags.contains('cleanup')) {
+      return false;
+    }
+    return true;
+  }
+
+  /// 자동 정리용 태그만 제거 (사용자 의미 태그는 유지).
+  static List<String> withoutCleanupTags(List<String> tags) {
+    return tags
+        .where((t) {
+          final n = t.trim();
+          return n != '정리대상' && n != 'cleanup';
+        })
+        .toList();
+  }
+
   /// 관리 필터 적용 (폴더·상태·수명주기).
   static List<BusinessPlanDocument> applyManageFilter(
     List<BusinessPlanDocument> plans,
@@ -60,14 +83,7 @@ class PlanLibraryManagement {
     final clock = now ?? DateTime.now();
     switch (filter) {
       case 'all':
-        return plans
-            .where(
-              (p) =>
-                  !p.isLibraryTrashed &&
-                  !p.tags.contains('정리대상') &&
-                  !p.tags.contains('cleanup'),
-            )
-            .toList();
+        return plans.where(isOperationalListEntry).toList();
       case 'in_progress':
         return plans
             .where(
@@ -442,6 +458,7 @@ class PlanLibraryManagement {
   }) {
     return plan.copyWith(
       libraryState: PlanLibraryState.active,
+      tags: withoutCleanupTags(plan.tags),
       updatedAt: updatedAt,
     );
   }
@@ -467,6 +484,7 @@ class PlanLibraryManagement {
   }) {
     return plan.copyWith(
       libraryState: PlanLibraryState.active,
+      tags: withoutCleanupTags(plan.tags),
       updatedAt: updatedAt,
       clearTrashedAt: true,
     );

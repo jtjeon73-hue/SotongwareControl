@@ -676,4 +676,42 @@ void main() {
     expect(byId['plan_to_protect']!.isLibraryArchived, isFalse);
     expect(prefs.getBool(BusinessPlanningStore.cleanupAppliedKey), isTrue);
   });
+
+  test('list UI keeps weak title duplicates active; only filter hides archived', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = BusinessPlanningStore();
+    final plans = [
+      _plan(
+        id: 'g_new',
+        topic: '가이드 전자책개발',
+        updatedAt: '2026-08-13T12:00:00.000Z',
+      ),
+      _plan(
+        id: 'g_old1',
+        topic: '가이드 전자책개발',
+        updatedAt: '2026-08-05T13:48:00.000Z',
+      ),
+      _plan(
+        id: 'g_old2',
+        topic: '가이드 전자책개발',
+        updatedAt: '2026-08-05T13:40:00.000Z',
+      ),
+    ];
+    await store.savePlans(plans);
+
+    final boot = await BusinessPlanningStore.bootstrapSession(store);
+    final byId = {for (final p in boot.plans) p.id: p};
+    expect(byId['g_new']!.isLibraryArchived, isFalse);
+    expect(byId['g_old1']!.isLibraryArchived, isFalse);
+    expect(byId['g_old2']!.isLibraryArchived, isFalse);
+
+    final all = PlanLibraryManagement.applyManageFilter(boot.plans, 'all');
+    expect(all.map((p) => p.id).toSet(), {'g_new', 'g_old1', 'g_old2'});
+
+    final candidates = PlanLibraryManagement.applyManageFilter(
+      boot.plans,
+      'duplicate_candidates',
+    );
+    expect(candidates.length, 3);
+  });
 }
