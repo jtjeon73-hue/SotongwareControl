@@ -1,4 +1,6 @@
 import '../models/business_planning.dart';
+import 'plan_execution_index.dart';
+import 'plan_execution_status.dart';
 import 'plan_user_facing_status.dart';
 
 /// 기획 라이브러리 일괄 작업 종류.
@@ -75,10 +77,17 @@ class PlanLibraryManagement {
     return true;
   }
 
-  /// 카드/목록 표시 제목. WI businessIdea가 있으면 우선 (데이터 덮어쓰기 없음).
-  static String displayTitle(BusinessPlanDocument plan) {
+  /// 카드/목록 표시 제목. 실행 mirror 제목 우선 (하드코딩 없음).
+  static String displayTitle(
+    BusinessPlanDocument plan, {
+    PlanExecutionSnapshot? execution,
+  }) {
+    final exec = execution ?? PlanExecutionStatusResolver.resolve(plan);
+    final remoteTitle = exec.displayTitle.trim();
+    if (exec.hasActualExecution && remoteTitle.isNotEmpty) return remoteTitle;
     final fromWi = plan.instruction?.businessIdea.trim() ?? '';
-    if (fromWi.isNotEmpty) return fromWi;
+    if (fromWi.isNotEmpty && !exec.hasActualExecution) return fromWi;
+    if (remoteTitle.isNotEmpty) return remoteTitle;
     final topic = plan.input.topic.trim();
     return topic.isEmpty ? '(주제 미입력)' : topic;
   }
@@ -87,28 +96,34 @@ class PlanLibraryManagement {
   static bool isBulkArchiveBlocked(
     BusinessPlanDocument plan, {
     String? activePlanId,
+    PlanExecutionSnapshot? execution,
   }) {
     if (plan.isLibraryArchived) return true;
     if (plan.isLibraryTrashed) return true;
     final active = (activePlanId ?? '').trim();
     if (active.isNotEmpty && plan.id == active) return true;
-    return PlanUserFacingStatus.isOperationallyProtected(plan);
+    return PlanUserFacingStatus.isOperationallyProtected(
+      plan,
+      execution: execution,
+    );
   }
 
   static String bulkArchiveBlockReason(
     BusinessPlanDocument plan, {
     String? activePlanId,
+    PlanExecutionSnapshot? execution,
   }) {
-    if (PlanUserFacingStatus.isProtectedInstruction(plan.stableInstructionId)) {
+    final exec = execution ?? PlanExecutionStatusResolver.resolve(plan);
+    if (PlanUserFacingStatus.isProtectedInstruction(plan.stableInstructionId) &&
+        exec.hasActualExecution) {
       return '운영 작업지시 보호';
     }
     if (plan.isProtected) return '보호됨';
     final active = (activePlanId ?? '').trim();
     if (active.isNotEmpty && plan.id == active) return '현재 Active';
-    final facing = PlanUserFacingStatus.label(plan);
-    if (facing == PlanUserFacingStatus.working) return '작업중';
-    if (facing == PlanUserFacingStatus.awaitingApproval) return '승인대기';
-    if (facing == PlanUserFacingStatus.delivered) return '전달완료';
+    if (exec.isActivelyRunning) return '작업중';
+    if (exec.isAwaitingApproval) return '승인대기';
+    if (exec.hasActualExecution) return '실행 중 프로젝트';
     return '운영 보호';
   }
 
@@ -131,10 +146,15 @@ class PlanLibraryManagement {
     BusinessPlanDocument plan,
     PlanLibraryBulkAction action, {
     String? activePlanId,
+    PlanExecutionSnapshot? execution,
   }) {
     switch (action) {
       case PlanLibraryBulkAction.archive:
-        return !isBulkArchiveBlocked(plan, activePlanId: activePlanId);
+        return !isBulkArchiveBlocked(
+          plan,
+          activePlanId: activePlanId,
+          execution: execution,
+        );
       case PlanLibraryBulkAction.unarchive:
         if (plan.isLibraryTrashed) return false;
         return plan.isLibraryArchived ||
@@ -171,11 +191,40 @@ class PlanLibraryManagement {
     Set<String>? duplicateCandidateIds,
     Duration staleAfter = const Duration(days: 30),
     DateTime? now,
+    PlanExecutionIndex? executionIndex,
   }) {
     final clock = now ?? DateTime.now();
+    PlanExecutionSnapshot execOf(BusinessPlanDocument p) =>
+        executionIndex?.snapshotFor(p) ??
+        PlanExecutionStatusResolver.resolve(p);
+
     switch (filter) {
       case 'all':
         return plans.where(isOperationalListEntry).toList();
+      case 'not_delivered':
+        return plans.where((p) {
+          if (!isOperationalListEntry(p)) return false;
+          final e = execOf(p);
+          return !e.isPostTransfer;
+        }).toList();
+      case 'working':
+        return plans.where((p) {
+          if (p.isLibraryTrashed || p.isLibraryArchived) return false;
+          final e = execOf(p);
+          return e.isActivelyRunning;
+        }).toList();
+      case 'delivered_not_run':
+        return plans.where((p) {
+          if (p.isLibraryTrashed) return false;
+          return execOf(p).isDeliveredOnly;
+        }).toList();
+      case 'pc_not_received':
+        return plans.where((p) {
+          if (p.isLibraryTrashed) return false;
+          final e = execOf(p);
+          return e.isPostTransfer &&
+              e.pcReceiveState == PlanPcReceiveState.notReceived;
+        }).toList();
       case 'in_progress':
         return plans
             .where(
@@ -247,16 +296,14 @@ class PlanLibraryManagement {
               s != PlanningStatus.archived;
         }).toList();
       case 'waiting':
-        return plans
-            .where(
-              (p) =>
-                  !p.isLibraryTrashed &&
-                  !p.isLibraryArchived &&
-                  (p.tags.contains('승인대기') ||
-                      PlanningStatus.normalize(p.status) ==
-                          PlanningStatus.validationRequired),
-            )
-            .toList();
+        return plans.where((p) {
+          if (p.isLibraryTrashed || p.isLibraryArchived) return false;
+          final e = execOf(p);
+          if (e.isAwaitingApproval) return true;
+          return p.tags.contains('승인대기') ||
+              PlanningStatus.normalize(p.status) ==
+                  PlanningStatus.validationRequired;
+        }).toList();
       case 'cleanup':
         return plans
             .where(
@@ -506,16 +553,22 @@ class PlanLibraryManagement {
   static PlanDeleteWarning permanentDeleteWarnings(
     BusinessPlanDocument plan, {
     String? activePlanId,
+    PlanExecutionSnapshot? execution,
   }) {
     final reasons = <String>[];
-    final s = PlanningStatus.normalize(plan.status);
-    if (s == PlanningStatus.inProgress) {
-      reasons.add('진행중');
+    final exec = execution ?? PlanExecutionStatusResolver.resolve(plan);
+    if (exec.isActivelyRunning) {
+      reasons.add('작업 진행 중 (${exec.productionCurrentStage}/${exec.productionTotalStages}단계)');
     }
-    if (plan.wasTransferred ||
-        s == PlanningStatus.transferred ||
-        s == PlanningStatus.imported) {
-      reasons.add('작업지시 전달 완료');
+    if (exec.isAwaitingApproval) {
+      reasons.add('승인 대기 중');
+    }
+    if (exec.hasActualExecution && !exec.isDeliveredOnly) {
+      reasons.add('실제 실행·산출물 존재');
+    } else if (exec.isPostTransfer && !exec.isDeliveredOnly) {
+      reasons.add('소통24워크 전달·수신 기록');
+    } else if (exec.isDeliveredOnly) {
+      // 전달만 된 잔재 — 강한 경고 불필요
     }
     if (activePlanId != null &&
         activePlanId.isNotEmpty &&
@@ -528,7 +581,8 @@ class PlanLibraryManagement {
     if (plan.isProtected) {
       reasons.add('보호됨');
     }
-    if (PlanUserFacingStatus.isProtectedInstruction(plan.stableInstructionId)) {
+    if (PlanUserFacingStatus.isProtectedInstruction(plan.stableInstructionId) &&
+        exec.hasActualExecution) {
       reasons.add('운영 작업지시 보호');
     }
     return PlanDeleteWarning(planId: plan.id, reasons: reasons);

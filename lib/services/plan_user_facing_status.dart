@@ -1,21 +1,28 @@
 import '../models/business_planning.dart';
-import 'plan_progress_status.dart';
+import 'plan_execution_status.dart';
 
-/// 제작소 메인에 노출하는 사용자용 기획 상태 (내부 전달 구현 세부 제외).
+/// 제작소 메인에 노출하는 사용자용 기획/실행 상태.
 class PlanUserFacingStatus {
   PlanUserFacingStatus._();
 
   static const planning = '기획중';
-  static const instructionReady = '작업지시 준비';
-  static const delivered = '전달완료';
+  static const instructionDesign = '작업지시 제작중';
+  static const instructionReady = '작업지시 준비완료';
+  static const transferPending = '전달대기';
+  static const deliveredNotRun = '전달됨 · 미실행';
+  static const pcReceivedNotStarted = 'PC 수신 · 미시작';
   static const working = '작업중';
   static const awaitingApproval = '승인대기';
+  static const revisionRequested = '보완요청';
+  static const reworking = '재작업중';
   static const completed = '완료';
   static const deferred = '보류';
   static const archived = '보관';
   static const cleanup = '정리대상';
+  static const error = '오류';
+  static const stopped = '중지';
 
-  /// 보호할 운영 작업지시 (절대 정리/훼손 대상에서 제외).
+  /// 운영 작업지시 — 실제 실행 증거 있을 때 강한 보호.
   static const protectedInstructionIds = <String>{'wi_plan_1785905165067'};
 
   static bool isProtectedInstruction(String? instructionId) {
@@ -23,7 +30,11 @@ class PlanUserFacingStatus {
     return id.isNotEmpty && protectedInstructionIds.contains(id);
   }
 
-  static String label(BusinessPlanDocument plan) {
+  /// 카드 배지 — [execution] 있으면 전달 후 실행 상태 우선.
+  static String label(
+    BusinessPlanDocument plan, {
+    PlanExecutionSnapshot? execution,
+  }) {
     if (plan.isLibraryTrashed) return cleanup;
     if (plan.tags.contains('정리대상') || plan.tags.contains('cleanup')) {
       return cleanup;
@@ -32,66 +43,71 @@ class PlanUserFacingStatus {
         PlanningStatus.normalize(plan.status) == PlanningStatus.archived) {
       return archived;
     }
-    // Explicit user tags (must remain reachable via label()).
+
+    final exec = execution ?? PlanExecutionStatusResolver.resolve(plan);
+
+    if (exec.isPostTransfer) {
+      return exec.primaryStatusLabel;
+    }
+
+    // --- 전달 전: 기획/작업지시 제작 상태만 ---
     if (plan.tags.contains('보류') ||
         plan.tags.contains('deferred') ||
         plan.tags.contains('hold')) {
       return deferred;
     }
-    // Analysis verdict hold → 보류 (제품 분석 경로; 별도 UI 토글 없음).
     if (plan.analysis?.verdict == PlanningVerdict.hold) {
       return deferred;
     }
-    if (plan.tags.contains('승인대기') ||
-        plan.tags.contains('awaiting_approval')) {
-      return awaitingApproval;
+
+    if (!plan.hasInstruction) {
+      if (exec.instructionDesignStep < exec.instructionDesignTotal) {
+        return instructionDesign;
+      }
+      return planning;
     }
 
     final s = PlanningStatus.normalize(plan.status);
-    switch (s) {
-      case PlanningStatus.draft:
-        return planning;
-      case PlanningStatus.validationRequired:
-        // 「승인대기」필터와 동일하게 노출
-        return awaitingApproval;
-      case PlanningStatus.instructionReady:
-      case PlanningStatus.readyToTransfer:
-      case PlanningStatus.downloadedPendingImport:
-        // JSON 다운로드·Inbox 미전달 등 내부 상태는 「작업지시 준비」로 통합
-        return instructionReady;
-      case PlanningStatus.transferred:
-      case PlanningStatus.imported:
-        return delivered;
-      case PlanningStatus.inProgress:
-        return working;
-      case PlanningStatus.completed:
-        return completed;
-      default:
-        return planning;
+    if (s == PlanningStatus.readyToTransfer ||
+        s == PlanningStatus.downloadedPendingImport) {
+      return transferPending;
     }
+    if (s == PlanningStatus.instructionReady ||
+        s == PlanningStatus.validationRequired) {
+      return instructionReady;
+    }
+    return planning;
   }
 
-  /// 자동 보관이 위험한 운영 진행 상태 (작업중/승인대기/전달완료 등).
-  static bool isOperationallyProtected(BusinessPlanDocument plan) {
-    if (isProtectedInstruction(plan.stableInstructionId)) return true;
+  /// 일괄 보관/삭제 보호 — transferred 단독으로는 보호하지 않는다.
+  static bool isOperationallyProtected(
+    BusinessPlanDocument plan, {
+    PlanExecutionSnapshot? execution,
+  }) {
     if (plan.isProtected) return true;
-    final facing = label(plan);
-    if (facing == working ||
-        facing == awaitingApproval ||
-        facing == delivered) {
-      return true;
+
+    final exec = execution ?? PlanExecutionStatusResolver.resolve(plan);
+
+    if (isProtectedInstruction(plan.stableInstructionId)) {
+      return exec.hasActualExecution;
     }
-    final s = PlanningStatus.normalize(plan.status);
-    return s == PlanningStatus.inProgress ||
-        s == PlanningStatus.transferred ||
-        s == PlanningStatus.imported ||
-        s == PlanningStatus.validationRequired;
+
+    if (!exec.isPostTransfer) return false;
+
+    if (exec.isDeliveredOnly) return false;
+
+    return exec.hasActualExecution &&
+        (exec.isActivelyRunning ||
+            exec.isAwaitingApproval ||
+            exec.runState == PlanRunState.completed ||
+            exec.runState == PlanRunState.revisionRequested);
   }
 
   /// 상단 기본 필터 id.
   static const primaryFilters = <String>[
     'all',
-    'active',
+    'not_delivered',
+    'working',
     'waiting',
     'completed',
     'archived',
@@ -101,14 +117,18 @@ class PlanUserFacingStatus {
     switch (id) {
       case 'all':
         return '현재';
-      case 'active':
-        return '진행중';
+      case 'not_delivered':
+        return '미전달';
+      case 'working':
+        return '작업중';
       case 'waiting':
         return '승인대기';
       case 'completed':
         return '완료';
       case 'archived':
         return '보관';
+      case 'active':
+        return '진행중';
       default:
         return id;
     }
@@ -117,6 +137,8 @@ class PlanUserFacingStatus {
   /// 상세/관리 필터 id.
   static const advancedFilters = <String>[
     'instruction_created',
+    'delivered_not_run',
+    'pc_not_received',
     'transferred',
     'trashed',
     'duplicate_candidates',
@@ -134,6 +156,10 @@ class PlanUserFacingStatus {
     switch (id) {
       case 'instruction_created':
         return '작업지시 준비';
+      case 'delivered_not_run':
+        return '전달됨·미실행';
+      case 'pc_not_received':
+        return 'PC 미수신';
       case 'transferred':
         return '전달완료';
       case 'trashed':
@@ -161,9 +187,8 @@ class PlanUserFacingStatus {
     }
   }
 
-  /// 진단용 — 메인 카드에는 쓰지 않음.
   static String diagnosticTransferLine(BusinessPlanDocument plan) {
-    final view = PlanProgressStatus.resolve(plan);
-    return view.transferLine;
+    final exec = PlanExecutionStatusResolver.resolve(plan);
+    return exec.transferLine;
   }
 }

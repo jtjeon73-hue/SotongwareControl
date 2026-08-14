@@ -123,6 +123,7 @@ class RemoteWorkInstructionMirrorService {
       'json': map,
       'checksum': checksum,
       'updatedAt': usesMemory ? now.toIso8601String() : FieldValue.serverTimestamp(),
+      'executionSummary': _executionSummaryFromMap(map, planId: '${map['projectId'] ?? ''}'),
     };
 
     try {
@@ -294,5 +295,31 @@ class RemoteWorkInstructionMirrorService {
       version: int.tryParse('${data['version'] ?? 1}') ?? 1,
       totalStages: int.tryParse('${data['totalStages'] ?? 18}') ?? 18,
     );
+  }
+
+  /// Sotong24Work state 필드가 json에 포함된 경우 중앙 mirror 요약.
+  static Map<String, dynamic> _executionSummaryFromMap(
+    Map<String, dynamic> map, {
+    String planId = '',
+  }) {
+    final approval = map['approval'];
+    var approvalStatus = '';
+    if (approval is Map) {
+      approvalStatus = '${approval['status'] ?? approval['stageDecision'] ?? ''}';
+    }
+    final titleDraft = '${map['titleDraft'] ?? map['title'] ?? map['businessIdea'] ?? ''}'.trim();
+    final currentStage = int.tryParse('${map['currentStageOrder'] ?? map['currentStage'] ?? 0}') ?? 0;
+    final stageId = '${map['currentStageId'] ?? ''}'.trim();
+    return {
+      'planId': planId.trim(),
+      'projectTitle': titleDraft,
+      'currentStage': currentStage,
+      'currentStageId': stageId,
+      'totalStages': int.tryParse('${map['totalStages'] ?? 18}') ?? 18,
+      'workflowStarted': map['workflowStarted'] == true || currentStage > 0,
+      'approvalStatus': approvalStatus,
+      'hasLocalProject': map['workFolder'] != null || map['projectPath'] != null,
+      'lastUpdated': DateTime.now().toUtc().toIso8601String(),
+    };
   }
 }

@@ -19,6 +19,9 @@ import '../services/dev_work_doc_service.dart';
 import '../services/dev_work_doc_verify.dart';
 import '../services/instruction_contract_validator.dart';
 import '../services/instruction_transfer_service.dart';
+import '../models/sotong24_remote_models.dart';
+import '../services/plan_execution_index.dart';
+import '../services/plan_execution_status.dart';
 import '../services/plan_library_management.dart';
 import '../services/plan_progress_status.dart';
 import '../services/plan_user_facing_status.dart';
@@ -26,6 +29,7 @@ import '../services/pc_workspace_ui.dart';
 import '../services/project_design_engine.dart';
 import '../services/remote_agent_repository.dart';
 import '../services/remote_work_instruction_mirror.dart';
+import '../services/sotong24_remote_repository.dart';
 import '../services/work_instruction_validator.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
@@ -51,6 +55,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _devWorkDoc = DevWorkDocService();
   final _wiMirror = RemoteWorkInstructionMirrorService();
   final _agentRepo = RemoteAgentRepository();
+  final _remoteRepo = Sotong24RemoteRepository();
   final _contractValidator = InstructionContractValidator();
   final _designEngine = ProjectDesignEngine();
 
@@ -91,6 +96,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   FolderPermissionState? _folderState;
   DevWorkDocState? _devDocState;
   List<RemoteAgentDoc> _remoteAgents = const [];
+  List<Sotong24RemoteProject> _remoteProjects = const [];
+  StreamSubscription<List<Sotong24RemoteProject>>? _remoteProjectsSub;
   bool _pcWorkspaceExpanded = false;
   DevWorkDocWriteResult? _lastDevWorkDocResult;
   Timer? _draftTimer;
@@ -111,12 +118,24 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     super.initState();
     _bindDraftListeners();
     _loadInitial();
+    _remoteProjectsSub = _remoteRepo.watchProjects().listen((projects) {
+      if (!mounted) return;
+      setState(() => _remoteProjects = projects);
+    });
   }
+
+  PlanExecutionIndex get _executionIndex =>
+      PlanExecutionIndex.fromRemoteProjects(_remoteProjects);
+
+  PlanExecutionSnapshot _execFor(BusinessPlanDocument plan) =>
+      _executionIndex.snapshotFor(plan);
 
   @override
   void dispose() {
     _draftTimer?.cancel();
     _wizardTimer?.cancel();
+    _remoteProjectsSub?.cancel();
+    _remoteRepo.dispose();
     for (final c in _allControllers) {
       c.dispose();
     }
@@ -2344,26 +2363,47 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   String _planListBadge(BusinessPlanDocument plan) {
-    return PlanUserFacingStatus.label(plan);
+    return PlanUserFacingStatus.label(plan, execution: _execFor(plan));
   }
 
   String _userFacingProgressLabel() {
     final doc = _activeDoc;
-    if (doc != null) return PlanUserFacingStatus.label(doc);
+    if (doc != null) {
+      return PlanUserFacingStatus.label(doc, execution: _execFor(doc));
+    }
     if (_instruction != null) return PlanUserFacingStatus.instructionReady;
     if (_planReady) return PlanUserFacingStatus.planning;
     return PlanUserFacingStatus.planning;
   }
 
   String _userFacingProgressHint() {
+    final doc = _activeDoc;
+    if (doc != null) {
+      final exec = _execFor(doc);
+      if (exec.isAwaitingApproval) {
+        return '승인 대기 중입니다. 결과를 확인하세요.';
+      }
+      if (exec.isActivelyRunning) {
+        return '소통24워크에서 ${exec.productionCurrentStage}/${exec.productionTotalStages}단계 진행 중입니다.';
+      }
+      if (exec.isDeliveredOnly) {
+        return '전달은 완료되었으나 PC에서 아직 실행하지 않았습니다.';
+      }
+      if (!exec.isPostTransfer) {
+        return '기획을 완성한 뒤 작업지시서를 생성·전달하세요.';
+      }
+    }
     final label = _userFacingProgressLabel();
     switch (label) {
       case PlanUserFacingStatus.planning:
         return '기획을 완성한 뒤 작업지시서를 생성하세요.';
       case PlanUserFacingStatus.instructionReady:
         return '작업지시서가 준비되었습니다. 소통24워크로 전달하세요.';
-      case PlanUserFacingStatus.delivered:
-        return '전달이 완료되었습니다. 작업 진행을 확인하세요.';
+      case PlanUserFacingStatus.transferPending:
+        return '전달 준비가 완료되었습니다. 소통24워크로 전달하세요.';
+      case PlanUserFacingStatus.deliveredNotRun:
+      case PlanUserFacingStatus.pcReceivedNotStarted:
+        return '전달 후 실행 전입니다. 필요하면 취소·보관할 수 있습니다.';
       case PlanUserFacingStatus.working:
         return '소통24워크에서 작업이 진행 중입니다.';
       case PlanUserFacingStatus.awaitingApproval:
@@ -2419,6 +2459,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           if (PlanLibraryManagement.isBulkArchiveBlocked(
             p,
             activePlanId: _activePlanId,
+            execution: _execFor(p),
           )) {
             continue;
           }
@@ -2636,6 +2677,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             },
             onStartNew: _startNewPlan,
             onBulkAction: _onLibraryBulkAction,
+            executionIndex: _executionIndex,
           ),
         ],
       ),

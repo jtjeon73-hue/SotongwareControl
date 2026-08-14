@@ -3,7 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sotong_ware_control/models/business_planning.dart';
 import 'package:sotong_ware_control/services/business_plan_mirror.dart';
 import 'package:sotong_ware_control/services/business_planning_store.dart';
+import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
+import 'package:sotong_ware_control/services/plan_execution_status.dart';
 import 'package:sotong_ware_control/services/plan_library_management.dart';
+import 'package:sotong_ware_control/services/plan_progress_status.dart';
 import 'package:sotong_ware_control/services/plan_user_facing_status.dart';
 
 BusinessPlanDocument _plan({
@@ -310,7 +313,7 @@ void main() {
       transferred,
       activePlanId: 't1',
     );
-    expect(w.reasons, contains('작업지시 전달 완료'));
+    expect(w.reasons, isNot(contains('작업지시 전달 완료')));
     expect(w.reasons, contains('즐겨찾기'));
     expect(w.reasons, contains('현재 Active 프로젝트와 연결'));
   });
@@ -479,7 +482,8 @@ void main() {
     expect(PlanUserFacingStatus.primaryFilterLabel('all'), '현재');
     expect(PlanUserFacingStatus.primaryFilters, [
       'all',
-      'active',
+      'not_delivered',
+      'working',
       'waiting',
       'completed',
       'archived',
@@ -522,27 +526,78 @@ void main() {
   });
 
   test('보호·운영 기획은 일괄 보관 차단 (선택/보관)', () {
+    final opsExec = PlanExecutionStatusResolver.resolve(
+      _plan(
+        id: 'ops_plan',
+        instructionId: 'wi_plan_1785905165067',
+        status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
+        instruction: _wi(id: 'wi_plan_1785905165067'),
+      ),
+      remoteProject: Sotong24RemoteProject(
+        projectId: 'wi_plan_1785905165067',
+        title: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+        productType: ArtifactType.ebook,
+        currentStage: 18,
+        totalStages: 18,
+        progress: 90,
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        startedAt: '2026-08-06T10:10:00+09:00',
+      ),
+    );
     final ops = _plan(
       id: 'ops_plan',
       instructionId: 'wi_plan_1785905165067',
       instruction: _wi(id: 'wi_plan_1785905165067'),
+      status: PlanningStatus.transferred,
+      lastTransferMode: PlanProgressStatus.folderMode,
       tags: const ['보류'],
     );
     final protected = _plan(id: 'prot', isProtected: true);
-    final working = _plan(id: 'work', status: PlanningStatus.inProgress);
+    final working = _plan(
+      id: 'work',
+      status: PlanningStatus.transferred,
+      lastTransferMode: PlanProgressStatus.folderMode,
+    );
+    final workingExec = PlanExecutionStatusResolver.resolve(
+      working,
+      remoteProject: Sotong24RemoteProject(
+        projectId: 'wi_work',
+        title: '작업중',
+        productType: ArtifactType.ebook,
+        currentStage: 7,
+        totalStages: 18,
+        progress: 40,
+        status: Sotong24WorkStatus.inProgress,
+        startedAt: '2026-08-06T10:10:00+09:00',
+      ),
+    );
     final waiting = _plan(
       id: 'wait',
       status: PlanningStatus.validationRequired,
     );
-    final delivered = _plan(id: 'deliv', status: PlanningStatus.transferred);
+    final delivered = _plan(
+      id: 'deliv',
+      status: PlanningStatus.transferred,
+      lastTransferMode: PlanProgressStatus.folderMode,
+    );
     final normal = _plan(id: 'ok', topic: '정리용');
 
     expect(
       PlanLibraryManagement.isBulkArchiveBlocked(
         ops,
         activePlanId: 'other',
+        execution: opsExec,
       ),
       isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        ops,
+        activePlanId: 'other',
+      ),
+      isFalse,
     );
     expect(
       PlanLibraryManagement.isBulkArchiveBlocked(
@@ -555,6 +610,7 @@ void main() {
       PlanLibraryManagement.isBulkArchiveBlocked(
         working,
         activePlanId: null,
+        execution: workingExec,
       ),
       isTrue,
     );
@@ -563,14 +619,14 @@ void main() {
         waiting,
         activePlanId: null,
       ),
-      isTrue,
+      isFalse,
     );
     expect(
       PlanLibraryManagement.isBulkArchiveBlocked(
         delivered,
         activePlanId: null,
       ),
-      isTrue,
+      isFalse,
     );
     expect(
       PlanLibraryManagement.isBulkArchiveBlocked(
@@ -655,6 +711,32 @@ void main() {
         ops,
         PlanLibraryBulkAction.archive,
       ),
+      isTrue,
+    );
+    final opsExec = PlanExecutionStatusResolver.resolve(
+      ops.copyWith(
+        status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
+      ),
+      remoteProject: Sotong24RemoteProject(
+        projectId: 'wi_plan_1785905165067',
+        title: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+        productType: ArtifactType.ebook,
+        currentStage: 18,
+        totalStages: 18,
+        progress: 90,
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        startedAt: '2026-08-06T10:10:00+09:00',
+      ),
+    );
+
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        ops,
+        PlanLibraryBulkAction.archive,
+        execution: opsExec,
+      ),
       isFalse,
     );
     expect(
@@ -701,12 +783,31 @@ void main() {
       expect(r.succeeded, isTrue);
     }
 
+    final opsExec = PlanExecutionStatusResolver.resolve(
+      ops.copyWith(
+        status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
+      ),
+      remoteProject: Sotong24RemoteProject(
+        projectId: 'wi_plan_1785905165067',
+        title: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+        productType: ArtifactType.ebook,
+        currentStage: 18,
+        totalStages: 18,
+        progress: 90,
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        startedAt: '2026-08-06T10:10:00+09:00',
+      ),
+    );
+
     final selected = [a, b, ops];
     final toArchive = selected
         .where(
           (p) => !PlanLibraryManagement.isBulkArchiveBlocked(
             p,
             activePlanId: null,
+            execution: p.id == 'bulk_ops' ? opsExec : null,
           ),
         )
         .map(

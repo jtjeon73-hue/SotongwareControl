@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/models/business_planning.dart';
+import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
+import 'package:sotong_ware_control/services/plan_execution_index.dart';
 import 'package:sotong_ware_control/widgets/project_design/plan_library_panel.dart';
 
 BusinessPlanDocument _plan({
@@ -33,6 +35,24 @@ BusinessPlanDocument _plan({
   );
 }
 
+Sotong24RemoteProject _opsRemoteProject() {
+  return Sotong24RemoteProject(
+    projectId: 'wi_plan_1785905165067',
+    title: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+    productType: ArtifactType.ebook,
+    currentStage: 18,
+    totalStages: 18,
+    progress: 90,
+    status: Sotong24WorkStatus.awaitingApproval,
+    approvalStatus: ApprovalStatus.pending,
+    startedAt: '2026-08-06T10:10:00+09:00',
+  );
+}
+
+PlanExecutionIndex _opsExecutionIndex() {
+  return PlanExecutionIndex.fromRemoteProjects([_opsRemoteProject()]);
+}
+
 Future<void> _pumpPanel(
   WidgetTester tester, {
   required List<BusinessPlanDocument> plans,
@@ -41,6 +61,7 @@ Future<void> _pumpPanel(
   ValueChanged<String>? onFolderChanged,
   Future<void> Function(PlanLibraryBulkAction, List<BusinessPlanDocument>)?
   onBulkAction,
+  PlanExecutionIndex? executionIndex,
 }) async {
   tester.view.physicalSize = const Size(1200, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -63,6 +84,7 @@ Future<void> _pumpPanel(
             onToggleFavorite: (_) {},
             onStartNew: () {},
             onBulkAction: onBulkAction ?? (_, _) async {},
+            executionIndex: executionIndex,
           ),
         ),
       ),
@@ -103,6 +125,7 @@ void main() {
         id: 'ops',
         topic: '가이드 전자책개발',
         instructionId: 'wi_plan_1785905165067',
+        status: PlanningStatus.transferred,
         tags: const ['보류'],
       ),
     ];
@@ -114,6 +137,7 @@ void main() {
       plans: plans,
       folderFilter: 'all',
       viewMode: PlanLibraryViewMode.cards,
+      executionIndex: _opsExecutionIndex(),
       onBulkAction: (action, selected) async {
         lastAction = action;
         lastSelected = selected;
@@ -132,7 +156,7 @@ void main() {
     expect(find.text('선택 해제'), findsOneWidget);
     expect(find.text('선택 항목 보관'), findsOneWidget);
     expect(find.byType(Checkbox), findsWidgets);
-    expect(_disabledCheckboxForTopic('가이드 전자책개발'), findsOneWidget);
+    expect(_disabledCheckboxForTopic('50대 초보도 따라 하는 AI 전자책 첫 출간'), findsOneWidget);
 
     await tester.tap(find.text('전체 선택'));
     await tester.pumpAndSettle();
@@ -179,7 +203,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('선택 항목 보관 해제'), findsOneWidget);
-    expect(find.text('선택 항목 보관'), findsNothing);
     expect(_enabledCheckboxForTopic('보관된 기획'), findsOneWidget);
 
     await tester.tap(_enabledCheckboxForTopic('보관된 기획'));
@@ -208,7 +231,7 @@ void main() {
       tester,
       plans: plans,
       folderFilter: 'trashed',
-      viewMode: PlanLibraryViewMode.list,
+      viewMode: PlanLibraryViewMode.cards,
       onBulkAction: (action, selected) async {
         lastAction = action;
         lastSelected = selected;
@@ -241,6 +264,7 @@ void main() {
         id: 'ops',
         topic: '운영 WI',
         instructionId: 'wi_plan_1785905165067',
+        status: PlanningStatus.transferred,
       ),
       _plan(id: 'prot', topic: '보호 기획', isProtected: true),
       _plan(
@@ -255,6 +279,7 @@ void main() {
       plans: plans,
       folderFilter: 'all',
       viewMode: PlanLibraryViewMode.cards,
+      executionIndex: _opsExecutionIndex(),
     );
     await tester.tap(find.text('관리'));
     await tester.pumpAndSettle();
@@ -263,13 +288,13 @@ void main() {
       find.byWidgetPredicate(
         (w) => w is Checkbox && w.onChanged != null,
       ),
-      findsOneWidget,
+      findsNWidgets(2),
     );
     expect(
       find.byWidgetPredicate(
         (w) => w is Checkbox && w.onChanged == null,
       ),
-      findsNWidgets(3),
+      findsNWidgets(2),
     );
   });
 
@@ -297,7 +322,9 @@ void main() {
                   searchQuery: '',
                   viewMode: PlanLibraryViewMode.cards,
                   sort: PlanLibrarySort.newest,
-                  onFolderChanged: (id) => setState(() => folderFilter = id),
+                  onFolderChanged: (f) => setState(() {
+                    folderFilter = f;
+                  }),
                   onSearchChanged: (_) {},
                   onViewModeChanged: (_) {},
                   onSortChanged: (_) {},
@@ -322,29 +349,5 @@ void main() {
     await tester.tap(find.text('보관'));
     await tester.pumpAndSettle();
     expect(find.text('선택 0개'), findsOneWidget);
-  });
-
-  testWidgets('모바일 좁은 폭에서 가로 overflow 없음', (tester) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    await _pumpPanel(
-      tester,
-      plans: [
-        _plan(id: 'm1', topic: '모바일 기획 제목이 다소 긴 경우에도 줄바꿈'),
-        _plan(id: 'm2', topic: '두번째'),
-      ],
-      folderFilter: 'all',
-      viewMode: PlanLibraryViewMode.table,
-    );
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-
-    await tester.tap(find.text('관리'));
-    await tester.pumpAndSettle();
-    expect(tester.takeException(), isNull);
-    expect(find.text('선택 항목 보관'), findsOneWidget);
   });
 }

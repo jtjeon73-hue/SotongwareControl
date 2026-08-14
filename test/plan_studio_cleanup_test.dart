@@ -2,10 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sotong_ware_control/models/business_planning.dart';
+import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/services/business_plan_mirror.dart';
 import 'package:sotong_ware_control/services/business_planning_store.dart';
 import 'package:sotong_ware_control/services/pc_workspace_ui.dart';
+import 'package:sotong_ware_control/services/plan_execution_status.dart';
 import 'package:sotong_ware_control/services/plan_library_management.dart';
+import 'package:sotong_ware_control/services/plan_progress_status.dart';
 import 'package:sotong_ware_control/services/plan_sync_meta.dart';
 import 'package:sotong_ware_control/services/plan_user_facing_status.dart';
 
@@ -20,6 +23,7 @@ BusinessPlanDocument _plan({
   bool isProtected = false,
   String customer = '고객',
   String updatedAt = '2026-08-13T00:00:00.000Z',
+  String? lastTransferMode,
 }) {
   return BusinessPlanDocument(
     id: id,
@@ -68,6 +72,7 @@ BusinessPlanDocument _plan({
     tags: tags,
     libraryState: libraryState,
     isProtected: isProtected,
+    lastTransferMode: lastTransferMode,
   );
 }
 
@@ -566,31 +571,56 @@ void main() {
 
   test('PlanUserFacingStatus.label covers all required statuses', () {
     final cases = <String, BusinessPlanDocument>{
-      PlanUserFacingStatus.planning: _plan(id: '1', topic: 'a'),
+      PlanUserFacingStatus.planning: BusinessPlanDocument(
+        id: '1',
+        status: PlanningStatus.draft,
+        version: 1,
+        createdAt: '2026-08-13T00:00:00.000Z',
+        updatedAt: '2026-08-13T00:00:00.000Z',
+        input: BusinessPlanInput(
+          topic: 'a',
+          customerProblem: '문제',
+          targetCustomer: '고객',
+          desiredOutcome: '목적',
+          artifactType: ArtifactType.ebook,
+          deliverableTypes: const [ArtifactType.ebook],
+          wizardSelections: const {'step': 6},
+        ),
+        instructionId: 'wi_1',
+      ),
+      PlanUserFacingStatus.instructionDesign: _plan(id: '1b', topic: 'a'),
       PlanUserFacingStatus.instructionReady: _plan(
         id: '2',
         topic: 'a',
         status: PlanningStatus.instructionReady,
+        instructionId: 'wi_2',
       ),
-      PlanUserFacingStatus.delivered: _plan(
+      PlanUserFacingStatus.deliveredNotRun: _plan(
         id: '3',
         topic: 'a',
         status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
       ),
       PlanUserFacingStatus.working: _plan(
         id: '4',
         topic: 'a',
-        status: PlanningStatus.inProgress,
+        status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
+        instructionId: 'wi_4',
       ),
       PlanUserFacingStatus.awaitingApproval: _plan(
         id: '5',
         topic: 'a',
-        status: PlanningStatus.validationRequired,
+        status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
+        instructionId: 'wi_5',
       ),
       PlanUserFacingStatus.completed: _plan(
         id: '6',
         topic: 'a',
-        status: PlanningStatus.completed,
+        status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
+        instructionId: 'wi_6',
       ),
       PlanUserFacingStatus.deferred: _plan(
         id: '7',
@@ -608,12 +638,96 @@ void main() {
         tags: const ['정리대상'],
       ),
     };
+    PlanExecutionSnapshot? executionFor(String label, BusinessPlanDocument plan) {
+      switch (label) {
+        case PlanUserFacingStatus.working:
+          return PlanExecutionStatusResolver.resolve(
+            plan,
+            remoteProject: Sotong24RemoteProject(
+              projectId: 'wi_4',
+              title: '작업중',
+              productType: ArtifactType.ebook,
+              currentStage: 7,
+              totalStages: 18,
+              progress: 40,
+              status: Sotong24WorkStatus.inProgress,
+              startedAt: '2026-08-06T10:10:00+09:00',
+            ),
+          );
+        case PlanUserFacingStatus.awaitingApproval:
+          return PlanExecutionStatusResolver.resolve(
+            plan,
+            remoteProject: Sotong24RemoteProject(
+              projectId: 'wi_5',
+              title: '승인대기',
+              productType: ArtifactType.ebook,
+              currentStage: 18,
+              totalStages: 18,
+              progress: 95,
+              status: Sotong24WorkStatus.awaitingApproval,
+              approvalStatus: ApprovalStatus.pending,
+              startedAt: '2026-08-06T10:10:00+09:00',
+            ),
+          );
+        case PlanUserFacingStatus.completed:
+          return PlanExecutionStatusResolver.resolve(
+            plan,
+            remoteProject: Sotong24RemoteProject(
+              projectId: 'wi_6',
+              title: '완료',
+              productType: ArtifactType.ebook,
+              currentStage: 18,
+              totalStages: 18,
+              progress: 100,
+              status: Sotong24WorkStatus.completed,
+              startedAt: '2026-08-06T10:10:00+09:00',
+            ),
+          );
+        default:
+          return null;
+      }
+    }
+
     for (final entry in cases.entries) {
-      expect(PlanUserFacingStatus.label(entry.value), entry.key);
+      expect(
+        PlanUserFacingStatus.label(
+          entry.value,
+          execution: executionFor(entry.key, entry.value),
+        ),
+        entry.key,
+      );
     }
     expect(
       PlanUserFacingStatus.label(
-        _plan(id: '10', topic: 'a', tags: const ['승인대기']),
+        _plan(
+          id: '10',
+          topic: 'a',
+          status: PlanningStatus.transferred,
+          lastTransferMode: PlanProgressStatus.folderMode,
+          instructionId: 'wi_10',
+          tags: const ['승인대기'],
+        ),
+        execution: PlanExecutionStatusResolver.resolve(
+          _plan(
+            id: '10',
+            topic: 'a',
+            status: PlanningStatus.transferred,
+            lastTransferMode: PlanProgressStatus.folderMode,
+            instructionId: 'wi_10',
+            tags: const ['승인대기'],
+          ),
+          remoteProject: Sotong24RemoteProject(
+            projectId: 'wi_10',
+            title: '승인대기',
+            productType: ArtifactType.ebook,
+            currentStage: 18,
+            totalStages: 18,
+            progress: 95,
+            status: Sotong24WorkStatus.awaitingApproval,
+            approvalStatus: ApprovalStatus.pending,
+            startedAt: '2026-08-06T10:10:00+09:00',
+          ),
+        ),
       ),
       PlanUserFacingStatus.awaitingApproval,
     );
@@ -709,8 +823,28 @@ void main() {
       '50대 초보도 따라 하는 AI 전자책 첫 출간',
     );
     expect(staleTopic.input.topic, '가이드 전자책개발');
+    final opsExec = PlanExecutionStatusResolver.resolve(
+      staleTopic.copyWith(
+        status: PlanningStatus.transferred,
+        lastTransferMode: PlanProgressStatus.folderMode,
+      ),
+      remoteProject: Sotong24RemoteProject(
+        projectId: opsId,
+        title: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+        productType: ArtifactType.ebook,
+        currentStage: 18,
+        totalStages: 18,
+        progress: 90,
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        startedAt: '2026-08-06T10:10:00+09:00',
+      ),
+    );
     expect(
-      PlanLibraryManagement.isBulkArchiveBlocked(staleTopic),
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        staleTopic,
+        execution: opsExec,
+      ),
       isTrue,
     );
   });

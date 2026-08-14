@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/business_planning.dart';
+import '../../services/plan_execution_index.dart';
+import '../../services/plan_execution_status.dart';
 import '../../services/plan_library_management.dart';
 import '../../services/plan_user_facing_status.dart';
 import '../../theme/control_theme.dart';
@@ -31,6 +33,7 @@ class PlanLibraryPanel extends StatefulWidget {
     required this.onStartNew,
     required this.onBulkAction,
     this.duplicateTopics = const {},
+    this.executionIndex,
   });
 
   final List<BusinessPlanDocument> plans;
@@ -52,6 +55,7 @@ class PlanLibraryPanel extends StatefulWidget {
   )
   onBulkAction;
   final Set<String> duplicateTopics;
+  final PlanExecutionIndex? executionIndex;
 
   @override
   State<PlanLibraryPanel> createState() => _PlanLibraryPanelState();
@@ -73,11 +77,16 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
   PlanLibraryBulkAction get _primarySelectionAction =>
       PlanLibraryManagement.primarySelectionActionForFilter(widget.folderFilter);
 
+  PlanExecutionSnapshot _exec(BusinessPlanDocument plan) =>
+      widget.executionIndex?.snapshotFor(plan) ??
+      PlanExecutionStatusResolver.resolve(plan);
+
   bool _canSelect(BusinessPlanDocument plan) {
     return PlanLibraryManagement.isSelectableForBulkAction(
       plan,
       _primarySelectionAction,
       activePlanId: widget.activePlanId,
+      execution: _exec(plan),
     );
   }
 
@@ -110,6 +119,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         list,
         widget.folderFilter,
         duplicateCandidateIds: _duplicateIds,
+        executionIndex: widget.executionIndex,
       );
     } else {
       list = list.where((p) => PlanLibraryManagement.isOperationalListEntry(p)).toList();
@@ -127,20 +137,23 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     final q = widget.searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list.where((p) {
-        final status = PlanUserFacingStatus.label(p).toLowerCase();
-        final artifact = ArtifactType.labelKo(
-          p.input.resolvedArtifactType,
-        ).toLowerCase();
-        final tags = p.tags.join(' ').toLowerCase();
-        final iid = p.stableInstructionId.toLowerCase();
-        return PlanLibraryManagement.displayTitle(p).toLowerCase().contains(q) ||
+        final status = PlanUserFacingStatus.label(p, execution: _exec(p))
+            .toLowerCase();
+        final exec = _exec(p);
+        return PlanLibraryManagement.displayTitle(p, execution: exec)
+            .toLowerCase()
+            .contains(q) ||
             p.input.topic.toLowerCase().contains(q) ||
             p.input.targetCustomer.toLowerCase().contains(q) ||
             p.input.customerProblem.toLowerCase().contains(q) ||
             status.contains(q) ||
-            artifact.contains(q) ||
-            tags.contains(q) ||
-            iid.contains(q) ||
+            ArtifactType.labelKo(p.input.resolvedArtifactType)
+                .toLowerCase()
+                .contains(q) ||
+            p.tags.join(' ').toLowerCase().contains(q) ||
+            p.stableInstructionId.toLowerCase().contains(q) ||
+            exec.instructionProgressLine.toLowerCase().contains(q) ||
+            exec.productionProgressLine.toLowerCase().contains(q) ||
             p.createdAt.toLowerCase().contains(q) ||
             p.updatedAt.toLowerCase().contains(q);
       }).toList();
@@ -194,7 +207,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     }
   }
 
-  String _statusBadge(BusinessPlanDocument p) => PlanUserFacingStatus.label(p);
+  String _statusBadge(BusinessPlanDocument p) =>
+      PlanUserFacingStatus.label(p, execution: _exec(p));
 
   String _formatIso(String iso) {
     final dt = DateTime.tryParse(iso);
@@ -232,7 +246,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
   }
 
   String _titleOf(BusinessPlanDocument plan) {
-    return PlanLibraryManagement.displayTitle(plan);
+    return PlanLibraryManagement.displayTitle(plan, execution: _exec(plan));
   }
 
   Future<void> _runBulk(PlanLibraryBulkAction action) async {
@@ -245,6 +259,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             (p) => PlanLibraryManagement.isBulkArchiveBlocked(
               p,
               activePlanId: widget.activePlanId,
+              execution: _exec(p),
             ),
           )
           .toList();
@@ -253,6 +268,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             (p) => !PlanLibraryManagement.isBulkArchiveBlocked(
               p,
               activePlanId: widget.activePlanId,
+              execution: _exec(p),
             ),
           )
           .toList();
@@ -266,7 +282,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
               blocked.isEmpty
                   ? '선택한 기획을 보관할 수 없습니다.'
                   : '선택한 기획은 보호·운영 상태라 일괄 보관할 수 없습니다.\n'
-                      '(${blocked.map((p) => PlanLibraryManagement.bulkArchiveBlockReason(p, activePlanId: widget.activePlanId)).toSet().join(', ')})',
+                      '(${blocked.map((p) => PlanLibraryManagement.bulkArchiveBlockReason(p, activePlanId: widget.activePlanId, execution: _exec(p))).toSet().join(', ')})',
             ),
             actions: [
               TextButton(
@@ -436,22 +452,47 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
 
   List<Widget> _cardMeta(BusinessPlanDocument p) {
     final artifact = ArtifactType.labelKo(p.input.resolvedArtifactType);
+    final exec = _exec(p);
     final status = _statusBadge(p);
+    final stepName = exec.isPostTransfer
+        ? ''
+        : PlanExecutionStatusResolver.instructionDesignStepName(p);
     return [
       Text(
-        '$artifact · $status',
-        style: const TextStyle(fontSize: 13, color: ControlColors.textSecondary),
+        artifact,
+        style: const TextStyle(
+          fontSize: 13,
+          color: ControlColors.textSecondary,
+        ),
       ),
       Text(
-        '최근 수정 ${_formatIso(p.updatedAt)}',
+        exec.instructionProgressLine,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
+      Text(
+        exec.productionProgressLine,
+        style: const TextStyle(fontSize: 12, color: ControlColors.textSecondary),
+      ),
+      if (stepName.isNotEmpty && !exec.isPostTransfer)
+        Text(
+          '현재 단계: $stepName',
+          style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
+        ),
+      if (exec.currentStageLabel.isNotEmpty && exec.hasActualExecution)
+        Text(
+          '현재 단계: ${exec.currentStageLabel}',
+          style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
+        ),
+      Text(
+        '상태: $status',
         style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
       ),
       Text(
-        '작업지시 ${p.stableInstructionId.isEmpty ? '없음' : p.stableInstructionId}',
+        '최근 수정 ${_formatIso(exec.lastUpdated.isNotEmpty ? exec.lastUpdated : p.updatedAt)}',
         style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
       ),
+      if (exec.isPostTransfer && exec.agentOnline)
+        _metaChip('PC Agent 온라인'),
       if (p.isProtected || p.favorite)
         Wrap(
           spacing: 8,

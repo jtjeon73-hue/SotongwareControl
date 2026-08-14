@@ -283,6 +283,47 @@ class Sotong24RemoteRepository {
     return null;
   }
 
+  /// 취소/중지 요청 — Relay request_poll → Sotong24Work Agent.
+  Future<String?> requestCancel({
+    required String projectId,
+    required String instructionId,
+    String message = '',
+  }) async {
+    final pid = projectId.trim();
+    if (pid.isEmpty) return 'projectId가 필요합니다.';
+    final now = DateTime.now().toUtc().toIso8601String();
+    final requestId = 'cancel_${instructionId.trim()}_${now.hashCode.abs()}';
+    final request = Sotong24RemoteRequest(
+      requestId: requestId,
+      projectId: pid,
+      stageId: '',
+      requestType: 'cancel',
+      status: ApprovalStatus.pending,
+      message: message.trim().isEmpty ? '사용자 취소 요청' : message.trim(),
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    if (usesMemory || _projects == null) {
+      final list = _memoryRequests[pid] ?? <Sotong24RemoteRequest>[];
+      _memoryRequests[pid] = [...list, request];
+      return null;
+    }
+
+    try {
+      final doc = _projects!.doc(pid);
+      await doc.collection('requests').doc(requestId).set(request.toMap());
+      await doc.set({
+        'status': Sotong24WorkStatus.error,
+        'updatedAt': now,
+        'cancelRequestedAt': now,
+      }, SetOptions(merge: true));
+      return null;
+    } catch (e) {
+      return '취소 요청 저장 실패: $e';
+    }
+  }
+
   void dispose() {
     _memoryController.close();
   }
