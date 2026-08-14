@@ -6,21 +6,11 @@ import '../../services/plan_library_management.dart';
 import '../../services/plan_user_facing_status.dart';
 import '../../theme/control_theme.dart';
 
+export '../../services/plan_library_management.dart' show PlanLibraryBulkAction;
+
 enum PlanLibraryViewMode { cards, list, table }
 
 enum PlanLibrarySort { newest, name, updated, status, artifact }
-
-enum PlanLibraryBulkAction {
-  favorite,
-  unfavorite,
-  archive,
-  unarchive,
-  trash,
-  restore,
-  protect,
-  unprotect,
-  permanentDelete,
-}
 
 /// 저장된 기획 관리 — 폴더·검색·보기·정렬·관리모드.
 class PlanLibraryPanel extends StatefulWidget {
@@ -71,6 +61,25 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
   bool _manageMode = false;
   bool _showDuplicates = false;
   final Set<String> _selectedIds = {};
+
+  @override
+  void didUpdateWidget(PlanLibraryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.folderFilter != widget.folderFilter) {
+      _clearSelection();
+    }
+  }
+
+  PlanLibraryBulkAction get _primarySelectionAction =>
+      PlanLibraryManagement.primarySelectionActionForFilter(widget.folderFilter);
+
+  bool _canSelect(BusinessPlanDocument plan) {
+    return PlanLibraryManagement.isSelectableForBulkAction(
+      plan,
+      _primarySelectionAction,
+      activePlanId: widget.activePlanId,
+    );
+  }
 
   List<PlanDuplicateGroup> get _duplicateGroups =>
       PlanLibraryManagement.findDuplicateGroups(widget.plans);
@@ -124,7 +133,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         ).toLowerCase();
         final tags = p.tags.join(' ').toLowerCase();
         final iid = p.stableInstructionId.toLowerCase();
-        return p.input.topic.toLowerCase().contains(q) ||
+        return PlanLibraryManagement.displayTitle(p).toLowerCase().contains(q) ||
+            p.input.topic.toLowerCase().contains(q) ||
             p.input.targetCustomer.toLowerCase().contains(q) ||
             p.input.customerProblem.toLowerCase().contains(q) ||
             status.contains(q) ||
@@ -139,7 +149,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     list.sort((a, b) {
       switch (widget.sort) {
         case PlanLibrarySort.name:
-          return a.input.topic.compareTo(b.input.topic);
+          return PlanLibraryManagement.displayTitle(a)
+              .compareTo(PlanLibraryManagement.displayTitle(b));
         case PlanLibrarySort.updated:
           return b.updatedAt.compareTo(a.updatedAt);
         case PlanLibrarySort.status:
@@ -164,6 +175,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
   }
 
   bool get _inTrashView => widget.folderFilter == 'trashed';
+
+  bool get _inArchivedView => widget.folderFilter == 'archived';
 
   Color _statusColor(String status) {
     switch (PlanningStatus.normalize(status)) {
@@ -190,6 +203,11 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
   }
 
   void _toggleSelect(String id) {
+    final byId = {for (final p in widget.plans) p.id: p};
+    final plan = byId[id];
+    if (plan != null && !_canSelect(plan)) {
+      return;
+    }
     setState(() {
       if (_selectedIds.contains(id)) {
         _selectedIds.remove(id);
@@ -203,7 +221,9 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     setState(() {
       _selectedIds
         ..clear()
-        ..addAll(_filtered.map((p) => p.id));
+        ..addAll(
+          _filtered.where(_canSelect).map((p) => p.id),
+        );
     });
   }
 
@@ -211,9 +231,81 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     setState(() => _selectedIds.clear());
   }
 
+  String _titleOf(BusinessPlanDocument plan) {
+    return PlanLibraryManagement.displayTitle(plan);
+  }
+
   Future<void> _runBulk(PlanLibraryBulkAction action) async {
-    final selected = _selectedPlans;
+    var selected = _selectedPlans;
     if (selected.isEmpty) return;
+
+    if (action == PlanLibraryBulkAction.archive) {
+      final blocked = selected
+          .where(
+            (p) => PlanLibraryManagement.isBulkArchiveBlocked(
+              p,
+              activePlanId: widget.activePlanId,
+            ),
+          )
+          .toList();
+      selected = selected
+          .where(
+            (p) => !PlanLibraryManagement.isBulkArchiveBlocked(
+              p,
+              activePlanId: widget.activePlanId,
+            ),
+          )
+          .toList();
+      if (selected.isEmpty) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('보관할 수 없음'),
+            content: Text(
+              blocked.isEmpty
+                  ? '선택한 기획을 보관할 수 없습니다.'
+                  : '선택한 기획은 보호·운영 상태라 일괄 보관할 수 없습니다.\n'
+                      '(${blocked.map((p) => PlanLibraryManagement.bulkArchiveBlockReason(p, activePlanId: widget.activePlanId)).toSet().join(', ')})',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      if (!mounted) return;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('선택 항목 보관'),
+          content: Text(
+            blocked.isEmpty
+                ? '선택한 ${selected.length}개의 기획을 보관하시겠습니까?'
+                : '선택한 ${selected.length}개의 기획을 보관하시겠습니까?\n'
+                    '보호·운영 기획 ${blocked.length}건은 제외됩니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('보관'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      await widget.onBulkAction(action, selected);
+      if (mounted) _clearSelection();
+      return;
+    }
 
     if (action == PlanLibraryBulkAction.trash) {
       final protected = selected.where((p) => p.isProtected).toList();
@@ -244,10 +336,19 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
       if (!ok) return;
     }
 
+    selected = selected
+        .where(
+          (p) => PlanLibraryManagement.isSelectableForBulkAction(
+            p,
+            action,
+            activePlanId: widget.activePlanId,
+          ),
+        )
+        .toList();
+    if (selected.isEmpty) return;
+
     await widget.onBulkAction(action, selected);
-    if (mounted) {
-      setState(() => _selectedIds.clear());
-    }
+    if (mounted) _clearSelection();
   }
 
   Future<bool> _confirmPermanentDelete(
@@ -260,7 +361,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         activePlanId: widget.activePlanId,
       );
       if (w.hasStrongWarning) {
-        final title = p.input.topic.isEmpty ? '(주제 미입력)' : p.input.topic;
+        final title = PlanLibraryManagement.displayTitle(p);
         warnings.add('· $title — ${w.reasons.join(', ')}');
       }
     }
@@ -387,7 +488,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                 });
               },
               icon: Icon(_manageMode ? Icons.close : Icons.tune, size: 18),
-              label: Text(_manageMode ? '관리 종료' : '필터'),
+              label: Text(_manageMode ? '관리 종료' : '관리'),
             ),
             const SizedBox(width: 8),
             FilledButton.tonalIcon(
@@ -580,18 +681,35 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
               spacing: 6,
               runSpacing: 6,
               children: [
-                if (!_inTrashView) ...[
-                  FilledButton.tonal(
-                    onPressed: _selectedIds.isEmpty
-                        ? null
-                        : () => _runBulk(PlanLibraryBulkAction.archive),
-                    child: const Text('보관'),
-                  ),
+                if (_inArchivedView) ...[
                   FilledButton.tonal(
                     onPressed: _selectedIds.isEmpty
                         ? null
                         : () => _runBulk(PlanLibraryBulkAction.unarchive),
-                    child: const Text('보관 해제'),
+                    child: const Text('선택 항목 보관 해제'),
+                  ),
+                ] else if (_inTrashView) ...[
+                  FilledButton.tonal(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.restore),
+                    child: const Text('선택 항목 복원'),
+                  ),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ControlColors.accentRose,
+                    ),
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.permanentDelete),
+                    child: const Text('영구 삭제'),
+                  ),
+                ] else ...[
+                  FilledButton.tonal(
+                    onPressed: _selectedIds.isEmpty
+                        ? null
+                        : () => _runBulk(PlanLibraryBulkAction.archive),
+                    child: const Text('선택 항목 보관'),
                   ),
                   FilledButton(
                     onPressed: _selectedIds.isEmpty
@@ -622,22 +740,6 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                         ? null
                         : () => _runBulk(PlanLibraryBulkAction.unprotect),
                     child: const Text('보호 해제'),
-                  ),
-                ] else ...[
-                  FilledButton.tonal(
-                    onPressed: _selectedIds.isEmpty
-                        ? null
-                        : () => _runBulk(PlanLibraryBulkAction.restore),
-                    child: const Text('복원'),
-                  ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: ControlColors.accentRose,
-                    ),
-                    onPressed: _selectedIds.isEmpty
-                        ? null
-                        : () => _runBulk(PlanLibraryBulkAction.permanentDelete),
-                    child: const Text('영구 삭제'),
                   ),
                 ],
               ],
@@ -777,13 +879,13 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                               if (_manageMode)
                                 Checkbox(
                                   value: _selectedIds.contains(p.id),
-                                  onChanged: (_) => _toggleSelect(p.id),
+                                  onChanged: _canSelect(p)
+                                      ? (_) => _toggleSelect(p.id)
+                                      : null,
                                 ),
                               Expanded(
                                 child: Text(
-                                  p.input.topic.isEmpty
-                                      ? '(주제 미입력)'
-                                      : p.input.topic,
+                                  _titleOf(p),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w700,
                                   ),
@@ -847,11 +949,13 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             leading: _manageMode
                 ? Checkbox(
                     value: _selectedIds.contains(p.id),
-                    onChanged: (_) => _toggleSelect(p.id),
+                    onChanged: _canSelect(p)
+                        ? (_) => _toggleSelect(p.id)
+                        : null,
                   )
                 : null,
             title: Text(
-              p.input.topic.isEmpty ? '(주제 미입력)' : p.input.topic,
+              _titleOf(p),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -884,7 +988,6 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: [
-          if (_manageMode) const DataColumn(label: Text('선택')),
           const DataColumn(label: Text('주제')),
           const DataColumn(label: Text('결과물')),
           const DataColumn(label: Text('상태')),
@@ -901,24 +1004,13 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             DataRow(
               selected:
                   p.id == widget.activePlanId || _selectedIds.contains(p.id),
-              onSelectChanged: (_) {
-                if (_manageMode) {
-                  _toggleSelect(p.id);
-                } else {
-                  widget.onOpenPlan(p);
-                }
-              },
+              onSelectChanged: !_manageMode
+                  ? (_) => widget.onOpenPlan(p)
+                  : (_canSelect(p) ? (_) => _toggleSelect(p.id) : null),
               cells: [
-                if (_manageMode)
-                  DataCell(
-                    Checkbox(
-                      value: _selectedIds.contains(p.id),
-                      onChanged: (_) => _toggleSelect(p.id),
-                    ),
-                  ),
                 DataCell(
                   Text(
-                    p.input.topic.isEmpty ? '(미입력)' : p.input.topic,
+                    _titleOf(p),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

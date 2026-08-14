@@ -493,15 +493,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return doc;
   }
 
-  DevWorkDocStatus get _devWorkDocStatus => DevWorkDocStatus.resolve(
-    devDocState: _devDocState,
-    lastSaveResult: _lastDevWorkDocResult,
-    instruction: _instruction,
-    activeDoc: _activeDoc,
-    transferFolder: _folderState,
-    input: _currentInput,
-  );
-
   bool get _devWorkDocFolderReady => _devDocState?.readyToWrite == true;
 
   bool _planningInputMatchesInstruction(
@@ -2425,6 +2416,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         case PlanLibraryBulkAction.unfavorite:
           updates.add(p.copyWith(favorite: false, updatedAt: now));
         case PlanLibraryBulkAction.archive:
+          if (PlanLibraryManagement.isBulkArchiveBlocked(
+            p,
+            activePlanId: _activePlanId,
+          )) {
+            continue;
+          }
           updates.add(PlanLibraryManagement.archive(p, updatedAt: now));
         case PlanLibraryBulkAction.unarchive:
           updates.add(PlanLibraryManagement.unarchive(p, updatedAt: now));
@@ -2449,7 +2446,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
 
     if (updates.isEmpty) {
-      _snack('적용할 항목이 없습니다.');
+      _snack(
+        action == PlanLibraryBulkAction.archive
+            ? '보호·운영 기획은 일괄 보관할 수 없습니다.'
+            : '적용할 항목이 없습니다.',
+      );
       return;
     }
     await _store.upsertPlans(updates);
@@ -2467,7 +2468,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       PlanLibraryBulkAction.unprotect => '보호 해제',
       PlanLibraryBulkAction.permanentDelete => '영구 삭제',
     };
-    _snack('$label ${updates.length}건 완료');
+    _snack(
+      '$label ${updates.length}건 완료'
+      '${action == PlanLibraryBulkAction.archive ? ' (클라우드 동기화 요청됨)' : ''}',
+    );
   }
 
   List<BusinessPlanDocument> _similarPlans(BusinessPlanDocument plan) {
@@ -3236,12 +3240,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
 
     final onlineAgents = _remoteAgents.where((a) => a.isOnline()).toList();
-    final agentLine = onlineAgents.isEmpty
-        ? (_remoteAgents.isEmpty
-              ? '소통24워크 PC : 상태 없음'
-              : '소통24워크 PC : 오프라인')
-        : '소통24워크 PC : 온라인'
-            '${onlineAgents.length == 1 ? '' : ' (${onlineAgents.length})'}';
+    final agentOnline = onlineAgents.isNotEmpty;
+    final copy = resolvePcWorkspaceStatusCopy(
+      fsaSupported: fsaSupported,
+      agentOnline: agentOnline,
+      hasAnyAgent: _remoteAgents.isNotEmpty,
+      devFolderReady: fsaSupported && (_devDocState?.readyToWrite == true),
+      inboxReady: _inboxTransferReady,
+      onlineAgentCount: onlineAgents.length,
+    );
 
     DateTime? lastHb;
     for (final a in onlineAgents) {
@@ -3253,37 +3260,38 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ? '마지막 동기화 : —'
         : '마지막 동기화 : ${formatRelativeKo(lastHb)}';
 
-    final devStatus = _devWorkDocStatus;
-    final inboxReady = _inboxTransferReady;
-    final envLabel = !fsaSupported
-        ? '원격 작업환경'
-        : (devStatus.kind == DevWorkDocStatusKind.folderReady
-              ? 'PC 작업환경 정상'
-              : 'PC 작업환경 재연결 필요');
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(envLabel, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(agentLine, style: const TextStyle(fontSize: 13)),
             Text(
-              fsaSupported
-                  ? (devStatus.kind == DevWorkDocStatusKind.folderReady
-                        ? 'DevWorkDoc 연결'
-                        : devStatus.displayLabel)
-                  : '작업지시 전달 : 원격(Firestore)',
-              style: const TextStyle(fontSize: 13),
+              copy.headline,
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
-            if (fsaSupported)
+            const SizedBox(height: 6),
+            Text(copy.agentLine, style: const TextStyle(fontSize: 13)),
+            if (copy.devWorkDocLine != null)
               Text(
-                inboxReady
-                    ? 'Sotong24Work Inbox 연결 (PC fallback)'
-                    : 'Inbox 로컬 폴더 : 미연결 (원격 전달 우선)',
-                style: const TextStyle(
+                copy.devWorkDocLine!,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: copy.devWorkDocLine!.contains('재연결') && agentOnline
+                      ? ControlColors.textMuted
+                      : (copy.devWorkDocLine!.contains('재연결')
+                            ? ControlColors.accentWarm
+                            : ControlColors.textPrimary),
+                  fontWeight:
+                      copy.devWorkDocLine!.contains('재연결') && !agentOnline
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
+              ),
+            if (copy.showInboxUnconnectedWarning)
+              const Text(
+                'Inbox 로컬 폴더 : 미연결',
+                style: TextStyle(
                   fontSize: 12,
                   color: ControlColors.textMuted,
                 ),

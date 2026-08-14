@@ -100,7 +100,7 @@ class PlanUserFacingStatus {
   static String primaryFilterLabel(String id) {
     switch (id) {
       case 'all':
-        return '전체';
+        return '현재';
       case 'active':
         return '진행중';
       case 'waiting':

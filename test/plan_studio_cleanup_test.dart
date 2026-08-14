@@ -640,6 +640,81 @@ void main() {
     );
   });
 
+  test('PC 작업환경 상태: Agent/Relay 정상이면 DevWorkDoc·Inbox 미연결을 전체 장애로 표시하지 않음', () {
+    final ok = resolvePcWorkspaceStatusCopy(
+      fsaSupported: true,
+      agentOnline: true,
+      hasAnyAgent: true,
+      devFolderReady: false,
+      inboxReady: false,
+    );
+    expect(ok.headline, '원격 작업 전달 정상');
+    expect(ok.agentLine, '소통24워크 PC  ● 온라인');
+    expect(ok.devWorkDocLine, 'DevWorkDoc  재연결 필요');
+    expect(ok.showInboxUnconnectedWarning, isFalse);
+
+    final offline = resolvePcWorkspaceStatusCopy(
+      fsaSupported: true,
+      agentOnline: false,
+      hasAnyAgent: true,
+      devFolderReady: false,
+      inboxReady: false,
+    );
+    expect(offline.headline, '소통24워크 PC 재연결 필요');
+    expect(offline.agentLine, '소통24워크 PC  · 오프라인');
+    expect(offline.showInboxUnconnectedWarning, isTrue);
+  });
+
+  test('운영 WI wi_plan_1785905165067 보호·표시 규칙 (데이터 변경 없음)', () {
+    const opsId = 'wi_plan_1785905165067';
+    expect(PlanUserFacingStatus.isProtectedInstruction(opsId), isTrue);
+    final base = _plan(
+      id: 'plan_ops',
+      topic: '가이드 전자책개발',
+      instructionId: opsId,
+      tags: const ['보류'],
+    );
+    final wi = base.instruction!;
+    final staleTopic = base.copyWith(
+      instruction: WorkInstruction(
+        schemaVersion: wi.schemaVersion,
+        instructionId: wi.instructionId,
+        projectId: wi.projectId,
+        instructionVersion: wi.instructionVersion,
+        createdAt: wi.createdAt,
+        updatedAt: wi.updatedAt,
+        businessIdea: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+        businessPurpose: wi.businessPurpose,
+        customerProblem: wi.customerProblem,
+        targetCustomer: wi.targetCustomer,
+        deliverableTypes: wi.deliverableTypes,
+        recommendedSequence: wi.recommendedSequence,
+        valueProposition: wi.valueProposition,
+        requiredMaterials: wi.requiredMaterials,
+        workflowSteps: wi.workflowSteps,
+        completionCriteria: wi.completionCriteria,
+        qualityChecks: wi.qualityChecks,
+        risks: wi.risks,
+        monetizationOptions: wi.monetizationOptions,
+        deploymentTargets: wi.deploymentTargets,
+        promotionChannels: wi.promotionChannels,
+        approvalItems: wi.approvalItems,
+        executionStatus: wi.executionStatus,
+        artifactType: wi.artifactType,
+        checksum: wi.checksum,
+      ),
+    );
+    expect(
+      PlanLibraryManagement.displayTitle(staleTopic),
+      '50대 초보도 따라 하는 AI 전자책 첫 출간',
+    );
+    expect(staleTopic.input.topic, '가이드 전자책개발');
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(staleTopic),
+      isTrue,
+    );
+  });
+
   test('bootstrapSession restores active before cleanup (draft active protected)', () async {
     SharedPreferences.setMockInitialValues({
       BusinessPlanningStore.activePlanIdKey: 'plan_to_protect',

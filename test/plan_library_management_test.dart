@@ -4,6 +4,7 @@ import 'package:sotong_ware_control/models/business_planning.dart';
 import 'package:sotong_ware_control/services/business_plan_mirror.dart';
 import 'package:sotong_ware_control/services/business_planning_store.dart';
 import 'package:sotong_ware_control/services/plan_library_management.dart';
+import 'package:sotong_ware_control/services/plan_user_facing_status.dart';
 
 BusinessPlanDocument _plan({
   required String id,
@@ -247,7 +248,7 @@ void main() {
     expect(groups, isEmpty);
   });
 
-  test('필터: 전체/보관/휴지통/중복 후보/진행중', () {
+  test('필터: 현재/보관/휴지통/중복 후보/진행중', () {
     final plans = [
       _plan(id: 'active1', status: PlanningStatus.draft),
       _plan(id: 'prog', status: PlanningStatus.inProgress, topic: '진행'),
@@ -370,7 +371,7 @@ void main() {
     expect(candidateIds, {'guide_new', 'guide_old_a', 'guide_old_b'});
   });
 
-  test('전체 필터는 정리대상 태그 기획 제외', () {
+  test('현재 필터는 정리대상 태그 기획 제외', () {
     final plans = [
       _plan(id: 'ok'),
       _plan(id: 'cleanup', tags: const ['cleanup', '정리대상']),
@@ -379,7 +380,7 @@ void main() {
     expect(all.map((p) => p.id), ['ok']);
   });
 
-  test('보관 해제/복원 시 cleanup 태그 제거 후 전체에 재표시', () {
+  test('보관 해제/복원 시 cleanup 태그 제거 후 현재 목록에 재표시', () {
     final archived = _plan(
       id: 'a1',
       libraryState: PlanLibraryState.archived,
@@ -472,5 +473,292 @@ void main() {
     expect(local.isLibraryArchived, isFalse);
     expect(local.tags, isNot(contains('cleanup')));
     expect(PlanLibraryManagement.isOperationalListEntry(local), isTrue);
+  });
+
+  test('기본 필터 라벨은 전체 대신 현재', () {
+    expect(PlanUserFacingStatus.primaryFilterLabel('all'), '현재');
+    expect(PlanUserFacingStatus.primaryFilters, [
+      'all',
+      'active',
+      'waiting',
+      'completed',
+      'archived',
+    ]);
+  });
+
+  test('현재 필터는 archive/cleanup/trash 제외하고 실제 보류는 포함', () {
+    final plans = [
+      _plan(id: 'live'),
+      _plan(id: 'hold', tags: const ['보류']),
+      _plan(id: 'arch', libraryState: PlanLibraryState.archived),
+      _plan(id: 'trash', libraryState: PlanLibraryState.trashed),
+      _plan(id: 'cleanup', tags: const ['cleanup']),
+    ];
+    final current = PlanLibraryManagement.applyManageFilter(plans, 'all');
+    expect(current.map((p) => p.id).toSet(), {'live', 'hold'});
+    expect(
+      PlanUserFacingStatus.label(current.firstWhere((p) => p.id == 'hold')),
+      PlanUserFacingStatus.deferred,
+    );
+  });
+
+  test('displayTitle은 WI businessIdea를 topic보다 우선 (데이터 덮어쓰기 없음)', () {
+    final plan = _plan(
+      id: 'ops',
+      topic: '가이드 전자책개발',
+      instructionId: 'wi_plan_1785905165067',
+      instruction: _wi(
+        id: 'wi_plan_1785905165067',
+        topic: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+      ),
+      tags: const ['보류'],
+    );
+    expect(
+      PlanLibraryManagement.displayTitle(plan),
+      '50대 초보도 따라 하는 AI 전자책 첫 출간',
+    );
+    expect(plan.input.topic, '가이드 전자책개발');
+    expect(PlanUserFacingStatus.label(plan), PlanUserFacingStatus.deferred);
+  });
+
+  test('보호·운영 기획은 일괄 보관 차단 (선택/보관)', () {
+    final ops = _plan(
+      id: 'ops_plan',
+      instructionId: 'wi_plan_1785905165067',
+      instruction: _wi(id: 'wi_plan_1785905165067'),
+      tags: const ['보류'],
+    );
+    final protected = _plan(id: 'prot', isProtected: true);
+    final working = _plan(id: 'work', status: PlanningStatus.inProgress);
+    final waiting = _plan(
+      id: 'wait',
+      status: PlanningStatus.validationRequired,
+    );
+    final delivered = _plan(id: 'deliv', status: PlanningStatus.transferred);
+    final normal = _plan(id: 'ok', topic: '정리용');
+
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        ops,
+        activePlanId: 'other',
+      ),
+      isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        protected,
+        activePlanId: null,
+      ),
+      isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        working,
+        activePlanId: null,
+      ),
+      isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        waiting,
+        activePlanId: null,
+      ),
+      isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        delivered,
+        activePlanId: null,
+      ),
+      isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        normal,
+        activePlanId: 'ops_plan',
+      ),
+      isFalse,
+    );
+    expect(
+      PlanLibraryManagement.isBulkArchiveBlocked(
+        normal,
+        activePlanId: 'ok',
+      ),
+      isTrue,
+    );
+  });
+
+  test('isSelectableForBulkAction — archive vs unarchive vs restore 분리', () {
+    final archived = _plan(
+      id: 'arch',
+      libraryState: PlanLibraryState.archived,
+      topic: '보관됨',
+    );
+    final trashed = _plan(
+      id: 'trash',
+      libraryState: PlanLibraryState.trashed,
+      topic: '휴지',
+    );
+    final ops = _plan(
+      id: 'ops',
+      instructionId: 'wi_plan_1785905165067',
+      instruction: _wi(id: 'wi_plan_1785905165067'),
+    );
+    final normal = _plan(id: 'ok', topic: '일반');
+
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        archived,
+        PlanLibraryBulkAction.archive,
+      ),
+      isFalse,
+    );
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        archived,
+        PlanLibraryBulkAction.unarchive,
+      ),
+      isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        ops.copyWith(libraryState: PlanLibraryState.archived),
+        PlanLibraryBulkAction.unarchive,
+      ),
+      isTrue,
+    );
+
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        trashed,
+        PlanLibraryBulkAction.archive,
+      ),
+      isFalse,
+    );
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        trashed,
+        PlanLibraryBulkAction.restore,
+      ),
+      isTrue,
+    );
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        trashed,
+        PlanLibraryBulkAction.permanentDelete,
+      ),
+      isTrue,
+    );
+
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        ops,
+        PlanLibraryBulkAction.archive,
+      ),
+      isFalse,
+    );
+    expect(
+      PlanLibraryManagement.isSelectableForBulkAction(
+        normal,
+        PlanLibraryBulkAction.archive,
+      ),
+      isTrue,
+    );
+
+    expect(
+      PlanLibraryManagement.primarySelectionActionForFilter('archived'),
+      PlanLibraryBulkAction.unarchive,
+    );
+    expect(
+      PlanLibraryManagement.primarySelectionActionForFilter('trashed'),
+      PlanLibraryBulkAction.restore,
+    );
+    expect(
+      PlanLibraryManagement.primarySelectionActionForFilter('all'),
+      PlanLibraryBulkAction.archive,
+    );
+  });
+
+  test('일반 기획 여러 건 일괄 보관 후 cloud OCC·reload 유지', () async {
+    SharedPreferences.setMockInitialValues({});
+    final memory = <String, Map<String, dynamic>>{};
+    final mirror = BusinessPlanMirrorService(
+      memory: memory,
+      ownerUidResolver: () => 'owner_test',
+    );
+    final store = BusinessPlanningStore(mirror: mirror);
+
+    final a = _plan(id: 'bulk_a', topic: '정리A');
+    final b = _plan(id: 'bulk_b', topic: '정리B');
+    final ops = _plan(
+      id: 'bulk_ops',
+      instructionId: 'wi_plan_1785905165067',
+      instruction: _wi(id: 'wi_plan_1785905165067'),
+    );
+
+    for (final p in [a, b, ops]) {
+      final r = await mirror.upsertPlan(p, ownerUid: 'owner_test');
+      expect(r.succeeded, isTrue);
+    }
+
+    final selected = [a, b, ops];
+    final toArchive = selected
+        .where(
+          (p) => !PlanLibraryManagement.isBulkArchiveBlocked(
+            p,
+            activePlanId: null,
+          ),
+        )
+        .map(
+          (p) => PlanLibraryManagement.archive(
+            p,
+            updatedAt: '2026-08-14T01:00:00.000Z',
+          ),
+        )
+        .toList();
+    expect(toArchive.map((p) => p.id).toSet(), {'bulk_a', 'bulk_b'});
+
+    for (final archived in toArchive) {
+      await store.savePlans([
+        ...(await store.loadPlans(runCleanup: false))
+            .where((p) => p.id != archived.id),
+        archived,
+      ]);
+      final archResult = await mirror.enqueueUpsert(
+        archived,
+        ownerUid: 'owner_test',
+      );
+      expect(archResult.succeeded, isTrue);
+    }
+
+    final archA = mirror.debugMemoryDoc('owner_test', 'bulk_a');
+    final archB = mirror.debugMemoryDoc('owner_test', 'bulk_b');
+    final opsDoc = mirror.debugMemoryDoc('owner_test', 'bulk_ops');
+    expect(
+      (archA!['plan'] as Map)['libraryState'],
+      PlanLibraryState.archived,
+    );
+    expect(
+      (archB!['plan'] as Map)['libraryState'],
+      PlanLibraryState.archived,
+    );
+    expect(
+      (opsDoc!['plan'] as Map)['libraryState'],
+      PlanLibraryState.active,
+    );
+
+    final reloaded = await store.loadPlans(runCleanup: false);
+    expect(
+      reloaded.firstWhere((p) => p.id == 'bulk_a').isLibraryArchived,
+      isTrue,
+    );
+    expect(
+      reloaded.firstWhere((p) => p.id == 'bulk_b').isLibraryArchived,
+      isTrue,
+    );
+    expect(
+      reloaded.firstWhere((p) => p.id == 'bulk_ops').isLibraryArchived,
+      isFalse,
+    );
   });
 }

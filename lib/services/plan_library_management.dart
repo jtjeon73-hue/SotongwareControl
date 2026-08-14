@@ -1,6 +1,19 @@
 import '../models/business_planning.dart';
 import 'plan_user_facing_status.dart';
 
+/// 기획 라이브러리 일괄 작업 종류.
+enum PlanLibraryBulkAction {
+  favorite,
+  unfavorite,
+  archive,
+  unarchive,
+  trash,
+  restore,
+  protect,
+  unprotect,
+  permanentDelete,
+}
+
 /// 중복 후보 그룹 (자동 삭제 없음 — UI에서 사용자 승인 필요).
 class PlanDuplicateGroup {
   const PlanDuplicateGroup({
@@ -49,7 +62,7 @@ class PlanLibraryManagement {
     return '${t.substring(0, 8)}…';
   }
 
-  /// 기본 「전체」 목록 — 현재 운영 가능한 기획만 (보관·정리대상·휴지통 제외).
+  /// 기본 「현재」 목록 — 현재 운영 가능한 기획만 (보관·정리대상·휴지통 제외).
   static bool isOperationalListEntry(BusinessPlanDocument plan) {
     if (plan.isLibraryTrashed) return false;
     if (plan.isLibraryArchived) return false;
@@ -60,6 +73,85 @@ class PlanLibraryManagement {
       return false;
     }
     return true;
+  }
+
+  /// 카드/목록 표시 제목. WI businessIdea가 있으면 우선 (데이터 덮어쓰기 없음).
+  static String displayTitle(BusinessPlanDocument plan) {
+    final fromWi = plan.instruction?.businessIdea.trim() ?? '';
+    if (fromWi.isNotEmpty) return fromWi;
+    final topic = plan.input.topic.trim();
+    return topic.isEmpty ? '(주제 미입력)' : topic;
+  }
+
+  /// 일괄 보관에서 제외해야 하는 보호·운영 기획.
+  static bool isBulkArchiveBlocked(
+    BusinessPlanDocument plan, {
+    String? activePlanId,
+  }) {
+    if (plan.isLibraryArchived) return true;
+    if (plan.isLibraryTrashed) return true;
+    final active = (activePlanId ?? '').trim();
+    if (active.isNotEmpty && plan.id == active) return true;
+    return PlanUserFacingStatus.isOperationallyProtected(plan);
+  }
+
+  static String bulkArchiveBlockReason(
+    BusinessPlanDocument plan, {
+    String? activePlanId,
+  }) {
+    if (PlanUserFacingStatus.isProtectedInstruction(plan.stableInstructionId)) {
+      return '운영 작업지시 보호';
+    }
+    if (plan.isProtected) return '보호됨';
+    final active = (activePlanId ?? '').trim();
+    if (active.isNotEmpty && plan.id == active) return '현재 Active';
+    final facing = PlanUserFacingStatus.label(plan);
+    if (facing == PlanUserFacingStatus.working) return '작업중';
+    if (facing == PlanUserFacingStatus.awaitingApproval) return '승인대기';
+    if (facing == PlanUserFacingStatus.delivered) return '전달완료';
+    return '운영 보호';
+  }
+
+  /// 현재 관리 필터에서 체크박스·전체 선택에 쓰는 primary bulk action.
+  static PlanLibraryBulkAction primarySelectionActionForFilter(
+    String folderFilter,
+  ) {
+    switch (folderFilter) {
+      case 'archived':
+        return PlanLibraryBulkAction.unarchive;
+      case 'trashed':
+        return PlanLibraryBulkAction.restore;
+      default:
+        return PlanLibraryBulkAction.archive;
+    }
+  }
+
+  /// bulk action + plan 상태 기준 선택 가능 여부 (체크박스 enable/disable).
+  static bool isSelectableForBulkAction(
+    BusinessPlanDocument plan,
+    PlanLibraryBulkAction action, {
+    String? activePlanId,
+  }) {
+    switch (action) {
+      case PlanLibraryBulkAction.archive:
+        return !isBulkArchiveBlocked(plan, activePlanId: activePlanId);
+      case PlanLibraryBulkAction.unarchive:
+        if (plan.isLibraryTrashed) return false;
+        return plan.isLibraryArchived ||
+            PlanningStatus.normalize(plan.status) == PlanningStatus.archived;
+      case PlanLibraryBulkAction.restore:
+      case PlanLibraryBulkAction.permanentDelete:
+        return plan.isLibraryTrashed;
+      case PlanLibraryBulkAction.trash:
+        return canMoveToTrash(plan) &&
+            !plan.isLibraryTrashed &&
+            !plan.isLibraryArchived;
+      case PlanLibraryBulkAction.favorite:
+      case PlanLibraryBulkAction.unfavorite:
+      case PlanLibraryBulkAction.protect:
+      case PlanLibraryBulkAction.unprotect:
+        return !plan.isLibraryTrashed;
+    }
   }
 
   /// 자동 정리용 태그만 제거 (사용자 의미 태그는 유지).
