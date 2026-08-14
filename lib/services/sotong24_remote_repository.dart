@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
+import 'business_planning_service.dart';
 import 'firebase_ready.dart';
 
 /// Firestore: sotong24work_projects/{projectId}
@@ -288,15 +289,44 @@ class Sotong24RemoteRepository {
     required String projectId,
     required String instructionId,
     String message = '',
+    String stageId = '',
   }) async {
     final pid = projectId.trim();
     if (pid.isEmpty) return 'projectId가 필요합니다.';
     final now = DateTime.now().toUtc().toIso8601String();
     final requestId = 'cancel_${instructionId.trim()}_${now.hashCode.abs()}';
+
+    var resolvedStageId = stageId.trim();
+    if (resolvedStageId.isEmpty) {
+      Sotong24RemoteProject? project;
+      if (usesMemory) {
+        for (final p in _memory) {
+          if (p.projectId == pid) {
+            project = p;
+            break;
+          }
+        }
+      } else if (_projects != null) {
+        try {
+          final snap = await _projects!.doc(pid).get();
+          if (snap.exists) {
+            project = Sotong24RemoteProject.fromMap(
+              snap.data() ?? {},
+              id: snap.id,
+            );
+          }
+        } catch (_) {}
+      }
+      resolvedStageId =
+          project?.currentStageDoc?.stageId ??
+          _stageIdForNumber(project?.currentStage ?? 0) ??
+          'maintain';
+    }
+
     final request = Sotong24RemoteRequest(
       requestId: requestId,
       projectId: pid,
-      stageId: '',
+      stageId: resolvedStageId,
       requestType: 'cancel',
       status: ApprovalStatus.pending,
       message: message.trim().isEmpty ? '사용자 취소 요청' : message.trim(),
@@ -326,6 +356,13 @@ class Sotong24RemoteRepository {
 
   void dispose() {
     _memoryController.close();
+  }
+
+  String? _stageIdForNumber(int stageNumber) {
+    if (stageNumber <= 0) return null;
+    final titles = BusinessPlanningService.standardWorkflowTitles;
+    if (stageNumber > titles.length) return null;
+    return titles[stageNumber - 1].$1;
   }
 }
 

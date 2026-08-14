@@ -21,7 +21,7 @@ const MAX_STR = {
 };
 
 /** Flutter Sotong24RemoteRequest.requestType */
-const REQUEST_TYPES = new Set(["approve", "revision_request"]);
+const REQUEST_TYPES = new Set(["approve", "revision_request", "cancel"]);
 
 /**
  * PC가 처리할 수 있는 request.status.
@@ -391,17 +391,29 @@ function pickRequestAllowlist(raw, { docId, expectedProjectId, currentStageId })
   }
 
   const stageId = String(raw.stageId ?? "").trim();
-  if (!stageId || stageId !== currentStageId) return null;
-  if (
-    stageId.includes("/") ||
-    stageId.includes("..") ||
-    !ID_RE.test(stageId)
-  ) {
-    return null;
-  }
-
   const requestType = String(raw.requestType ?? "").trim();
   if (!REQUEST_TYPES.has(requestType)) return null;
+
+  if (requestType === "cancel") {
+    if (
+      stageId &&
+      (stageId.includes("/") ||
+        stageId.includes("..") ||
+        !ID_RE.test(stageId) ||
+        stageId !== currentStageId)
+    ) {
+      return null;
+    }
+  } else {
+    if (!stageId || stageId !== currentStageId) return null;
+    if (
+      stageId.includes("/") ||
+      stageId.includes("..") ||
+      !ID_RE.test(stageId)
+    ) {
+      return null;
+    }
+  }
 
   const status = String(raw.status ?? "").trim();
   if (!REQUEST_ACTIONABLE_STATUS.has(status)) return null;
@@ -420,7 +432,7 @@ function pickRequestAllowlist(raw, { docId, expectedProjectId, currentStageId })
   return {
     requestId,
     projectId,
-    stageId,
+    stageId: requestType === "cancel" && !stageId ? currentStageId : stageId,
     requestType,
     status,
     message,
