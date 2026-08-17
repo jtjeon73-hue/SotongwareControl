@@ -10,6 +10,18 @@ import '../services/auth_service.dart';
 import '../services/remote_agent_repository.dart';
 import '../services/remote_control_api.dart';
 import '../services/remote_work_instruction_source.dart';
+import '../models/remote_e2e_sample.dart';
+import '../models/sotong24_remote_models.dart';
+import '../services/remote_e2e_sample_service.dart';
+import '../services/remote_cursor_autostart_test_service.dart';
+import '../services/remote_codex_unattended_test_service.dart';
+import '../services/sotong24_remote_repository.dart';
+import '../widgets/remote_e2e_sample_panel.dart';
+import '../widgets/remote_cursor_autostart_panel.dart';
+import '../widgets/remote_codex_unattended_panel.dart';
+import '../widgets/remote_ops_dashboard.dart';
+import '../widgets/operational_collapsible_section.dart';
+import '../widgets/sidebar_navigation.dart';
 import '../theme/control_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -21,12 +33,22 @@ class RemoteControlScreen extends StatefulWidget {
     this.api,
     this.instructionSource,
     this.auth,
+    this.e2eService,
+    this.cursorAutostartService,
+    this.codexUnattendedService,
+    this.workshopRepository,
+    this.onNavigate,
   });
 
   final RemoteAgentRepository? repository;
   final RemoteControlApi? api;
   final RemoteWorkInstructionSource? instructionSource;
   final AuthClient? auth;
+  final RemoteE2eSampleService? e2eService;
+  final RemoteCursorAutostartTestService? cursorAutostartService;
+  final RemoteCodexUnattendedTestService? codexUnattendedService;
+  final Sotong24RemoteRepository? workshopRepository;
+  final ValueChanged<ControlDestination>? onNavigate;
 
   @override
   State<RemoteControlScreen> createState() => _RemoteControlScreenState();
@@ -38,9 +60,77 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   late final RemoteControlApi _api = widget.api ?? RemoteControlApi();
   late final RemoteWorkInstructionSource _instructions =
       widget.instructionSource ?? RemoteWorkInstructionSource();
+  late final RemoteE2eSampleService _e2e =
+      widget.e2eService ?? RemoteE2eSampleService();
+  late final RemoteCursorAutostartTestService _cursor =
+      widget.cursorAutostartService ?? RemoteCursorAutostartTestService();
+  late final RemoteCodexUnattendedTestService _codex =
+      widget.codexUnattendedService ?? RemoteCodexUnattendedTestService();
+  late final Sotong24RemoteRepository _workshop =
+      widget.workshopRepository ?? Sotong24RemoteRepository();
+  var _ownsWorkshop = false;
 
   String _jobFilter = 'all';
   bool _sending = false;
+  bool _e2eBusy = false;
+  bool _cursorBusy = false;
+  bool _codexBusy = false;
+  RemoteE2eSampleSession _e2eSession = const RemoteE2eSampleSession();
+  RemoteE2eSampleSession _cursorSession = const RemoteE2eSampleSession();
+  RemoteE2eSampleSession _codexSession = const RemoteE2eSampleSession();
+  var _dashboardRefreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ownsWorkshop = widget.workshopRepository == null;
+    _refreshE2eSession();
+    _refreshCursorSession();
+    _refreshCodexSession();
+  }
+
+  @override
+  void dispose() {
+    if (_ownsWorkshop) _workshop.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refreshE2eSession() async {
+    final loaded = await _e2e.loadSession();
+    if (mounted) setState(() => _e2eSession = loaded);
+  }
+
+  Future<void> _refreshCursorSession() async {
+    final loaded = await _cursor.loadSession();
+    if (mounted) setState(() => _cursorSession = loaded);
+  }
+
+  Future<void> _refreshCodexSession() async {
+    final loaded = await _codex.loadSession();
+    if (mounted) setState(() => _codexSession = loaded);
+  }
+
+  Future<void> _refreshDashboard() async {
+    setState(() => _dashboardRefreshing = true);
+    await Future.wait([
+      _refreshE2eSession(),
+      _refreshCursorSession(),
+      _refreshCodexSession(),
+    ]);
+    if (mounted) setState(() => _dashboardRefreshing = false);
+  }
+
+  Sotong24RemoteProject? _matchWorkshop(
+    List<Sotong24RemoteProject> workshops,
+    String instructionId,
+  ) {
+    final iid = instructionId.trim();
+    if (iid.isEmpty) return null;
+    for (final p in workshops) {
+      if (p.projectId == iid) return p;
+    }
+    return null;
+  }
 
   String? get _uid {
     final fromAuth = widget.auth?.currentUser?.uid;
@@ -63,95 +153,208 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
           stream: _repo.watchJobs(ownerUid: uid),
           builder: (context, jobSnap) {
             final jobs = jobSnap.data ?? const <RemoteJobDoc>[];
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final narrow = constraints.maxWidth < 900;
-                return ListView(
-                  padding: EdgeInsets.fromLTRB(
-                    narrow ? 16 : 24,
-                    16,
-                    narrow ? 16 : 24,
-                    32,
-                  ),
-                  children: [
-                    Text(
-                      '소통24워크 원격관제',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '노트북 Agent를 연결하고 기존 작업지시를 원격 전송합니다.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: ControlColors.textSecondary,
+            return StreamBuilder<List<Sotong24RemoteProject>>(
+              stream: _workshop.watchProjects(),
+              builder: (context, workshopSnap) {
+                final workshops =
+                    workshopSnap.data ?? const <Sotong24RemoteProject>[];
+                final matched = _matchWorkshop(
+                  workshops,
+                  _e2eSession.instructionId,
+                );
+                final codexMatched = _matchWorkshop(
+                  workshops,
+                  _codexSession.instructionId,
+                );
+                final e2eView = _e2e.buildView(
+                  session: _e2eSession,
+                  agents: agents,
+                  jobs: jobs,
+                  workshopStatus: matched?.status,
+                  workshopProgressPercent: matched?.overallProgressPercent,
+                  workshopCurrentStage: matched?.currentStage,
+                  workshopTotalStages: matched?.totalStages,
+                );
+                final cursorView = _cursor.buildView(
+                  session: _cursorSession,
+                  agents: agents,
+                  jobs: jobs,
+                );
+                final codexView = _codex.buildView(
+                  session: _codexSession,
+                  agents: agents,
+                  jobs: jobs,
+                  workshopStatus: codexMatched?.status,
+                  workshopProgressPercent: codexMatched?.overallProgressPercent,
+                  workshopCurrentStage: codexMatched?.currentStage,
+                  workshopTotalStages: codexMatched?.totalStages,
+                );
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final narrow = constraints.maxWidth < 900;
+                    return ListView(
+                      padding: EdgeInsets.fromLTRB(
+                        narrow ? 16 : 24,
+                        16,
+                        narrow ? 16 : 24,
+                        32,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _SummaryRow(agents: agents, jobs: jobs),
-                    const SizedBox(height: 20),
-                    if (agents.isEmpty)
-                      _EmptyAgentsCard(onPair: () => _openPairing(context))
-                    else ...[
-                      Row(
-                        children: [
-                          Text(
-                            '연결된 노트북',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
+                      children: [
+                        Text(
+                          '노트북 원격관제',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '노트북·Agent·AI 작업자의 운영 상태를 확인합니다. '
+                          '작업지시 최초 전송은 작업지시 제작소에서 진행하세요.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: ControlColors.textSecondary),
+                        ),
+                        const SizedBox(height: 16),
+                        RemoteOpsDashboard(
+                          agents: agents,
+                          workshops: workshops,
+                          refreshing: _dashboardRefreshing,
+                          onRefresh: _refreshDashboard,
+                        ),
+                        const SizedBox(height: 16),
+                        if (agents.isEmpty)
+                          _EmptyAgentsCard(onPair: () => _openPairing(context))
+                        else
+                          OperationalCollapsibleSection(
+                            title: 'Agent 상태 자세히',
+                            subtitle: '연결·전송·상세 정보',
+                            sectionKey: const Key('remote_agent_details'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () => _openPairing(context),
+                                    icon: const Icon(Icons.add_link, size: 18),
+                                    label: const Text('새 연결'),
+                                  ),
+                                ),
+                                for (final a in agents)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _AgentCard(
+                                      agent: a,
+                                      busy: _sending,
+                                      onSend: () => _startSendFlow(context, a),
+                                      onDetail: () =>
+                                          _openAgentDetail(context, a),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                          const Spacer(),
-                          TextButton.icon(
-                            onPressed: () => _openPairing(context),
-                            icon: const Icon(Icons.add_link, size: 18),
-                            label: const Text('새 연결'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ...agents.map(
-                        (a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _AgentCard(
-                            agent: a,
-                            busy: _sending,
-                            onSend: () => _startSendFlow(context, a),
-                            onDetail: () => _openAgentDetail(context, a),
+                        const SizedBox(height: 12),
+                        OperationalCollapsibleSection(
+                          title: '작업 내역 자세히',
+                          subtitle: '원격 Job 목록·필터',
+                          sectionKey: const Key('remote_job_history'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _JobFilterChips(
+                                value: _jobFilter,
+                                onChanged: (v) =>
+                                    setState(() => _jobFilter = v),
+                              ),
+                              const SizedBox(height: 8),
+                              ..._filteredJobs(jobs).map(
+                                (j) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _JobCard(
+                                    job: j,
+                                    agentName: _agentName(
+                                      agents,
+                                      j.assignedAgentId,
+                                    ),
+                                    onOpen: () => _openJobDetail(context, j),
+                                  ),
+                                ),
+                              ),
+                              if (_filteredJobs(jobs).isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  child: Text(
+                                    '표시할 작업이 없습니다.',
+                                    style: TextStyle(
+                                      color: ControlColors.textMuted,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Text(
-                      '원격 작업',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _JobFilterChips(
-                      value: _jobFilter,
-                      onChanged: (v) => setState(() => _jobFilter = v),
-                    ),
-                    const SizedBox(height: 8),
-                    ..._filteredJobs(jobs).map(
-                      (j) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _JobCard(
-                          job: j,
-                          agentName: _agentName(agents, j.assignedAgentId),
-                          onOpen: () => _openJobDetail(context, j),
+                        const SizedBox(height: 12),
+                        OperationalCollapsibleSection(
+                          title: '개발/진단 도구',
+                          subtitle: 'E2E·Cursor·Codex TEST — 운영 중에는 접어 두세요',
+                          sectionKey: const Key('remote_dev_tools'),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              RemoteE2eSamplePanel(
+                                view: e2eView,
+                                busy: _e2eBusy,
+                                onCreateSample: _e2eCreateSample,
+                                onViewContent: () => showRemoteE2eJsonDialog(
+                                  context,
+                                  _e2eSession.jsonText,
+                                ),
+                                onSendToAgent: () => _e2eSend(e2eView),
+                                onViewStatus: () => _e2eViewStatus(e2eView),
+                                onReset: _e2eReset,
+                                onOpenProductWorkshop: widget.onNavigate == null
+                                    ? null
+                                    : () => widget.onNavigate!(
+                                        ControlDestination.productWorkshop,
+                                      ),
+                              ),
+                              const SizedBox(height: 16),
+                              RemoteCursorAutostartPanel(
+                                view: cursorView,
+                                busy: _cursorBusy,
+                                onCreate: _cursorCreate,
+                                onViewContent: () => showRemoteE2eJsonDialog(
+                                  context,
+                                  _cursorSession.jsonText,
+                                ),
+                                onSendToAgent: () => _cursorSend(cursorView),
+                                onReset: _cursorReset,
+                              ),
+                              const SizedBox(height: 16),
+                              RemoteCodexUnattendedPanel(
+                                view: codexView,
+                                busy: _codexBusy,
+                                onCreate: _codexCreate,
+                                onViewContent: () => showRemoteE2eJsonDialog(
+                                  context,
+                                  _codexSession.jsonText,
+                                ),
+                                onSendToAgent: () => _codexSend(codexView),
+                                onViewStatus: () => _codexViewStatus(codexView),
+                                onReset: _codexReset,
+                                onOpenProductWorkshop: widget.onNavigate == null
+                                    ? null
+                                    : () => widget.onNavigate!(
+                                        ControlDestination.productWorkshop,
+                                      ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                    if (_filteredJobs(jobs).isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Text(
-                          '표시할 작업이 없습니다.',
-                          style: TextStyle(color: ControlColors.textMuted),
-                        ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
                 );
               },
             );
@@ -263,7 +466,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('소통24워크로 전송'),
+            child: const Text('소통24워크 Agent로 전송'),
           ),
         ],
       ),
@@ -302,68 +505,311 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   void _toast(BuildContext context, String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
-}
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({required this.agents, required this.jobs});
-
-  final List<RemoteAgentDoc> agents;
-  final List<RemoteJobDoc> jobs;
-
-  @override
-  Widget build(BuildContext context) {
-    final online = agents.where((a) => a.isOnline()).length;
-    final running = jobs
-        .where((j) => j.status == 'running' || j.status == 'claimed')
-        .length;
-    final waiting = jobs
-        .where(
-          (j) =>
-              j.status == 'waiting_approval' ||
-              j.status == 'revision_requested',
-        )
-        .length;
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        _StatChip(label: '연결', value: '${agents.length}'),
-        _StatChip(label: '온라인', value: '$online'),
-        _StatChip(label: '실행 중', value: '$running'),
-        _StatChip(label: '승인 대기', value: '$waiting'),
-      ],
-    );
+  Future<void> _e2eCreateSample() async {
+    setState(() => _e2eBusy = true);
+    try {
+      final session = await _e2e.createSample(ownerUid: _uid);
+      if (!mounted) return;
+      setState(() => _e2eSession = session);
+      _toast(context, '샘플 작업지시서를 생성했습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '생성 실패: $e');
+    } finally {
+      if (mounted) setState(() => _e2eBusy = false);
+    }
   }
-}
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: ControlColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ControlColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+  Future<void> _e2eReset() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('테스트 초기화'),
+        content: const Text(
+          '새 instructionId로 샘플을 다시 만듭니다.\n'
+          '기존 전송·Job 기록은 삭제하지 않습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
           ),
-          Text(
-            label,
-            style: TextStyle(color: ControlColors.textMuted, fontSize: 12),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('초기화'),
           ),
         ],
       ),
     );
+    if (ok != true || !mounted) return;
+    setState(() => _e2eBusy = true);
+    try {
+      final session = await _e2e.resetSample(ownerUid: _uid);
+      if (!mounted) return;
+      setState(() => _e2eSession = session);
+      _toast(context, '새 테스트 샘플이 준비되었습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '초기화 실패: $e');
+    } finally {
+      if (mounted) setState(() => _e2eBusy = false);
+    }
+  }
+
+  Future<void> _e2eViewStatus(RemoteE2eSampleView fallback) async {
+    RemoteE2eSampleView view = fallback;
+    try {
+      final results = await Future.wait([
+        _repo.watchAgents(ownerUid: _uid).first,
+        _repo.watchJobs(ownerUid: _uid).first,
+        _workshop.watchProjects().first,
+      ]);
+      final agents = results[0] as List<RemoteAgentDoc>;
+      final jobs = results[1] as List<RemoteJobDoc>;
+      final workshops = results[2] as List<Sotong24RemoteProject>;
+      Sotong24RemoteProject? matched;
+      final iid = _e2eSession.instructionId.trim();
+      if (iid.isNotEmpty) {
+        for (final p in workshops) {
+          if (p.projectId == iid) {
+            matched = p;
+            break;
+          }
+        }
+      }
+      view = _e2e.buildView(
+        session: _e2eSession,
+        agents: agents,
+        jobs: jobs,
+        workshopStatus: matched?.status,
+        workshopProgressPercent: matched?.overallProgressPercent,
+        workshopCurrentStage: matched?.currentStage,
+        workshopTotalStages: matched?.totalStages,
+      );
+    } catch (_) {
+      view = fallback;
+    }
+    if (!mounted) return;
+    await showRemoteE2eStatusSheet(context, view);
+  }
+
+  Future<void> _e2eSend(RemoteE2eSampleView view) async {
+    final agent = view.targetAgent;
+    if (agent == null) {
+      _toast(
+        context,
+        view.sendBlockedReason.isNotEmpty
+            ? view.sendBlockedReason
+            : 'Online Agent가 없습니다.',
+      );
+      return;
+    }
+    setState(() => _e2eBusy = true);
+    try {
+      final jobs = await _repo.watchJobs(ownerUid: _uid).first;
+      final updated = await _e2e.sendToAgent(
+        session: _e2eSession,
+        agent: agent,
+        api: _api,
+        jobs: jobs,
+        ownerUid: _uid,
+      );
+      if (!mounted) return;
+      setState(() => _e2eSession = updated);
+      _toast(context, '전송 완료 · ${agent.deviceName} · Job ${updated.sentJobId}');
+    } on RemoteControlApiException catch (e) {
+      if (!mounted) return;
+      _toast(context, e.userMessage);
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '전송 실패: $e');
+    } finally {
+      if (mounted) setState(() => _e2eBusy = false);
+    }
+  }
+
+  Future<void> _cursorCreate() async {
+    setState(() => _cursorBusy = true);
+    try {
+      final session = await _cursor.createSample(ownerUid: _uid);
+      if (!mounted) return;
+      setState(() => _cursorSession = session);
+      _toast(context, 'Cursor 자동실행 TEST 생성 · ${session.instructionId}');
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '생성 실패: $e');
+    } finally {
+      if (mounted) setState(() => _cursorBusy = false);
+    }
+  }
+
+  Future<void> _cursorReset() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cursor TEST 초기화'),
+        content: const Text(
+          '새 instructionId로 Cursor 자동실행 TEST를 다시 만듭니다.\n'
+          '기존 E2E 샘플·Job은 변경하지 않습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('초기화'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _cursorBusy = true);
+    try {
+      final session = await _cursor.resetSample(ownerUid: _uid);
+      if (!mounted) return;
+      setState(() => _cursorSession = session);
+      _toast(context, '새 Cursor TEST가 준비되었습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '초기화 실패: $e');
+    } finally {
+      if (mounted) setState(() => _cursorBusy = false);
+    }
+  }
+
+  Future<void> _cursorSend(RemoteE2eSampleView view) async {
+    final agent = view.targetAgent;
+    if (agent == null) {
+      _toast(
+        context,
+        view.sendBlockedReason.isNotEmpty
+            ? view.sendBlockedReason
+            : 'Online Agent가 없습니다.',
+      );
+      return;
+    }
+    setState(() => _cursorBusy = true);
+    try {
+      final jobs = await _repo.watchJobs(ownerUid: _uid).first;
+      final updated = await _cursor.sendToAgent(
+        session: _cursorSession,
+        agent: agent,
+        api: _api,
+        jobs: jobs,
+        ownerUid: _uid,
+      );
+      if (!mounted) return;
+      setState(() => _cursorSession = updated);
+      _toast(
+        context,
+        'Cursor TEST 전송 완료 · ${agent.deviceName} · Job ${updated.sentJobId}',
+      );
+    } on RemoteControlApiException catch (e) {
+      if (!mounted) return;
+      _toast(context, e.userMessage);
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '전송 실패: $e');
+    } finally {
+      if (mounted) setState(() => _cursorBusy = false);
+    }
+  }
+
+  Future<void> _codexCreate() async {
+    setState(() => _codexBusy = true);
+    try {
+      final session = await _codex.createSample(ownerUid: _uid);
+      if (!mounted) return;
+      setState(() => _codexSession = session);
+      _toast(context, 'Codex 무인작업 TEST 생성 · ${session.instructionId}');
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '생성 실패: $e');
+    } finally {
+      if (mounted) setState(() => _codexBusy = false);
+    }
+  }
+
+  Future<void> _codexReset() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Codex TEST 초기화'),
+        content: const Text(
+          '새 instructionId로 Codex 무인작업 TEST를 다시 만듭니다.\n'
+          '기존 E2E·Cursor 샘플·Job은 변경하지 않습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('초기화'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _codexBusy = true);
+    try {
+      final session = await _codex.resetSample(ownerUid: _uid);
+      if (!mounted) return;
+      setState(() => _codexSession = session);
+      _toast(context, '새 Codex TEST가 준비되었습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '초기화 실패: $e');
+    } finally {
+      if (mounted) setState(() => _codexBusy = false);
+    }
+  }
+
+  Future<void> _codexViewStatus(RemoteE2eSampleView view) async {
+    if (!mounted) return;
+    await showRemoteE2eStatusSheet(context, view);
+  }
+
+  Future<void> _codexSend(RemoteE2eSampleView view) async {
+    final agent = view.targetAgent;
+    if (agent == null) {
+      _toast(
+        context,
+        view.sendBlockedReason.isNotEmpty
+            ? view.sendBlockedReason
+            : 'Online Agent가 없습니다.',
+      );
+      return;
+    }
+    setState(() => _codexBusy = true);
+    try {
+      final jobs = await _repo.watchJobs(ownerUid: _uid).first;
+      final updated = await _codex.sendToAgent(
+        session: _codexSession,
+        agent: agent,
+        api: _api,
+        jobs: jobs,
+        ownerUid: _uid,
+      );
+      if (!mounted) return;
+      setState(() => _codexSession = updated);
+      _toast(
+        context,
+        'Codex TEST 전송 완료 · ${agent.deviceName} · Job ${updated.sentJobId}',
+      );
+    } on RemoteControlApiException catch (e) {
+      if (!mounted) return;
+      _toast(context, e.userMessage);
+    } catch (e) {
+      if (!mounted) return;
+      _toast(context, '전송 실패: $e');
+    } finally {
+      if (mounted) setState(() => _codexBusy = false);
+    }
   }
 }
 
@@ -385,7 +831,7 @@ class _EmptyAgentsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '연결된 소통24워크가 없습니다',
+            '연결된 노트북 Agent가 없습니다',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 8),
@@ -397,7 +843,7 @@ class _EmptyAgentsCard extends StatelessWidget {
           FilledButton.icon(
             onPressed: onPair,
             icon: const Icon(Icons.link),
-            label: const Text('소통24워크 연결하기'),
+            label: const Text('노트북 Agent 연결하기'),
           ),
         ],
       ),
@@ -438,7 +884,7 @@ class _AgentCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  agent.deviceName.isEmpty ? '소통24워크 노트북' : agent.deviceName,
+                  agent.deviceName.isEmpty ? '소통24워크 Agent' : agent.deviceName,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
@@ -654,7 +1100,7 @@ class _PairingSheetState extends State<_PairingSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '소통24워크 연결',
+            '노트북 Agent 연결',
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
@@ -690,7 +1136,7 @@ class _PairingSheetState extends State<_PairingSheet> {
                   : const Text('새 연결 코드 만들기'),
             ),
           ] else ...[
-            const Text('소통24워크 연결 코드'),
+            const Text('노트북 Agent 연결 코드'),
             const SizedBox(height: 8),
             SelectableText(
               p.pairingCode,

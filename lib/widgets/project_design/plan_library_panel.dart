@@ -75,7 +75,9 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
   }
 
   PlanLibraryBulkAction get _primarySelectionAction =>
-      PlanLibraryManagement.primarySelectionActionForFilter(widget.folderFilter);
+      PlanLibraryManagement.primarySelectionActionForFilter(
+        widget.folderFilter,
+      );
 
   PlanExecutionSnapshot _exec(BusinessPlanDocument plan) =>
       widget.executionIndex?.snapshotFor(plan) ??
@@ -122,7 +124,9 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         executionIndex: widget.executionIndex,
       );
     } else {
-      list = list.where((p) => PlanLibraryManagement.isOperationalListEntry(p)).toList();
+      list = list
+          .where((p) => PlanLibraryManagement.isOperationalListEntry(p))
+          .toList();
       list = list.where((p) {
         final folder = p.libraryFolder.isNotEmpty
             ? p.libraryFolder
@@ -137,19 +141,22 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     final q = widget.searchQuery.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list.where((p) {
-        final status = PlanUserFacingStatus.label(p, execution: _exec(p))
-            .toLowerCase();
+        final status = PlanUserFacingStatus.label(
+          p,
+          execution: _exec(p),
+        ).toLowerCase();
         final exec = _exec(p);
-        return PlanLibraryManagement.displayTitle(p, execution: exec)
-            .toLowerCase()
-            .contains(q) ||
+        return PlanLibraryManagement.displayTitle(
+              p,
+              execution: exec,
+            ).toLowerCase().contains(q) ||
             p.input.topic.toLowerCase().contains(q) ||
             p.input.targetCustomer.toLowerCase().contains(q) ||
             p.input.customerProblem.toLowerCase().contains(q) ||
             status.contains(q) ||
-            ArtifactType.labelKo(p.input.resolvedArtifactType)
-                .toLowerCase()
-                .contains(q) ||
+            ArtifactType.labelKo(
+              p.input.resolvedArtifactType,
+            ).toLowerCase().contains(q) ||
             p.tags.join(' ').toLowerCase().contains(q) ||
             p.stableInstructionId.toLowerCase().contains(q) ||
             exec.instructionProgressLine.toLowerCase().contains(q) ||
@@ -162,8 +169,9 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     list.sort((a, b) {
       switch (widget.sort) {
         case PlanLibrarySort.name:
-          return PlanLibraryManagement.displayTitle(a)
-              .compareTo(PlanLibraryManagement.displayTitle(b));
+          return PlanLibraryManagement.displayTitle(
+            a,
+          ).compareTo(PlanLibraryManagement.displayTitle(b));
         case PlanLibrarySort.updated:
           return b.updatedAt.compareTo(a.updatedAt);
         case PlanLibrarySort.status:
@@ -235,9 +243,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
     setState(() {
       _selectedIds
         ..clear()
-        ..addAll(
-          _filtered.where(_canSelect).map((p) => p.id),
-        );
+        ..addAll(_filtered.where(_canSelect).map((p) => p.id));
     });
   }
 
@@ -282,7 +288,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
               blocked.isEmpty
                   ? '선택한 기획을 보관할 수 없습니다.'
                   : '선택한 기획은 보호·운영 상태라 일괄 보관할 수 없습니다.\n'
-                      '(${blocked.map((p) => PlanLibraryManagement.bulkArchiveBlockReason(p, activePlanId: widget.activePlanId, execution: _exec(p))).toSet().join(', ')})',
+                        '(${blocked.map((p) => PlanLibraryManagement.bulkArchiveBlockReason(p, activePlanId: widget.activePlanId, execution: _exec(p))).toSet().join(', ')})',
             ),
             actions: [
               TextButton(
@@ -303,7 +309,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             blocked.isEmpty
                 ? '선택한 ${selected.length}개의 기획을 보관하시겠습니까?'
                 : '선택한 ${selected.length}개의 기획을 보관하시겠습니까?\n'
-                    '보호·운영 기획 ${blocked.length}건은 제외됩니다.',
+                      '보호·운영 기획 ${blocked.length}건은 제외됩니다.',
           ),
           actions: [
             TextButton(
@@ -471,7 +477,10 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
       ),
       Text(
         exec.productionProgressLine,
-        style: const TextStyle(fontSize: 12, color: ControlColors.textSecondary),
+        style: const TextStyle(
+          fontSize: 12,
+          color: ControlColors.textSecondary,
+        ),
       ),
       if (stepName.isNotEmpty && !exec.isPostTransfer)
         Text(
@@ -491,8 +500,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
         '최근 수정 ${_formatIso(exec.lastUpdated.isNotEmpty ? exec.lastUpdated : p.updatedAt)}',
         style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
       ),
-      if (exec.isPostTransfer && exec.agentOnline)
-        _metaChip('PC Agent 온라인'),
+      if (exec.isPostTransfer && exec.agentOnline) _metaChip('PC Agent 온라인'),
       if (p.isProtected || p.favorite)
         Wrap(
           spacing: 8,
@@ -547,7 +555,8 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
             for (final id in PlanUserFacingStatus.primaryFilters)
               ChoiceChip(
                 label: Text(PlanUserFacingStatus.primaryFilterLabel(id)),
-                selected: widget.folderFilter == id ||
+                selected:
+                    widget.folderFilter == id ||
                     (id == 'active' && widget.folderFilter == 'in_progress'),
                 onSelected: (_) {
                   widget.onFolderChanged(id);
@@ -1049,12 +1058,7 @@ class _PlanLibraryPanelState extends State<PlanLibraryPanel> {
                   ? (_) => widget.onOpenPlan(p)
                   : (_canSelect(p) ? (_) => _toggleSelect(p.id) : null),
               cells: [
-                DataCell(
-                  Text(
-                    _titleOf(p),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                DataCell(Text(_titleOf(p), overflow: TextOverflow.ellipsis)),
                 DataCell(
                   Text(ArtifactType.labelKo(p.input.resolvedArtifactType)),
                 ),

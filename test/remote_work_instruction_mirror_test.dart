@@ -153,8 +153,10 @@ void main() {
       }),
     );
     expect(
-      (await mirror.listActive(ownerUid: uid, artifactType: ArtifactType.ebook))
-          .length,
+      (await mirror.listActive(
+        ownerUid: uid,
+        artifactType: ArtifactType.ebook,
+      )).length,
       1,
     );
     await mirror.markArchived(
@@ -163,8 +165,10 @@ void main() {
       instructionId: 'wi_arch',
     );
     expect(
-      (await mirror.listActive(ownerUid: uid, artifactType: ArtifactType.ebook))
-          .length,
+      (await mirror.listActive(
+        ownerUid: uid,
+        artifactType: ArtifactType.ebook,
+      )).length,
       0,
     );
     await mirror.restoreActive(
@@ -173,8 +177,10 @@ void main() {
       instructionId: 'wi_arch',
     );
     expect(
-      (await mirror.listActive(ownerUid: uid, artifactType: ArtifactType.ebook))
-          .length,
+      (await mirror.listActive(
+        ownerUid: uid,
+        artifactType: ArtifactType.ebook,
+      )).length,
       1,
     );
   });

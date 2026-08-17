@@ -51,6 +51,8 @@ class RemoteAgentDoc {
       case 'running':
         return '작업 진행 중';
       case 'waiting_approval':
+      case 'awaiting_user_approval':
+      case 'pending_review':
         return '승인 대기';
       case 'revision_requested':
         return '보완 요청';
@@ -71,6 +73,8 @@ class RemoteAgentDoc {
       case 'error':
         return RemoteAgentUiKind.error;
       case 'waiting_approval':
+      case 'awaiting_user_approval':
+      case 'pending_review':
       case 'revision_requested':
         return RemoteAgentUiKind.waitingApproval;
       case 'running':
@@ -85,7 +89,7 @@ class RemoteAgentDoc {
     return RemoteAgentDoc(
       agentId: '${map['agentId'] ?? id ?? ''}',
       ownerUid: '${map['ownerUid'] ?? ''}',
-      deviceName: '${map['deviceName'] ?? '소통24워크'}',
+      deviceName: '${map['deviceName'] ?? '소통24워크 Agent'}',
       state: '${map['state'] ?? 'idle'}',
       enabled: map['enabled'] != false,
       appVersion: '${map['appVersion'] ?? ''}',
@@ -115,6 +119,7 @@ class RemoteJobDoc {
     this.updatedAt,
     this.startedAt,
     this.completedAt,
+    this.instructionId = '',
   });
 
   final String jobId;
@@ -123,6 +128,7 @@ class RemoteJobDoc {
   final String type;
   final String status;
   final String assignedAgentId;
+  final String instructionId;
   final String currentStage;
   final int totalStages;
   final int progress;
@@ -140,6 +146,8 @@ class RemoteJobDoc {
       case 'running':
         return '작업 중';
       case 'waiting_approval':
+      case 'awaiting_user_approval':
+      case 'pending_review':
         return '승인 대기';
       case 'revision_requested':
         return '보완 요청';
@@ -175,6 +183,38 @@ class RemoteJobDoc {
       updatedAt: _ts(map['updatedAt']),
       startedAt: _ts(map['startedAt']),
       completedAt: _ts(map['completedAt']),
+      instructionId: '${map['instructionId'] ?? ''}',
+    );
+  }
+}
+
+class RemoteCommandDoc {
+  const RemoteCommandDoc({
+    required this.commandId,
+    required this.jobId,
+    this.type = '',
+    this.status = '',
+    this.idempotencyKey = '',
+    this.agentId = '',
+  });
+
+  final String commandId;
+  final String jobId;
+  final String type;
+  final String status;
+  final String idempotencyKey;
+  final String agentId;
+
+  bool get isStartJob => type == 'START_JOB';
+
+  factory RemoteCommandDoc.fromMap(Map<String, dynamic> map, {String? id}) {
+    return RemoteCommandDoc(
+      commandId: '${map['commandId'] ?? id ?? ''}',
+      jobId: '${map['jobId'] ?? ''}',
+      type: '${map['type'] ?? ''}',
+      status: '${map['status'] ?? ''}',
+      idempotencyKey: '${map['idempotencyKey'] ?? ''}',
+      agentId: '${map['agentId'] ?? ''}',
     );
   }
 }

@@ -118,7 +118,7 @@ class Sotong24WorkScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           PageHero(
-                            title: '소통24워크',
+                            title: '소통24워크 Agent',
                             subtitle:
                                 'MFC 기반 자동화 개발 프로그램 — 앱·전자책·마케팅·유튜브·MFC 개발 및 유지관리. '
                                 '확인되지 않은 상태는 완료로 표시하지 않습니다.',
@@ -127,7 +127,7 @@ class Sotong24WorkScreen extends StatelessWidget {
                           const SizedBox(height: 16),
                           if (unit == null && modules.isEmpty)
                             const EmptyStatePanel(
-                              title: '소통24워크 데이터가 없습니다',
+                              title: '소통24워크 Agent 데이터가 없습니다',
                               message:
                                   '데이터 관리에서 기본 구조를 생성하면 5개 개발 영역 카드가 준비됩니다.',
                             )
@@ -210,7 +210,7 @@ class Sotong24WorkScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 20),
                             Text(
-                              '소통24워크 작업 내역',
+                              '소통24워크 Agent 작업 내역',
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             const SizedBox(height: 8),
@@ -238,7 +238,7 @@ class Sotong24WorkScreen extends StatelessWidget {
                                     ),
                                     SizedBox(height: 8),
                                     Text(
-                                      '소통24워크 → Firestore 자동 연동은 아직 구현되지 않았습니다. '
+                                      '소통24워크 Agent → Firestore 자동 연동은 아직 구현되지 않았습니다. '
                                       '연동 스키마는 docs/sotong24work_integration.md 를 참고하십시오.',
                                     ),
                                   ],

@@ -12,11 +12,7 @@ import 'instruction_content_checksum.dart';
 /// Remote-control mirror of DevWorkDoc Active WorkInstruction JSON.
 /// Local DevWorkDoc remains SSOT for PC; Firestore is a soft sync for mobile.
 class RemoteWorkInstructionMirrorService {
-  RemoteWorkInstructionMirrorService({
-    this._db,
-    this._auth,
-    this._memory,
-  });
+  RemoteWorkInstructionMirrorService({this._db, this._auth, this._memory});
 
   static const collection = 'workInstructions';
   static const statusActive = 'active';
@@ -85,9 +81,7 @@ class RemoteWorkInstructionMirrorService {
           : artifactType,
     );
     final iid = DevWorkDocPaths.sanitizeInstructionId(
-      instructionId.isEmpty
-          ? '${map['instructionId'] ?? ''}'
-          : instructionId,
+      instructionId.isEmpty ? '${map['instructionId'] ?? ''}' : instructionId,
     );
     if (iid.isEmpty || artifact == ArtifactType.undecided) return false;
 
@@ -104,11 +98,7 @@ class RemoteWorkInstructionMirrorService {
       stages = int.tryParse('${map['totalStages']}') ?? stages;
     }
 
-    final id = docId(
-      ownerUid: uid,
-      artifactType: artifact,
-      instructionId: iid,
-    );
+    final id = docId(ownerUid: uid, artifactType: artifact, instructionId: iid);
     final now = DateTime.now().toUtc();
     final checksum = stableContentChecksum(text);
 
@@ -122,16 +112,20 @@ class RemoteWorkInstructionMirrorService {
       'status': statusActive,
       'json': map,
       'checksum': checksum,
-      'updatedAt': usesMemory ? now.toIso8601String() : FieldValue.serverTimestamp(),
-      'executionSummary': _executionSummaryFromMap(map, planId: '${map['projectId'] ?? ''}'),
+      'updatedAt': usesMemory
+          ? now.toIso8601String()
+          : FieldValue.serverTimestamp(),
+      'executionSummary': _executionSummaryFromMap(
+        map,
+        planId: '${map['projectId'] ?? ''}',
+      ),
     };
 
     try {
       if (usesMemory) {
         final mem = _memory!;
         final existing = mem[id];
-        payload['createdAt'] =
-            existing?['createdAt'] ?? now.toIso8601String();
+        payload['createdAt'] = existing?['createdAt'] ?? now.toIso8601String();
         mem[id] = {...?existing, ...payload};
         return true;
       }
@@ -305,10 +299,17 @@ class RemoteWorkInstructionMirrorService {
     final approval = map['approval'];
     var approvalStatus = '';
     if (approval is Map) {
-      approvalStatus = '${approval['status'] ?? approval['stageDecision'] ?? ''}';
+      approvalStatus =
+          '${approval['status'] ?? approval['stageDecision'] ?? ''}';
     }
-    final titleDraft = '${map['titleDraft'] ?? map['title'] ?? map['businessIdea'] ?? ''}'.trim();
-    final currentStage = int.tryParse('${map['currentStageOrder'] ?? map['currentStage'] ?? 0}') ?? 0;
+    final titleDraft =
+        '${map['titleDraft'] ?? map['title'] ?? map['businessIdea'] ?? ''}'
+            .trim();
+    final currentStage =
+        int.tryParse(
+          '${map['currentStageOrder'] ?? map['currentStage'] ?? 0}',
+        ) ??
+        0;
     final stageId = '${map['currentStageId'] ?? ''}'.trim();
     return {
       'planId': planId.trim(),
@@ -318,7 +319,8 @@ class RemoteWorkInstructionMirrorService {
       'totalStages': int.tryParse('${map['totalStages'] ?? 18}') ?? 18,
       'workflowStarted': map['workflowStarted'] == true || currentStage > 0,
       'approvalStatus': approvalStatus,
-      'hasLocalProject': map['workFolder'] != null || map['projectPath'] != null,
+      'hasLocalProject':
+          map['workFolder'] != null || map['projectPath'] != null,
       'lastUpdated': DateTime.now().toUtc().toIso8601String(),
     };
   }

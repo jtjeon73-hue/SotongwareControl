@@ -268,9 +268,10 @@ void main() {
       ),
     ];
 
-    final allIds = PlanLibraryManagement.applyManageFilter(plans, 'all')
-        .map((p) => p.id)
-        .toList();
+    final allIds = PlanLibraryManagement.applyManageFilter(
+      plans,
+      'all',
+    ).map((p) => p.id).toList();
     expect(allIds, isNot(contains('trash')));
     expect(allIds, isNot(contains('arch')));
     expect(allIds, containsAll(['active1', 'prog', 'd1', 'd2']));
@@ -399,7 +400,9 @@ void main() {
     expect(unarchived.tags, contains('보류'));
     expect(unarchived.tags, contains('userNote'));
     expect(
-      PlanLibraryManagement.applyManageFilter([unarchived], 'all').map((p) => p.id),
+      PlanLibraryManagement.applyManageFilter([
+        unarchived,
+      ], 'all').map((p) => p.id),
       ['a1'],
     );
 
@@ -415,10 +418,7 @@ void main() {
     expect(restored.isLibraryTrashed, isFalse);
     expect(restored.tags, isNot(contains('cleanup')));
     expect(restored.tags, contains('favorite-ish'));
-    expect(
-      PlanLibraryManagement.isOperationalListEntry(restored),
-      isTrue,
-    );
+    expect(PlanLibraryManagement.isOperationalListEntry(restored), isTrue);
   });
 
   test('수동 보관/보관 해제는 upsertPlan cloud OCC(memory mirror)로 반영', () async {
@@ -593,17 +593,11 @@ void main() {
       isTrue,
     );
     expect(
-      PlanLibraryManagement.isBulkArchiveBlocked(
-        ops,
-        activePlanId: 'other',
-      ),
+      PlanLibraryManagement.isBulkArchiveBlocked(ops, activePlanId: 'other'),
       isFalse,
     );
     expect(
-      PlanLibraryManagement.isBulkArchiveBlocked(
-        protected,
-        activePlanId: null,
-      ),
+      PlanLibraryManagement.isBulkArchiveBlocked(protected, activePlanId: null),
       isTrue,
     );
     expect(
@@ -615,17 +609,11 @@ void main() {
       isTrue,
     );
     expect(
-      PlanLibraryManagement.isBulkArchiveBlocked(
-        waiting,
-        activePlanId: null,
-      ),
+      PlanLibraryManagement.isBulkArchiveBlocked(waiting, activePlanId: null),
       isFalse,
     );
     expect(
-      PlanLibraryManagement.isBulkArchiveBlocked(
-        delivered,
-        activePlanId: null,
-      ),
+      PlanLibraryManagement.isBulkArchiveBlocked(delivered, activePlanId: null),
       isFalse,
     );
     expect(
@@ -636,10 +624,7 @@ void main() {
       isFalse,
     );
     expect(
-      PlanLibraryManagement.isBulkArchiveBlocked(
-        normal,
-        activePlanId: 'ok',
-      ),
+      PlanLibraryManagement.isBulkArchiveBlocked(normal, activePlanId: 'ok'),
       isTrue,
     );
   });
@@ -821,8 +806,9 @@ void main() {
 
     for (final archived in toArchive) {
       await store.savePlans([
-        ...(await store.loadPlans(runCleanup: false))
-            .where((p) => p.id != archived.id),
+        ...(await store.loadPlans(
+          runCleanup: false,
+        )).where((p) => p.id != archived.id),
         archived,
       ]);
       final archResult = await mirror.enqueueUpsert(
@@ -835,18 +821,9 @@ void main() {
     final archA = mirror.debugMemoryDoc('owner_test', 'bulk_a');
     final archB = mirror.debugMemoryDoc('owner_test', 'bulk_b');
     final opsDoc = mirror.debugMemoryDoc('owner_test', 'bulk_ops');
-    expect(
-      (archA!['plan'] as Map)['libraryState'],
-      PlanLibraryState.archived,
-    );
-    expect(
-      (archB!['plan'] as Map)['libraryState'],
-      PlanLibraryState.archived,
-    );
-    expect(
-      (opsDoc!['plan'] as Map)['libraryState'],
-      PlanLibraryState.active,
-    );
+    expect((archA!['plan'] as Map)['libraryState'], PlanLibraryState.archived);
+    expect((archB!['plan'] as Map)['libraryState'], PlanLibraryState.archived);
+    expect((opsDoc!['plan'] as Map)['libraryState'], PlanLibraryState.active);
 
     final reloaded = await store.loadPlans(runCleanup: false);
     expect(

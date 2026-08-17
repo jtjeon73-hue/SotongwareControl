@@ -128,6 +128,7 @@ class PlanningStatus {
   static const readyToTransfer = 'ready_to_transfer';
   static const downloadedPendingImport = 'downloaded_pending_import';
   static const transferred = 'transferred';
+  static const transferFailed = 'transfer_failed';
   static const imported = 'imported';
   static const inProgress = 'in_progress';
   static const completed = 'completed';
@@ -160,6 +161,8 @@ class PlanningStatus {
         return downloadedPendingImport;
       case transferred:
         return transferred;
+      case transferFailed:
+        return transferFailed;
       case imported:
         return imported;
       case inProgress:
@@ -188,9 +191,11 @@ class PlanningStatus {
       case downloadedPendingImport:
         return 'JSON 다운로드 완료 · 수동 가져오기 대기';
       case transferred:
-        return '소통24워크 Inbox 전달 완료';
+        return '소통24워크 Agent 전달 완료';
+      case transferFailed:
+        return '전송 실패 · 다시 시도 필요';
       case imported:
-        return '소통24워크 가져오기 완료';
+        return '소통24워크 Agent 가져오기 완료';
       case inProgress:
         return '작업 진행';
       case completed:
@@ -661,6 +666,75 @@ class WorkflowStep {
   );
 }
 
+/// Production AI 실행 정책 (opt-in). 없으면 Agent는 자동 Codex를 돌리지 않음.
+/// Sotong24Work `AiExecution::Policy` 와 필드 일치.
+class AiExecutionPolicy {
+  const AiExecutionPolicy({
+    required this.enabled,
+    required this.worker,
+    required this.maxAutoStageOrder,
+    required this.approvalRequired,
+    required this.artifactUploadEnabled,
+    required this.autoAdvance,
+    required this.deploymentAllowed,
+  });
+
+  /// ④ pilot 고정값 — 1단계 Codex + 승인 게이트, 자동 배포 금지.
+  static const AiExecutionPolicy pilotCodexStage1 = AiExecutionPolicy(
+    enabled: true,
+    worker: 'codex',
+    maxAutoStageOrder: 1,
+    approvalRequired: true,
+    artifactUploadEnabled: true,
+    autoAdvance: false,
+    deploymentAllowed: false,
+  );
+
+  final bool enabled;
+  final String worker;
+  final int maxAutoStageOrder;
+  final bool approvalRequired;
+  final bool artifactUploadEnabled;
+  final bool autoAdvance;
+  final bool deploymentAllowed;
+
+  Map<String, dynamic> toJson() => {
+    'enabled': enabled,
+    'worker': worker,
+    'maxAutoStageOrder': maxAutoStageOrder,
+    'approvalRequired': approvalRequired,
+    'artifactUploadEnabled': artifactUploadEnabled,
+    'autoAdvance': autoAdvance,
+    'deploymentAllowed': deploymentAllowed,
+  };
+
+  factory AiExecutionPolicy.fromJson(Map<String, dynamic> json) {
+    return AiExecutionPolicy(
+      enabled: json['enabled'] == true,
+      worker: '${json['worker'] ?? 'none'}'.trim().isEmpty
+          ? 'none'
+          : '${json['worker']}'.trim(),
+      maxAutoStageOrder: () {
+        final v = json['maxAutoStageOrder'];
+        if (v is int) return v;
+        return int.tryParse('$v') ?? 0;
+      }(),
+      approvalRequired: json['approvalRequired'] != false,
+      artifactUploadEnabled: json['artifactUploadEnabled'] == true,
+      autoAdvance: json['autoAdvance'] == true,
+      deploymentAllowed: json['deploymentAllowed'] == true,
+    );
+  }
+
+  /// `aiExecution` (canonical) 또는 `executionPolicy` (alias) 파싱.
+  static AiExecutionPolicy? tryParse(Map<String, dynamic> instructionJson) {
+    final raw =
+        instructionJson['aiExecution'] ?? instructionJson['executionPolicy'];
+    if (raw is! Map) return null;
+    return AiExecutionPolicy.fromJson(Map<String, dynamic>.from(raw));
+  }
+}
+
 class WorkInstruction {
   const WorkInstruction({
     required this.schemaVersion,
@@ -695,6 +769,7 @@ class WorkInstruction {
     this.sourceFileName = '',
     this.status = '',
     this.contract,
+    this.aiExecution,
   });
 
   final String schemaVersion;
@@ -732,6 +807,9 @@ class WorkInstruction {
   /// schema 1.1+ 표준 Contract (레거시 1.0은 null 가능).
   final InstructionContract? contract;
 
+  /// Production AI opt-in. null이면 기존과 동일(자동 Codex 없음).
+  final AiExecutionPolicy? aiExecution;
+
   Map<String, dynamic> toJson() => {
     'schemaVersion': schemaVersion,
     'instructionId': instructionId,
@@ -765,6 +843,7 @@ class WorkInstruction {
     'checksum': checksum,
     'sourceFileName': sourceFileName,
     if (status.isNotEmpty) 'status': status,
+    if (aiExecution != null) 'aiExecution': aiExecution!.toJson(),
     if (contract != null) ...contract!.toNestedJson(),
   };
 
@@ -828,6 +907,7 @@ class WorkInstruction {
     sourceFileName: '${json['sourceFileName'] ?? ''}',
     status: '${json['status'] ?? ''}',
     contract: InstructionContract.tryParse(json),
+    aiExecution: AiExecutionPolicy.tryParse(json),
   );
 }
 
@@ -946,6 +1026,11 @@ class BusinessPlanDocument {
     this.lastTransferFileName,
     this.lastTransferChecksum,
     this.lastTransferMode,
+    this.lastRemoteJobId,
+    this.lastRemoteCommandId,
+    this.lastRemoteAgentId,
+    this.lastDeliveryErrorCode,
+    this.lastDeliveryErrorLabel,
     this.versionHistory = const [],
     this.favorite = false,
     this.libraryFolder = '',
@@ -970,6 +1055,11 @@ class BusinessPlanDocument {
   final String? lastTransferFileName;
   final String? lastTransferChecksum;
   final String? lastTransferMode;
+  final String? lastRemoteJobId;
+  final String? lastRemoteCommandId;
+  final String? lastRemoteAgentId;
+  final String? lastDeliveryErrorCode;
+  final String? lastDeliveryErrorLabel;
   final List<PlanVersionSnapshot> versionHistory;
   final bool favorite;
   final String libraryFolder;
@@ -1000,13 +1090,19 @@ class BusinessPlanDocument {
             ? instruction!.primaryTrack
             : input.primaryTrack);
 
-  /// Inbox 폴더에 실제 파일 쓰기가 성공한 경우만 true.
-  /// 브라우저 다운로드·lastTransferAt 만으로는 true가 되지 않는다.
+  /// Job + START_JOB 이 모두 확보된 경우만 true. Inbox 파일 쓰기만으로는 true가 되지 않는다.
   bool get wasTransferred {
     final s = PlanningStatus.normalize(status);
     if (s == PlanningStatus.imported) return true;
     if (s != PlanningStatus.transferred) return false;
-    return (lastTransferMode ?? '') == 'folder';
+    return hasRemoteDelivery;
+  }
+
+  bool get hasRemoteDelivery {
+    final mode = (lastTransferMode ?? '').trim();
+    if (mode == 'remote') return true;
+    return (lastRemoteJobId ?? '').trim().isNotEmpty &&
+        (lastRemoteCommandId ?? '').trim().isNotEmpty;
   }
 
   /// 다운로드만 되어 수동 가져오기 대기인 경우.
@@ -1015,7 +1111,12 @@ class BusinessPlanDocument {
     final mode = lastTransferMode ?? '';
     if (s == PlanningStatus.downloadedPendingImport) return true;
     if (mode == 'download' && s != PlanningStatus.imported) return true;
-    if (s == PlanningStatus.transferred && mode != 'folder') return true;
+    if (s == PlanningStatus.transferred &&
+        mode != 'folder' &&
+        mode != 'remote' &&
+        !hasRemoteDelivery) {
+      return true;
+    }
     return false;
   }
 
@@ -1034,6 +1135,12 @@ class BusinessPlanDocument {
     String? lastTransferFileName,
     String? lastTransferChecksum,
     String? lastTransferMode,
+    String? lastRemoteJobId,
+    String? lastRemoteCommandId,
+    String? lastRemoteAgentId,
+    String? lastDeliveryErrorCode,
+    String? lastDeliveryErrorLabel,
+    bool clearDeliveryError = false,
     List<PlanVersionSnapshot>? versionHistory,
     bool? favorite,
     String? libraryFolder,
@@ -1059,6 +1166,15 @@ class BusinessPlanDocument {
       lastTransferFileName: lastTransferFileName ?? this.lastTransferFileName,
       lastTransferChecksum: lastTransferChecksum ?? this.lastTransferChecksum,
       lastTransferMode: lastTransferMode ?? this.lastTransferMode,
+      lastRemoteJobId: lastRemoteJobId ?? this.lastRemoteJobId,
+      lastRemoteCommandId: lastRemoteCommandId ?? this.lastRemoteCommandId,
+      lastRemoteAgentId: lastRemoteAgentId ?? this.lastRemoteAgentId,
+      lastDeliveryErrorCode: clearDeliveryError
+          ? null
+          : (lastDeliveryErrorCode ?? this.lastDeliveryErrorCode),
+      lastDeliveryErrorLabel: clearDeliveryError
+          ? null
+          : (lastDeliveryErrorLabel ?? this.lastDeliveryErrorLabel),
       versionHistory: versionHistory ?? this.versionHistory,
       favorite: favorite ?? this.favorite,
       libraryFolder: libraryFolder ?? this.libraryFolder,
@@ -1087,6 +1203,13 @@ class BusinessPlanDocument {
     if (lastTransferChecksum != null)
       'lastTransferChecksum': lastTransferChecksum,
     if (lastTransferMode != null) 'lastTransferMode': lastTransferMode,
+    if (lastRemoteJobId != null) 'lastRemoteJobId': lastRemoteJobId,
+    if (lastRemoteCommandId != null) 'lastRemoteCommandId': lastRemoteCommandId,
+    if (lastRemoteAgentId != null) 'lastRemoteAgentId': lastRemoteAgentId,
+    if (lastDeliveryErrorCode != null)
+      'lastDeliveryErrorCode': lastDeliveryErrorCode,
+    if (lastDeliveryErrorLabel != null)
+      'lastDeliveryErrorLabel': lastDeliveryErrorLabel,
     'versionHistory': versionHistory.map((e) => e.toJson()).toList(),
     'favorite': favorite,
     if (libraryFolder.isNotEmpty) 'libraryFolder': libraryFolder,
@@ -1172,6 +1295,21 @@ class BusinessPlanDocument {
       lastTransferMode: json['lastTransferMode'] == null
           ? null
           : '${json['lastTransferMode']}',
+      lastRemoteJobId: json['lastRemoteJobId'] == null
+          ? null
+          : '${json['lastRemoteJobId']}',
+      lastRemoteCommandId: json['lastRemoteCommandId'] == null
+          ? null
+          : '${json['lastRemoteCommandId']}',
+      lastRemoteAgentId: json['lastRemoteAgentId'] == null
+          ? null
+          : '${json['lastRemoteAgentId']}',
+      lastDeliveryErrorCode: json['lastDeliveryErrorCode'] == null
+          ? null
+          : '${json['lastDeliveryErrorCode']}',
+      lastDeliveryErrorLabel: json['lastDeliveryErrorLabel'] == null
+          ? null
+          : '${json['lastDeliveryErrorLabel']}',
       versionHistory:
           (json['versionHistory'] as List?)
               ?.map(

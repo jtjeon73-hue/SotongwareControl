@@ -142,7 +142,7 @@ class PlanningSummary {
           PlanningSummaryField(
             label: '상태',
             value: hasInstruction
-                ? '작업지시서 생성됨 — 소통24워크 전달 가능'
+                ? '작업지시서 생성됨 — 소통24워크 Agent 전달 가능'
                 : '작업지시서 미생성 — 전달 준비 전',
           ),
         ],

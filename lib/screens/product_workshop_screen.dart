@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../data/sotong24_workflows.dart';
-import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
 import '../services/sotong24_remote_repository.dart';
+import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
-import '../utils/external_url.dart';
-import '../widgets/sotong24_production_guide_panel.dart';
+import '../widgets/revision_request_dialog.dart';
+import '../widgets/operational_collapsible_section.dart';
 import '../widgets/sotong24_stage_widgets.dart';
 
-/// 소통24워크 — PC Sotong24Work 원격 관제·승인 화면.
+/// AI 제작공정 — 전송된 작업의 단계 진행·승인·보완 화면.
 /// 내부 destination key는 `productWorkshop`을 유지한다.
 class ProductWorkshopScreen extends StatefulWidget {
   const ProductWorkshopScreen({super.key, this.repository});
@@ -62,6 +62,31 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
         }
 
         final filtered = projects.where(_filter.matches).toList();
+        final primary = filtered.where((p) => !p.isIncompleteListing).toList();
+        final incomplete = filtered
+            .where((p) => p.isIncompleteListing)
+            .toList();
+        final realWork = primary
+            .where((p) => !Sotong24WorkshopPresentation.isTestProject(p))
+            .toList();
+        final testWork = primary
+            .where(Sotong24WorkshopPresentation.isTestProject)
+            .toList();
+        final awaiting = realWork
+            .where(
+              (p) => p.userFacingStatus == Sotong24WorkStatus.awaitingApproval,
+            )
+            .toList();
+        final inProgress = realWork
+            .where(
+              (p) =>
+                  p.userFacingStatus != Sotong24WorkStatus.awaitingApproval &&
+                  p.userFacingStatus != Sotong24WorkStatus.completed,
+            )
+            .toList();
+        final completed = realWork
+            .where((p) => p.userFacingStatus == Sotong24WorkStatus.completed)
+            .toList();
         final focus = _pickFocusProject(projects);
         final anyDemo = projects.any((p) => p.isDemo);
 
@@ -69,18 +94,18 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             Text(
-              '소통24워크',
+              'AI 제작공정',
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
             const Text(
-              '선택된 제품을 실제로 제작하는 곳입니다. PC 소통24워크 상태를 확인하고 승인·보완을 요청합니다.',
+              '전송된 작업의 진행 상태를 확인하고 승인·보완을 관리합니다.',
               style: TextStyle(
                 color: ControlColors.textSecondary,
-                fontSize: 15,
-                height: 1.4,
+                fontSize: 14,
+                height: 1.35,
               ),
             ),
             if (anyDemo) ...[
@@ -118,7 +143,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            if (filtered.isEmpty)
+            if (realWork.isEmpty && testWork.isEmpty && incomplete.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Text(
@@ -126,13 +151,76 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                   style: TextStyle(color: ControlColors.textMuted),
                 ),
               )
-            else
-              for (final p in filtered) ...[
-                _ProjectCard(project: p, onOpen: () => _openDetail(p)),
-                const SizedBox(height: 10),
+            else ...[
+              if (awaiting.isNotEmpty) ...[
+                const _SectionHeader(
+                  title: '승인 필요한 작업',
+                  subtitle: '결과를 확인하고 승인 또는 보완 요청을 진행하세요.',
+                ),
+                const SizedBox(height: 8),
+                for (final p in awaiting) ...[
+                  _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                  const SizedBox(height: 10),
+                ],
               ],
-            const SizedBox(height: 8),
-            Sotong24ProductionGuidePanel(focusProject: focus),
+              if (inProgress.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const _SectionHeader(
+                  title: '진행 중',
+                  subtitle: 'AI가 작업 중이거나 보완·오류 상태입니다.',
+                ),
+                const SizedBox(height: 8),
+                for (final p in inProgress) ...[
+                  _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                  const SizedBox(height: 10),
+                ],
+              ],
+              if (completed.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const _SectionHeader(title: '완료', subtitle: '제작이 끝난 작업입니다.'),
+                const SizedBox(height: 8),
+                for (final p in completed) ...[
+                  _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                  const SizedBox(height: 10),
+                ],
+              ],
+              if (testWork.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                OperationalCollapsibleSection(
+                  title: '개발/테스트 작업 보기',
+                  subtitle: 'E2E·Agent 검증용 — 데이터는 보존됩니다',
+                  sectionKey: const Key('workshop_test_projects'),
+                  child: Column(
+                    children: [
+                      for (final p in testWork) ...[
+                        _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                        const SizedBox(height: 10),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              if (incomplete.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                OperationalCollapsibleSection(
+                  title: '진단/불완전 데이터',
+                  subtitle: '삭제하지 않은 이전 TEST 항목',
+                  sectionKey: const Key('workshop_incomplete_projects'),
+                  child: Column(
+                    children: [
+                      for (final p in incomplete) ...[
+                        _ProjectCard(
+                          project: p,
+                          onOpen: () => _openDetail(p),
+                          incomplete: true,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ],
         );
       },
@@ -140,13 +228,23 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
   }
 
   Sotong24RemoteProject? _pickFocusProject(List<Sotong24RemoteProject> all) {
-    for (final p in all) {
-      if (p.status == Sotong24WorkStatus.awaitingApproval) return p;
+    final real = all
+        .where(
+          (p) =>
+              !p.isIncompleteListing &&
+              !Sotong24WorkshopPresentation.isTestProject(p),
+        )
+        .toList();
+    if (real.isEmpty) return null;
+    for (final p in real) {
+      if (p.userFacingStatus == Sotong24WorkStatus.awaitingApproval) {
+        return p;
+      }
     }
-    for (final p in all) {
-      if (p.status != Sotong24WorkStatus.completed) return p;
+    for (final p in real) {
+      if (p.userFacingStatus != Sotong24WorkStatus.completed) return p;
     }
-    return all.isEmpty ? null : all.first;
+    return real.first;
   }
 
   Future<void> _openDetail(Sotong24RemoteProject project) async {
@@ -200,12 +298,6 @@ class _Sotong24RemoteDetailScreenState
             return const Center(child: CircularProgressIndicator());
           }
           final stage = project.currentStageDoc;
-          final showApprovalActions =
-              project.status == Sotong24WorkStatus.awaitingApproval ||
-              project.approvalStatus == ApprovalStatus.pending ||
-              (stage != null &&
-                  (stage.status == Sotong24WorkStatus.awaitingApproval ||
-                      stage.approvalStatus == ApprovalStatus.pending));
           final workflow = Sotong24WorkflowCatalog.forProduct(
             project.productType,
             contentSubtype: project.contentSubtype,
@@ -215,60 +307,147 @@ class _Sotong24RemoteDetailScreenState
               : (workflow.byId(stage.stageId) ??
                     workflow.byOrder(stage.stageNumber));
           final stats = Sotong24StageStats.fromProject(project);
+          final testKind = Sotong24WorkshopPresentation.testKind(project);
+          final isTest = testKind != WorkshopTestKind.none;
+          final displayTitle = Sotong24WorkshopPresentation.displayTitle(
+            project,
+          );
+          final showApprovalActions = project.showApprovalActions;
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
             children: [
               if (project.isDemo)
                 const Padding(
-                  padding: EdgeInsets.only(bottom: 10),
+                  padding: EdgeInsets.only(bottom: 8),
                   child: _InfoBanner(text: '데모(연동 전) 프로젝트입니다.'),
                 ),
-              Text(
-                project.title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  height: 1.35,
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      displayTitle,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        height: 1.3,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ),
+                  if (isTest)
+                    _TestBadge(
+                      label: Sotong24WorkshopPresentation.testKindBadgeLabel(
+                        testKind,
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
-                workflow.title,
+                project.productTypeLabel,
                 style: const TextStyle(
                   color: ControlColors.teal,
                   fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
               ),
-              const SizedBox(height: 10),
-              _Kv('제작 종류', project.productTypeLabel),
-              _Kv('시작일', _formatTime(project.startedAt)),
-              _Kv('현재 상태', Sotong24WorkStatus.labelKo(project.status)),
-              _Kv(
-                'PC 상태',
-                Sotong24PcLinkStatus.labelKo(project.resolvedPcStatus),
-              ),
-              _Kv('진행', '${project.currentStage} / ${project.totalStages}'),
-              _Kv('진행률', '${project.progress}%'),
               const SizedBox(height: 8),
+              _Kv(
+                '현재 단계',
+                Sotong24WorkshopPresentation.currentStageLine(project),
+              ),
+              _Kv('상태', project.userFacingStatusLabel),
+              if (Sotong24WorkshopPresentation.revisionLine(project).isNotEmpty)
+                _Kv(
+                  '결과 버전',
+                  Sotong24WorkshopPresentation.revisionLine(
+                    project,
+                  ).replaceFirst('결과 버전 ', ''),
+                ),
+              _Kv(
+                '전체 진행률',
+                Sotong24WorkshopPresentation.overallProgressLine(
+                  project,
+                ).replaceFirst('전체 진행률 ', ''),
+              ),
+              _Kv('PC', Sotong24PcLinkStatus.labelKo(project.resolvedPcStatus)),
+              const SizedBox(height: 6),
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
-                  value: (project.progress.clamp(0, 100)) / 100,
-                  minHeight: 12,
+                  value: (project.overallProgressPercent.clamp(0, 100)) / 100,
+                  minHeight: 10,
                   backgroundColor: ControlColors.border,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Sotong24StatsRow(stats: stats),
-              if (showApprovalActions && stage != null) ...[
-                const SizedBox(height: 16),
+              const SizedBox(height: 4),
+              Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text(
+                    '진단정보 보기',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: ControlColors.textMuted,
+                    ),
+                  ),
+                  children: [
+                    _Kv('instructionId', project.projectId),
+                    if (stage != null) ...[
+                      _Kv('stageId', stage.stageId),
+                      _Kv('stage status', stage.status),
+                    ],
+                    _Kv('project status', project.status),
+                    _Kv('approvalStatus', project.approvalStatus),
+                    if (project.showReportedProgressDiagnostic)
+                      _Kv(
+                        'Agent 보고 진행률',
+                        '${project.reportedProgressPercent}%',
+                      ),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        '진단정보는 지원·디버깅용입니다. 일반 작업은 위 제목·상태를 기준으로 하세요.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: ControlColors.textMuted,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (stage != null) ...[
+                const SizedBox(height: 12),
                 Sotong24NowTodoPanel(
                   project: project,
                   stage: stage,
                   def: stageDef,
                 ),
               ],
-              const SizedBox(height: 20),
+              if (project.userFacingStatus == Sotong24WorkStatus.completed) ...[
+                const SizedBox(height: 12),
+                _CompletedBanner(isTest: isTest),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: const Text('목록으로'),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
               Text(
                 '전체 제작 단계 (${workflow.totalStages})',
                 style: Theme.of(
@@ -280,7 +459,7 @@ class _Sotong24RemoteDetailScreenState
                 workflow.summary,
                 style: const TextStyle(
                   color: ControlColors.textSecondary,
-                  fontSize: 13,
+                  fontSize: 12,
                 ),
               ),
               const SizedBox(height: 8),
@@ -293,46 +472,46 @@ class _Sotong24RemoteDetailScreenState
                       workflow.byOrder(s.stageNumber),
                 ),
               if (stage != null) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 Text(
                   '결과 확인',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 _ResultPanel(stage: stage),
               ],
               if (showApprovalActions && stage != null) ...[
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 Text(
                   '승인',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 const Text(
-                  '승인해도 배포·판매 등록·Git push는 자동 실행되지 않습니다. PC가 요청을 확인한 뒤 다음 단계를 진행합니다.',
+                  '승인해도 배포·판매 등록·Git push는 자동 실행되지 않습니다.',
                   style: TextStyle(
                     color: ControlColors.textSecondary,
-                    fontSize: 14,
-                    height: 1.4,
+                    fontSize: 13,
+                    height: 1.35,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 44,
                   child: FilledButton(
                     onPressed: _busy ? null : () => _onApprove(project, stage),
                     child: const Text('승인', style: TextStyle(fontSize: 16)),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 44,
                   child: OutlinedButton(
                     onPressed: _busy ? null : () => _onRevision(project, stage),
                     style: OutlinedButton.styleFrom(
@@ -350,10 +529,9 @@ class _Sotong24RemoteDetailScreenState
     );
   }
 
-  String _resolveRequestId(Sotong24RemoteStage stage) {
-    if (stage.activeRequestId.isNotEmpty) return stage.activeRequestId;
-    return 'req_${stage.stageId}_${DateTime.now().millisecondsSinceEpoch}';
-  }
+  /// preferred hint만 전달. 실제 requestId는 repository.allocateRequestId가
+  /// pending 슬롯 재사용 / 처리완료 id면 신규 발급으로 결정한다.
+  String _resolveRequestId(Sotong24RemoteStage stage) => stage.activeRequestId;
 
   Future<void> _onApprove(
     Sotong24RemoteProject project,
@@ -369,7 +547,7 @@ class _Sotong24RemoteDetailScreenState
     setState(() => _busy = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(err ?? '승인했습니다. PC 소통24워크가 요청을 확인하면 다음 단계로 진행합니다.'),
+        content: Text(err ?? '승인 요청을 전송했습니다. Agent가 확인하면 다음 단계로 진행합니다.'),
       ),
     );
   }
@@ -378,33 +556,7 @@ class _Sotong24RemoteDetailScreenState
     Sotong24RemoteProject project,
     Sotong24RemoteStage stage,
   ) async {
-    final controller = TextEditingController();
-    final message = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('보완 요청'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '보완할 내용을 구체적으로 적어 주세요.',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('요청'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
+    final message = await showRevisionRequestDialog(context);
     if (message == null || !mounted) return;
     if (message.isEmpty) {
       ScaffoldMessenger.of(
@@ -424,7 +576,7 @@ class _Sotong24RemoteDetailScreenState
     setState(() => _busy = false);
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(err ?? '보완 요청을 저장했습니다.')));
+    ).showSnackBar(SnackBar(content: Text(err ?? '보완 요청을 전송했습니다.')));
   }
 }
 
@@ -435,9 +587,11 @@ class _CurrentWorkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final testKind = Sotong24WorkshopPresentation.testKind(project);
+    final isTest = testKind != WorkshopTestKind.none;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: ControlColors.surface,
         borderRadius: BorderRadius.circular(14),
@@ -458,53 +612,71 @@ class _CurrentWorkCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 const _DemoBadge(),
               ],
+              if (!project.isDemo && isTest) ...[
+                const SizedBox(width: 8),
+                _TestBadge(
+                  label: Sotong24WorkshopPresentation.testKindBadgeLabel(
+                    testKind,
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             project.productTypeLabel,
             style: const TextStyle(
               color: ControlColors.teal,
               fontWeight: FontWeight.w700,
-              fontSize: 13,
+              fontSize: 12,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            project.title,
+            Sotong24WorkshopPresentation.displayTitle(project),
             style: const TextStyle(
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
-              height: 1.35,
+              height: 1.3,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: (project.progress.clamp(0, 100)) / 100,
-              minHeight: 12,
+              value: (project.overallProgressPercent.clamp(0, 100)) / 100,
+              minHeight: 10,
               backgroundColor: ControlColors.border,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            '${project.progress}% · ${project.currentStage} / ${project.totalStages} 단계'
-            '${project.currentStageDoc == null ? '' : ' · ${project.currentStageDoc!.stageName}'}',
+            '현재 단계: ${Sotong24WorkshopPresentation.currentStageLine(project)}',
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
-          const SizedBox(height: 10),
-          Sotong24StatsRow(stats: Sotong24StageStats.fromProject(project)),
-          const SizedBox(height: 10),
-          _Kv('상태', Sotong24WorkStatus.labelKo(project.status)),
-          _Kv('PC상태', Sotong24PcLinkStatus.labelKo(project.resolvedPcStatus)),
-          _Kv('마지막 동기화', _formatTime(project.lastHeartbeat)),
-          _Kv(
-            '워크플로',
-            Sotong24WorkflowCatalog.forProduct(
-              project.productType,
-              contentSubtype: project.contentSubtype,
-            ).title,
+          Text(
+            Sotong24WorkshopPresentation.overallProgressLine(project),
+            style: const TextStyle(
+              fontSize: 13,
+              color: ControlColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '상태: ${project.userFacingStatusLabel}',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          if (Sotong24WorkshopPresentation.revisionLine(project).isNotEmpty)
+            Text(
+              Sotong24WorkshopPresentation.revisionLine(project),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          Text(
+            '마지막 동기화: ${_formatTime(project.lastHeartbeat)}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: ControlColors.textMuted,
+            ),
           ),
         ],
       ),
@@ -513,25 +685,37 @@ class _CurrentWorkCard extends StatelessWidget {
 }
 
 class _ProjectCard extends StatelessWidget {
-  const _ProjectCard({required this.project, required this.onOpen});
+  const _ProjectCard({
+    required this.project,
+    required this.onOpen,
+    this.incomplete = false,
+  });
 
   final Sotong24RemoteProject project;
   final VoidCallback onOpen;
+  final bool incomplete;
 
   @override
   Widget build(BuildContext context) {
+    final testKind = Sotong24WorkshopPresentation.testKind(project);
+    final isTest = testKind != WorkshopTestKind.none;
+    final title = Sotong24WorkshopPresentation.displayTitle(project);
     return Material(
-      color: ControlColors.surface,
+      color: incomplete ? ControlColors.surfaceMuted : ControlColors.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onOpen,
         borderRadius: BorderRadius.circular(14),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: ControlColors.border),
+            border: Border.all(
+              color: incomplete
+                  ? ControlColors.border.withValues(alpha: 0.7)
+                  : ControlColors.border,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,40 +725,74 @@ class _ProjectCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      project.title,
-                      style: const TextStyle(
+                      title,
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        height: 1.35,
+                        fontSize: incomplete ? 14 : 15,
+                        height: 1.3,
+                        color: incomplete
+                            ? ControlColors.textSecondary
+                            : ControlColors.textPrimary,
                       ),
                     ),
                   ),
                   if (project.isDemo) const _DemoBadge(),
+                  if (!project.isDemo && isTest)
+                    _TestBadge(
+                      label: Sotong24WorkshopPresentation.testKindBadgeLabel(
+                        testKind,
+                      ),
+                    ),
+                  if (incomplete)
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ControlColors.border.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        '진단용',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
-                '${project.productTypeLabel} · '
-                '${project.currentStage}/${project.totalStages} · '
-                '${project.progress}%',
-                style: const TextStyle(
+                incomplete
+                    ? (project.productTypeLabel.isEmpty
+                          ? '유형 미정'
+                          : project.productTypeLabel)
+                    : '${project.productTypeLabel}\n'
+                          '${Sotong24WorkshopPresentation.listProgressSummary(project)}',
+                style: TextStyle(
                   color: ControlColors.textSecondary,
-                  fontSize: 14,
+                  fontSize: incomplete ? 12 : 13,
+                  height: 1.35,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                '상태: ${Sotong24WorkStatus.labelKo(project.status)}',
-                style: const TextStyle(fontSize: 14),
-              ),
-              Text(
-                '업데이트: ${_formatTime(project.updatedAt)}',
+                '상태: ${project.userFacingStatusLabel}',
                 style: const TextStyle(
                   fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '마지막 동기화: ${_formatTime(project.updatedAt.isNotEmpty ? project.updatedAt : project.lastHeartbeat)}',
+                style: const TextStyle(
+                  fontSize: 12,
                   color: ControlColors.textMuted,
                 ),
               ),
-              const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(onPressed: onOpen, child: const Text('상세보기')),
@@ -605,6 +823,13 @@ class _ResultPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (stage.revision > 0) ...[
+            Text(
+              '최신 결과 r${stage.revision}',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+          ],
           if (stage.summary.isNotEmpty) ...[
             const Text(
               '단계 결과 요약',
@@ -663,35 +888,25 @@ class _ResultPanel extends StatelessWidget {
             const SizedBox(height: 10),
           ],
           if (stage.hasOpenableResult) ...[
-            if (_http(stage.resultUrl))
-              TextButton.icon(
-                onPressed: () => _open(stage.resultUrl),
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('결과 파일/PDF 열기'),
-              ),
-            if (_http(stage.previewUrl))
-              TextButton.icon(
-                onPressed: () => _open(stage.previewUrl),
-                icon: const Icon(Icons.open_in_new),
-                label: const Text('미리보기 링크'),
-              ),
-          ] else
+            Sotong24StageResultOpenButtons(stage: stage, compact: true),
+          ] else ...[
             const Text(
-              '열 수 있는 웹/Storage URL이 아직 없습니다. (로컬 경로는 표시하지 않습니다)',
-              style: TextStyle(color: ControlColors.textMuted, fontSize: 13),
+              '결과 준비 중',
+              style: TextStyle(
+                color: ControlColors.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
+            const SizedBox(height: 4),
+            const Text(
+              '휴대폰에서 열 수 있는 결과물이 아직 등록되지 않았습니다.',
+              style: TextStyle(color: ControlColors.textMuted, fontSize: 12),
+            ),
+          ],
         ],
       ),
     );
-  }
-
-  bool _http(String value) {
-    final lower = value.toLowerCase();
-    return lower.startsWith('https://') || lower.startsWith('http://');
-  }
-
-  Future<void> _open(String url) async {
-    await ExternalUrl.open(url);
   }
 }
 
@@ -725,6 +940,96 @@ class _Kv extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CompletedBanner extends StatelessWidget {
+  const _CompletedBanner({required this.isTest});
+
+  final bool isTest;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ControlColors.tealSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ControlColors.teal),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isTest ? 'TEST E2E 완료' : '작업 완료',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '모든 제작 단계가 완료되었습니다.',
+            style: TextStyle(fontSize: 14, height: 1.35),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: const TextStyle(
+            fontSize: 12,
+            color: ControlColors.textMuted,
+            height: 1.3,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TestBadge extends StatelessWidget {
+  const _TestBadge({this.label = 'TEST'});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8F5E9),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF2E7D32)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF1B5E20),
+        ),
       ),
     );
   }
@@ -787,7 +1092,7 @@ class _ErrorBody extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Text(
-        '소통24워크 데이터를 불러오지 못했습니다.\n$message',
+        'AI 제작공정 데이터를 불러오지 못했습니다.\n$message',
         style: const TextStyle(color: ControlColors.accentRose, height: 1.4),
       ),
     );

@@ -430,7 +430,7 @@ class _IdeaBankScreenState extends State<IdeaBankScreen> {
               const SizedBox(height: 4),
               const Text(
                 '새로운 기회와 제작 아이디어를 발견하는 곳입니다. '
-                '(사업전략연구실=공부·판단, 작업지시제작소=지시 전환, 소통24워크=실제 제작)',
+                '(사업전략연구실=공부·판단, 작업지시제작소=지시 전환, AI 제작공정=단계 진행)',
                 style: TextStyle(
                   color: ControlColors.textSecondary,
                   height: 1.35,

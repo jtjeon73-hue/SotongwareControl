@@ -10,6 +10,8 @@ class PlanUserFacingStatus {
   static const instructionReady = '작업지시 준비완료';
   static const transferPending = '전달대기';
   static const deliveredNotRun = '전달됨 · 미실행';
+  static const transferFailed = '전송 실패';
+  static const retryNeeded = '다시 시도 필요';
   static const pcReceivedNotStarted = 'PC 수신 · 미시작';
   static const working = '작업중';
   static const awaitingApproval = '승인대기';
@@ -48,6 +50,9 @@ class PlanUserFacingStatus {
 
     if (exec.isPostTransfer) {
       return exec.primaryStatusLabel;
+    }
+    if (exec.primaryStatusLabel == transferFailed) {
+      return transferFailed;
     }
 
     // --- 전달 전: 기획/작업지시 제작 상태만 ---

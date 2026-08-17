@@ -30,6 +30,7 @@ import 'screens/study/study_ai_teacher_screen.dart';
 import 'screens/study/study_courses_screen.dart';
 import 'screens/study/study_dashboard_screen.dart';
 import 'screens/study/study_notes_and_more_screens.dart';
+import 'screens/standard_production_guide_screen.dart';
 import 'screens/system_settings_screen.dart';
 import 'services/auth_service.dart';
 import 'state/control_scope.dart';
@@ -262,7 +263,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.productWorkshop:
         return const ProductWorkshopScreen();
       case ControlDestination.sotong24RemoteControl:
-        return const RemoteControlScreen();
+        return RemoteControlScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.autoPromotion:
         return const AutoPromotionScreen();
       case ControlDestination.autoSales:
@@ -273,6 +274,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return SystemSettingsScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.alertCenter:
         return AlertCenterScreen(onNavigate: _onDestinationSelected);
+      case ControlDestination.standardProductionGuide:
+        return const StandardProductionGuideScreen();
       case ControlDestination.ideaBank:
         return IdeaBankScreen(
           onSendToWorkInstruction: _sendIdeaToWorkInstruction,
@@ -415,7 +418,8 @@ class _ControlHeader extends StatelessWidget {
               onPressed: onSignOut,
               icon: const Icon(Icons.logout),
             ),
-            TextButton(onPressed: onSignOut, child: const Text('로그아웃')),
+            if (screenWidth >= 560)
+              TextButton(onPressed: onSignOut, child: const Text('로그아웃')),
           ],
         ),
       ),

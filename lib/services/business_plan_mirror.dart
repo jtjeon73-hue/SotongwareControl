@@ -229,17 +229,17 @@ class BusinessPlanMirrorService {
     }
     _pending[planId] = plan;
     final prev = _queues[planId] ?? Future.value(MirrorWriteResult.skipped);
-    final next = prev
-        .catchError((_) => MirrorWriteResult.failed)
-        .then((_) async {
-          if (writeBlocked.contains(planId)) {
-            _pending.remove(planId);
-            return MirrorWriteResult.conflict();
-          }
-          final latest = _pending.remove(planId);
-          if (latest == null) return MirrorWriteResult.skipped;
-          return upsertPlan(latest, ownerUid: ownerUid);
-        });
+    final next = prev.catchError((_) => MirrorWriteResult.failed).then((
+      _,
+    ) async {
+      if (writeBlocked.contains(planId)) {
+        _pending.remove(planId);
+        return MirrorWriteResult.conflict();
+      }
+      final latest = _pending.remove(planId);
+      if (latest == null) return MirrorWriteResult.skipped;
+      return upsertPlan(latest, ownerUid: ownerUid);
+    });
     _queues[planId] = next;
     return next;
   }

@@ -19,22 +19,22 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('메뉴 5개 부문과 flattened 16개 일치', () {
+  test('메뉴 5개 부문과 flattened 17개 일치', () {
     expect(MenuDivisionCatalog.all.length, 5);
     expect(MenuDivisionCatalog.all.map((e) => e.title).toList(), [
-      '기획실행부',
+      '운영 관제',
       '개발부',
       '마케팅재무부',
       '설정부',
       '사업전략부',
     ]);
-    expect(SidebarNavigation.canonicalDestinations.length, 16);
+    expect(SidebarNavigation.canonicalDestinations.length, 17);
     expect(
       SidebarNavigation.canonicalDestinations,
       MenuDivisionCatalog.flattenedDestinations,
     );
-    expect(ControlDestination.productWorkshop.label, '소통24워크');
-    expect(ControlDestination.sotong24RemoteControl.label, '소통24워크 원격관제');
+    expect(ControlDestination.productWorkshop.label, 'AI 제작공정');
+    expect(ControlDestination.sotong24RemoteControl.label, '노트북 원격관제');
     expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
   });
 
@@ -102,9 +102,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('기획실행부'), findsOneWidget);
+    expect(find.text('운영 관제'), findsOneWidget);
     expect(find.text('개발부'), findsOneWidget);
-    expect(find.text('소통24워크'), findsWidgets);
+    expect(find.text('AI 제작공정'), findsWidgets);
   });
 
   testWidgets('소통24워크·아이디어뱅크 390px', (tester) async {
@@ -121,7 +121,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('소통24워크'), findsWidgets);
+    expect(find.text('AI 제작공정'), findsWidgets);
     expect(find.textContaining('지금 할 일'), findsNothing); // 목록 화면
     expect(find.textContaining('완료'), findsWidgets);
     expect(tester.takeException(), isNull);

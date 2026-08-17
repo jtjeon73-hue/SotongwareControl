@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
@@ -116,6 +117,59 @@ class Sotong24RemoteRepository {
         .toList();
   }
 
+  /// 읽기 전용: 프로젝트의 request 문서 목록.
+  Future<List<Sotong24RemoteRequest>> listRequests(String projectId) {
+    return _loadRequests(projectId);
+  }
+
+  /// Memory 전용: Agent가 보완 재작업 후 동일 stage를 다시 승인대기로 돌린 상태.
+  /// activeRequestId(처리된 revision_request)는 그대로 두어 r2 재승인 시나리오를 재현한다.
+  @visibleForTesting
+  Future<String?> simulateAgentReworkAwaitingApproval({
+    required String projectId,
+    required String stageId,
+    String resultPreview = '',
+  }) async {
+    if (!usesMemory) return 'memory 전용 헬퍼입니다.';
+    final project = await getProject(projectId);
+    if (project == null) return '프로젝트를 찾을 수 없습니다.';
+    final now = DateTime.now().toUtc().toIso8601String();
+    final stages = project.stages.map((s) {
+      if (s.stageId != stageId) return s;
+      return Sotong24RemoteStage(
+        stageId: s.stageId,
+        stageNumber: s.stageNumber,
+        stageName: s.stageName,
+        status: Sotong24WorkStatus.awaitingApproval,
+        summary: s.summary,
+        resultPreview: resultPreview.isNotEmpty
+            ? resultPreview
+            : s.resultPreview,
+        workReport: s.workReport,
+        errorMessage: s.errorMessage,
+        userAttention: s.userAttention,
+        resultUrl: s.resultUrl,
+        previewUrl: s.previewUrl,
+        approvalRequired: true,
+        approvalStatus: ApprovalStatus.pending,
+        activeRequestId: s.activeRequestId,
+        updatedAt: now,
+      );
+    }).toList();
+    final updated = project.copyWith(
+      stages: stages,
+      status: Sotong24WorkStatus.awaitingApproval,
+      approvalStatus: ApprovalStatus.pending,
+      updatedAt: now,
+    );
+    _memory = [
+      for (final p in _memory)
+        if (p.projectId == project.projectId) updated else p,
+    ];
+    _memoryController.add(List.unmodifiable(_memory));
+    return null;
+  }
+
   Future<Sotong24RemoteProject?> getProject(String projectId) async {
     final list = await watchProjects().first;
     for (final p in list) {
@@ -172,11 +226,26 @@ class Sotong24RemoteRepository {
     final project = await getProject(projectId);
     if (project == null) return '프로젝트를 찾을 수 없습니다.';
 
+    Sotong24RemoteStage? stage;
+    for (final s in project.stages) {
+      if (s.stageId == stageId) {
+        stage = s;
+        break;
+      }
+    }
+    if (stage == null) return '해당 단계를 찾을 수 없습니다.';
+
     final existing = await _loadRequests(projectId);
+    final resolvedId = Sotong24RemoteApprovalGuard.allocateRequestId(
+      stage: stage,
+      existingRequests: existing,
+      preferred: requestId,
+    );
+
     final error = _guard.validateSubmit(
       project: project,
       stageId: stageId,
-      requestId: requestId,
+      requestId: resolvedId,
       existingRequests: existing.where(
         (r) =>
             r.status == ApprovalStatus.pending ||
@@ -188,7 +257,7 @@ class Sotong24RemoteRepository {
 
     final now = DateTime.now().toUtc().toIso8601String();
     final request = Sotong24RemoteRequest(
-      requestId: requestId,
+      requestId: resolvedId,
       projectId: projectId,
       stageId: stageId,
       requestType: requestType,
@@ -211,13 +280,13 @@ class Sotong24RemoteRepository {
 
     try {
       final doc = _projects!.doc(projectId);
-      await doc.collection('requests').doc(requestId).set(request.toMap());
+      await doc.collection('requests').doc(resolvedId).set(request.toMap());
       await doc.collection('stages').doc(stageId).set({
         'approvalStatus': decision,
         'status': decision == ApprovalStatus.approved
             ? Sotong24WorkStatus.completed
             : Sotong24WorkStatus.revision,
-        'activeRequestId': requestId,
+        'activeRequestId': resolvedId,
         'updatedAt': now,
         if (message.isNotEmpty) 'userAttention': message,
       }, SetOptions(merge: true));
@@ -384,16 +453,16 @@ extension Sotong24ProjectFilterX on Sotong24ProjectFilter {
   }
 
   bool matches(Sotong24RemoteProject p) {
+    final status = p.userFacingStatus;
     switch (this) {
       case Sotong24ProjectFilter.inProgress:
-        return p.status == Sotong24WorkStatus.inProgress ||
-            p.status == Sotong24WorkStatus.revision ||
-            p.status == Sotong24WorkStatus.ready;
+        return status == Sotong24WorkStatus.inProgress ||
+            status == Sotong24WorkStatus.revision ||
+            status == Sotong24WorkStatus.ready;
       case Sotong24ProjectFilter.awaitingApproval:
-        return p.status == Sotong24WorkStatus.awaitingApproval ||
-            p.approvalStatus == ApprovalStatus.pending;
+        return status == Sotong24WorkStatus.awaitingApproval;
       case Sotong24ProjectFilter.completed:
-        return p.status == Sotong24WorkStatus.completed;
+        return status == Sotong24WorkStatus.completed;
       case Sotong24ProjectFilter.all:
         return true;
     }

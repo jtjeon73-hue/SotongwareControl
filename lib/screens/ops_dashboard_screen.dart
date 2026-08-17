@@ -320,7 +320,7 @@ class OpsDashboardScreen extends StatelessWidget {
                                           onPressed: () => onNavigate(
                                             ControlDestination.sotong24work,
                                           ),
-                                          child: const Text('소통24워크'),
+                                          child: const Text('소통24워크 사업부'),
                                         ),
                                         FilledButton.tonal(
                                           onPressed: () => onNavigate(

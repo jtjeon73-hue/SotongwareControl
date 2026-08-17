@@ -427,4 +427,95 @@ describe("remote agent contract V1", () => {
     const res = await call(db, "/api/agent/pull", {}, { method: "GET" });
     assert.equal(res.statusCode, 405);
   });
+
+  async function heartbeat(agentId, agentToken) {
+    const res = await call(
+      db,
+      "/api/agent/heartbeat",
+      { agentId, state: "idle", protocolVersion: PROTOCOL_VERSION },
+      { token: agentToken }
+    );
+    assert.equal(res.statusCode, 200);
+  }
+
+  it("deliver-instruction creates job+START_JOB once", async () => {
+    const { agentId, agentToken } = await pairAndEnroll();
+    await heartbeat(agentId, agentToken);
+    const first = await control(db, "/api/control/deliver-instruction", {
+      instructionId: "wi_plan_1786083242850",
+      title: "AI 학습 도우미 활용법 전자책",
+      type: "ebook",
+      assignedAgentId: agentId,
+      payload: { instructionId: "wi_plan_1786083242850", businessIdea: "AI 학습 도우미 활용법 전자책" },
+    });
+    assert.equal(first.statusCode, 200);
+    assert.ok(first.body.jobId);
+    assert.ok(first.body.commandId);
+    assert.equal(first.body.outcome, "created");
+
+    const again = await control(db, "/api/control/deliver-instruction", {
+      instructionId: "wi_plan_1786083242850",
+      title: "AI 학습 도우미 활용법 전자책",
+      type: "ebook",
+      assignedAgentId: agentId,
+      payload: { instructionId: "wi_plan_1786083242850" },
+    });
+    assert.equal(again.statusCode, 200);
+    assert.equal(again.body.jobId, first.body.jobId);
+    assert.equal(again.body.commandId, first.body.commandId);
+    assert.equal(again.body.idempotent, true);
+
+    const jobDoc = db.store.get(`${COL.JOBS}/${first.body.jobId}`);
+    assert.equal(jobDoc.instructionId, "wi_plan_1786083242850");
+  });
+
+  it("deliver-instruction repairs START_JOB only", async () => {
+    const { agentId, agentToken } = await pairAndEnroll();
+    await heartbeat(agentId, agentToken);
+    const created = await control(db, "/api/control/create-job", {
+      title: "orphan",
+      type: "ebook",
+      assignedAgentId: agentId,
+      instructionId: "wi_plan_orphan_cmd",
+    });
+    assert.equal(created.statusCode, 200);
+    const repaired = await control(db, "/api/control/deliver-instruction", {
+      instructionId: "wi_plan_orphan_cmd",
+      title: "orphan",
+      assignedAgentId: agentId,
+      payload: { instructionId: "wi_plan_orphan_cmd" },
+    });
+    assert.equal(repaired.statusCode, 200);
+    assert.equal(repaired.body.jobId, created.body.jobId);
+    assert.equal(repaired.body.outcome, "command_repaired");
+    assert.ok(repaired.body.commandId);
+  });
+
+  it("deliver-instruction rejects offline agent", async () => {
+    const { agentId } = await pairAndEnroll();
+    const res = await control(db, "/api/control/deliver-instruction", {
+      instructionId: "wi_plan_offline",
+      title: "t",
+      assignedAgentId: agentId,
+      payload: { instructionId: "wi_plan_offline" },
+    });
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.error, "agent_offline");
+  });
+
+  it("create-job with instructionId is idempotent", async () => {
+    const { agentId } = await pairAndEnroll();
+    const a = await control(db, "/api/control/create-job", {
+      title: "t",
+      assignedAgentId: agentId,
+      instructionId: "wi_plan_idem",
+    });
+    const b = await control(db, "/api/control/create-job", {
+      title: "t2",
+      assignedAgentId: agentId,
+      instructionId: "wi_plan_idem",
+    });
+    assert.equal(a.body.jobId, b.body.jobId);
+    assert.equal(b.body.idempotent, true);
+  });
 });

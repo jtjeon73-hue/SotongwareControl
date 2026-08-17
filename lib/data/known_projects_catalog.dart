@@ -61,7 +61,7 @@ class KnownProjectsCatalog {
     KnownProjectSpec(
       id: 'sotong24work_hub',
       businessUnitId: 'sotong24work',
-      name: '소통24워크',
+      name: '소통24워크 Agent',
       projectType: 'mfc_tool',
       group: '주요 운영',
       description: 'MFC 기반 자동화 개발·유지관리 내부 프로그램',

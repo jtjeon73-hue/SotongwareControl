@@ -49,6 +49,7 @@ enum ControlDestination {
   systemSettings,
   alertCenter,
   ideaBank,
+  standardProductionGuide,
 }
 
 extension ControlDestinationX on ControlDestination {
@@ -125,9 +126,9 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.publicServices:
         return '공개 서비스';
       case ControlDestination.productWorkshop:
-        return '소통24워크';
+        return 'AI 제작공정';
       case ControlDestination.sotong24RemoteControl:
-        return '소통24워크 원격관제';
+        return '노트북 원격관제';
       case ControlDestination.autoPromotion:
         return '자동 홍보 전략실';
       case ControlDestination.autoSales:
@@ -140,6 +141,8 @@ extension ControlDestinationX on ControlDestination {
         return '알람센터';
       case ControlDestination.ideaBank:
         return '뉴 아이디어 뱅크';
+      case ControlDestination.standardProductionGuide:
+        return '표준제작 가이드';
     }
   }
 
@@ -231,6 +234,8 @@ extension ControlDestinationX on ControlDestination {
         return Icons.notifications_outlined;
       case ControlDestination.ideaBank:
         return Icons.lightbulb_outline;
+      case ControlDestination.standardProductionGuide:
+        return Icons.library_books_outlined;
     }
   }
 

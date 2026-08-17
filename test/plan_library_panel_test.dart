@@ -94,10 +94,7 @@ Future<void> _pumpPanel(
 
 Finder _enabledCheckboxForTopic(String topic) {
   return find.descendant(
-    of: find.ancestor(
-      of: find.text(topic),
-      matching: find.byType(InkWell),
-    ),
+    of: find.ancestor(of: find.text(topic), matching: find.byType(InkWell)),
     matching: find.byWidgetPredicate(
       (w) => w is Checkbox && w.onChanged != null,
     ),
@@ -106,10 +103,7 @@ Finder _enabledCheckboxForTopic(String topic) {
 
 Finder _disabledCheckboxForTopic(String topic) {
   return find.descendant(
-    of: find.ancestor(
-      of: find.text(topic),
-      matching: find.byType(InkWell),
-    ),
+    of: find.ancestor(of: find.text(topic), matching: find.byType(InkWell)),
     matching: find.byWidgetPredicate(
       (w) => w is Checkbox && w.onChanged == null,
     ),
@@ -156,7 +150,10 @@ void main() {
     expect(find.text('선택 해제'), findsOneWidget);
     expect(find.text('선택 항목 보관'), findsOneWidget);
     expect(find.byType(Checkbox), findsWidgets);
-    expect(_disabledCheckboxForTopic('50대 초보도 따라 하는 AI 전자책 첫 출간'), findsOneWidget);
+    expect(
+      _disabledCheckboxForTopic('50대 초보도 따라 하는 AI 전자책 첫 출간'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('전체 선택'));
     await tester.pumpAndSettle();
@@ -166,10 +163,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('선택한 2개의 기획을 보관하시겠습니까?'), findsOneWidget);
     await tester.tap(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text('보관'),
-      ),
+      find.descendant(of: find.byType(AlertDialog), matching: find.text('보관')),
     );
     await tester.pumpAndSettle();
 
@@ -218,11 +212,7 @@ void main() {
 
   testWidgets('휴지통 화면: trashed plan 선택·복원', (tester) async {
     final plans = [
-      _plan(
-        id: 'tr1',
-        topic: '휴지통 기획',
-        libraryState: PlanLibraryState.trashed,
-      ),
+      _plan(id: 'tr1', topic: '휴지통 기획', libraryState: PlanLibraryState.trashed),
     ];
     PlanLibraryBulkAction? lastAction;
     List<BusinessPlanDocument>? lastSelected;
@@ -267,11 +257,7 @@ void main() {
         status: PlanningStatus.transferred,
       ),
       _plan(id: 'prot', topic: '보호 기획', isProtected: true),
-      _plan(
-        id: 'work',
-        topic: '작업중',
-        status: PlanningStatus.inProgress,
-      ),
+      _plan(id: 'work', topic: '작업중', status: PlanningStatus.inProgress),
     ];
 
     await _pumpPanel(
@@ -285,15 +271,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byWidgetPredicate(
-        (w) => w is Checkbox && w.onChanged != null,
-      ),
+      find.byWidgetPredicate((w) => w is Checkbox && w.onChanged != null),
       findsNWidgets(2),
     );
     expect(
-      find.byWidgetPredicate(
-        (w) => w is Checkbox && w.onChanged == null,
-      ),
+      find.byWidgetPredicate((w) => w is Checkbox && w.onChanged == null),
       findsNWidgets(2),
     );
   });

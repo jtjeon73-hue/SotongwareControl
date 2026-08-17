@@ -21,6 +21,7 @@ const {
   handleCreatePairing,
   handleCreateJob,
   handleStartJob,
+  handleDeliverInstruction,
   validateApproveStageBody,
   validateRequestRevisionBody,
 } = require("./handlers");
@@ -109,6 +110,10 @@ async function handleApiRequest(req, res, deps) {
       "/api/control/start-job": async () => {
         const { uid } = await authenticateControl(req, deps);
         return handleStartJob(db, uid, body);
+      },
+      "/api/control/deliver-instruction": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleDeliverInstruction(db, uid, body);
       },
       "/api/control/approve-stage": async () => {
         await authenticateControl(req, deps);

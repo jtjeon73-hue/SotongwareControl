@@ -9,10 +9,21 @@ import '../theme/control_theme.dart';
 /// 사업별 표준 제작 가이드 패널 (참고용 매뉴얼).
 /// 실제 제작 진행률은 원격관제 프로젝트 데이터이며, 이 패널의 체크리스트와 혼동하지 않는다.
 class Sotong24ProductionGuidePanel extends StatefulWidget {
-  const Sotong24ProductionGuidePanel({super.key, this.focusProject});
+  const Sotong24ProductionGuidePanel({
+    super.key,
+    this.focusProject,
+    this.initialProductId,
+    this.initialContentSubtype,
+    this.embedded = false,
+  });
 
   /// 목록의 포커스 프로젝트 — 같은 제품이면 "현재 제작 단계" 표시(데모면 배지).
   final Sotong24RemoteProject? focusProject;
+  final String? initialProductId;
+  final String? initialContentSubtype;
+
+  /// 독립 메뉴(표준제작 가이드)에 임베드될 때 제목·사업 picker 숨김.
+  final bool embedded;
 
   @override
   State<Sotong24ProductionGuidePanel> createState() =>
@@ -21,11 +32,31 @@ class Sotong24ProductionGuidePanel extends StatefulWidget {
 
 class _Sotong24ProductionGuidePanelState
     extends State<Sotong24ProductionGuidePanel> {
-  String _productId = 'ebook';
-  String _contentSubtype = ContentSubtype.shorts;
+  late String _productId;
+  late String _contentSubtype;
   var _mode = _GuideViewMode.guide;
   final _search = TextEditingController();
   var _productPickerExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _productId = widget.initialProductId ?? 'ebook';
+    _contentSubtype = widget.initialContentSubtype ?? ContentSubtype.shorts;
+  }
+
+  @override
+  void didUpdateWidget(covariant Sotong24ProductionGuidePanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialProductId != null &&
+        widget.initialProductId != oldWidget.initialProductId) {
+      _productId = widget.initialProductId!;
+    }
+    if (widget.initialContentSubtype != null &&
+        widget.initialContentSubtype != oldWidget.initialContentSubtype) {
+      _contentSubtype = widget.initialContentSubtype!;
+    }
+  }
 
   @override
   void dispose() {
@@ -61,20 +92,22 @@ class _Sotong24ProductionGuidePanelState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '사업별 표준 제작 가이드',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          '제품을 처음 기획하는 단계부터 제작·검사·출시·운영까지 사업별 표준 제작 절차를 확인할 수 있습니다. '
-          '가이드는 참고용이며, 실제 진행상태는 원격관제 프로젝트 데이터입니다.',
-          style: TextStyle(color: ControlColors.textSecondary, height: 1.35),
-        ),
-        const SizedBox(height: 12),
-        _buildProductPicker(isMobile),
+        if (!widget.embedded) ...[
+          Text(
+            '사업별 표준 제작 가이드',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '제품을 처음 기획하는 단계부터 제작·검사·출시·운영까지 사업별 표준 제작 절차를 확인할 수 있습니다. '
+            '가이드는 참고용이며, 실제 진행상태는 AI 제작공정 프로젝트 데이터입니다.',
+            style: TextStyle(color: ControlColors.textSecondary, height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          _buildProductPicker(isMobile),
+        ],
         if (_productId == 'contents') ...[
           const SizedBox(height: 8),
           Wrap(

@@ -134,6 +134,9 @@ class RemoteControlApi {
     if (status == 404 || code == 'not_found') {
       return '요청한 대상을 찾을 수 없습니다.';
     }
+    if (code == 'agent_offline' || code == 'agent_missing') {
+      return '전송 실패. 연결된 노트북 Agent가 없습니다. 다시 시도가 필요합니다.';
+    }
     if (code == 'bad_pairing') {
       return '연결 코드가 올바르지 않거나 만료되었습니다.';
     }
@@ -164,18 +167,55 @@ class RemoteControlApi {
     required String title,
     required String assignedAgentId,
     int totalStages = 18,
+    String? instructionId,
   }) async {
-    final map = await _post('/api/control/create-job', {
+    final body = <String, dynamic>{
       'type': type,
       'title': title,
       'assignedAgentId': assignedAgentId,
       'totalStages': totalStages,
-    });
+    };
+    final iid = (instructionId ?? '').trim();
+    if (iid.isNotEmpty) body['instructionId'] = iid;
+    final map = await _post('/api/control/create-job', body);
     final id = '${map['jobId'] ?? ''}';
     if (id.isEmpty) {
       throw RemoteControlApiException('작업 생성에 실패했습니다.');
     }
     return id;
+  }
+
+  Future<({String jobId, String commandId, String agentId, String outcome})>
+  deliverInstruction({
+    required String instructionId,
+    required String type,
+    required String title,
+    required String assignedAgentId,
+    required Map<String, dynamic> payload,
+    int totalStages = 18,
+  }) async {
+    final map = await _post('/api/control/deliver-instruction', {
+      'instructionId': instructionId,
+      'type': type,
+      'title': title,
+      'assignedAgentId': assignedAgentId,
+      'totalStages': totalStages,
+      'payload': payload,
+    });
+    final jobId = '${map['jobId'] ?? ''}';
+    final commandId = '${map['commandId'] ?? ''}';
+    if (jobId.isEmpty || commandId.isEmpty) {
+      throw RemoteControlApiException(
+        '전송에 실패했습니다. 다시 시도해 주세요.',
+        code: 'start_failed',
+      );
+    }
+    return (
+      jobId: jobId,
+      commandId: commandId,
+      agentId: '${map['agentId'] ?? assignedAgentId}',
+      outcome: '${map['outcome'] ?? 'created'}',
+    );
   }
 
   Future<({String commandId, String jobId, bool idempotent})> startJob({

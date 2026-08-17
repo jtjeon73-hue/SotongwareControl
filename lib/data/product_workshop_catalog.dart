@@ -137,7 +137,7 @@ class ProductWorkshopCatalog {
         ),
         ProductionStep(
           number: 4,
-          name: '소통24워크 제작',
+          name: 'AI 제작공정',
           purpose: '본문·표지·PDF 제작',
           inputs: 'Inbox 작업지시',
           aiWork: '단계별 집필·편집 (Sotong24Work)',

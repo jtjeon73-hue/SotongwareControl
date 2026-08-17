@@ -68,7 +68,7 @@ void main() {
     expect(PlanProgressStatus.isTrulyTransferred(doc), isFalse);
   });
 
-  test('folder write shows 전달됨', () {
+  test('Inbox folder-only is not 전달됨', () {
     final doc = plan(
       status: PlanningStatus.transferred,
       lastTransferMode: PlanProgressStatus.folderMode,
@@ -79,6 +79,25 @@ void main() {
       hasTransferFolder: true,
     );
 
+    expect(view.isTrulyTransferred, isFalse);
+    expect(view.badgeLabel, '전송 실패');
+    expect(doc.wasTransferred, isFalse);
+  });
+
+  test('remote Job+START_JOB shows 전달됨', () {
+    final base = plan(
+      status: PlanningStatus.transferred,
+      lastTransferMode: PlanProgressStatus.remoteMode,
+    );
+    final doc = base.copyWith(
+      lastRemoteJobId: 'job_1',
+      lastRemoteCommandId: 'cmd_1',
+    );
+    final view = PlanProgressStatus.resolve(
+      doc,
+      hasDevWorkDocRoot: true,
+      hasTransferFolder: true,
+    );
     expect(view.isTrulyTransferred, isTrue);
     expect(view.badgeLabel, '전달됨');
     expect(doc.wasTransferred, isTrue);

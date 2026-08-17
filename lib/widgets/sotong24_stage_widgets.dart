@@ -1,8 +1,62 @@
 import 'package:flutter/material.dart';
 
 import '../data/sotong24_workflows.dart';
+import '../models/instruction_contract.dart';
+import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
 import '../theme/control_theme.dart';
+import 'result_link_button.dart';
+
+/// 단계 자체 resultUrl/previewUrl 열기 — currentStage에 의존하지 않음.
+class Sotong24StageResultOpenButtons extends StatelessWidget {
+  const Sotong24StageResultOpenButtons({
+    super.key,
+    required this.stage,
+    this.compact = false,
+  });
+
+  final Sotong24RemoteStage stage;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = stage.openableResultUrl;
+    final preview = stage.openablePreviewUrl;
+    if (result == null && preview == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!compact) ...[
+          const Text(
+            '결과물',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: ControlColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+        if (result != null)
+          ResultLinkButton(
+            url: result,
+            label: '결과물 보기',
+            icon: Icons.description_outlined,
+            style: ResultLinkStyle.tonal,
+          ),
+        if (result != null && preview != null) const SizedBox(height: 8),
+        if (preview != null)
+          ResultLinkButton(
+            url: preview,
+            label: '미리보기',
+            icon: Icons.open_in_new,
+            style: ResultLinkStyle.outlined,
+          ),
+      ],
+    );
+  }
+}
 
 class Sotong24StageStats {
   const Sotong24StageStats({
@@ -26,19 +80,20 @@ class Sotong24StageStats {
     var revision = 0;
     var error = 0;
     for (final s in project.stages) {
-      switch (s.status) {
-        case Sotong24WorkStatus.completed:
-          completed++;
-        case Sotong24WorkStatus.inProgress:
-          inProgress++;
-        case Sotong24WorkStatus.awaitingApproval:
-          awaiting++;
-        case Sotong24WorkStatus.revision:
-          revision++;
-        case Sotong24WorkStatus.error:
-          error++;
-        default:
-          break;
+      final st = Sotong24UserFacingStatus.normalize(s.status);
+      // 배타적 분류 — pending approval은 awaiting으로만 센다(중복 금지).
+      if (st == Sotong24WorkStatus.error) {
+        error++;
+      } else if (st == Sotong24WorkStatus.revision ||
+          s.approvalStatus == ApprovalStatus.revisionRequested) {
+        revision++;
+      } else if (st == Sotong24WorkStatus.awaitingApproval ||
+          s.approvalStatus == ApprovalStatus.pending) {
+        awaiting++;
+      } else if (st == Sotong24WorkStatus.inProgress) {
+        inProgress++;
+      } else if (st == Sotong24WorkStatus.completed) {
+        completed++;
       }
     }
     return Sotong24StageStats(
@@ -52,7 +107,7 @@ class Sotong24StageStats {
 }
 
 String sotong24StatusGlyph(String status) {
-  switch (status) {
+  switch (Sotong24UserFacingStatus.normalize(status)) {
     case Sotong24WorkStatus.completed:
       return '✓';
     case Sotong24WorkStatus.inProgress:
@@ -121,60 +176,88 @@ class Sotong24NowTodoPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final completed = project.userFacingStatus == Sotong24WorkStatus.completed;
+    final headline = project.nowTodoHeadline(stage: stage);
     final checks = def?.userChecks ?? const <String>['결과 확인'];
+    final awaiting =
+        project.userFacingStatus == Sotong24WorkStatus.awaitingApproval;
+    final showChecks = !completed && awaiting && checks.isNotEmpty;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: ControlColors.warningBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ControlColors.accentWarm),
+        color: completed ? ControlColors.tealSoft : ControlColors.warningBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: completed ? ControlColors.teal : ControlColors.accentWarm,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '지금 할 일',
+            completed ? '작업 완료' : '지금 할 일',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           Text(
-            '${stage.stageNumber}단계 「${stage.stageName}」 결과를 확인해 주세요.',
+            headline,
             style: const TextStyle(
               fontSize: 15,
-              height: 1.4,
+              height: 1.35,
               fontWeight: FontWeight.w600,
             ),
           ),
-          if ((def?.aiWork ?? stage.workReport).isNotEmpty) ...[
-            const SizedBox(height: 10),
-            const Text('AI 작업', style: TextStyle(fontWeight: FontWeight.w700)),
+          if (completed &&
+              (RemoteE2eSampleMarkers.isTestInstructionId(project.projectId) ||
+                  RemoteE2eSampleMarkers.isTestTitle(project.title))) ...[
             const SizedBox(height: 4),
-            Text(
-              def?.aiWork.isNotEmpty == true ? def!.aiWork : stage.workReport,
-              style: const TextStyle(fontSize: 14, height: 1.4),
-            ),
-          ],
-          const SizedBox(height: 10),
-          const Text('내가 확인할 것', style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          for (final c in checks)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '□ $c',
-                style: const TextStyle(fontSize: 14, height: 1.35),
+            const Text(
+              'TEST E2E 완료',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: ControlColors.teal,
               ),
             ),
-          if (stage.userAttention.isNotEmpty) ...[
+          ],
+          if (!completed &&
+              awaiting &&
+              (def?.aiWork ?? stage.workReport).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('AI 작업', style: TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text(
+              def?.aiWork.isNotEmpty == true ? def!.aiWork : stage.workReport,
+              style: const TextStyle(fontSize: 13, height: 1.35),
+            ),
+          ],
+          if (showChecks) ...[
+            const SizedBox(height: 8),
+            const Text(
+              '내가 확인할 것',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 2),
+            for (final c in checks)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  '□ $c',
+                  style: const TextStyle(fontSize: 13, height: 1.3),
+                ),
+              ),
+          ],
+          if (!completed && stage.userAttention.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
               stage.userAttention,
               style: const TextStyle(
-                fontSize: 14,
-                height: 1.4,
+                fontSize: 13,
+                height: 1.35,
                 color: ControlColors.textSecondary,
               ),
             ),
@@ -279,7 +362,9 @@ class _Sotong24ExpandableStageTileState
                     ),
                   ),
                   Text(
-                    Sotong24WorkStatus.labelKo(s.status),
+                    Sotong24WorkStatus.labelKo(
+                      Sotong24UserFacingStatus.normalize(s.status),
+                    ),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -308,6 +393,11 @@ class _Sotong24ExpandableStageTileState
                   _line('이 단계에서 하는 일', def?.workDescription ?? ''),
                   _line('AI 작업', def?.aiWork ?? s.workReport),
                   _line('생성 결과물', def?.outputs ?? s.resultPreview),
+                  if (s.hasOpenableResult) ...[
+                    const SizedBox(height: 4),
+                    Sotong24StageResultOpenButtons(stage: s),
+                    const SizedBox(height: 8),
+                  ],
                   if (def != null && def.qualityChecks.isNotEmpty)
                     _line(
                       '품질검사',

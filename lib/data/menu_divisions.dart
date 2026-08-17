@@ -20,11 +20,12 @@ class MenuDivisionCatalog {
 
   static const planningExecution = MenuDivision(
     id: 'planning_execution',
-    title: '기획실행부',
+    title: '운영 관제',
     destinations: [
       ControlDestination.aiBusinessAnalysis,
       ControlDestination.productWorkshop,
       ControlDestination.sotong24RemoteControl,
+      ControlDestination.standardProductionGuide,
     ],
   );
 

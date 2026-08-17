@@ -11,11 +11,15 @@ class RemoteAgentRepository {
     List<RemoteAgentDoc>? memoryAgents,
     List<RemoteJobDoc>? memoryJobs,
     Map<String, List<RemoteStageDoc>>? memoryStages,
+    Map<String, List<RemoteCommandDoc>>? memoryCommands,
   }) : _forceMemory = forceMemory ?? false,
        _memoryAgents = List<RemoteAgentDoc>.from(memoryAgents ?? const []),
        _memoryJobs = List<RemoteJobDoc>.from(memoryJobs ?? const []),
        _memoryStages = Map<String, List<RemoteStageDoc>>.from(
          memoryStages ?? const {},
+       ),
+       _memoryCommands = Map<String, List<RemoteCommandDoc>>.from(
+         memoryCommands ?? const {},
        );
 
   final FirebaseFirestore? _db;
@@ -23,6 +27,7 @@ class RemoteAgentRepository {
   List<RemoteAgentDoc> _memoryAgents;
   List<RemoteJobDoc> _memoryJobs;
   final Map<String, List<RemoteStageDoc>> _memoryStages;
+  final Map<String, List<RemoteCommandDoc>> _memoryCommands;
 
   bool get usesMemory => _forceMemory || !isFirebaseReady();
 
@@ -103,6 +108,17 @@ class RemoteAgentRepository {
     });
   }
 
+  Future<List<RemoteCommandDoc>> listCommands(String jobId) async {
+    if (usesMemory || _jobs == null) {
+      return List.of(_memoryCommands[jobId] ?? const []);
+    }
+    final snap = await _jobs!.doc(jobId).collection('commands').get();
+    return snap.docs
+        .map((d) => RemoteCommandDoc.fromMap(d.data(), id: d.id))
+        .where((c) => c.commandId.isNotEmpty)
+        .toList();
+  }
+
   Stream<RemoteAgentDoc?> watchPairingCompletion({required String sessionId}) {
     if (usesMemory) {
       return Stream.value(null);
@@ -127,6 +143,7 @@ class RemoteAgentRepository {
     List<RemoteAgentDoc>? agents,
     List<RemoteJobDoc>? jobs,
     Map<String, List<RemoteStageDoc>>? stages,
+    Map<String, List<RemoteCommandDoc>>? commands,
   }) {
     if (agents != null) _memoryAgents = List.of(agents);
     if (jobs != null) _memoryJobs = List.of(jobs);
@@ -134,6 +151,11 @@ class RemoteAgentRepository {
       _memoryStages
         ..clear()
         ..addAll(stages);
+    }
+    if (commands != null) {
+      _memoryCommands
+        ..clear()
+        ..addAll(commands);
     }
   }
 }

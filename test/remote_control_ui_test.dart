@@ -169,6 +169,52 @@ void main() {
   });
 
   group('widgets', () {
+    test('menu label and online threshold', () {
+      expect(ControlDestination.sotong24RemoteControl.label, '노트북 원격관제');
+      expect(RemoteControlEnv.onlineThresholdSeconds, 90);
+    });
+
+    testWidgets('E2E sample panel visible', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final repo = RemoteAgentRepository(forceMemory: true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RemoteControlScreen(
+              repository: repo,
+              api: RemoteControlApi(
+                httpClient: MockClient(
+                  (_) async => http.Response('{"ok":false}', 500),
+                ),
+                idTokenProvider: () async => 't',
+              ),
+              instructionSource: RemoteWorkInstructionSource(memoryCatalog: []),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('개발/진단 도구'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('개발/진단 도구'));
+      await tester.pumpAndSettle();
+      expect(find.text('샘플 작업지시서 E2E 테스트'), findsOneWidget);
+      expect(find.text('샘플 작업지시서 생성'), findsOneWidget);
+      expect(find.text('Cursor 자동실행 TEST'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Codex 무인작업 TEST'),
+        120,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Codex 무인작업 TEST'), findsOneWidget);
+    });
+
     testWidgets('empty agents shows connect CTA', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -192,8 +238,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('연결된 소통24워크가 없습니다'), findsOneWidget);
-      expect(find.text('소통24워크 연결하기'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('노트북 Agent 연결하기'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('연결된 노트북 Agent가 없습니다'), findsOneWidget);
+      expect(find.text('노트북 Agent 연결하기'), findsOneWidget);
     });
 
     testWidgets('agent online idle card', (tester) async {
@@ -225,6 +276,18 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Agent 상태 자세히'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Agent 상태 자세히'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('작업 보내기'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.textContaining('작업지시 대기'), findsWidgets);
       expect(find.text('작업 보내기'), findsOneWidget);
     });
@@ -258,6 +321,18 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Agent 상태 자세히'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Agent 상태 자세히'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('작업 보내기'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       final btn = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, '작업 보내기'),
       );
@@ -302,12 +377,19 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('AI 전자책'), findsOneWidget);
-      expect(find.textContaining('작업 중'), findsWidgets);
+      await tester.scrollUntilVisible(
+        find.text('작업 내역 자세히'),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('작업 내역 자세히'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('50대'), findsWidgets);
+      expect(find.textContaining('상태:'), findsWidgets);
     });
 
     testWidgets('pairing sheet creates code', (tester) async {
-      tester.view.physicalSize = const Size(390, 844);
+      tester.view.physicalSize = const Size(390, 1600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
 
@@ -329,17 +411,18 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('소통24워크 연결하기'));
+      await tester.scrollUntilVisible(
+        find.text('노트북 Agent 연결하기'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('노트북 Agent 연결하기'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('새 연결 코드 만들기'));
       await tester.pumpAndSettle();
       expect(find.text('XY12AB34'), findsOneWidget);
       expect(find.text('코드 복사'), findsOneWidget);
-    });
-
-    testWidgets('menu label exists', (tester) async {
-      expect(ControlDestination.sotong24RemoteControl.label, '소통24워크 원격관제');
-      expect(RemoteControlEnv.onlineThresholdSeconds, 90);
     });
 
     testWidgets('narrow layout no overflow smoke', (tester) async {

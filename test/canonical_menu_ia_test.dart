@@ -12,13 +12,14 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  test('canonical 메뉴는 16개이며 지정 순서·라벨을 따른다', () {
+  test('canonical 메뉴는 17개이며 지정 순서·라벨을 따른다', () {
     final menus = SidebarNavigation.canonicalDestinations;
-    expect(menus.length, 16);
+    expect(menus.length, 17);
     expect(menus.map((e) => e.label).toList(), [
       '작업지시 제작소',
-      '소통24워크',
-      '소통24워크 원격관제',
+      'AI 제작공정',
+      '노트북 원격관제',
+      '표준제작 가이드',
       '산업자동화SW개발부',
       '전자책 개발부',
       '앱 개발부',

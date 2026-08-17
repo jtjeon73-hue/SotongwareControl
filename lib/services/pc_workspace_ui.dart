@@ -54,9 +54,9 @@ PcWorkspaceStatusCopy resolvePcWorkspaceStatusCopy({
 }) {
   final relayOk = agentOnline;
   final agentLine = !agentOnline
-      ? (hasAnyAgent ? '소통24워크 PC  · 오프라인' : '소통24워크 PC  · 상태 없음')
-      : '소통24워크 PC  ● 온라인'
-          '${onlineAgentCount == 1 ? '' : ' ($onlineAgentCount)'}';
+      ? (hasAnyAgent ? '소통24워크 Agent  · 오프라인' : '소통24워크 Agent  · 상태 없음')
+      : '소통24워크 Agent  ● 온라인'
+            '${onlineAgentCount == 1 ? '' : ' ($onlineAgentCount)'}';
 
   final String headline;
   if (!fsaSupported) {
@@ -64,7 +64,7 @@ PcWorkspaceStatusCopy resolvePcWorkspaceStatusCopy({
   } else if (relayOk) {
     headline = '원격 작업 전달 정상';
   } else {
-    headline = '소통24워크 PC 재연결 필요';
+    headline = '소통24워크 Agent 재연결 필요';
   }
 
   final String? devLine;

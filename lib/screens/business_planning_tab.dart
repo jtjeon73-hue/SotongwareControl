@@ -11,7 +11,6 @@ import '../models/idea_bank.dart';
 import '../models/planning_wizard_state.dart';
 import '../models/project_design_state.dart';
 import '../models/remote_agent_models.dart';
-import '../services/browser_json_download_service.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
 import '../services/dev_work_doc_paths.dart';
@@ -30,14 +29,17 @@ import '../services/project_design_engine.dart';
 import '../services/remote_agent_repository.dart';
 import '../services/remote_work_instruction_mirror.dart';
 import '../services/sotong24_remote_repository.dart';
+import '../services/work_instruction_remote_delivery.dart';
 import '../services/work_instruction_validator.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/project_design/instruction_preview_panel.dart';
 import '../widgets/project_design/plan_library_panel.dart';
+import '../widgets/operational_collapsible_section.dart';
 import '../widgets/project_design/project_design_wizard.dart';
 
-/// 작업지시 제작소 본문 (로컬 규칙 기반, 외부 AI 없음).
+/// 작업지시 제작소 본문 (로컬 규칙 기반).
+/// Production AI는 새 ebook WI에만 opt-in `aiExecution`으로 연결한다.
 class BusinessPlanningTab extends StatefulWidget {
   const BusinessPlanningTab({super.key, this.ideaSeed});
 
@@ -56,6 +58,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   final _wiMirror = RemoteWorkInstructionMirrorService();
   final _agentRepo = RemoteAgentRepository();
   final _remoteRepo = Sotong24RemoteRepository();
+  final _delivery = WorkInstructionRemoteDeliveryService();
   final _contractValidator = InstructionContractValidator();
   final _designEngine = ProjectDesignEngine();
 
@@ -90,14 +93,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   bool _transferBusy = false;
   String? _lastTransferDiagnosis;
   bool _inputModeQuick = true;
+
+  /// 새 ebook WI에만 Codex 1단계 pilot 정책 부착. 기존 WI에는 자동 삽입하지 않음.
+  bool _aiProductionPilot = true;
   String _libraryFolder = 'all';
   PlanLibraryViewMode _libraryView = PlanLibraryViewMode.cards;
   PlanLibrarySort _librarySort = PlanLibrarySort.newest;
   FolderPermissionState? _folderState;
   DevWorkDocState? _devDocState;
   List<RemoteAgentDoc> _remoteAgents = const [];
+  List<RemoteJobDoc> _remoteJobs = const [];
   List<Sotong24RemoteProject> _remoteProjects = const [];
   StreamSubscription<List<Sotong24RemoteProject>>? _remoteProjectsSub;
+  StreamSubscription<List<RemoteJobDoc>>? _remoteJobsSub;
+  StreamSubscription<List<RemoteAgentDoc>>? _remoteAgentsSub;
+  bool _orphanRepairStarted = false;
   bool _pcWorkspaceExpanded = false;
   DevWorkDocWriteResult? _lastDevWorkDocResult;
   Timer? _draftTimer;
@@ -122,10 +132,22 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       if (!mounted) return;
       setState(() => _remoteProjects = projects);
     });
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      _remoteJobsSub = _agentRepo.watchJobs(ownerUid: uid).listen((jobs) {
+        if (!mounted) return;
+        setState(() => _remoteJobs = jobs);
+        unawaited(_maybeRepairOrphan());
+      });
+      _remoteAgentsSub = _agentRepo.watchAgents(ownerUid: uid).listen((agents) {
+        if (!mounted) return;
+        setState(() => _remoteAgents = agents);
+      });
+    } catch (_) {}
   }
 
   PlanExecutionIndex get _executionIndex =>
-      PlanExecutionIndex.fromRemoteProjects(_remoteProjects);
+      PlanExecutionIndex.fromRemoteProjects(_remoteProjects, jobs: _remoteJobs);
 
   PlanExecutionSnapshot _execFor(BusinessPlanDocument plan) =>
       _executionIndex.snapshotFor(plan);
@@ -135,6 +157,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _draftTimer?.cancel();
     _wizardTimer?.cancel();
     _remoteProjectsSub?.cancel();
+    _remoteJobsSub?.cancel();
+    _remoteAgentsSub?.cancel();
     _remoteRepo.dispose();
     for (final c in _allControllers) {
       c.dispose();
@@ -181,10 +205,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       var agents = <RemoteAgentDoc>[];
       try {
         final uid = FirebaseAuth.instance.currentUser?.uid;
-        agents = await _agentRepo.watchAgents(ownerUid: uid).first.timeout(
-          const Duration(seconds: 4),
-          onTimeout: () => const <RemoteAgentDoc>[],
-        );
+        agents = await _agentRepo
+            .watchAgents(ownerUid: uid)
+            .first
+            .timeout(
+              const Duration(seconds: 4),
+              onTimeout: () => const <RemoteAgentDoc>[],
+            );
       } catch (_) {
         agents = const [];
       }
@@ -206,6 +233,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _analysis = plan.analysis;
             _instruction = plan.instruction;
             _activeDoc = plan;
+            _aiProductionPilot = plan.instruction?.aiExecution?.enabled == true;
             if (plan.input.wizardSelections != null) {
               _wizardState = PlanningWizardState.fromJson(
                 plan.input.wizardSelections!,
@@ -226,6 +254,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         }
       });
       _consumeIdeaSeedIfNeeded();
+      unawaited(_maybeRepairOrphan());
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -382,6 +411,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       case PlanningStatus.readyToTransfer:
       case PlanningStatus.validationRequired:
       case PlanningStatus.transferred:
+      case PlanningStatus.transferFailed:
       case PlanningStatus.downloadedPendingImport:
         return _instruction != null;
       default:
@@ -458,6 +488,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       lastTransferChecksum:
           lastTransferChecksum ?? _activeDoc?.lastTransferChecksum,
       lastTransferMode: lastTransferMode ?? _activeDoc?.lastTransferMode,
+      lastRemoteJobId: _activeDoc?.lastRemoteJobId,
+      lastRemoteCommandId: _activeDoc?.lastRemoteCommandId,
+      lastRemoteAgentId: _activeDoc?.lastRemoteAgentId,
+      lastDeliveryErrorCode: _activeDoc?.lastDeliveryErrorCode,
+      lastDeliveryErrorLabel: _activeDoc?.lastDeliveryErrorLabel,
       versionHistory: versionHistory ?? _activeDoc?.versionHistory ?? const [],
       favorite: favorite ?? existing?.favorite ?? false,
       libraryFolder: libraryFolder ?? existing?.libraryFolder ?? '',
@@ -530,6 +565,16 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         input.desiredOutcome.trim() == wi.businessPurpose.trim() &&
         ArtifactType.normalize(artifact) == wiArtifact &&
         input.notes.trim() == wi.notes.trim();
+  }
+
+  /// 새 ebook + pilot 토글 ON일 때만 고정 정책. 기존 WI 자동 migration 없음.
+  AiExecutionPolicy? _resolveAiExecutionForBuild(BusinessPlanInput input) {
+    if (!_aiProductionPilot) return null;
+    final artifact = input.resolvedArtifactType == ArtifactType.undecided
+        ? ArtifactType.ebook
+        : ArtifactType.normalize(input.resolvedArtifactType);
+    if (artifact != ArtifactType.ebook) return null;
+    return AiExecutionPolicy.pilotCodexStage1;
   }
 
   Future<void> _createInstruction() async {
@@ -961,6 +1006,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ).convert(existingInstruction.toJson());
       }
     } else {
+      final aiExecution = _resolveAiExecutionForBuild(input);
       var built = _service.buildInstruction(
         planId: id,
         input: input,
@@ -971,6 +1017,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         createdAt: preserveCreatedAt,
         updatedAt: preserveUpdatedAt,
         status: PlanningStatus.instructionReady,
+        aiExecution: aiExecution,
       );
       final sourceFileName =
           'WI_${DevWorkDocPaths.sanitizeInstructionId(iid)}.json';
@@ -991,6 +1038,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         checksum: checksum,
         sourceFileName: sourceFileName,
         status: PlanningStatus.instructionReady,
+        aiExecution: aiExecution,
       );
       jsonText = const JsonEncoder.withIndent(
         '  ',
@@ -1157,10 +1205,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('먼저 작업지시서를 생성하세요.');
       return;
     }
-    if (!_inboxTransferReady) {
-      _snack('Inbox 전달 준비가 되지 않았습니다. 「전달 폴더 다시 선택」으로 쓰기 권한을 확인하세요.');
-      return;
-    }
     if (_needsVersionRecovery) {
       _snack('부분 저장 또는 충돌 상태입니다. 먼저 Active를 복구하세요.');
       await _openVersionDiagnoseAndRecover();
@@ -1221,201 +1265,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       return;
     }
 
-    setState(() => _transferBusy = true);
-    browserJsonDownloadBlocked = true;
-    final downloadsBefore = browserJsonDownloadCallCount;
-    try {
-      ensureBrowserJsonDownloadRegistered();
-      await _savePlan(silent: true);
-
-      // 항상 확정 Active 스냅샷만 전달 (재생성 스냅샷·다른 기획 금지)
-      final activeText = _devWorkDocFolderReady
-          ? await _devWorkDoc.readActive(artifact, iid)
-          : null;
-      final gate = gateActiveSnapshotForTransfer(
-        activeText: activeText,
-        selectedInstructionId: iid,
-        selectedVersion: _version,
-        selectedArtifactType: artifact,
-      );
-      if (!gate.allowed || gate.jsonText == null || gate.checksum == null) {
-        if (!mounted) return;
-        await _showTransferBlockedDialog(gate.message);
-        return;
-      }
-
-      final jsonText = gate.jsonText!;
-      final checksum = gate.checksum!;
-      final fileName = inboxTransferFileName(
-        instructionId: iid,
-        version: _version,
-        artifactType: artifact,
-      );
-
-      if (!mounted) return;
-      final proceed = await _confirmInboxTransfer(
-        title: _currentInput.topic,
-        instructionId: iid,
-        version: _version,
-        artifactType: artifact,
-        checksum: checksum,
-        folderName: _folderState?.folderName ?? 'Inbox',
-        fileName: fileName,
-      );
-      if (proceed != true) return;
-
-      final result = await _transfer.writeJsonFile(
-        fileName: fileName,
-        jsonText: jsonText,
-        instructionId: iid,
-        version: _version,
-        expectedChecksum: checksum,
-      );
-
-      final downloadsAfter = browserJsonDownloadCallCount;
-      final diagnosis = _formatTransferDiagnosis(
-        result: result,
-        downloadsBefore: downloadsBefore,
-        downloadsAfter: downloadsAfter,
-        expectedFileName: fileName,
-        expectedChecksum: checksum,
-        folderName: _folderState?.folderName ?? 'Inbox',
-      );
-      if (mounted) {
-        setState(() => _lastTransferDiagnosis = diagnosis);
-      }
-
-      // 직접 전달 경로에서는 다운로드가 발생하지 않음. 실패도 다운로드로 대체하지 않음.
-      if (downloadsAfter != downloadsBefore ||
-          result.outcome == TransferOutcome.downloadOnly ||
-          result.mode == PlanProgressStatus.downloadMode ||
-          result.downloadCallsDuringTransfer > 0) {
-        if (!mounted) return;
-        await _showTransferFailedDialog(
-          'Inbox 직접 전달 중 브라우저 다운로드가 감지·차단되었습니다.\n$diagnosis',
-        );
-        return;
-      }
-
-      if (result.outcome == TransferOutcome.conflict) {
-        if (!mounted) return;
-        await _showTransferConflictDialog(result);
-        return;
-      }
-
-      if (!result.isFolderSuccess) {
-        if (!mounted) return;
-        await _showTransferFailedDialog(
-          '${result.message ?? '직접 전달에 실패했습니다.'}\n$diagnosis',
-        );
-        return;
-      }
-
-      final now = DateTime.now().toUtc().toIso8601String();
-      final id = _activePlanId!;
-      final existing = _allPlans.firstWhere((p) => p.id == id);
-      final doc = existing.copyWith(
-        status: PlanningStatus.transferred,
-        updatedAt: now,
-        instruction: _instruction,
-        lastTransferAt: now,
-        lastTransferFileName: result.fileName ?? fileName,
-        lastTransferChecksum: result.checksum ?? checksum,
-        lastTransferMode: PlanProgressStatus.folderMode,
-      );
-
-      await _store.upsertPlan(doc);
-      await _refreshPlans();
-      if (!mounted) return;
-      final folder = await _transfer.currentState();
-      if (!mounted) return;
-      setState(() {
-        _activeDoc = doc;
-        _folderState = folder;
-      });
-
-      if (result.outcome == TransferOutcome.alreadyExists) {
-        _snack('기존 Inbox 파일 확인');
-      } else {
-        _snack('소통24워크 Inbox 전달 완료');
-      }
-      if (mounted) {
-        await _showTransferSuccessDiagnosis(diagnosis);
-      }
-    } finally {
-      browserJsonDownloadBlocked = false;
-      if (mounted) setState(() => _transferBusy = false);
-    }
-  }
-
-  String _formatTransferDiagnosis({
-    required TransferWriteResult result,
-    required int downloadsBefore,
-    required int downloadsAfter,
-    required String expectedFileName,
-    required String expectedChecksum,
-    required String folderName,
-  }) {
-    return [
-      '경로: ${result.pathId ?? 'inbox_write'}',
-      '대상 폴더: ${result.folderName ?? folderName}',
-      '파일명: ${result.fileName ?? expectedFileName}',
-      'size: ${result.bytes}B',
-      'instructionId: ${result.instructionId ?? '-'}',
-      'version: ${result.version ?? '-'}',
-      'contentChecksum: ${result.checksum ?? expectedChecksum}',
-      'verified: ${result.verified}',
-      'outcome: ${result.outcome.name}',
-      'downloadCalls: ${downloadsAfter - downloadsBefore} (누적 $downloadsAfter)',
-    ].join('\n');
-  }
-
-  Future<void> _showTransferSuccessDiagnosis(String diagnosis) {
-    return showDialog<void>(
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Inbox 전달 검증'),
-        content: SingleChildScrollView(child: Text(diagnosis)),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('확인'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<bool?> _confirmInboxTransfer({
-    required String title,
-    required String instructionId,
-    required int version,
-    required String artifactType,
-    required String checksum,
-    required String folderName,
-    required String fileName,
-  }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Inbox로 전달'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('기획 제목: $title'),
-            Text('instructionId: $instructionId'),
-            Text('전달 버전: v$version'),
-            Text('artifactType: $artifactType'),
-            Text('contentChecksum: $checksum'),
-            Text('대상 폴더: $folderName (Inbox)'),
-            Text('파일명: $fileName'),
-            const SizedBox(height: 8),
-            const Text(
-              '선택된 Inbox에 직접 저장합니다. 브라우저 다운로드는 실행되지 않습니다.',
-              style: TextStyle(fontSize: 12),
-            ),
-          ],
+        title: const Text('작업을 전송할까요?'),
+        content: Text(
+          '「${_currentInput.topic}」을 연결된 노트북 Agent로 전달합니다.\n'
+          '전송이 성공해야 전달됨으로 표시됩니다.',
         ),
         actions: [
           TextButton(
@@ -1429,83 +1286,211 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ],
       ),
     );
+    if (confirmed != true) return;
+
+    await _deliverActiveInstruction(
+      instructionId: iid,
+      artifactType: artifact,
+      ensurePilot: _aiProductionPilot,
+      silent: false,
+    );
   }
 
-  Future<void> _showTransferBlockedDialog(String message) {
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('전달 차단'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-          if (_needsVersionRecovery)
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _openVersionDiagnoseAndRecover();
-              },
-              child: const Text('Active 복구'),
+  Future<void> _maybeRepairOrphan() async {
+    if (_transferBusy || _loading) return;
+    const iid = WorkInstructionRemoteDelivery.orphanProductionInstructionId;
+    BusinessPlanDocument? plan;
+    for (final p in _allPlans) {
+      if (p.stableInstructionId == iid) plan = p;
+    }
+    if (plan == null || plan.instruction == null) return;
+    if (WorkInstructionRemoteDelivery.isProtectedSkip(iid)) return;
+    final existing = WorkInstructionRemoteDelivery.findJob(_remoteJobs, iid);
+    if (existing != null) {
+      if (!plan.hasRemoteDelivery) {
+        final cmds = await _agentRepo.listCommands(existing.jobId);
+        final start = WorkInstructionRemoteDelivery.findStartJob(cmds);
+        if (start != null) {
+          final doc = WorkInstructionRemoteDelivery.markDelivered(
+            plan: plan,
+            result: RemoteDeliveryResult(
+              delivered: true,
+              jobId: existing.jobId,
+              commandId: start.commandId,
+              agentId: existing.assignedAgentId,
+              outcome: 'reused',
             ),
-        ],
-      ),
+            instruction: plan.instruction,
+          );
+          await _store.upsertPlan(doc);
+          await _refreshPlans();
+          if (mounted && _activePlanId == plan.id) {
+            setState(() {
+              _activeDoc = doc;
+              _instruction = doc.instruction;
+            });
+          }
+        }
+      }
+      return;
+    }
+    if (_orphanRepairStarted) return;
+    if (WorkInstructionRemoteDelivery.pickTargetAgent(_remoteAgents) == null) {
+      return;
+    }
+    _orphanRepairStarted = true;
+    await _deliverActiveInstruction(
+      instructionId: iid,
+      artifactType: plan.input.resolvedArtifactType.isEmpty
+          ? ArtifactType.ebook
+          : plan.input.resolvedArtifactType,
+      ensurePilot: true,
+      silent: true,
+      planOverride: plan,
     );
   }
 
-  Future<void> _showTransferConflictDialog(TransferWriteResult result) {
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Inbox 충돌'),
-        content: Text(
-          result.message ??
-              '동일 버전인데 핵심 내용이 다릅니다. 덮어쓰지 않았습니다.\n'
-                  '사용자 승인 후 새 버전을 생성하세요.',
+  Future<void> _deliverActiveInstruction({
+    required String instructionId,
+    required String artifactType,
+    required bool ensurePilot,
+    required bool silent,
+    BusinessPlanDocument? planOverride,
+  }) async {
+    if (_transferBusy) return;
+    setState(() => _transferBusy = true);
+    try {
+      if (!silent) await _savePlan(silent: true);
+      var plan =
+          planOverride ??
+          (_activePlanId == null
+              ? null
+              : _allPlans.cast<BusinessPlanDocument?>().firstWhere(
+                  (p) => p?.id == _activePlanId,
+                  orElse: () => null,
+                ));
+      plan ??= _activeDoc;
+      if (plan == null || plan.instruction == null) {
+        if (!silent) _snack('전달할 작업지시서가 없습니다.');
+        return;
+      }
+
+      Map<String, dynamic> payload = Map<String, dynamic>.from(
+        plan.instruction!.toJson(),
+      );
+      if (_devWorkDocFolderReady) {
+        final activeText = await _devWorkDoc.readActive(
+          artifactType,
+          instructionId,
+        );
+        if (activeText != null && activeText.trim().isNotEmpty) {
+          try {
+            final decoded = jsonDecode(activeText);
+            if (decoded is Map &&
+                '${decoded['instructionId'] ?? ''}'.trim() == instructionId) {
+              payload = Map<String, dynamic>.from(decoded);
+            }
+          } catch (_) {}
+        }
+      }
+
+      final attach = WorkInstructionRemoteDelivery.shouldAttachPilot(
+        toggleOn: ensurePilot,
+        instruction: WorkInstruction.fromJson(payload),
+        repairOrphan: WorkInstructionRemoteDelivery.isOrphanProduction(
+          instructionId,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _createNewVersion();
-            },
-            child: const Text('새 버전 생성'),
-          ),
-        ],
-      ),
-    );
+      );
+      if (attach) {
+        payload = WorkInstructionRemoteDelivery.attachPilotAiExecution(payload);
+      }
+      payload['instructionId'] = instructionId;
+      final jsonText = const JsonEncoder.withIndent('  ').convert(payload);
+      final instruction = WorkInstruction.fromJson(payload);
+
+      await _mirrorActiveSoft(
+        artifactType: artifactType,
+        instructionId: instructionId,
+        jsonText: jsonText,
+        version: plan.version,
+        title: instruction.businessIdea,
+      );
+
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final result = await _delivery.deliver(
+        instructionId: instructionId,
+        title: instruction.businessIdea.isNotEmpty
+            ? instruction.businessIdea
+            : plan.input.topic,
+        type: ArtifactType.normalize(artifactType),
+        payload: payload,
+        totalStages: instruction.workflowSteps.isEmpty
+            ? 18
+            : instruction.workflowSteps.length,
+        ownerUid: uid,
+      );
+
+      final existing = _allPlans.firstWhere(
+        (p) => p.id == plan!.id,
+        orElse: () => plan!,
+      );
+      final transientAgentGap =
+          silent &&
+          (result.errorCode == 'agent_offline' ||
+              result.errorCode == 'agent_missing');
+      if (!result.delivered && transientAgentGap) {
+        _orphanRepairStarted = false;
+        return;
+      }
+      final doc = result.delivered
+          ? WorkInstructionRemoteDelivery.markDelivered(
+              plan: existing,
+              result: result,
+              instruction: instruction,
+            )
+          : WorkInstructionRemoteDelivery.markFailed(
+              plan: existing,
+              result: result,
+            );
+      if (result.delivered || !silent) {
+        await _store.upsertPlan(doc);
+        await _refreshPlans();
+      }
+      if (!mounted) return;
+      final viewing = _activePlanId == plan.id;
+      if (viewing && (result.delivered || !silent)) {
+        setState(() {
+          _activeDoc = doc;
+          _instruction = instruction;
+        });
+      }
+      if (result.delivered) {
+        if (!silent) {
+          _snack('소통24워크 Agent로 전달했습니다.');
+        } else if (result.outcome == 'created' ||
+            result.outcome == 'command_repaired') {
+          _snack('기존 작업을 Agent로 복구 전송했습니다.');
+        }
+      } else if (!silent) {
+        await _showTransferFailedDialog(result.userMessage);
+      } else {
+        _snack(result.userMessage);
+      }
+    } finally {
+      if (mounted) setState(() => _transferBusy = false);
+    }
   }
 
   Future<void> _showTransferFailedDialog(String message) {
     return showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('직접 전달 실패'),
+        title: const Text('전송 실패'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('닫기'),
-          ),
-          OutlinedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _pickTransferFolder();
-            },
-            child: const Text('전달 폴더 다시 선택'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _downloadInstructionJson();
-            },
-            child: const Text('수동 다운로드 화면으로'),
           ),
         ],
       ),
@@ -1696,10 +1681,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         title: _instruction?.businessIdea,
       );
     } else {
-      await _wiMirror.restoreActive(
-        artifactType: artifact,
-        instructionId: iid,
-      );
+      await _wiMirror.restoreActive(artifactType: artifact, instructionId: iid);
     }
 
     final id = _activePlanId!;
@@ -1743,7 +1725,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             'ID: $iid · 버전 $versionCount개\n\n'
             '삭제 대상:\n$filesHint\n\n'
             '이 작업은 되돌릴 수 없습니다.'
-            '${_activeDoc?.wasTransferred == true ? '\n\n소통24워크 쪽 파일은 자동 삭제되지 않습니다.' : ''}',
+            '${_activeDoc?.wasTransferred == true ? '\n\n소통24워크 Agent 쪽 파일은 자동 삭제되지 않습니다.' : ''}',
           ),
         ),
         actions: [
@@ -2119,6 +2101,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _analysis = plan.analysis;
       _instruction = plan.instruction;
       _activeDoc = plan;
+      _aiProductionPilot = plan.instruction?.aiExecution?.enabled == true;
       if (plan.input.wizardSelections != null) {
         _wizardState = PlanningWizardState.fromJson(
           plan.input.wizardSelections!,
@@ -2148,6 +2131,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _analysis = null;
       _instruction = null;
       _activeDoc = null;
+      _aiProductionPilot = true;
       _inputModeQuick = true;
       _wizardState = PlanningWizardState(mode: 'quick');
       _designState = ProjectDesignState();
@@ -2201,7 +2185,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         title: Text('검증 ${result.levelLabel}'),
         content: SingleChildScrollView(
           child: result.ok
-              ? const Text('소통24워크 전달에 필요한 항목이 모두 충족됩니다.')
+              ? const Text('소통24워크 Agent 전달에 필요한 항목이 모두 충족됩니다.')
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -2384,12 +2368,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         return '승인 대기 중입니다. 결과를 확인하세요.';
       }
       if (exec.isActivelyRunning) {
-        return '소통24워크에서 ${exec.productionCurrentStage}/${exec.productionTotalStages}단계 진행 중입니다.';
+        return 'AI 제작공정에서 ${exec.productionCurrentStage}/${exec.productionTotalStages}단계 진행 중입니다.';
       }
       if (exec.isDeliveredOnly) {
         return '전달은 완료되었으나 PC에서 아직 실행하지 않았습니다.';
       }
       if (!exec.isPostTransfer) {
+        if (exec.primaryStatusLabel == PlanUserFacingStatus.transferFailed) {
+          return '전송에 실패했습니다. 「다시 시도」로 연결된 노트북 Agent에 전달하세요.';
+        }
         return '기획을 완성한 뒤 작업지시서를 생성·전달하세요.';
       }
     }
@@ -2398,14 +2385,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       case PlanUserFacingStatus.planning:
         return '기획을 완성한 뒤 작업지시서를 생성하세요.';
       case PlanUserFacingStatus.instructionReady:
-        return '작업지시서가 준비되었습니다. 소통24워크로 전달하세요.';
+        return '작업지시서가 준비되었습니다. 소통24워크 Agent로 전달하세요.';
       case PlanUserFacingStatus.transferPending:
-        return '전달 준비가 완료되었습니다. 소통24워크로 전달하세요.';
+        return '전달 준비가 완료되었습니다. 소통24워크 Agent로 전달하세요.';
       case PlanUserFacingStatus.deliveredNotRun:
       case PlanUserFacingStatus.pcReceivedNotStarted:
         return '전달 후 실행 전입니다. 필요하면 취소·보관할 수 있습니다.';
       case PlanUserFacingStatus.working:
-        return '소통24워크에서 작업이 진행 중입니다.';
+        return 'AI 제작공정에서 작업이 진행 중입니다.';
       case PlanUserFacingStatus.awaitingApproval:
         return '승인 대기 중입니다.';
       case PlanUserFacingStatus.completed:
@@ -2644,40 +2631,157 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _buildAdvancedForm(),
           if (_planReady) ...[
             const SizedBox(height: 12),
-            _buildReviewCard(),
-            const SizedBox(height: 12),
-            _buildWorkflowStepStrip(),
+            _buildSendSummaryCard(),
             const SizedBox(height: 12),
             _buildMainActions(),
           ],
           const SizedBox(height: 12),
-          _buildWorkspaceStatusStrip(),
-          const SizedBox(height: 20),
-          PlanLibraryPanel(
-            plans: _allPlans,
-            activePlanId: _activePlanId,
-            folderFilter: _libraryFolder,
-            searchQuery: _searchCtrl.text,
-            viewMode: _libraryView,
-            sort: _librarySort,
-            duplicateTopics: _duplicateTopics,
-            onFolderChanged: (f) => setState(() => _libraryFolder = f),
-            onSearchChanged: (q) {
-              _searchCtrl.text = q;
-              setState(() {});
-            },
-            onViewModeChanged: (m) => setState(() => _libraryView = m),
-            onSortChanged: (s) => setState(() => _librarySort = s),
-            onOpenPlan: _onPlanTileTap,
-            onToggleFavorite: (p) async {
-              final next = p.copyWith(favorite: !p.favorite);
-              await _store.upsertPlan(next);
-              await _refreshPlans();
-              if (mounted) setState(() {});
-            },
-            onStartNew: _startNewPlan,
-            onBulkAction: _onLibraryBulkAction,
-            executionIndex: _executionIndex,
+          OperationalCollapsibleSection(
+            title: 'AI 제작설정 보기',
+            subtitle: '파일럿 정책·Codex·승인 방식',
+            sectionKey: const Key('planning_ai_settings'),
+            child: _buildAiProductionPilotCard(),
+          ),
+          if (_planReady) ...[
+            const SizedBox(height: 12),
+            OperationalCollapsibleSection(
+              title: '진행 단계',
+              subtitle: '기획 → 작업지시 → 전달 → 진행',
+              child: _buildWorkflowStepStrip(),
+            ),
+            const SizedBox(height: 12),
+            OperationalCollapsibleSection(
+              title: '상세 기획·작업지시 보기',
+              subtitle: '검토·JSON·계약 미리보기',
+              sectionKey: const Key('planning_detail_review'),
+              child: _buildReviewCard(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          OperationalCollapsibleSection(
+            title: '고급/진단정보',
+            subtitle: 'PC 작업공간·Inbox·DevWorkDoc 상태',
+            sectionKey: const Key('planning_diagnostics'),
+            child: _buildWorkspaceStatusStrip(),
+          ),
+          const SizedBox(height: 12),
+          OperationalCollapsibleSection(
+            title: '저장된 기획 목록',
+            subtitle: 'Planning Library',
+            sectionKey: const Key('planning_library'),
+            child: PlanLibraryPanel(
+              plans: _allPlans,
+              activePlanId: _activePlanId,
+              folderFilter: _libraryFolder,
+              searchQuery: _searchCtrl.text,
+              viewMode: _libraryView,
+              sort: _librarySort,
+              duplicateTopics: _duplicateTopics,
+              onFolderChanged: (f) => setState(() => _libraryFolder = f),
+              onSearchChanged: (q) {
+                _searchCtrl.text = q;
+                setState(() {});
+              },
+              onViewModeChanged: (m) => setState(() => _libraryView = m),
+              onSortChanged: (s) => setState(() => _librarySort = s),
+              onOpenPlan: _onPlanTileTap,
+              onToggleFavorite: (p) async {
+                final next = p.copyWith(favorite: !p.favorite);
+                await _store.upsertPlan(next);
+                await _refreshPlans();
+                if (mounted) setState(() {});
+              },
+              onStartNew: _startNewPlan,
+              onBulkAction: _onLibraryBulkAction,
+              executionIndex: _executionIndex,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSendSummaryCard() {
+    final input = _currentInput;
+    final isEbookPilot =
+        _aiProductionPilot &&
+        ArtifactType.normalize(input.resolvedArtifactType) ==
+            ArtifactType.ebook;
+
+    return Card(
+      key: const Key('planning_send_summary'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '최종 확인',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            _sendSummaryRow(
+              '제작물',
+              ArtifactType.labelKo(input.resolvedArtifactType),
+            ),
+            _sendSummaryRow(
+              '제목',
+              input.topic.trim().isEmpty ? '(미입력)' : input.topic.trim(),
+            ),
+            _sendSummaryRow(
+              '대상',
+              input.targetCustomer.trim().isEmpty
+                  ? '(미입력)'
+                  : input.targetCustomer.trim(),
+            ),
+            _sendSummaryRow('제작방식', isEbookPilot ? 'AI 제작' : '수동/혼합'),
+            if (isEbookPilot) ...[
+              _sendSummaryRow('AI 작업자', 'Codex'),
+              _sendSummaryRow('자동진행', '1단계까지 자동 · 이후 승인 필요'),
+              _sendSummaryRow('승인', '필요'),
+              _sendSummaryRow('자동배포', '안 함'),
+            ],
+            if (_instruction != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                '작업지시 v${_instruction!.instructionVersion} 준비됨',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: ControlColors.teal,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sendSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: ControlColors.textMuted,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, height: 1.35),
+            ),
           ),
         ],
       ),
@@ -2726,10 +2830,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               ),
             ),
             const SizedBox(width: 8),
-            StatusBadge(
-              label: label,
-              color: _progressBadgeColor(view),
-            ),
+            StatusBadge(label: label, color: _progressBadgeColor(view)),
           ],
         ),
       ),
@@ -2741,11 +2842,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     final steps = [
       _WorkflowStepDef('기획', _planReady),
       _WorkflowStepDef('작업지시', _instruction != null),
-      _WorkflowStepDef('전달', view.isTrulyTransferred ||
-          PlanningStatus.normalize(_activeDoc?.status ?? '') ==
-              PlanningStatus.transferred ||
-          PlanningStatus.normalize(_activeDoc?.status ?? '') ==
-              PlanningStatus.imported),
+      _WorkflowStepDef(
+        '전달',
+        view.isTrulyTransferred ||
+            PlanningStatus.normalize(_activeDoc?.status ?? '') ==
+                PlanningStatus.imported,
+      ),
       _WorkflowStepDef(
         '진행',
         PlanningStatus.normalize(_activeDoc?.status ?? '') ==
@@ -2822,6 +2924,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Widget _buildBanner() {
+    final pilotOn =
+        _aiProductionPilot &&
+        (_artifactType == ArtifactType.undecided ||
+            ArtifactType.normalize(_artifactType) == ArtifactType.ebook);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2830,10 +2936,83 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: ControlColors.border),
       ),
-      child: const Text(
-        'Project Design Engine — 선택과 승인 중심으로 기획합니다. '
-        '외부 AI 자동 실행은 없으며, 실제 제작·배포는 소통24워크에서 진행합니다.',
-        style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
+      child: Text(
+        pilotOn
+            ? 'Project Design Engine — 선택과 승인 중심으로 기획합니다. '
+                  '파일럿: 새 전자책 작업지시서에 Codex 1단계 AI 제작이 포함될 수 있습니다. '
+                  '1단계 후 사용자 승인이 필요하며 자동 배포는 없습니다.'
+            : 'Project Design Engine — 선택과 승인 중심으로 기획합니다. '
+                  'AI 자동 실행은 이 지시서에 포함되지 않으며, 실제 제작·배포는 소통24워크 Agent에서 진행합니다.',
+        style: const TextStyle(
+          fontSize: 12.5,
+          color: ControlColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAiProductionPilotCard() {
+    final isEbook =
+        _artifactType == ArtifactType.undecided ||
+        ArtifactType.normalize(_artifactType) == ArtifactType.ebook;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'AI 제작 (파일럿)',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ControlColors.teal.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'pilot',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: ControlColors.teal,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('AI 제작 사용'),
+              subtitle: Text(
+                isEbook
+                    ? '새 전자책 작업지시서에만 적용됩니다. 기존 지시서에는 자동으로 넣지 않습니다.'
+                    : '현재는 전자책 파일럿만 지원합니다.',
+                style: const TextStyle(fontSize: 12.5),
+              ),
+              value: _aiProductionPilot && isEbook,
+              onChanged: !isEbook
+                  ? null
+                  : (v) => setState(() => _aiProductionPilot = v),
+            ),
+            if (_aiProductionPilot && isEbook) ...[
+              const Divider(height: 20),
+              const _PilotKv('AI 작업자', 'Codex'),
+              const _PilotKv('자동 진행', '1단계까지만'),
+              const _PilotKv('1단계 결과 후', '사용자 승인 필요'),
+              const _PilotKv('결과물 휴대폰 보기', '사용'),
+              const _PilotKv('자동 배포', '사용 안 함'),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -3083,11 +3262,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
 
     // Inbox 직접 전달만 — 수동 다운로드와 완전히 분리 (다운로드는 DevWorkDoc 액션에만)
+    final failed =
+        _activeDoc != null &&
+        _execFor(_activeDoc!).primaryStatusLabel == '전송 실패';
     return [
       FilledButton.icon(
-        onPressed: (_canTransfer && _inboxTransferReady && !_transferBusy)
-            ? _transferToWork
-            : null,
+        onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
         icon: _transferBusy
             ? const SizedBox(
                 width: 18,
@@ -3100,7 +3280,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               ? '전달 중…'
               : (_contractValidation?.isBlocked == true
                     ? '전달 차단(BLOCKED)'
-                    : '소통24워크 Inbox로 전달'),
+                    : (failed ? '다시 시도' : '소통24워크 Agent로 전달')),
         ),
       ),
     ];
@@ -3127,18 +3307,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (_instruction != null &&
         _isInstructionReady &&
         !_isInstructionArchived) {
-      if (!_inboxTransferReady) {
-        final folder = _folderState;
-        final reason = folder == null || !folder.hasHandle
-            ? '소통24워크 Inbox 폴더가 선택되지 않았거나 핸들이 없습니다.'
-            : !folder.permissionGranted
-            ? 'Inbox 쓰기 권한이 없거나 만료되었습니다.'
-            : 'Inbox 직접 전달 준비가 되지 않았습니다.';
+      final online = WorkInstructionRemoteDelivery.pickTargetAgent(
+        _remoteAgents,
+      );
+      if (online == null) {
         hints.add(
           _actionHint(
-            reason,
-            '「전달 폴더 다시 선택」으로 Inbox를 선택한 뒤 전달하세요. '
-            '실패 시에만 「수동 가져오기용 JSON 다운로드」를 사용하세요.',
+            '연결된 노트북 Agent가 없습니다.',
+            '노트북에서 소통24워크 Agent가 켜져 있는지 확인한 뒤 다시 시도하세요.',
           ),
         );
       } else if (!_canTransfer) {
@@ -3333,10 +3509,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             if (copy.showInboxUnconnectedWarning)
               const Text(
                 'Inbox 로컬 폴더 : 미연결',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: ControlColors.textMuted,
-                ),
+                style: TextStyle(fontSize: 12, color: ControlColors.textMuted),
               ),
             Text(
               syncLine,
@@ -3352,15 +3525,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   () => _pcWorkspaceExpanded = !_pcWorkspaceExpanded,
                 ),
                 icon: Icon(
-                  _pcWorkspaceExpanded
-                      ? Icons.expand_less
-                      : Icons.expand_more,
+                  _pcWorkspaceExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 18,
                 ),
                 label: Text(
-                  _pcWorkspaceExpanded
-                      ? 'PC 작업환경 설정 닫기'
-                      : '관리 · PC 작업환경 설정',
+                  _pcWorkspaceExpanded ? 'PC 작업환경 설정 닫기' : '관리 · PC 작업환경 설정',
                 ),
               ),
               if (_pcWorkspaceExpanded) ...[
@@ -3379,7 +3548,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   Widget _buildDevWorkDocFolderSettings() {
     final devDoc = _devDocState;
     final ready = devDoc?.readyToWrite == true;
-    final reconnect = !ready &&
+    final reconnect =
+        !ready &&
         ((devDoc?.rootFolderName ?? '').trim().isNotEmpty ||
             devDoc?.hasRoot == true);
     return Card(
@@ -3396,9 +3566,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             Text(
               ready
                   ? 'PC 저장폴더 연결됨'
-                  : (reconnect
-                        ? 'PC 저장폴더 재연결 필요'
-                        : 'PC 저장폴더 미연결'),
+                  : (reconnect ? 'PC 저장폴더 재연결 필요' : 'PC 저장폴더 미연결'),
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
@@ -3449,7 +3617,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   Widget _buildFolderSettings() {
     final folder = _folderState;
     final ready = folder?.readyToWrite == true;
-    final nameOnly = !ready &&
+    final nameOnly =
+        !ready &&
         (folder?.folderName ?? '').trim().isNotEmpty &&
         folder?.hasHandle != true;
     return Card(
@@ -3459,7 +3628,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '소통24워크 Inbox (PC fallback)',
+              '소통24워크 Agent Inbox (PC fallback)',
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 6),
@@ -3503,4 +3672,38 @@ class _WorkflowStepDef {
 
   final String label;
   final bool done;
+}
+
+class _PilotKv extends StatelessWidget {
+  const _PilotKv(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: ControlColors.textMuted,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

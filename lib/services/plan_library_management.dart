@@ -176,12 +176,10 @@ class PlanLibraryManagement {
 
   /// 자동 정리용 태그만 제거 (사용자 의미 태그는 유지).
   static List<String> withoutCleanupTags(List<String> tags) {
-    return tags
-        .where((t) {
-          final n = t.trim();
-          return n != '정리대상' && n != 'cleanup';
-        })
-        .toList();
+    return tags.where((t) {
+      final n = t.trim();
+      return n != '정리대상' && n != 'cleanup';
+    }).toList();
   }
 
   /// 관리 필터 적용 (폴더·상태·수명주기).
@@ -292,8 +290,7 @@ class PlanLibraryManagement {
             return false;
           }
           final s = PlanningStatus.normalize(p.status);
-          return s != PlanningStatus.completed &&
-              s != PlanningStatus.archived;
+          return s != PlanningStatus.completed && s != PlanningStatus.archived;
         }).toList();
       case 'waiting':
         return plans.where((p) {
@@ -450,7 +447,10 @@ class PlanLibraryManagement {
           if (!comp.contains(n)) stack.add(n);
         }
       }
-      final docs = comp.map((i) => byId[i]).whereType<BusinessPlanDocument>().toList();
+      final docs = comp
+          .map((i) => byId[i])
+          .whereType<BusinessPlanDocument>()
+          .toList();
       if (docs.length >= 2) clusters.add(docs);
     }
     return clusters;
@@ -558,7 +558,9 @@ class PlanLibraryManagement {
     final reasons = <String>[];
     final exec = execution ?? PlanExecutionStatusResolver.resolve(plan);
     if (exec.isActivelyRunning) {
-      reasons.add('작업 진행 중 (${exec.productionCurrentStage}/${exec.productionTotalStages}단계)');
+      reasons.add(
+        '작업 진행 중 (${exec.productionCurrentStage}/${exec.productionTotalStages}단계)',
+      );
     }
     if (exec.isAwaitingApproval) {
       reasons.add('승인 대기 중');
@@ -566,7 +568,7 @@ class PlanLibraryManagement {
     if (exec.hasActualExecution && !exec.isDeliveredOnly) {
       reasons.add('실제 실행·산출물 존재');
     } else if (exec.isPostTransfer && !exec.isDeliveredOnly) {
-      reasons.add('소통24워크 전달·수신 기록');
+      reasons.add('소통24워크 Agent 전달·수신 기록');
     } else if (exec.isDeliveredOnly) {
       // 전달만 된 잔재 — 강한 경고 불필요
     }

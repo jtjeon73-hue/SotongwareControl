@@ -1,10 +1,7 @@
 /// Per-plan soft-mirror sync metadata (local SharedPreferences).
 /// baseRevision is only confirmed after successful write or accepted cloud reload.
 class PlanSyncMeta {
-  const PlanSyncMeta({
-    required this.baseRevision,
-    required this.state,
-  });
+  const PlanSyncMeta({required this.baseRevision, required this.state});
 
   static const synced = 'synced';
   static const dirty = 'dirty';

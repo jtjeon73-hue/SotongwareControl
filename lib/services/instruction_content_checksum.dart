@@ -72,6 +72,7 @@ const instructionCoreKeys = <String>{
   'workflow',
   'approval',
   'validation',
+  'aiExecution',
 };
 
 const _sortableStringListKeys = <String>{

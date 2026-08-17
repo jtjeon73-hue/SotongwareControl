@@ -4,9 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sotong_ware_control/data/sotong24_production_guides.dart';
 import 'package:sotong_ware_control/data/sotong24_workflows.dart';
 import 'package:sotong_ware_control/models/artifact_type.dart';
-import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
+import 'package:sotong_ware_control/screens/standard_production_guide_screen.dart';
 import 'package:sotong_ware_control/services/business_planning_service.dart';
-import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/widgets/sotong24_production_guide_panel.dart';
 
 void main() {
@@ -155,22 +154,20 @@ void main() {
     });
   }
 
-  testWidgets('소통24워크 화면에 신 가이드 표시', (tester) async {
+  testWidgets('표준제작 가이드 화면에 신 가이드 표시', (tester) async {
     tester.view.physicalSize = const Size(1280, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    final repo = Sotong24RemoteRepository(forceMemory: true);
-    addTearDown(repo.dispose);
-
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(body: ProductWorkshopScreen(repository: repo)),
-      ),
+      const MaterialApp(home: Scaffold(body: StandardProductionGuideScreen())),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('사업별 표준 제작 가이드'), findsOneWidget);
+    await tester.tap(find.text('전자책 제작'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('전자책'), findsWidgets);
     expect(find.text('제작 가이드 (기존 설명)'), findsNothing);
     expect(tester.takeException(), isNull);
   });

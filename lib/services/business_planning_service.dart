@@ -138,6 +138,7 @@ class BusinessPlanningService {
     String status = 'active',
     String checksum = '',
     String sourceFileName = '',
+    AiExecutionPolicy? aiExecution,
   }) {
     final stamp = (now ?? DateTime.now()).toUtc();
     final iso = stamp.toIso8601String();
@@ -220,7 +221,7 @@ class BusinessPlanningService {
         '최종 가격·판매·배포 채널',
         '공개 문구·과장 표현 검토',
         '저작권·출처·개인정보 확인',
-        '소통24워크 실행 전 사용자 승인',
+        '소통24워크 Agent 실행 전 사용자 승인',
       ],
       executionStatus: '지시서 준비',
       notes: input.notes.trim(),
@@ -232,6 +233,7 @@ class BusinessPlanningService {
       sourceFileName: fileName,
       status: status,
       contract: contract,
+      aiExecution: aiExecution,
     );
   }
 
@@ -523,7 +525,7 @@ class BusinessPlanningService {
 
   String buildReadableInstruction(WorkInstruction instruction) {
     final buffer = StringBuffer()
-      ..writeln('【소통24워크 표준 작업지시서】')
+      ..writeln('【소통24워크 Agent 표준 작업지시서】')
       ..writeln('schemaVersion: ${instruction.schemaVersion}')
       ..writeln('지시서 ID: ${instruction.instructionId}')
       ..writeln('프로젝트 ID: ${instruction.projectId}')
@@ -566,7 +568,7 @@ class BusinessPlanningService {
       ..writeln()
       ..writeln(
         '※ 본 지시서는 로컬 규칙 기반 기획 도우미가 생성했습니다. '
-        '외부 AI가 내용을 만들어 낸 것이 아니며, 소통24워크 자동 실행은 포함하지 않습니다.',
+        '외부 AI가 내용을 만들어 낸 것이 아니며, 소통24워크 Agent 자동 실행은 포함하지 않습니다.',
       );
     return buffer.toString();
   }

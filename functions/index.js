@@ -12,6 +12,7 @@ const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { handleRelayRequest } = require("./sotong24/relay");
 const { handleApiRequest } = require("./remote/router");
+const { createAdminStorageDeps } = require("./sotong24/artifact");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -95,9 +96,24 @@ exports.sotong24Relay = onRequest(
     memory: "256MiB",
   },
   async (req, res) => {
+    let storageDeps = {};
+    try {
+      storageDeps = createAdminStorageDeps(admin);
+    } catch (e) {
+      // Storage bucket missing — artifact ops return 503; other relay ops still work
+      console.log(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          op: "storage_init",
+          result: "unavailable",
+          code: String(e && e.message ? e.message : e),
+        })
+      );
+    }
     await handleRelayRequest(req, res, {
       getSecret: () => sotong24RelaySecret.value(),
       db: admin.firestore(),
+      ...storageDeps,
     });
   }
 );

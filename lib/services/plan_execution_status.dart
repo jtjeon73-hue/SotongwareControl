@@ -12,6 +12,7 @@ class PlanTransferState {
   static const notDelivered = 'not_delivered';
   static const pending = 'pending';
   static const delivered = 'delivered';
+  static const failed = 'failed';
 }
 
 /// PC 수신 여부 (Sotong24Work mirror 기준).
@@ -149,7 +150,11 @@ class PlanExecutionStatusResolver {
     final reconciled = PlanProgressStatus.reconcile(plan);
     final planStatus = PlanningStatus.normalize(reconciled.status);
     final trulyTransferred = PlanProgressStatus.isTrulyTransferred(reconciled);
-    final downloadPending = PlanProgressStatus.isDownloadOnlyPending(reconciled);
+    final downloadPending = PlanProgressStatus.isDownloadOnlyPending(
+      reconciled,
+    );
+    final remoteEvidence =
+        (remoteProject != null && !remoteProject.isDemo) || remoteJob != null;
 
     final designStep = _instructionDesignStep(plan);
     final designComplete = plan.hasInstruction;
@@ -159,6 +164,8 @@ class PlanExecutionStatusResolver {
       trulyTransferred: trulyTransferred,
       downloadPending: downloadPending,
       designComplete: designComplete,
+      remoteEvidence: remoteEvidence,
+      transferFailed: planStatus == PlanningStatus.transferFailed,
     );
     final isPostTransfer =
         transferState == PlanTransferState.delivered ||
@@ -208,10 +215,12 @@ class PlanExecutionStatusResolver {
         ? '작업지시 완료'
         : '작업지시 $designStep/$instructionDesignTotal';
 
-    final productionLine = !isPostTransfer
-        ? '소통24워크: 미전달'
+    final productionLine = transferState == PlanTransferState.failed
+        ? '다시 시도 필요'
+        : !isPostTransfer
+        ? 'AI 제작공정: 미전달'
         : !hasActualExecution
-        ? '소통24워크: ${pcReceive == PlanPcReceiveState.received ? '수신됨 · 미시작' : '전달됨 · PC 미수신'}'
+        ? 'AI 제작공정: ${pcReceive == PlanPcReceiveState.received ? '수신됨 · 미시작' : '전달됨 · PC 미수신'}'
         : runState == PlanRunState.awaitingApproval
         ? '제작 $prodCurrent/$prodTotal · 승인대기'
         : '제작 $prodCurrent/$prodTotal';
@@ -291,9 +300,16 @@ class PlanExecutionStatusResolver {
     required bool trulyTransferred,
     required bool downloadPending,
     required bool designComplete,
+    bool remoteEvidence = false,
+    bool transferFailed = false,
   }) {
-    if (planStatus == PlanningStatus.imported || trulyTransferred) {
+    if (planStatus == PlanningStatus.imported ||
+        trulyTransferred ||
+        remoteEvidence) {
       return PlanTransferState.delivered;
+    }
+    if (transferFailed) {
+      return PlanTransferState.failed;
     }
     if (downloadPending ||
         planStatus == PlanningStatus.downloadedPendingImport) {
@@ -301,6 +317,9 @@ class PlanExecutionStatusResolver {
     }
     if (planStatus == PlanningStatus.readyToTransfer && designComplete) {
       return PlanTransferState.pending;
+    }
+    if (planStatus == PlanningStatus.transferred && !trulyTransferred) {
+      return PlanTransferState.failed;
     }
     return PlanTransferState.notDelivered;
   }
@@ -325,7 +344,8 @@ class PlanExecutionStatusResolver {
         currentStageId: remoteProject.currentStageDoc?.stageId ?? '',
         runState: _runStateFromRemoteProject(remoteProject),
         approvalStatus: remoteProject.approvalStatus,
-        workflowStarted: remoteProject.startedAt.isNotEmpty ||
+        workflowStarted:
+            remoteProject.startedAt.isNotEmpty ||
             remoteProject.currentStage > 0,
         hasLocalProject: true,
         hasArtifacts: remoteProject.progress > 0,
@@ -345,14 +365,20 @@ class PlanExecutionStatusResolver {
         currentStageId: merged.currentStageId,
         runState: _runStateFromJob(remoteJob) ?? merged.runState,
         approvalStatus: merged.approvalStatus,
-        workflowStarted: merged.workflowStarted ||
+        workflowStarted:
+            merged.workflowStarted ||
             remoteJob.startedAt != null ||
-            const {'running', 'claimed', 'waiting_approval', 'reworking'}
-                .contains(remoteJob.status),
+            const {
+              'running',
+              'claimed',
+              'waiting_approval',
+              'reworking',
+            }.contains(remoteJob.status),
         hasLocalProject: merged.hasLocalProject,
         hasArtifacts: merged.hasArtifacts,
         agentOnline: merged.agentOnline,
-        lastUpdated: remoteJob.updatedAt?.toIso8601String() ?? merged.lastUpdated,
+        lastUpdated:
+            remoteJob.updatedAt?.toIso8601String() ?? merged.lastUpdated,
         jobId: remoteJob.jobId,
         agentId: remoteJob.assignedAgentId,
         planId: merged.planId,
@@ -484,6 +510,9 @@ class PlanExecutionStatusResolver {
     }
 
     if (!isPostTransfer) {
+      if (transferState == PlanTransferState.failed) {
+        return '전송 실패';
+      }
       if (!designComplete) {
         if (designStep < instructionDesignTotal) return '작업지시 제작중';
         return '기획중';
@@ -531,7 +560,10 @@ class PlanExecutionStatusResolver {
     required bool hasActualExecution,
   }) {
     if (transferState == PlanTransferState.notDelivered) {
-      return '소통24워크: 미전달';
+      return 'AI 제작공정: 미전달';
+    }
+    if (transferState == PlanTransferState.failed) {
+      return '다시 시도 필요';
     }
     if (!hasActualExecution) {
       return pcReceive == PlanPcReceiveState.received
@@ -540,16 +572,16 @@ class PlanExecutionStatusResolver {
     }
     switch (runState) {
       case PlanRunState.awaitingApproval:
-        return '소통24워크: 승인대기';
+        return 'AI 제작공정: 승인대기';
       case PlanRunState.working:
       case PlanRunState.reworking:
-        return '소통24워크: 작업중';
+        return 'AI 제작공정: 작업중';
       case PlanRunState.completed:
-        return '소통24워크: 완료';
+        return 'AI 제작공정: 완료';
       case PlanRunState.error:
-        return '소통24워크: 오류';
+        return 'AI 제작공정: 오류';
       default:
-        return '소통24워크: 실행중';
+        return 'AI 제작공정: 실행중';
     }
   }
 }

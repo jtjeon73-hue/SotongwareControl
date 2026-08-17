@@ -16,7 +16,7 @@ class OpsSeedService {
     final units = <BusinessUnitDoc>[
       const BusinessUnitDoc(
         id: 'sotong24work',
-        name: '소통24워크',
+        name: '소통24워크 Agent',
         description:
             'MFC 기반 자동화 개발 프로그램. 앱·전자책·마케팅·유튜브·MFC 개발 및 유지관리 핵심 내부 도구.',
         status: '확인 필요',

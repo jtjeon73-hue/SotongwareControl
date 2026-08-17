@@ -62,8 +62,7 @@ class RemoteWorkInstructionSource {
           '${item.artifactType}__${DevWorkDocPaths.sanitizeInstructionId(item.instructionId)}';
       map.putIfAbsent(key, () => item);
     }
-    final out = map.values.toList()
-      ..sort((a, b) => a.title.compareTo(b.title));
+    final out = map.values.toList()..sort((a, b) => a.title.compareTo(b.title));
     return out;
   }
 
@@ -77,7 +76,9 @@ class RemoteWorkInstructionSource {
       final map = Map<String, dynamic>.from(decoded);
       final id = '${map['instructionId'] ?? ''}'.trim();
       if (id.isEmpty) return null;
-      final title = '${map['title'] ?? map['projectName'] ?? id}'.trim();
+      final title =
+          '${map['title'] ?? map['projectName'] ?? map['businessIdea'] ?? id}'
+              .trim();
       final artifact = ArtifactType.normalize(
         '${map['artifactType'] ?? map['deliverableType'] ?? artifactHint ?? ''}',
       );
@@ -85,6 +86,10 @@ class RemoteWorkInstructionSource {
       var total = 18;
       final stages = map['stages'];
       if (stages is List && stages.isNotEmpty) total = stages.length;
+      final workflowSteps = map['workflowSteps'];
+      if (workflowSteps is List && workflowSteps.isNotEmpty) {
+        total = workflowSteps.length;
+      }
       if (map['totalStages'] != null) {
         total = int.tryParse('${map['totalStages']}') ?? total;
       }

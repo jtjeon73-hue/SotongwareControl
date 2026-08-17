@@ -8,8 +8,8 @@ class DisplayNames {
   static const _projectNames = <String, String>{
     'control_center': '소통총관제',
     'sotongware_control': '소통총관제',
-    'sotong24work': '소통24워크',
-    'sotong24work_hub': '소통24워크',
+    'sotong24work': '소통24워크 Agent',
+    'sotong24work_hub': '소통24워크 Agent',
     'sotong_site_manager': '소통사이트매니저',
     'sotongsitemanager': '소통사이트매니저',
   };

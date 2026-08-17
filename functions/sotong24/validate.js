@@ -269,6 +269,16 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
   if (status !== undefined) out.status = status;
   if (summary !== undefined) out.summary = summary;
   if (resultPreview !== undefined) out.resultPreview = resultPreview;
+  // resultUrl / previewUrl — https only, Storage host required (no local/file/js)
+  const { sanitizeHttpsUrl } = require("./artifact");
+  const resultUrl = sanitizeHttpsUrl(input.resultUrl, "resultUrl", {
+    requireStorageHost: true,
+  });
+  const previewUrl = sanitizeHttpsUrl(input.previewUrl, "previewUrl", {
+    requireStorageHost: true,
+  });
+  if (resultUrl !== undefined) out.resultUrl = resultUrl;
+  if (previewUrl !== undefined) out.previewUrl = previewUrl;
   if (approvalRequired !== undefined) out.approvalRequired = approvalRequired;
   if (approvalStatus !== undefined) out.approvalStatus = approvalStatus;
   out.updatedAt = serverNowIso;
@@ -284,6 +294,8 @@ function assertOperations(op) {
     "stage_sync",
     "full_sync",
     "request_poll",
+    "artifact_upload_init",
+    "artifact_upload_complete",
   ]);
   if (!allowed.has(op)) reject("invalid_argument", "operation invalid");
   return op;

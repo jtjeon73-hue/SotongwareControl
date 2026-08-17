@@ -24,6 +24,8 @@ BusinessPlanDocument _plan({
   String customer = '고객',
   String updatedAt = '2026-08-13T00:00:00.000Z',
   String? lastTransferMode,
+  String? lastRemoteJobId,
+  String? lastRemoteCommandId,
 }) {
   return BusinessPlanDocument(
     id: id,
@@ -73,6 +75,8 @@ BusinessPlanDocument _plan({
     libraryState: libraryState,
     isProtected: isProtected,
     lastTransferMode: lastTransferMode,
+    lastRemoteJobId: lastRemoteJobId,
+    lastRemoteCommandId: lastRemoteCommandId,
   );
 }
 
@@ -115,10 +119,7 @@ void main() {
       tags: const ['cloneOf:plan_parent', 'sourcePlanId:plan_parent'],
       updatedAt: '2026-08-12T02:00:00.000Z',
     );
-    final out = PlanLibraryManagement.softMarkDuplicateCleanup([
-      parent,
-      clone,
-    ]);
+    final out = PlanLibraryManagement.softMarkDuplicateCleanup([parent, clone]);
     final byId = {for (final p in out) p.id: p};
     expect(byId['plan_parent']!.isLibraryArchived, isFalse);
     expect(byId['plan_clone']!.isLibraryArchived, isTrue);
@@ -150,10 +151,11 @@ void main() {
       updatedAt: '2026-08-11T03:00:00.000Z',
     );
 
-    final out = PlanLibraryManagement.softMarkDuplicateCleanup(
-      [parent, clone, activeClone],
-      activePlanId: 'plan_active_clone',
-    );
+    final out = PlanLibraryManagement.softMarkDuplicateCleanup([
+      parent,
+      clone,
+      activeClone,
+    ], activePlanId: 'plan_active_clone');
     final byId = {for (final p in out) p.id: p};
     expect(byId['plan_ops']!.isLibraryArchived, isFalse);
     expect(byId['plan_clone_ops']!.isLibraryArchived, isFalse);
@@ -224,94 +226,113 @@ void main() {
     expect(byId['plan_waiting']!.isLibraryArchived, isFalse);
   });
 
-  test('backfill createIfAbsent is idempotent and does not overwrite', () async {
-    final memory = <String, Map<String, dynamic>>{};
-    final mirror = BusinessPlanMirrorService(memory: memory);
-    final original = _plan(
-      id: 'plan_m1',
-      topic: '원본 제목',
-      instructionId: 'wi_plan_m1',
-    );
-    final changed = _plan(
-      id: 'plan_m1',
-      topic: '덮어쓰면 안 됨',
-      instructionId: 'wi_plan_m1',
-    );
+  test(
+    'backfill createIfAbsent is idempotent and does not overwrite',
+    () async {
+      final memory = <String, Map<String, dynamic>>{};
+      final mirror = BusinessPlanMirrorService(memory: memory);
+      final original = _plan(
+        id: 'plan_m1',
+        topic: '원본 제목',
+        instructionId: 'wi_plan_m1',
+      );
+      final changed = _plan(
+        id: 'plan_m1',
+        topic: '덮어쓰면 안 됨',
+        instructionId: 'wi_plan_m1',
+      );
 
-    expect(await mirror.createIfAbsent(original, ownerUid: 'uid_test'), isTrue);
-    expect(await mirror.createIfAbsent(changed, ownerUid: 'uid_test'), isTrue);
+      expect(
+        await mirror.createIfAbsent(original, ownerUid: 'uid_test'),
+        isTrue,
+      );
+      expect(
+        await mirror.createIfAbsent(changed, ownerUid: 'uid_test'),
+        isTrue,
+      );
 
-    final listed = await mirror.listPlans(ownerUid: 'uid_test');
-    expect(listed.length, 1);
-    expect(listed.first.input.topic, '원본 제목');
-  });
+      final listed = await mirror.listPlans(ownerUid: 'uid_test');
+      expect(listed.length, 1);
+      expect(listed.first.input.topic, '원본 제목');
+    },
+  );
 
-  test('permanent delete tombstone prevents cloud resurrection on load', () async {
-    SharedPreferences.setMockInitialValues({});
-    final memory = <String, Map<String, dynamic>>{};
-    final mirror = BusinessPlanMirrorService(
-      memory: memory,
-      ownerUidResolver: () => 'uid_a',
-    );
-    final store = BusinessPlanningStore(mirror: mirror);
-    final plan = _plan(id: 'plan_del', topic: '삭제대상', instructionId: 'wi_del');
+  test(
+    'permanent delete tombstone prevents cloud resurrection on load',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final memory = <String, Map<String, dynamic>>{};
+      final mirror = BusinessPlanMirrorService(
+        memory: memory,
+        ownerUidResolver: () => 'uid_a',
+      );
+      final store = BusinessPlanningStore(mirror: mirror);
+      final plan = _plan(
+        id: 'plan_del',
+        topic: '삭제대상',
+        instructionId: 'wi_del',
+      );
 
-    await store.savePlans([plan]);
-    expect((await mirror.upsertPlan(plan)).succeeded, isTrue);
-    expect((await mirror.listPlans()).length, 1);
+      await store.savePlans([plan]);
+      expect((await mirror.upsertPlan(plan)).succeeded, isTrue);
+      expect((await mirror.listPlans()).length, 1);
 
-    await store.deletePlans(['plan_del']);
-    await store.savePlans([plan]);
-    final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getStringList(BusinessPlanningStore.deletedIdsKey),
-      contains('plan_del'),
-    );
+      await store.deletePlans(['plan_del']);
+      await store.savePlans([plan]);
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getStringList(BusinessPlanningStore.deletedIdsKey),
+        contains('plan_del'),
+      );
 
-    final loaded = await store.loadPlans(activeContextReady: true);
-    expect(loaded.map((p) => p.id), isNot(contains('plan_del')));
-    expect(await mirror.listDeletedPlanIds(), {'plan_del'});
-    expect(await mirror.listPlans(), isEmpty);
+      final loaded = await store.loadPlans(activeContextReady: true);
+      expect(loaded.map((p) => p.id), isNot(contains('plan_del')));
+      expect(await mirror.listDeletedPlanIds(), {'plan_del'});
+      expect(await mirror.listPlans(), isEmpty);
 
-    expect(
-      (await mirror.upsertPlan(plan)).status,
-      MirrorWriteStatus.tombstoned,
-    );
-    expect(await mirror.createIfAbsent(plan), isTrue);
-    expect(await mirror.listPlans(), isEmpty);
-  });
+      expect(
+        (await mirror.upsertPlan(plan)).status,
+        MirrorWriteStatus.tombstoned,
+      );
+      expect(await mirror.createIfAbsent(plan), isTrue);
+      expect(await mirror.listPlans(), isEmpty);
+    },
+  );
 
-  test('revision OCC: reversed network completion keeps newer payload', () async {
-    final memory = <String, Map<String, dynamic>>{};
-    final mirror = BusinessPlanMirrorService(memory: memory);
-    final oldPayload = _plan(
-      id: 'plan_rev',
-      topic: '오래된',
-      updatedAt: '2026-08-13T21:00:00.000+09:00',
-    );
-    final newPayload = _plan(
-      id: 'plan_rev',
-      topic: '최신',
-      updatedAt: '2026-08-13T10:00:00.000Z',
-    );
+  test(
+    'revision OCC: reversed network completion keeps newer payload',
+    () async {
+      final memory = <String, Map<String, dynamic>>{};
+      final mirror = BusinessPlanMirrorService(memory: memory);
+      final oldPayload = _plan(
+        id: 'plan_rev',
+        topic: '오래된',
+        updatedAt: '2026-08-13T21:00:00.000+09:00',
+      );
+      final newPayload = _plan(
+        id: 'plan_rev',
+        topic: '최신',
+        updatedAt: '2026-08-13T10:00:00.000Z',
+      );
 
-    final r1 = await mirror.upsertPlan(newPayload, ownerUid: 'uid_b');
-    expect(r1.succeeded, isTrue);
-    expect(r1.revision, 1);
+      final r1 = await mirror.upsertPlan(newPayload, ownerUid: 'uid_b');
+      expect(r1.succeeded, isTrue);
+      expect(r1.revision, 1);
 
-    final r2 = await mirror.upsertPlan(
-      oldPayload,
-      ownerUid: 'uid_b',
-      baseRevision: 0,
-    );
-    expect(r2.status, MirrorWriteStatus.conflict);
-    expect(mirror.knownRevisions['plan_rev'], 1);
-    expect(mirror.isWriteBlocked('plan_rev'), isTrue);
-    expect(
-      (await mirror.listPlans(ownerUid: 'uid_b')).single.input.topic,
-      '최신',
-    );
-  });
+      final r2 = await mirror.upsertPlan(
+        oldPayload,
+        ownerUid: 'uid_b',
+        baseRevision: 0,
+      );
+      expect(r2.status, MirrorWriteStatus.conflict);
+      expect(mirror.knownRevisions['plan_rev'], 1);
+      expect(mirror.isWriteBlocked('plan_rev'), isTrue);
+      expect(
+        (await mirror.listPlans(ownerUid: 'uid_b')).single.input.topic,
+        '최신',
+      );
+    },
+  );
 
   test('same-device enqueueUpsert A then B keeps B', () async {
     final memory = <String, Map<String, dynamic>>{};
@@ -323,64 +344,64 @@ void main() {
     final b = _plan(id: 'plan_q', topic: 'B');
 
     await Future.wait([mirror.enqueueUpsert(a), mirror.enqueueUpsert(b)]);
-    expect(
-      (await mirror.listPlans(ownerUid: 'uid_q')).single.input.topic,
-      'B',
-    );
+    expect((await mirror.listPlans(ownerUid: 'uid_q')).single.input.topic, 'B');
   });
 
-  test('cross-device conflict: stale reenqueue never becomes revision 3', () async {
-    final memory = <String, Map<String, dynamic>>{};
-    final deviceA = BusinessPlanMirrorService(
-      memory: memory,
-      ownerUidResolver: () => 'uid_x',
-    );
-    final deviceB = BusinessPlanMirrorService(
-      memory: memory,
-      ownerUidResolver: () => 'uid_x',
-    );
+  test(
+    'cross-device conflict: stale reenqueue never becomes revision 3',
+    () async {
+      final memory = <String, Map<String, dynamic>>{};
+      final deviceA = BusinessPlanMirrorService(
+        memory: memory,
+        ownerUidResolver: () => 'uid_x',
+      );
+      final deviceB = BusinessPlanMirrorService(
+        memory: memory,
+        ownerUidResolver: () => 'uid_x',
+      );
 
-    expect(
-      (await deviceA.upsertPlan(_plan(id: 'plan_x', topic: 'v1'))).revision,
-      1,
-    );
-    expect(
-      (await deviceA.upsertPlan(
-        _plan(id: 'plan_x', topic: 'A-latest'),
-        baseRevision: 1,
-      )).revision,
-      2,
-    );
+      expect(
+        (await deviceA.upsertPlan(_plan(id: 'plan_x', topic: 'v1'))).revision,
+        1,
+      );
+      expect(
+        (await deviceA.upsertPlan(
+          _plan(id: 'plan_x', topic: 'A-latest'),
+          baseRevision: 1,
+        )).revision,
+        2,
+      );
 
-    final stale = _plan(id: 'plan_x', topic: 'B-stale');
-    final lost = await deviceB.upsertPlan(stale, baseRevision: 1);
-    expect(lost.status, MirrorWriteStatus.conflict);
-    expect(deviceB.knownRevisions.containsKey('plan_x'), isFalse);
-    expect(deviceB.isWriteBlocked('plan_x'), isTrue);
+      final stale = _plan(id: 'plan_x', topic: 'B-stale');
+      final lost = await deviceB.upsertPlan(stale, baseRevision: 1);
+      expect(lost.status, MirrorWriteStatus.conflict);
+      expect(deviceB.knownRevisions.containsKey('plan_x'), isFalse);
+      expect(deviceB.isWriteBlocked('plan_x'), isTrue);
 
-    final retry = await deviceB.enqueueUpsert(stale);
-    expect(retry.status, MirrorWriteStatus.conflict);
-    expect(memory['uid_x__plan_x']!['revision'], 2);
-    expect(
-      Map<String, dynamic>.from(
-        memory['uid_x__plan_x']!['plan'] as Map,
-      )['input']['topic'],
-      'A-latest',
-    );
+      final retry = await deviceB.enqueueUpsert(stale);
+      expect(retry.status, MirrorWriteStatus.conflict);
+      expect(memory['uid_x__plan_x']!['revision'], 2);
+      expect(
+        Map<String, dynamic>.from(
+          memory['uid_x__plan_x']!['plan'] as Map,
+        )['input']['topic'],
+        'A-latest',
+      );
 
-    deviceB.acceptCloudRevision('plan_x', 2);
-    final neu = await deviceB.upsertPlan(
-      _plan(id: 'plan_x', topic: 'C-new'),
-      baseRevision: 2,
-    );
-    expect(neu.revision, 3);
-    expect(
-      Map<String, dynamic>.from(
-        memory['uid_x__plan_x']!['plan'] as Map,
-      )['input']['topic'],
-      'C-new',
-    );
-  });
+      deviceB.acceptCloudRevision('plan_x', 2);
+      final neu = await deviceB.upsertPlan(
+        _plan(id: 'plan_x', topic: 'C-new'),
+        baseRevision: 2,
+      );
+      expect(neu.revision, 3);
+      expect(
+        Map<String, dynamic>.from(
+          memory['uid_x__plan_x']!['plan'] as Map,
+        )['input']['topic'],
+        'C-new',
+      );
+    },
+  );
 
   test('store→mirror path: conflict blocks autosave overwrite', () async {
     SharedPreferences.setMockInitialValues({});
@@ -391,10 +412,7 @@ void main() {
     );
     final store = BusinessPlanningStore(mirror: mirror);
 
-    expect(
-      (await mirror.upsertPlan(_plan(id: 'ps', topic: 'v1'))).revision,
-      1,
-    );
+    expect((await mirror.upsertPlan(_plan(id: 'ps', topic: 'v1'))).revision, 1);
     expect(
       (await mirror.upsertPlan(
         _plan(id: 'ps', topic: 'A'),
@@ -414,8 +432,9 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(memory['uid_s__ps']!['revision'], 2);
     expect(
-      Map<String, dynamic>.from(memory['uid_s__ps']!['plan'] as Map)['input']
-          ['topic'],
+      Map<String, dynamic>.from(
+        memory['uid_s__ps']!['plan'] as Map,
+      )['input']['topic'],
       'A',
     );
 
@@ -448,10 +467,7 @@ void main() {
     final r = await mirror.upsertPlan(spoof, ownerUid: 'u', baseRevision: 0);
     expect(r.status, MirrorWriteStatus.conflict);
     expect(mirror.knownRevisions['plan_tz'], 1);
-    expect(
-      (await mirror.listPlans(ownerUid: 'u')).single.input.topic,
-      'first',
-    );
+    expect((await mirror.listPlans(ownerUid: 'u')).single.input.topic, 'first');
   });
 
   test('merge prefers revision/sync meta over updatedAt string order', () {
@@ -487,52 +503,64 @@ void main() {
     expect(merged2.plans.single.input.topic, 'local-dirty');
   });
 
-  test('applyAfterCommit: failure does not update revision side effects', () async {
-    var accepts = 0;
-    try {
-      await BusinessPlanMirrorService.applyAfterCommit<int>(
-        run: () async => throw StateError('txn failed'),
-        onCommitted: (_) => accepts++,
+  test(
+    'applyAfterCommit: failure does not update revision side effects',
+    () async {
+      var accepts = 0;
+      try {
+        await BusinessPlanMirrorService.applyAfterCommit<int>(
+          run: () async => throw StateError('txn failed'),
+          onCommitted: (_) => accepts++,
+        );
+        fail('expected throw');
+      } catch (_) {}
+      expect(accepts, 0);
+    },
+  );
+
+  test(
+    'applyAfterCommit: success applies side effect once after commit',
+    () async {
+      var accepts = 0;
+      var logicalPasses = 0;
+      final rev = await BusinessPlanMirrorService.applyAfterCommit<int>(
+        run: () async {
+          // Simulate callback retry work before outer commit returns.
+          logicalPasses++;
+          logicalPasses++;
+          return 4;
+        },
+        onCommitted: (v) {
+          accepts++;
+          expect(v, 4);
+        },
       );
-      fail('expected throw');
-    } catch (_) {}
-    expect(accepts, 0);
-  });
+      expect(rev, 4);
+      expect(logicalPasses, 2);
+      expect(accepts, 1);
+    },
+  );
 
-  test('applyAfterCommit: success applies side effect once after commit', () async {
-    var accepts = 0;
-    var logicalPasses = 0;
-    final rev = await BusinessPlanMirrorService.applyAfterCommit<int>(
-      run: () async {
-        // Simulate callback retry work before outer commit returns.
-        logicalPasses++;
-        logicalPasses++;
-        return 4;
-      },
-      onCommitted: (v) {
-        accepts++;
-        expect(v, 4);
-      },
-    );
-    expect(rev, 4);
-    expect(logicalPasses, 2);
-    expect(accepts, 1);
-  });
+  test(
+    'markDeleted success accepts revision; foreign namespace leaves original intact',
+    () async {
+      final memory = <String, Map<String, dynamic>>{};
+      final mirror = BusinessPlanMirrorService(memory: memory);
+      await mirror.upsertPlan(
+        _plan(id: 'own', topic: 'a'),
+        ownerUid: 'owner_a',
+      );
+      expect(mirror.knownRevisions['own'], 1);
 
-  test('markDeleted success accepts revision; foreign namespace leaves original intact', () async {
-    final memory = <String, Map<String, dynamic>>{};
-    final mirror = BusinessPlanMirrorService(memory: memory);
-    await mirror.upsertPlan(_plan(id: 'own', topic: 'a'), ownerUid: 'owner_a');
-    expect(mirror.knownRevisions['own'], 1);
+      await mirror.markDeleted('own', ownerUid: 'owner_b');
+      expect(memory['owner_a__own']!['isDeleted'], isNot(true));
+      expect(memory['owner_b__own']?['isDeleted'], isTrue);
 
-    await mirror.markDeleted('own', ownerUid: 'owner_b');
-    expect(memory['owner_a__own']!['isDeleted'], isNot(true));
-    expect(memory['owner_b__own']?['isDeleted'], isTrue);
-
-    expect(await mirror.markDeleted('own', ownerUid: 'owner_a'), isTrue);
-    expect(memory['owner_a__own']!['isDeleted'], isTrue);
-    expect(mirror.knownRevisions['own'], 2);
-  });
+      expect(await mirror.markDeleted('own', ownerUid: 'owner_a'), isTrue);
+      expect(memory['owner_a__own']!['isDeleted'], isTrue);
+      expect(mirror.knownRevisions['own'], 2);
+    },
+  );
 
   test('other owner cannot markDeleted foreign document', () async {
     final memory = <String, Map<String, dynamic>>{};
@@ -545,29 +573,35 @@ void main() {
     expect(memory['owner_b__plan_own']?['isDeleted'], isTrue);
   });
 
-  test('delete crash-window: intent-before-remove still filters on load', () async {
-    SharedPreferences.setMockInitialValues({});
-    final memory = <String, Map<String, dynamic>>{};
-    final mirror = BusinessPlanMirrorService(
-      memory: memory,
-      ownerUidResolver: () => 'uid_c',
-    );
-    final store = BusinessPlanningStore(mirror: mirror);
-    final plan = _plan(id: 'plan_crash', topic: 'crash');
-    await store.savePlans([plan]);
-    await mirror.upsertPlan(plan);
+  test(
+    'delete crash-window: intent-before-remove still filters on load',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final memory = <String, Map<String, dynamic>>{};
+      final mirror = BusinessPlanMirrorService(
+        memory: memory,
+        ownerUidResolver: () => 'uid_c',
+      );
+      final store = BusinessPlanningStore(mirror: mirror);
+      final plan = _plan(id: 'plan_crash', topic: 'crash');
+      await store.savePlans([plan]);
+      await mirror.upsertPlan(plan);
 
-    // Crash after delete intent, before local list removal.
-    await store.deletePlansIntentOnlyForTest(['plan_crash']);
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getStringList(BusinessPlanningStore.deletedIdsKey), contains('plan_crash'));
-    final stillLocal = await store.loadPlans(
-      activeContextReady: false,
-      runCleanup: false,
-    );
-    // loadPlans filters deletedIds even if plan row still persisted.
-    expect(stillLocal.map((p) => p.id), isNot(contains('plan_crash')));
-  });
+      // Crash after delete intent, before local list removal.
+      await store.deletePlansIntentOnlyForTest(['plan_crash']);
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getStringList(BusinessPlanningStore.deletedIdsKey),
+        contains('plan_crash'),
+      );
+      final stillLocal = await store.loadPlans(
+        activeContextReady: false,
+        runCleanup: false,
+      );
+      // loadPlans filters deletedIds even if plan row still persisted.
+      expect(stillLocal.map((p) => p.id), isNot(contains('plan_crash')));
+    },
+  );
 
   test('PlanUserFacingStatus.label covers all required statuses', () {
     final cases = <String, BusinessPlanDocument>{
@@ -599,7 +633,9 @@ void main() {
         id: '3',
         topic: 'a',
         status: PlanningStatus.transferred,
-        lastTransferMode: PlanProgressStatus.folderMode,
+        lastTransferMode: PlanProgressStatus.remoteMode,
+        lastRemoteJobId: 'job_3',
+        lastRemoteCommandId: 'cmd_3',
       ),
       PlanUserFacingStatus.working: _plan(
         id: '4',
@@ -638,7 +674,10 @@ void main() {
         tags: const ['정리대상'],
       ),
     };
-    PlanExecutionSnapshot? executionFor(String label, BusinessPlanDocument plan) {
+    PlanExecutionSnapshot? executionFor(
+      String label,
+      BusinessPlanDocument plan,
+    ) {
       switch (label) {
         case PlanUserFacingStatus.working:
           return PlanExecutionStatusResolver.resolve(
@@ -763,7 +802,7 @@ void main() {
       inboxReady: false,
     );
     expect(ok.headline, '원격 작업 전달 정상');
-    expect(ok.agentLine, '소통24워크 PC  ● 온라인');
+    expect(ok.agentLine, '소통24워크 Agent  ● 온라인');
     expect(ok.devWorkDocLine, 'DevWorkDoc  재연결 필요');
     expect(ok.showInboxUnconnectedWarning, isFalse);
 
@@ -774,8 +813,8 @@ void main() {
       devFolderReady: false,
       inboxReady: false,
     );
-    expect(offline.headline, '소통24워크 PC 재연결 필요');
-    expect(offline.agentLine, '소통24워크 PC  · 오프라인');
+    expect(offline.headline, '소통24워크 Agent 재연결 필요');
+    expect(offline.agentLine, '소통24워크 Agent  · 오프라인');
     expect(offline.showInboxUnconnectedWarning, isTrue);
   });
 
@@ -849,78 +888,87 @@ void main() {
     );
   });
 
-  test('bootstrapSession restores active before cleanup (draft active protected)', () async {
-    SharedPreferences.setMockInitialValues({
-      BusinessPlanningStore.activePlanIdKey: 'plan_to_protect',
-    });
-    final memory = <String, Map<String, dynamic>>{};
-    final mirror = BusinessPlanMirrorService(memory: memory);
-    final store = BusinessPlanningStore(mirror: mirror);
+  test(
+    'bootstrapSession restores active before cleanup (draft active protected)',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        BusinessPlanningStore.activePlanIdKey: 'plan_to_protect',
+      });
+      final memory = <String, Map<String, dynamic>>{};
+      final mirror = BusinessPlanMirrorService(memory: memory);
+      final store = BusinessPlanningStore(mirror: mirror);
 
-    final parent = _plan(
-      id: 'plan_parent_active',
-      topic: '동일',
-      checksum: 'act_cs',
-      status: PlanningStatus.draft,
-      updatedAt: '2026-08-13T05:00:00.000Z',
-    );
-    final activeClone = _plan(
-      id: 'plan_to_protect',
-      topic: '동일',
-      checksum: 'act_cs',
-      status: PlanningStatus.draft,
-      tags: const ['cloneOf:plan_parent_active'],
-      updatedAt: '2026-08-10T05:00:00.000Z',
-    );
-    await store.savePlans([parent, activeClone]);
+      final parent = _plan(
+        id: 'plan_parent_active',
+        topic: '동일',
+        checksum: 'act_cs',
+        status: PlanningStatus.draft,
+        updatedAt: '2026-08-13T05:00:00.000Z',
+      );
+      final activeClone = _plan(
+        id: 'plan_to_protect',
+        topic: '동일',
+        checksum: 'act_cs',
+        status: PlanningStatus.draft,
+        tags: const ['cloneOf:plan_parent_active'],
+        updatedAt: '2026-08-10T05:00:00.000Z',
+      );
+      await store.savePlans([parent, activeClone]);
 
-    // Simulate prior bug: load without active context must NOT set cleanup flag.
-    await store.loadPlans(activeContextReady: false, runCleanup: false);
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getBool(BusinessPlanningStore.cleanupAppliedKey), isNot(true));
+      // Simulate prior bug: load without active context must NOT set cleanup flag.
+      await store.loadPlans(activeContextReady: false, runCleanup: false);
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getBool(BusinessPlanningStore.cleanupAppliedKey),
+        isNot(true),
+      );
 
-    final boot = await BusinessPlanningStore.bootstrapSession(store);
-    expect(boot.activePlanId, 'plan_to_protect');
-    final byId = {for (final p in boot.plans) p.id: p};
-    expect(byId['plan_to_protect']!.isLibraryArchived, isFalse);
-    expect(prefs.getBool(BusinessPlanningStore.cleanupAppliedKey), isTrue);
-  });
+      final boot = await BusinessPlanningStore.bootstrapSession(store);
+      expect(boot.activePlanId, 'plan_to_protect');
+      final byId = {for (final p in boot.plans) p.id: p};
+      expect(byId['plan_to_protect']!.isLibraryArchived, isFalse);
+      expect(prefs.getBool(BusinessPlanningStore.cleanupAppliedKey), isTrue);
+    },
+  );
 
-  test('list UI keeps weak title duplicates active; only filter hides archived', () async {
-    SharedPreferences.setMockInitialValues({});
-    final store = BusinessPlanningStore();
-    final plans = [
-      _plan(
-        id: 'g_new',
-        topic: '가이드 전자책개발',
-        updatedAt: '2026-08-13T12:00:00.000Z',
-      ),
-      _plan(
-        id: 'g_old1',
-        topic: '가이드 전자책개발',
-        updatedAt: '2026-08-05T13:48:00.000Z',
-      ),
-      _plan(
-        id: 'g_old2',
-        topic: '가이드 전자책개발',
-        updatedAt: '2026-08-05T13:40:00.000Z',
-      ),
-    ];
-    await store.savePlans(plans);
+  test(
+    'list UI keeps weak title duplicates active; only filter hides archived',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final store = BusinessPlanningStore();
+      final plans = [
+        _plan(
+          id: 'g_new',
+          topic: '가이드 전자책개발',
+          updatedAt: '2026-08-13T12:00:00.000Z',
+        ),
+        _plan(
+          id: 'g_old1',
+          topic: '가이드 전자책개발',
+          updatedAt: '2026-08-05T13:48:00.000Z',
+        ),
+        _plan(
+          id: 'g_old2',
+          topic: '가이드 전자책개발',
+          updatedAt: '2026-08-05T13:40:00.000Z',
+        ),
+      ];
+      await store.savePlans(plans);
 
-    final boot = await BusinessPlanningStore.bootstrapSession(store);
-    final byId = {for (final p in boot.plans) p.id: p};
-    expect(byId['g_new']!.isLibraryArchived, isFalse);
-    expect(byId['g_old1']!.isLibraryArchived, isFalse);
-    expect(byId['g_old2']!.isLibraryArchived, isFalse);
+      final boot = await BusinessPlanningStore.bootstrapSession(store);
+      final byId = {for (final p in boot.plans) p.id: p};
+      expect(byId['g_new']!.isLibraryArchived, isFalse);
+      expect(byId['g_old1']!.isLibraryArchived, isFalse);
+      expect(byId['g_old2']!.isLibraryArchived, isFalse);
 
-    final all = PlanLibraryManagement.applyManageFilter(boot.plans, 'all');
-    expect(all.map((p) => p.id).toSet(), {'g_new', 'g_old1', 'g_old2'});
+      final all = PlanLibraryManagement.applyManageFilter(boot.plans, 'all');
+      expect(all.map((p) => p.id).toSet(), {'g_new', 'g_old1', 'g_old2'});
 
-    final candidates = PlanLibraryManagement.applyManageFilter(
-      boot.plans,
-      'duplicate_candidates',
-    );
-    expect(candidates.length, 3);
-  });
+      final candidates = PlanLibraryManagement.applyManageFilter(
+        boot.plans,
+        'duplicate_candidates',
+      );
+      expect(candidates.length, 3);
+    },
+  );
 }

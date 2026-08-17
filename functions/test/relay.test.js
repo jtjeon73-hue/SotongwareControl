@@ -156,7 +156,7 @@ function seedRequest(db, projectId, requestId, data) {
   );
 }
 
-async function call(body, { auth = true, db, headers = {} } = {}) {
+async function call(body, { auth = true, db, headers = {}, extras = {} } = {}) {
   const res = mockRes();
   const req = mockReq({
     body,
@@ -168,6 +168,7 @@ async function call(body, { auth = true, db, headers = {} } = {}) {
   await handleRelayRequest(req, res, {
     getSecret: () => SECRET,
     db: db || createMockDb(),
+    ...extras,
   });
   return res;
 }
@@ -275,6 +276,74 @@ describe("allowlist / validation", () => {
     assert.equal(s.stageId, "launch");
     assert.ok(!("workReport" in s));
     assert.ok(!("fullManuscript" in s));
+  });
+
+  it("allows https storage resultUrl/previewUrl", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "draft",
+        stageNumber: 7,
+        status: "awaiting_approval",
+        resultUrl:
+          "https://storage.googleapis.com/sotongware-control.appspot.com/sotong24/artifacts/test/x/draft/r1/a.md",
+        previewUrl:
+          "https://firebasestorage.googleapis.com/v0/b/sotongware-control.appspot.com/o/x",
+      },
+      { productType: "ebook", serverNowIso }
+    );
+    assert.ok(s.resultUrl.startsWith("https://storage.googleapis.com/"));
+    assert.ok(s.previewUrl.startsWith("https://firebasestorage.googleapis.com/"));
+  });
+
+  it("rejects javascript/file/local resultUrl", () => {
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "draft",
+            stageNumber: 7,
+            resultUrl: "javascript:alert(1)",
+          },
+          { productType: "ebook", serverNowIso }
+        ),
+      /forbidden_scheme/
+    );
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "draft",
+            stageNumber: 7,
+            resultUrl: "file:///C:/temp/a.md",
+          },
+          { productType: "ebook", serverNowIso }
+        ),
+      /forbidden_scheme/
+    );
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "draft",
+            stageNumber: 7,
+            resultUrl: "C:\\Users\\me\\a.md",
+          },
+          { productType: "ebook", serverNowIso }
+        ),
+      /local_path_forbidden|backslash/
+    );
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "draft",
+            stageNumber: 7,
+            resultUrl: "https://evil.example/a.md",
+          },
+          { productType: "ebook", serverNowIso }
+        ),
+      /storage_host_required/
+    );
   });
 });
 
@@ -384,6 +453,34 @@ describe("relay HTTP handler", () => {
     );
     assert.equal(sdoc.stageNumber, 15);
     assert.equal(sdoc.stageName, "공개 및 공유");
+  });
+
+  it("stage_sync persists resultUrl/previewUrl", async () => {
+    const db = createMockDb();
+    const resultUrl =
+      "https://storage.googleapis.com/sotongware-control.appspot.com/sotong24/artifacts/test/wi_test_remote_e2e_1/draft/r1/a.md";
+    const res = await call(
+      {
+        operation: "stage_sync",
+        project: sampleProject,
+        stage: {
+          stageId: "draft",
+          stageNumber: 7,
+          status: "awaiting_approval",
+          resultUrl,
+          previewUrl: resultUrl,
+          workReport: "NOPE",
+        },
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    const sdoc = db.store.get(
+      `sotong24work_projects/${sampleProject.projectId}/stages/draft`
+    );
+    assert.equal(sdoc.resultUrl, resultUrl);
+    assert.equal(sdoc.previewUrl, resultUrl);
+    assert.ok(!("workReport" in sdoc));
   });
 
   it("full_sync accepts all 18 canonical stages", async () => {

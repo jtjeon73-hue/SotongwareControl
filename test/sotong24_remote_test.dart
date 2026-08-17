@@ -10,8 +10,8 @@ import 'package:sotong_ware_control/widgets/sidebar_navigation.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('canonical 메뉴 라벨이 소통24워크이다', () {
-    expect(ControlDestination.productWorkshop.label, '소통24워크');
+  test('canonical 메뉴 라벨이 AI 제작공정이다', () {
+    expect(ControlDestination.productWorkshop.label, 'AI 제작공정');
     expect(
       SidebarNavigation.canonicalDestinations
           .where((e) => e == ControlDestination.productWorkshop)
@@ -111,7 +111,7 @@ void main() {
         requestId: 'wrong_id',
         message: '표지 수정',
       ),
-      contains('requestId'),
+      contains('대기'),
     );
 
     expect(
@@ -146,7 +146,186 @@ void main() {
     expect(after.status, Sotong24WorkStatus.revision);
   });
 
-  testWidgets('소통24워크 화면·모바일 폭 표시', (tester) async {
+  test('allocateRequestId: pending은 재사용, 처리완료면 신규', () {
+    final stage = Sotong24RemoteStage(
+      stageId: 'stage_07_outline',
+      stageNumber: 7,
+      stageName: '아웃라인',
+      status: Sotong24WorkStatus.awaitingApproval,
+      approvalRequired: true,
+      approvalStatus: ApprovalStatus.pending,
+      activeRequestId: 'req_rev_A',
+    );
+    final existing = [
+      const Sotong24RemoteRequest(
+        requestId: 'req_rev_A',
+        projectId: 'wi_fake_e2e_reapprove',
+        stageId: 'stage_07_outline',
+        requestType: 'revision_request',
+        status: ApprovalStatus.revisionRequested,
+        processedAt: '2026-08-15T12:00:00.000Z',
+      ),
+    ];
+    final next = Sotong24RemoteApprovalGuard.allocateRequestId(
+      stage: stage,
+      existingRequests: existing,
+      preferred: 'req_rev_A',
+      now: DateTime.utc(2026, 8, 15, 12, 30),
+    );
+    expect(next, isNot(equals('req_rev_A')));
+    expect(next, isNotEmpty);
+    expect(next, startsWith('req_stage_07_outline_'));
+
+    final open = Sotong24RemoteApprovalGuard.allocateRequestId(
+      stage: stage.copyWith(activeRequestId: 'req_pending_open'),
+      existingRequests: const [
+        Sotong24RemoteRequest(
+          requestId: 'req_pending_open',
+          projectId: 'wi_fake_e2e_reapprove',
+          stageId: 'stage_07_outline',
+          requestType: 'approve',
+          status: ApprovalStatus.pending,
+        ),
+      ],
+      preferred: 'req_pending_open',
+    );
+    expect(open, 'req_pending_open');
+  });
+
+  test('r1 보완 후 r2 재승인 requestId는 달라야 하고 더블클릭은 차단', () async {
+    final repo = Sotong24RemoteRepository(forceMemory: true);
+    addTearDown(repo.dispose);
+    final project = (await repo.watchProjects().first).firstWhere(
+      (p) => p.projectId == Sotong24RemoteDemoCatalog.demoProjectId,
+    );
+    final stage = project.currentStageDoc!;
+    final pendingSlot = stage.activeRequestId;
+    expect(pendingSlot, isNotEmpty);
+
+    // B. 보완 → requestId A
+    expect(
+      await repo.requestRevision(
+        projectId: project.projectId,
+        stageId: stage.stageId,
+        requestId: pendingSlot,
+        message: '초보자가 이해하기 쉽게 예시를 하나 추가해 주세요.',
+      ),
+      isNull,
+    );
+    final afterRev = await repo.listRequests(project.projectId);
+    final revReq = afterRev.firstWhere(
+      (r) => r.requestType == 'revision_request',
+    );
+    final requestIdA = revReq.requestId;
+    expect(requestIdA, pendingSlot);
+    expect(revReq.status, ApprovalStatus.revisionRequested);
+
+    // Agent 재작업 → r2 승인대기 (stale activeRequestId = A 유지)
+    expect(
+      await repo.simulateAgentReworkAwaitingApproval(
+        projectId: project.projectId,
+        stageId: stage.stageId,
+        resultPreview: '7단계 E2E 보완 후 재승인 대기 r2',
+      ),
+      isNull,
+    );
+    final r2 = await repo.getProject(project.projectId);
+    final r2Stage = r2!.stages.firstWhere((s) => s.stageId == stage.stageId);
+    expect(r2Stage.status, Sotong24WorkStatus.awaitingApproval);
+    expect(r2Stage.activeRequestId, requestIdA);
+
+    // C. 재승인 → requestId B, A != B
+    expect(
+      await repo.approveStage(
+        projectId: project.projectId,
+        stageId: stage.stageId,
+        requestId: r2Stage.activeRequestId,
+      ),
+      isNull,
+    );
+    final afterApprove = await repo.listRequests(project.projectId);
+    final approveReqs = afterApprove
+        .where((r) => r.requestType == 'approve')
+        .toList();
+    expect(approveReqs, isNotEmpty);
+    final requestIdB = approveReqs.last.requestId;
+    expect(requestIdB, isNotEmpty);
+    expect(requestIdB, isNot(equals(requestIdA)));
+    expect(
+      (await repo.getProject(project.projectId))!.approvalStatus,
+      ApprovalStatus.approved,
+    );
+
+    // D. 동일 승인 더블클릭 → 중복 생성 없음
+    final countBefore = afterApprove.length;
+    final dup = await repo.approveStage(
+      projectId: project.projectId,
+      stageId: stage.stageId,
+      requestId: requestIdB,
+    );
+    expect(dup, isNotNull);
+    final countAfter = (await repo.listRequests(project.projectId)).length;
+    expect(countAfter, countBefore);
+  });
+
+  test('다른 stage 승인은 새 requestId', () async {
+    final titles = BusinessPlanningService.standardWorkflowTitles;
+    final now = DateTime.utc(2026, 8, 15, 13).toIso8601String();
+    final stages = <Sotong24RemoteStage>[
+      for (var i = 0; i < titles.length; i++)
+        Sotong24RemoteStage(
+          stageId: titles[i].$1,
+          stageNumber: i + 1,
+          stageName: titles[i].$2,
+          status: i + 1 < 8
+              ? Sotong24WorkStatus.completed
+              : (i + 1 == 8
+                    ? Sotong24WorkStatus.awaitingApproval
+                    : Sotong24WorkStatus.ready),
+          approvalRequired: i + 1 == 8,
+          approvalStatus: i + 1 == 8
+              ? ApprovalStatus.pending
+              : ApprovalStatus.notRequired,
+          activeRequestId: i + 1 == 8 ? 'req_stage08_open' : '',
+          updatedAt: now,
+        ),
+    ];
+    final stage8Id = titles[7].$1;
+    final repo = Sotong24RemoteRepository(
+      forceMemory: true,
+      memorySeed: [
+        Sotong24RemoteProject(
+          projectId: 'wi_fake_e2e_stage8',
+          title: '[TEST] stage8 approve',
+          productType: 'ebook',
+          currentStage: 8,
+          totalStages: titles.length,
+          progress: 0,
+          status: Sotong24WorkStatus.awaitingApproval,
+          approvalStatus: ApprovalStatus.pending,
+          stages: stages,
+          updatedAt: now,
+          createdAt: now,
+        ),
+      ],
+    );
+    addTearDown(repo.dispose);
+
+    expect(
+      await repo.approveStage(
+        projectId: 'wi_fake_e2e_stage8',
+        stageId: stage8Id,
+        requestId: 'req_stage08_open',
+      ),
+      isNull,
+    );
+    final reqs = await repo.listRequests('wi_fake_e2e_stage8');
+    expect(reqs.single.requestId, 'req_stage08_open');
+    expect(reqs.single.requestType, 'approve');
+    expect(reqs.single.stageId, stage8Id);
+  });
+
+  testWidgets('AI 제작공정 화면·모바일 폭 표시', (tester) async {
     final repo = Sotong24RemoteRepository(forceMemory: true);
     addTearDown(repo.dispose);
 
@@ -161,8 +340,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('소통24워크'), findsWidgets);
-    expect(find.textContaining('선택된 제품을 실제로 제작하는 곳'), findsOneWidget);
+    expect(find.text('AI 제작공정'), findsWidgets);
+    expect(find.textContaining('진행 상태를 확인하고'), findsOneWidget);
     expect(find.textContaining('현재 제작'), findsOneWidget);
     expect(find.textContaining('50대 초보도'), findsWidgets);
     expect(find.text('승인 대기'), findsWidgets);

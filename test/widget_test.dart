@@ -185,9 +185,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.text('작업지시 제작소'), findsWidgets);
+    expect(find.text('AI 제작공정'), findsWidgets);
+    expect(find.text('노트북 원격관제'), findsWidgets);
+    expect(find.text('표준제작 가이드'), findsWidgets);
     expect(find.text('산업자동화SW개발부'), findsOneWidget);
-    expect(find.text('뉴 아이디어 뱅크'), findsOneWidget);
-    expect(find.text('사업 전략연구실'), findsOneWidget);
     expect(find.text('로그아웃'), findsOneWidget);
     await tester.drag(find.byType(ListView).first, const Offset(0, -800));
     await tester.pumpAndSettle();
@@ -218,7 +219,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('로그아웃'), findsOneWidget);
+    expect(find.byTooltip('로그아웃'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

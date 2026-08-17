@@ -99,14 +99,14 @@ void main() {
       final exec = PlanExecutionStatusResolver.resolve(plan);
       expect(exec.isPostTransfer, isFalse);
       expect(exec.instructionProgressLine, '작업지시 4/7');
-      expect(exec.productionProgressLine, '소통24워크: 미전달');
+      expect(exec.productionProgressLine, 'AI 제작공정: 미전달');
       expect(
         PlanUserFacingStatus.label(plan, execution: exec),
         PlanUserFacingStatus.instructionDesign,
       );
     });
 
-    test('전달됨·미실행 잔재 — operational protect 아님', () {
+    test('Inbox-only 잔재 — 전달됨 아님, 전송 실패', () {
       final plan = _plan(
         id: 'plan_1785904827934',
         instructionId: 'wi_plan_1785904827934',
@@ -115,9 +115,10 @@ void main() {
         lastTransferMode: PlanProgressStatus.folderMode,
       );
       final exec = PlanExecutionStatusResolver.resolve(plan);
-      expect(exec.isDeliveredOnly, isTrue);
+      expect(exec.isDeliveredOnly, isFalse);
       expect(exec.hasActualExecution, isFalse);
-      expect(exec.primaryStatusLabel, '전달됨 · 미실행');
+      expect(exec.primaryStatusLabel, '전송 실패');
+      expect(exec.productionProgressLine, '다시 시도 필요');
       expect(
         PlanUserFacingStatus.isOperationallyProtected(plan, execution: exec),
         isFalse,
@@ -137,7 +138,10 @@ void main() {
         lastTransferMode: PlanProgressStatus.folderMode,
       );
       final remote = _remoteOpsProject();
-      final exec = PlanExecutionStatusResolver.resolve(plan, remoteProject: remote);
+      final exec = PlanExecutionStatusResolver.resolve(
+        plan,
+        remoteProject: remote,
+      );
       expect(exec.displayTitle, '50대 초보도 따라 하는 AI 전자책 첫 출간');
       expect(exec.instructionProgressLine, '작업지시 완료');
       expect(exec.productionProgressLine, '제작 18/18 · 승인대기');
@@ -187,7 +191,9 @@ void main() {
         hasWi: true,
         lastTransferMode: PlanProgressStatus.folderMode,
       );
-      final index = PlanExecutionIndex.fromRemoteProjects([_remoteOpsProject()]);
+      final index = PlanExecutionIndex.fromRemoteProjects([
+        _remoteOpsProject(),
+      ]);
       final exec = index.snapshotFor(plan);
       expect(exec.productionCurrentStage, 18);
       expect(exec.currentStageLabel, isNotEmpty);

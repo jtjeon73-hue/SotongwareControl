@@ -235,7 +235,10 @@ void main() {
       state,
       hasInstruction: true,
     );
-    expect(withInstruction.transferReadyLabel, '작업지시서 생성됨 — 소통24워크 전달 가능');
+    expect(
+      withInstruction.transferReadyLabel,
+      '작업지시서 생성됨 — 소통24워크 Agent 전달 가능',
+    );
   });
 
   test(

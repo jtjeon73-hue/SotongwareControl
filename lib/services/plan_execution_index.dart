@@ -50,13 +50,10 @@ class PlanExecutionIndex {
   }
 
   static String _jobInstructionKey(RemoteJobDoc job) {
-    // createJob idempotencyKey often embeds instructionId; title may match WI.
+    final iid = job.instructionId.trim();
+    if (iid.isNotEmpty) return iid;
     final title = job.title.trim();
     if (title.startsWith('wi_')) return title;
-    final jid = job.jobId.trim();
-    for (final part in jid.split('_')) {
-      if (part.startsWith('wi') && part.contains('plan')) return part;
-    }
     return '';
   }
 

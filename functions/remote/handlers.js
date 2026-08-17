@@ -432,10 +432,18 @@ async function handleCreateJob(db, uid, body) {
   const agent = agentSnap.data() || {};
   if (agent.ownerUid !== uid) throw httpError(403, "forbidden", "agent_owner_mismatch");
 
+  const instructionId = String(body.instructionId || "").trim();
+  if (instructionId) {
+    const existing = await findJobByInstructionId(db, uid, instructionId);
+    if (existing) {
+      return { jobId: existing.id, idempotent: true };
+    }
+  }
+
   const jobId = newId("job");
   const ts = nowIso();
   const totalStages = Number(body.totalStages) || 18;
-  await db.collection(COL.JOBS).doc(jobId).set({
+  const doc = {
     jobId,
     ownerUid: uid,
     type,
@@ -449,8 +457,37 @@ async function handleCreateJob(db, uid, body) {
     startedAt: null,
     completedAt: null,
     updatedAt: ts,
-  });
-  return { jobId };
+  };
+  if (instructionId) doc.instructionId = instructionId;
+  await db.collection(COL.JOBS).doc(jobId).set(doc);
+  return { jobId, idempotent: false };
+}
+
+async function findJobByInstructionId(db, uid, instructionId) {
+  const snap = await db
+    .collection(COL.JOBS)
+    .where("ownerUid", "==", uid)
+    .orderBy("updatedAt", "desc")
+    .limit(80)
+    .get();
+  for (const d of snap.docs) {
+    const data = d.data() || {};
+    if (String(data.instructionId || "").trim() === instructionId) {
+      return { id: d.id, data };
+    }
+  }
+  return null;
+}
+
+async function findStartCommand(jobRef) {
+  const all = await jobRef.collection("commands").get();
+  for (const d of all.docs) {
+    const data = d.data() || {};
+    if (data.type === COMMAND_TYPE.START_JOB && data.commandId) {
+      return data;
+    }
+  }
+  return null;
 }
 
 async function handleStartJob(db, uid, body) {
@@ -464,12 +501,16 @@ async function handleStartJob(db, uid, body) {
   if (job.ownerUid !== uid) throw httpError(403, "forbidden", "job_owner_mismatch");
   if (!job.assignedAgentId) throw httpError(400, "invalid_payload", "assignedAgentId missing");
 
+  const existingStart = await findStartCommand(jobRef);
+  if (existingStart) {
+    return { commandId: existingStart.commandId, jobId, idempotent: true };
+  }
+
   const commandId = newId("cmd");
   const idempotencyKey = String(body.idempotencyKey || `idem_${commandId}`);
   const payload = isPlainObject(body.payload) ? body.payload : {};
   const ts = nowIso();
 
-  // Idempotent start: if same idempotencyKey exists, return existing
   const existing = await jobRef
     .collection("commands")
     .where("idempotencyKey", "==", idempotencyKey)
@@ -500,6 +541,117 @@ async function handleStartJob(db, uid, body) {
   await jobRef.collection("commands").doc(commandId).set(cmd);
   await jobRef.set({ status: WORK_STATUS.QUEUED, updatedAt: ts }, { merge: true });
   return { commandId, jobId, idempotent: false };
+}
+
+async function resolveOnlineAgent(db, uid, assignedAgentId) {
+  if (assignedAgentId) {
+    const snap = await db.collection(COL.AGENTS).doc(assignedAgentId).get();
+    if (!snap.exists) throw httpError(404, "not_found", "agent_missing");
+    const agent = snap.data() || {};
+    if (agent.ownerUid !== uid) throw httpError(403, "forbidden", "agent_owner_mismatch");
+    if (agent.enabled === false) {
+      throw httpError(409, "agent_offline", "agent disabled");
+    }
+    if (!isAgentOnline(agent.lastHeartbeatAt)) {
+      throw httpError(409, "agent_offline", "agent offline");
+    }
+    return assignedAgentId;
+  }
+  const snap = await db.collection(COL.AGENTS).where("ownerUid", "==", uid).get();
+  const online = [];
+  for (const d of snap.docs) {
+    const a = d.data() || {};
+    if (a.enabled === false) continue;
+    if (!isAgentOnline(a.lastHeartbeatAt)) continue;
+    online.push({ id: d.id, agentId: a.agentId || d.id, deviceName: a.deviceName || "" });
+  }
+  if (online.length === 0) {
+    throw httpError(409, "agent_offline", "no online agent");
+  }
+  const jt = online.find((a) => String(a.deviceName).toUpperCase().includes("JT-JEON"));
+  return (jt || online[0]).agentId;
+}
+
+async function handleDeliverInstruction(db, uid, body) {
+  const instructionId = String(body.instructionId || "").trim();
+  if (!instructionId) throw httpError(400, "invalid_payload", "instructionId required");
+  const payload = isPlainObject(body.payload) ? body.payload : {};
+  const payloadId = String(payload.instructionId || "").trim();
+  if (payloadId && payloadId !== instructionId) {
+    throw httpError(400, "invalid_payload", "instructionId mismatch");
+  }
+
+  const assignedAgentId = await resolveOnlineAgent(
+    db,
+    uid,
+    String(body.assignedAgentId || "").trim()
+  );
+
+  const existing = await findJobByInstructionId(db, uid, instructionId);
+  const inFlight = new Set([
+    WORK_STATUS.CLAIMED,
+    WORK_STATUS.RUNNING,
+    WORK_STATUS.WAITING_APPROVAL,
+    WORK_STATUS.REVISION_REQUESTED,
+    WORK_STATUS.REWORKING,
+  ]);
+
+  if (existing) {
+    const jobId = existing.id;
+    const status = existing.data.status;
+    const jobRef = db.collection(COL.JOBS).doc(jobId);
+    const start = await findStartCommand(jobRef);
+    if (start) {
+      let outcome = "reused";
+      if (inFlight.has(status)) outcome = "reused_in_progress";
+      if (status === WORK_STATUS.COMPLETED || status === WORK_STATUS.APPROVED) {
+        outcome = "reused_completed";
+      }
+      return {
+        jobId,
+        commandId: start.commandId,
+        agentId: existing.data.assignedAgentId,
+        outcome,
+        idempotent: true,
+      };
+    }
+    if (status === WORK_STATUS.COMPLETED || status === WORK_STATUS.APPROVED) {
+      throw httpError(409, "already_completed", "job already completed");
+    }
+    if (inFlight.has(status)) {
+      throw httpError(409, "already_in_progress", "job already claimed");
+    }
+    const started = await handleStartJob(db, uid, {
+      jobId,
+      payload,
+      idempotencyKey: `idem_start_${instructionId}`,
+    });
+    return {
+      jobId,
+      commandId: started.commandId,
+      agentId: existing.data.assignedAgentId,
+      outcome: "command_repaired",
+      idempotent: started.idempotent === true,
+    };
+  }
+
+  const created = await handleCreateJob(db, uid, {
+    ...body,
+    assignedAgentId,
+    instructionId,
+  });
+  const started = await handleStartJob(db, uid, {
+    jobId: created.jobId,
+    payload,
+    idempotencyKey: `idem_start_${instructionId}`,
+  });
+  return {
+    jobId: created.jobId,
+    commandId: started.commandId,
+    agentId: assignedAgentId,
+    outcome: "created",
+    idempotent: false,
+  };
 }
 
 /** Stubs for approve/revision validators (contract ready) */
@@ -540,6 +692,7 @@ module.exports = {
   handleCreatePairing,
   handleCreateJob,
   handleStartJob,
+  handleDeliverInstruction,
   validateApproveStageBody,
   validateRequestRevisionBody,
   isAgentOnline,

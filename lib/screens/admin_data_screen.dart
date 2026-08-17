@@ -386,7 +386,9 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(sotong24Mode ? '소통24워크 JSON 가져오기(승인형)' : '작업 로그 JSON 가져오기'),
+        title: Text(
+          sotong24Mode ? '소통24워크 Agent JSON 가져오기(승인형)' : '작업 로그 JSON 가져오기',
+        ),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -397,7 +399,7 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
                 const Padding(
                   padding: EdgeInsets.only(bottom: 8),
                   child: Text(
-                    '소통24워크 직접 자동 전송: 준비 중\n현재 사용 가능 방식: JSON 가져오기',
+                    '소통24워크 Agent 직접 자동 전송: 준비 중\n현재 사용 가능 방식: JSON 가져오기',
                     style: TextStyle(color: ControlColors.accentWarm),
                   ),
                 ),
@@ -688,7 +690,7 @@ class _AdminDataScreenState extends State<AdminDataScreen> {
             title: '데이터 관리',
             subtitle:
                 '실제 확인된 데이터만 등록합니다. 가상 매출·완료 수치는 생성하지 않습니다. '
-                '소통24워크 직접 자동 전송: 준비 중 · 현재 방식: JSON 가져오기',
+                '소통24워크 Agent 직접 자동 전송: 준비 중 · 현재 방식: JSON 가져오기',
             badge: '관리자',
           ),
           const SizedBox(height: 16),

@@ -320,8 +320,7 @@ class BusinessPlanningStore {
       }
       if (l == null || c == null) continue;
 
-      if (meta.isConflict ||
-          (meta.isDirty && meta.baseRevision != cloudRev)) {
+      if (meta.isConflict || (meta.isDirty && meta.baseRevision != cloudRev)) {
         // C: conflict — accept cloud into working set; local snapshot preserved separately.
         out[id] = c;
         metaOut[id] = PlanSyncMeta(

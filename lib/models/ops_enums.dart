@@ -74,7 +74,7 @@ class WorkLogSource {
       case jsonImport:
         return 'JSON 가져오기';
       case sotong24:
-        return '소통24워크 연동';
+        return '소통24워크 Agent 연동';
       case system:
         return '시스템 생성';
       default:

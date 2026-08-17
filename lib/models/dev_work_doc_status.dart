@@ -127,7 +127,7 @@ class DevWorkDocStatus {
         kind: DevWorkDocStatusKind.transferComplete,
         label: '전달 완료',
         icon: Icons.check_circle_outline,
-        nextAction: '소통24워크에서 가져오기·실행을 진행하세요.',
+        nextAction: '소통24워크 Agent에서 가져오기·실행을 진행하세요.',
       );
     }
 
@@ -140,9 +140,9 @@ class DevWorkDocStatus {
       if (validation.ok && folderReady) {
         return DevWorkDocStatus(
           kind: DevWorkDocStatusKind.transferReady,
-          label: '소통24워크 전달 준비 완료',
+          label: '소통24워크 Agent 전달 준비 완료',
           icon: Icons.outbound,
-          nextAction: '「소통24워크로 전달」 버튼으로 Inbox에 저장하세요.',
+          nextAction: '「소통24워크 Agent로 전달」 버튼으로 Inbox에 저장하세요.',
         );
       }
     }
