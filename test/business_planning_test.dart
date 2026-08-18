@@ -274,7 +274,7 @@ void main() {
       const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('직접 입력으로 만들기'));
+    await tester.tap(find.text('기타 작업'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('직접 입력'));
     await tester.pumpAndSettle();

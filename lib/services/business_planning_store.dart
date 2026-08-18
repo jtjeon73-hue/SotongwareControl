@@ -23,6 +23,8 @@ class BusinessPlanningStore {
   static const activePlanIdKey = 'business_planning_active_plan_id_v1';
   static const syncMetaKey = 'business_planning_sync_meta_v1';
   static const conflictSnapshotsKey = 'business_planning_conflict_snapshots_v1';
+  static const failedTransferListCleanupKey =
+      'business_planning_failed_transfer_list_cleanup_v1';
 
   final BusinessPlanMirrorService _mirror;
 
@@ -212,6 +214,31 @@ class BusinessPlanningStore {
         await savePlans(deduped);
       }
       await prefs.setBool(cleanupAppliedKey, true);
+    }
+
+    if (runCleanup &&
+        activeContextReady &&
+        prefs.getBool(failedTransferListCleanupKey) != true) {
+      var changedFailed = false;
+      deduped = deduped.map((p) {
+        if (p.wasTransferred) return p;
+        final status = PlanningStatus.normalize(p.status);
+        final failedAttempt =
+            status == PlanningStatus.transferFailed ||
+            ((p.lastTransferAt ?? '').trim().isNotEmpty &&
+                !p.hasRemoteDelivery);
+        if (!failedAttempt) return p;
+        changedFailed = true;
+        final tags = List<String>.from(p.tags);
+        if (!tags.contains('cleanup:failed_transfer_hidden')) {
+          tags.add('cleanup:failed_transfer_hidden');
+        }
+        return p.copyWith(libraryState: PlanLibraryState.archived, tags: tags);
+      }).toList();
+      if (changedFailed) {
+        await savePlans(deduped);
+      }
+      await prefs.setBool(failedTransferListCleanupKey, true);
     }
 
     if (prefs.getBool(backfillAppliedKey) != true) {

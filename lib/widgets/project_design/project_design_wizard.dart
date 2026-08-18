@@ -5,6 +5,7 @@ import '../../models/artifact_type.dart';
 import '../../models/concept_candidate.dart';
 import '../../models/project_design_state.dart';
 import '../../services/project_design_engine.dart';
+import '../../services/work_instruction_workshop_presentation.dart';
 import '../../theme/control_theme.dart';
 import 'concept_picker_panel.dart';
 
@@ -634,7 +635,13 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           ArtifactType.labelKo(_state.artifactType ?? ''),
           DesignFieldStatus.userSelected,
         ),
-        _confirmRow('대상 고객', _state.targetCustomer, _state.customerStatus),
+        _confirmRow(
+          '대상 고객',
+          WorkInstructionWorkshopPresentation.humanizeAudienceOrField(
+            _state.targetCustomer,
+          ),
+          _state.customerStatus,
+        ),
         _confirmRow(
           '선택 컨셉',
           selected.isEmpty ? '(없음)' : selected.map((c) => c.title).join(' · '),

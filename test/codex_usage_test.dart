@@ -83,6 +83,7 @@ void main() {
     });
 
     test('malformed weekly → 사용량 확인 필요', () {
+      final now = DateTime.utc(2026, 8, 18, 2, 30);
       final agent = RemoteAgentDoc(
         agentId: 'a',
         ownerUid: 'u',
@@ -98,7 +99,10 @@ void main() {
           ),
         ),
       );
-      expect(CodexUsagePresentation.fallbackUsageText(agent), '사용량 확인 필요');
+      expect(
+        CodexUsagePresentation.viewFor(agent, now: now)!.displayText,
+        '사용량 확인 필요',
+      );
     });
 
     test('quota status thresholds', () {

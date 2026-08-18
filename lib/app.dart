@@ -200,6 +200,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return AiBusinessAnalysisScreen(
           key: ValueKey(_ideaSeed?.title ?? 'wi_default'),
           ideaSeed: _ideaSeed,
+          onOpenProductWorkshop: () =>
+              _onDestinationSelected(ControlDestination.productWorkshop),
+          onOpenRemoteDiagnostics: () =>
+              _onDestinationSelected(ControlDestination.sotong24RemoteControl),
         );
       case ControlDestination.operationsAnalysis:
         return const OperationsAnalysisScreen();

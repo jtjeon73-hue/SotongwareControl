@@ -6,9 +6,16 @@ import 'business_planning_tab.dart';
 
 /// 작업지시 제작소 — Project Design Engine 전용 화면.
 class AiBusinessAnalysisScreen extends StatelessWidget {
-  const AiBusinessAnalysisScreen({super.key, this.ideaSeed});
+  const AiBusinessAnalysisScreen({
+    super.key,
+    this.ideaSeed,
+    this.onOpenProductWorkshop,
+    this.onOpenRemoteDiagnostics,
+  });
 
   final IdeaToPlanningSeed? ideaSeed;
+  final VoidCallback? onOpenProductWorkshop;
+  final VoidCallback? onOpenRemoteDiagnostics;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +31,11 @@ class AiBusinessAnalysisScreen extends StatelessWidget {
             compact: true,
           ),
           const SizedBox(height: 8),
-          BusinessPlanningTab(ideaSeed: ideaSeed),
+          BusinessPlanningTab(
+            ideaSeed: ideaSeed,
+            onOpenProductWorkshop: onOpenProductWorkshop,
+            onOpenRemoteDiagnostics: onOpenRemoteDiagnostics,
+          ),
         ],
       ),
     );
