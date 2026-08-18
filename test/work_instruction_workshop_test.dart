@@ -228,4 +228,72 @@ void main() {
     expect(find.text('고급 원문 보기'), findsOneWidget);
     expect(find.textContaining('"instructionId"'), findsNothing);
   });
+
+  testWidgets('InstructionPreviewPanel — 모바일 단일 열 + 390px overflow 없음', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    const long =
+        '온라인에서 수익을 내고 싶지만 무엇을 팔아야 할지, 누구를 대상으로 해야 할지, '
+        '첫 전자책을 어떻게 구성해야 할지 막막한 초보 창업자를 위한 실전 안내입니다. '
+        '주제 선정부터 목차, 판매 페이지까지 한 권으로 따라 할 수 있게 정리합니다.';
+
+    const wi = WorkInstruction(
+      schemaVersion: '1.0',
+      instructionId: 'wi_plan_1787030423574',
+      projectId: 'proj',
+      instructionVersion: '1',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+      businessIdea: '온라인 수익 첫걸음 전자책',
+      businessPurpose: long,
+      customerProblem: long,
+      targetCustomer: '초보 창업자',
+      deliverableTypes: ['ebook'],
+      recommendedSequence: ['ebook'],
+      valueProposition: long,
+      requiredMaterials: [],
+      workflowSteps: [],
+      completionCriteria: [],
+      qualityChecks: ['맞춤법 검토', '초보도 따라 할 수 있는 난이도'],
+      risks: [],
+      monetizationOptions: [],
+      deploymentTargets: [],
+      promotionChannels: [],
+      approvalItems: ['단계별 승인'],
+      executionStatus: 'draft',
+      artifactType: 'ebook',
+      notes: '표지 시안은 따뜻한 톤으로',
+      checksum: 'x',
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 390,
+            child: SingleChildScrollView(
+              child: InstructionPreviewPanel(instruction: wi),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('instruction_preview_doc')), findsOneWidget);
+    expect(find.text('기본'), findsOneWidget);
+    expect(find.text('대상과 문제'), findsOneWidget);
+    expect(find.text('제작 목표'), findsOneWidget);
+    expect(find.text('제작 조건'), findsOneWidget);
+    expect(find.text('사업유형'), findsOneWidget);
+    expect(find.text('작업 제목'), findsOneWidget);
+    expect(find.text('온라인 수익 첫걸음 전자책'), findsWidgets);
+    expect(find.text('내용 복사'), findsOneWidget);
+    expect(find.textContaining('"instructionId"'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

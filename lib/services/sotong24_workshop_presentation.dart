@@ -40,6 +40,61 @@ class Sotong24WorkshopPresentation {
   static bool hasOperationalWork(Iterable<Sotong24RemoteProject> projects) =>
       operationalProjects(projects).isNotEmpty;
 
+  /// `sotong24work_projects/{instructionId}` 와 동일한 운영 프로젝트만.
+  static Sotong24RemoteProject? projectForInstruction(
+    Iterable<Sotong24RemoteProject> projects,
+    String instructionId,
+  ) {
+    final id = instructionId.trim();
+    if (id.isEmpty) return null;
+    for (final p in operationalProjects(projects)) {
+      if (p.projectId.trim() == id) return p;
+    }
+    return null;
+  }
+
+  static Sotong24RemoteProject? defaultFocusProject(
+    Iterable<Sotong24RemoteProject> projects,
+  ) {
+    final real = operationalProjects(projects);
+    if (real.isEmpty) return null;
+    for (final p in real) {
+      if (p.userFacingStatus == Sotong24WorkStatus.awaitingApproval) {
+        return p;
+      }
+    }
+    for (final p in real) {
+      if (p.userFacingStatus != Sotong24WorkStatus.completed) return p;
+    }
+    return real.first;
+  }
+
+  /// `focusInstructionId`가 있으면 그 프로젝트만. 없으면 대시보드 기본 포커스.
+  /// 지정 id의 프로젝트가 아직 없으면 이전 작업으로 fallback하지 않는다.
+  static WorkshopFocusResolution resolveFocus({
+    required Iterable<Sotong24RemoteProject> projects,
+    String? focusInstructionId,
+  }) {
+    final id = focusInstructionId?.trim() ?? '';
+    if (id.isEmpty) {
+      return WorkshopFocusResolution(
+        waitingForExactProject: false,
+        project: defaultFocusProject(projects),
+      );
+    }
+    final match = projectForInstruction(projects, id);
+    if (match != null) {
+      return WorkshopFocusResolution(
+        waitingForExactProject: false,
+        project: match,
+      );
+    }
+    return const WorkshopFocusResolution(
+      waitingForExactProject: true,
+      project: null,
+    );
+  }
+
   /// 카드/상세 제목 (사용자 SSOT).
   static String displayTitle(Sotong24RemoteProject project) {
     final t = project.title.trim();
@@ -234,3 +289,15 @@ class Sotong24WorkshopPresentation {
 }
 
 enum WorkshopTestKind { none, codex, cursor, e2e }
+
+class WorkshopFocusResolution {
+  const WorkshopFocusResolution({
+    required this.waitingForExactProject,
+    this.project,
+  });
+
+  final Sotong24RemoteProject? project;
+  final bool waitingForExactProject;
+
+  bool get hasExactProject => project != null;
+}

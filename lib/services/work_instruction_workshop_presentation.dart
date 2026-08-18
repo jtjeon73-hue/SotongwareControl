@@ -246,6 +246,56 @@ class WorkInstructionWorkshopPresentation {
   ];
 }
 
+enum InstructionCreateButtonKind { create, completed, recreate }
+
+/// 작업지시서 생성 버튼·스낵바 (일반 운영 UX).
+class InstructionCreateUx {
+  InstructionCreateUx._();
+
+  static const createdMessage = '작업지시서 생성 완료';
+  static const alreadyCreatedMessage = '이미 작업지시서가 생성되었습니다.';
+  static const jsonDownloadedMessage = 'JSON 파일을 다운로드했습니다.';
+  static const createLabel = '작업지시서 생성';
+  static const completedLabel = '✓ 작업지시서 생성 완료';
+  static const recreateLabel = '변경사항으로 작업지시서 다시 생성';
+
+  static InstructionCreateButtonKind kind({
+    required bool generated,
+    required bool stale,
+  }) {
+    if (!generated) return InstructionCreateButtonKind.create;
+    if (stale) return InstructionCreateButtonKind.recreate;
+    return InstructionCreateButtonKind.completed;
+  }
+
+  static String label(InstructionCreateButtonKind kind) {
+    switch (kind) {
+      case InstructionCreateButtonKind.create:
+        return createLabel;
+      case InstructionCreateButtonKind.completed:
+        return completedLabel;
+      case InstructionCreateButtonKind.recreate:
+        return recreateLabel;
+    }
+  }
+
+  static bool enabled(
+    InstructionCreateButtonKind kind, {
+    required bool canCreate,
+  }) {
+    if (!canCreate) return false;
+    return kind != InstructionCreateButtonKind.completed;
+  }
+
+  /// 일반 운영 화면에 보이면 안 되는 DevWorkDoc/수동가져오기 표현.
+  static bool isInternalOperatorMessage(String message) {
+    return message.contains('JSON 다운로드 완료') ||
+        message.contains('수동 가져오기 대기') ||
+        message.contains('전달됨 아님') ||
+        message.contains('전달 된 아님');
+  }
+}
+
 class InstructionQualityHint {
   const InstructionQualityHint({
     required this.area,

@@ -256,6 +256,108 @@ void main() {
     expect(transferCount, 0);
   });
 
+  test('전달 성공 + operational project 없음 → preparing', () {
+    final step7 = WorkInstructionDeliveryPresentation.resolve(
+      plan: transferredPlan(),
+      validation: const ContractValidationResult(
+        level: ContractValidationLevel.valid,
+        issues: [],
+      ),
+      agents: [onlineAgent()],
+      transferBusy: false,
+      now: now,
+      operationalProjectReady: false,
+    );
+    expect(step7.workshopPhase, WorkshopHandoffPhase.preparing);
+    expect(step7.showSuccessPanel, isTrue);
+  });
+
+  test('전달 성공 + operational project 있음 → registered', () {
+    final step7 = WorkInstructionDeliveryPresentation.resolve(
+      plan: transferredPlan(),
+      validation: const ContractValidationResult(
+        level: ContractValidationLevel.valid,
+        issues: [],
+      ),
+      agents: [onlineAgent()],
+      transferBusy: false,
+      now: now,
+      operationalProjectReady: true,
+    );
+    expect(step7.workshopPhase, WorkshopHandoffPhase.registered);
+  });
+
+  testWidgets('Step7DeliveryPanel — project 미생성 시 준비 중', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final step7 = WorkInstructionDeliveryPresentation.resolve(
+      plan: transferredPlan(),
+      validation: const ContractValidationResult(
+        level: ContractValidationLevel.valid,
+        issues: [],
+      ),
+      agents: [onlineAgent()],
+      transferBusy: false,
+      now: now,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Step7DeliveryPanel(
+              view: step7,
+              onOpenProductWorkshop: () {},
+              onRecheckWorkshop: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('AI 제작공정을 준비하고 있습니다.'), findsOneWidget);
+    expect(find.text('AI 제작공정 준비 중'), findsOneWidget);
+    expect(find.text('상태 재확인'), findsOneWidget);
+    expect(find.text('AI 제작공정에서 보기'), findsNothing);
+  });
+
+  testWidgets('Step7DeliveryPanel — project 생성 후 제작공정에서 보기', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final step7 = WorkInstructionDeliveryPresentation.resolve(
+      plan: transferredPlan(),
+      validation: const ContractValidationResult(
+        level: ContractValidationLevel.valid,
+        issues: [],
+      ),
+      agents: [onlineAgent()],
+      transferBusy: false,
+      now: now,
+      operationalProjectReady: true,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Step7DeliveryPanel(
+              view: step7,
+              onOpenProductWorkshop: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('제작공정 등록 완료'), findsOneWidget);
+    expect(find.text('AI 제작공정에서 보기'), findsOneWidget);
+    expect(find.text('AI 제작공정 준비 중'), findsNothing);
+  });
+
   testWidgets('Step7DeliveryPanel — double tap 전송 1회', (tester) async {
     var transferCount = 0;
     var busy = false;

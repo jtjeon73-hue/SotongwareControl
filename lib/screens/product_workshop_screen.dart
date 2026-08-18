@@ -16,10 +16,12 @@ class ProductWorkshopScreen extends StatefulWidget {
     super.key,
     this.repository,
     this.onStartNewWork,
+    this.focusInstructionId,
   });
 
   final Sotong24RemoteRepository? repository;
   final VoidCallback? onStartNewWork;
+  final String? focusInstructionId;
 
   @override
   State<ProductWorkshopScreen> createState() => _ProductWorkshopScreenState();
@@ -29,6 +31,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
   late final Sotong24RemoteRepository _repo;
   var _ownsRepo = false;
   var _filter = Sotong24ProjectFilter.all;
+  String? _openedFocusForId;
 
   @override
   void initState() {
@@ -38,6 +41,14 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
     } else {
       _repo = Sotong24RemoteRepository();
       _ownsRepo = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ProductWorkshopScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusInstructionId != widget.focusInstructionId) {
+      _openedFocusForId = null;
     }
   }
 
@@ -94,7 +105,23 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
         final completed = realWork
             .where((p) => p.userFacingStatus == Sotong24WorkStatus.completed)
             .toList();
-        final focus = _pickFocusProject(projects);
+        final focusId = widget.focusInstructionId?.trim() ?? '';
+        final focusing = focusId.isNotEmpty;
+        final resolution = Sotong24WorkshopPresentation.resolveFocus(
+          projects: projects,
+          focusInstructionId: widget.focusInstructionId,
+        );
+        final focus = resolution.project;
+        final waiting = resolution.waitingForExactProject;
+        if (focusing && focus != null && _openedFocusForId != focusId) {
+          final opened = focus;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            if (_openedFocusForId == focusId) return;
+            _openedFocusForId = focusId;
+            _openDetail(opened);
+          });
+        }
         final isEmpty =
             realWork.isEmpty && testWork.isEmpty && incomplete.isEmpty;
 
@@ -117,13 +144,15 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            if (focus != null)
+            if (waiting)
+              _PreparingWorkshopCard(onRecheck: () => setState(() {}))
+            else if (focus != null)
               _CurrentWorkCard(project: focus)
             else if (isEmpty)
               _EmptyWorkshopCard(onStartNewWork: widget.onStartNewWork)
             else
               const _InfoBanner(text: '진행 중인 제작 프로젝트가 없습니다.'),
-            if (!isEmpty) ...[
+            if (!focusing && !isEmpty) ...[
               const SizedBox(height: 16),
               Text(
                 '작업 목록',
@@ -149,9 +178,10 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            if (realWork.isEmpty && testWork.isEmpty && incomplete.isEmpty)
-              const SizedBox.shrink()
-            else ...[
+            if (!focusing &&
+                !(realWork.isEmpty &&
+                    testWork.isEmpty &&
+                    incomplete.isEmpty)) ...[
               if (awaiting.isNotEmpty) ...[
                 const _SectionHeader(
                   title: '승인 필요한 작업',
@@ -225,20 +255,6 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
         );
       },
     );
-  }
-
-  Sotong24RemoteProject? _pickFocusProject(List<Sotong24RemoteProject> all) {
-    final real = Sotong24WorkshopPresentation.operationalProjects(all);
-    if (real.isEmpty) return null;
-    for (final p in real) {
-      if (p.userFacingStatus == Sotong24WorkStatus.awaitingApproval) {
-        return p;
-      }
-    }
-    for (final p in real) {
-      if (p.userFacingStatus != Sotong24WorkStatus.completed) return p;
-    }
-    return real.first;
   }
 
   Future<void> _openDetail(Sotong24RemoteProject project) async {
@@ -1063,6 +1079,52 @@ class _DemoBadge extends StatelessWidget {
       child: const Text(
         '데모',
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class _PreparingWorkshopCard extends StatelessWidget {
+  const _PreparingWorkshopCard({this.onRecheck});
+
+  final VoidCallback? onRecheck;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('workshop_preparing_card'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ControlColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ControlColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'AI 제작공정을 준비하고 있습니다.',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Agent가 작업지시는 정상 수신했습니다.',
+            style: TextStyle(
+              fontSize: 13.5,
+              color: ControlColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+          if (onRecheck != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton(
+              key: const Key('workshop_recheck_status'),
+              onPressed: onRecheck,
+              child: const Text('상태 재확인'),
+            ),
+          ],
+        ],
       ),
     );
   }

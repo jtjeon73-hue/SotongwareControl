@@ -15,6 +15,7 @@ class Step7DeliveryPanel extends StatelessWidget {
     this.onDiagnosticAction,
     this.onCopyGptMemo,
     this.onShowValidation,
+    this.onRecheckWorkshop,
   });
 
   final DeliveryStep7View view;
@@ -25,6 +26,7 @@ class Step7DeliveryPanel extends StatelessWidget {
   final void Function(DeliveryDiagnosticAction action)? onDiagnosticAction;
   final VoidCallback? onCopyGptMemo;
   final VoidCallback? onShowValidation;
+  final VoidCallback? onRecheckWorkshop;
 
   @override
   Widget build(BuildContext context) {
@@ -97,8 +99,10 @@ class Step7DeliveryPanel extends StatelessWidget {
         const SizedBox(height: 12),
         if (view.showSuccessPanel) ...[
           _SuccessPanel(
+            phase: view.workshopPhase,
             onViewInstruction: onViewInstruction,
             onOpenProductWorkshop: onOpenProductWorkshop,
+            onRecheckWorkshop: onRecheckWorkshop,
           ),
           const SizedBox(height: 12),
         ] else if (view.failure != null &&
@@ -140,13 +144,21 @@ class Step7DeliveryPanel extends StatelessWidget {
 }
 
 class _SuccessPanel extends StatelessWidget {
-  const _SuccessPanel({this.onViewInstruction, this.onOpenProductWorkshop});
+  const _SuccessPanel({
+    this.phase = WorkshopHandoffPhase.preparing,
+    this.onViewInstruction,
+    this.onOpenProductWorkshop,
+    this.onRecheckWorkshop,
+  });
 
+  final WorkshopHandoffPhase phase;
   final VoidCallback? onViewInstruction;
   final VoidCallback? onOpenProductWorkshop;
+  final VoidCallback? onRecheckWorkshop;
 
   @override
   Widget build(BuildContext context) {
+    final registered = phase == WorkshopHandoffPhase.registered;
     return Container(
       key: const Key('planning_delivery_success'),
       width: double.infinity,
@@ -169,6 +181,16 @@ class _SuccessPanel extends StatelessWidget {
             style: TextStyle(color: ControlColors.textSecondary),
           ),
           const SizedBox(height: 8),
+          Text(
+            registered ? '제작공정 등록 완료' : 'AI 제작공정을 준비하고 있습니다.',
+            key: Key(
+              registered
+                  ? 'planning_workshop_registered'
+                  : 'planning_workshop_preparing',
+            ),
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 4,
             runSpacing: 0,
@@ -177,11 +199,24 @@ class _SuccessPanel extends StatelessWidget {
                 onPressed: onViewInstruction,
                 child: const Text('작업지시 내용 보기'),
               ),
-              if (onOpenProductWorkshop != null)
+              if (registered)
                 TextButton(
+                  key: const Key('planning_open_workshop'),
                   onPressed: onOpenProductWorkshop,
                   child: const Text('AI 제작공정에서 보기'),
+                )
+              else ...[
+                TextButton(
+                  key: const Key('planning_recheck_workshop'),
+                  onPressed: onRecheckWorkshop,
+                  child: const Text('상태 재확인'),
                 ),
+                TextButton(
+                  key: const Key('planning_workshop_preparing_action'),
+                  onPressed: onOpenProductWorkshop,
+                  child: const Text('AI 제작공정 준비 중'),
+                ),
+              ],
             ],
           ),
         ],

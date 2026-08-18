@@ -50,7 +50,7 @@ class BusinessPlanningTab extends StatefulWidget {
 
   /// 뉴 아이디어 뱅크에서 전달. 새 기획으로만 적용(기존 active 덮어쓰지 않음).
   final IdeaToPlanningSeed? ideaSeed;
-  final VoidCallback? onOpenProductWorkshop;
+  final void Function({String? instructionId})? onOpenProductWorkshop;
   final VoidCallback? onOpenRemoteDiagnostics;
 
   @override
@@ -363,7 +363,27 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       agents: _remoteAgents,
       transferBusy: _transferBusy || _agentRefreshBusy,
       lastResult: _effectiveLastTransferResult,
+      operationalProjectReady: _operationalProjectReady,
     );
+  }
+
+  bool get _operationalProjectReady {
+    final id = (_instruction?.instructionId ?? _instructionId ?? '').trim();
+    return Sotong24WorkshopPresentation.projectForInstruction(
+          _remoteProjects,
+          id,
+        ) !=
+        null;
+  }
+
+  bool get _instructionMatchesCurrentInput {
+    if (_instruction == null) return false;
+    final saved = _activeDoc?.input;
+    if (saved != null) {
+      return _planningInputMatchesInstruction(saved, _instruction!) &&
+          _planningInputMatchesInstruction(_currentInput, _instruction!);
+    }
+    return _planningInputMatchesInstruction(_currentInput, _instruction!);
   }
 
   void _applyInput(BusinessPlanInput input) {
@@ -592,24 +612,45 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return AiExecutionPolicy.pilotCodexStage1;
   }
 
-  Future<void> _createInstruction() async {
+  Future<void> _createOrPromptInstruction() async {
     if (!_canCreateInstruction) {
       _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
       return;
     }
     if (_instruction != null) {
-      _snack('이미 작업지시서가 있습니다. 「수정」 또는 「새 버전」을 사용하세요.');
-      return;
-    }
-    if (!_devWorkDocFolderReady) {
-      _snack('DevWorkDoc 폴더를 먼저 설정하세요. JSON만 필요하면 「JSON 다운로드」를 사용하세요.');
+      _snack(InstructionCreateUx.alreadyCreatedMessage);
       return;
     }
     await _saveInstructionInternal(
       version: 1,
       isNewVersion: false,
       appendPreviousToHistory: false,
-      saveTarget: DevWorkDocSaveTarget.folder,
+      saveTarget: _devWorkDocFolderReady
+          ? DevWorkDocSaveTarget.folder
+          : DevWorkDocSaveTarget.localOnly,
+    );
+  }
+
+  Future<void> _recreateInstructionFromChanges() async {
+    if (!_canCreateInstruction) {
+      _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
+      return;
+    }
+    if (_instruction == null) {
+      await _createOrPromptInstruction();
+      return;
+    }
+    if (_instructionMatchesCurrentInput) {
+      _snack(InstructionCreateUx.alreadyCreatedMessage);
+      return;
+    }
+    await _saveInstructionInternal(
+      version: _version + 1,
+      isNewVersion: true,
+      appendPreviousToHistory: true,
+      saveTarget: _devWorkDocFolderReady
+          ? DevWorkDocSaveTarget.folder
+          : DevWorkDocSaveTarget.localOnly,
     );
   }
 
@@ -997,6 +1038,16 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         version: version,
         jsonText: jsonText,
       );
+    } else if (saveTarget == DevWorkDocSaveTarget.localOnly) {
+      saveResult = DevWorkDocWriteResult(
+        ok: true,
+        mode: 'local',
+        outcome: DevWorkDocSaveOutcome.completeSuccess,
+        instructionId: iid,
+        version: version,
+        checksum: instruction.checksum,
+        message: InstructionCreateUx.createdMessage,
+      );
     } else {
       saveResult = await _devWorkDoc.saveInstruction(
         artifactType: artifact,
@@ -1008,8 +1059,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
 
     final isDownloadTarget = saveTarget == DevWorkDocSaveTarget.downloadOnly;
+    final isLocalSuccess =
+        saveTarget == DevWorkDocSaveTarget.localOnly && saveResult.ok;
     final isFolderSuccess =
         !isDownloadTarget &&
+        !isLocalSuccess &&
         (saveResult.isFolderCompleteSuccess ||
             (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists &&
                 saveResult.activeVerified &&
@@ -1020,7 +1074,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         saveResult.mode == 'download' &&
         saveResult.outcome == DevWorkDocSaveOutcome.downloadOnly;
 
-    if (!isFolderSuccess && !isDownloadComplete) {
+    if (!isFolderSuccess && !isDownloadComplete && !isLocalSuccess) {
       if (mounted) {
         setState(() => _lastDevWorkDocResult = saveResult);
         ScaffoldMessenger.of(context).clearSnackBars();
@@ -1093,12 +1147,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     });
 
     if (isDownloadComplete) {
-      _snack(
-        'JSON 다운로드 완료 · 수동 가져오기 대기 '
-        '(전달됨 아님). v$version · ${saveResult.fileName ?? ''}',
-      );
-    } else if (saveResult.isFolderCompleteSuccess ||
-        saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial) {
+      _snack(InstructionCreateUx.jsonDownloadedMessage);
+    } else if (isFolderSuccess ||
+        isLocalSuccess ||
+        saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists) {
       await _mirrorActiveSoft(
         artifactType: artifact,
         instructionId: iid,
@@ -1109,35 +1161,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             : instruction.projectId,
       );
       _snack(
-        saveResult.outcome == DevWorkDocSaveOutcome.recoveredFromPartial
-            ? '부분 저장 복구 완료. v$version\n'
-                  'Active: ${saveResult.activeBytes}B · Versions: ${saveResult.versionsBytes}B'
-            : 'DevWorkDoc에 저장했습니다. v$version\n'
-                  'Active: 저장·검증 완료 (${saveResult.activeBytes}B)\n'
-                  'Versions: v$version 저장·검증 완료 (${saveResult.versionsBytes}B)',
-      );
-    } else if (saveResult.outcome == DevWorkDocSaveOutcome.alreadyExists) {
-      await _mirrorActiveSoft(
-        artifactType: artifact,
-        instructionId: iid,
-        jsonText: jsonText,
-        version: version,
-        title: instruction.businessIdea.isNotEmpty
-            ? instruction.businessIdea
-            : instruction.projectId,
-      );
-      _snack(
-        saveResult.message?.contains('구형') == true
-            ? '${saveResult.message}\nActive·Versions v$version 유지'
-            : 'DevWorkDoc 기존 파일 확인 (동일 핵심 checksum). v$version\n'
-                  'Active·Versions v$version 검증 완료',
+        validation.canTransfer
+            ? InstructionCreateUx.createdMessage
+            : '작업지시를 보내기 전에 확인이 필요합니다. 아래 안내를 확인하세요.',
       );
     } else if (validation.canTransfer) {
-      _snack(
-        validation.level == ContractValidationLevel.warning
-            ? '작업지시서를 생성했습니다. (v$version, WARNING — 전달 전 확인 필요)'
-            : '작업지시서를 생성했습니다. (v$version)',
-      );
+      _snack(InstructionCreateUx.createdMessage);
     } else {
       _snack('작업지시를 보내기 전에 확인이 필요합니다. 아래 안내를 확인하세요.');
     }
@@ -1563,10 +1592,25 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       case DeliveryDiagnosticAction.validationReview:
         _showValidationIssues();
       case DeliveryDiagnosticAction.openWorkshop:
-        widget.onOpenProductWorkshop?.call();
+        _openWorkshopForCurrent();
       case DeliveryDiagnosticAction.copyGptMemo:
         _copyDeliveryGptMemo();
     }
+  }
+
+  void _openWorkshopForCurrent() {
+    final id = (_instruction?.instructionId ?? _instructionId ?? '').trim();
+    _openWorkshopFor(id);
+  }
+
+  void _openWorkshopFor(String instructionId) {
+    widget.onOpenProductWorkshop?.call(instructionId: instructionId);
+  }
+
+  void _recheckWorkshopStatus() {
+    if (!mounted) return;
+    setState(() {});
+    _snack(_operationalProjectReady ? '제작공정 등록 완료' : 'AI 제작공정을 준비하고 있습니다.');
   }
 
   Future<void> _mirrorActiveSoft({
@@ -1725,7 +1769,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ? null
             : SnackBarAction(
                 label: 'AI 제작공정에서 보기',
-                onPressed: widget.onOpenProductWorkshop!,
+                onPressed: () => widget.onOpenProductWorkshop?.call(),
               ),
       ),
     );
@@ -1795,27 +1839,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('작업지시서가 없습니다.');
       return;
     }
-    final validation = _contractValidation;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('작업지시 내용'),
-        content: SizedBox(
-          width: 560,
-          child: SingleChildScrollView(
-            child: InstructionPreviewPanel(
-              instruction: _instruction!,
-              validation: validation,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
+    await showWorkInstructionViewer(
+      context,
+      instruction: _instruction!,
+      validation: _contractValidation,
     );
   }
 
@@ -1853,8 +1880,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               onChanged: _onDesignChanged,
               onRequestSavePlan: () => _savePlan(),
               onRequestCreateInstruction: () => _createOrPromptInstruction(),
+              onRequestRecreateInstruction: _recreateInstructionFromChanges,
               onRequestNewWork: _startNewPlan,
               onOccupiedConcept: _onOccupiedConcept,
+              instructionGenerated: _instruction != null,
+              instructionStale:
+                  _instruction != null && !_instructionMatchesCurrentInput,
             )
           else
             _buildAdvancedForm(),
@@ -1892,6 +1923,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                           ? () => _showInstructionViewer()
                           : null,
                       child: const Text('작업지시 원문/고급'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _canCreateInstruction || _instruction != null
+                          ? _downloadInstructionJson
+                          : null,
+                      child: const Text('JSON 다운로드'),
                     ),
                   ],
                 ),
@@ -1987,8 +2024,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                         ),
                         if (widget.onOpenProductWorkshop != null)
                           TextButton(
-                            onPressed: widget.onOpenProductWorkshop,
-                            child: const Text('AI 제작공정에서 보기'),
+                            onPressed: () =>
+                                _openWorkshopFor(plan.stableInstructionId),
+                            child: Text(
+                              Sotong24WorkshopPresentation.projectForInstruction(
+                                        _remoteProjects,
+                                        plan.stableInstructionId,
+                                      ) ==
+                                      null
+                                  ? 'AI 제작공정 준비 중'
+                                  : 'AI 제작공정에서 보기',
+                            ),
                           ),
                       ],
                     ),
@@ -2437,26 +2483,16 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       view: _step7DeliveryView,
       onTransfer: _transferToWork,
       onOpenRemoteDiagnostics: widget.onOpenRemoteDiagnostics,
-      onOpenProductWorkshop: widget.onOpenProductWorkshop,
+      onOpenProductWorkshop: widget.onOpenProductWorkshop == null
+          ? null
+          : _openWorkshopForCurrent,
       onViewInstruction: _instruction != null
           ? () => _showInstructionViewer()
           : null,
       onDiagnosticAction: _onDeliveryDiagnosticAction,
       onCopyGptMemo: _copyDeliveryGptMemo,
       onShowValidation: _showValidationIssues,
+      onRecheckWorkshop: _recheckWorkshopStatus,
     );
-  }
-
-  Future<void> _createOrPromptInstruction() async {
-    if (!_canCreateInstruction) {
-      _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
-      return;
-    }
-    if (_devWorkDocFolderReady) {
-      await _createInstruction();
-      return;
-    }
-    // 폴더 미설정: 지시서는 생성하되 DevWorkDoc 직접 저장과 구분 (다운로드)
-    await _downloadInstructionJson();
   }
 }

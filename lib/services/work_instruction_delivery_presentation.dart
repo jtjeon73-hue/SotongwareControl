@@ -9,6 +9,8 @@ import '../services/work_instruction_workshop_presentation.dart';
 /// STEP 7 — Agent 전달 UI 상태 (presentation only).
 enum DeliveryButtonState { ready, sending, sent, failed, blocked }
 
+enum WorkshopHandoffPhase { none, preparing, registered }
+
 enum DeliveryFailureKind {
   agentOffline,
   heartbeatStale,
@@ -83,6 +85,7 @@ class DeliveryStep7View {
     required this.showSuccessPanel,
     required this.failure,
     required this.validationLines,
+    this.workshopPhase = WorkshopHandoffPhase.none,
   });
 
   final AgentDeliveryStatusView agentStatus;
@@ -92,6 +95,7 @@ class DeliveryStep7View {
   final bool showSuccessPanel;
   final DeliveryFailureView? failure;
   final List<String> validationLines;
+  final WorkshopHandoffPhase workshopPhase;
 }
 
 class WorkInstructionDeliveryPresentation {
@@ -162,6 +166,7 @@ class WorkInstructionDeliveryPresentation {
     required bool transferBusy,
     RemoteDeliveryResult? lastResult,
     DateTime? now,
+    bool operationalProjectReady = false,
   }) {
     final agentView = agentStatus(agents, now: now);
     final validationLines = validation == null
@@ -179,6 +184,9 @@ class WorkInstructionDeliveryPresentation {
         showSuccessPanel: true,
         failure: null,
         validationLines: validationLines,
+        workshopPhase: operationalProjectReady
+            ? WorkshopHandoffPhase.registered
+            : WorkshopHandoffPhase.preparing,
       );
     }
 

@@ -17,19 +17,25 @@ class ProjectDesignWizard extends StatefulWidget {
     required this.initial,
     required this.onChanged,
     this.onRequestCreateInstruction,
+    this.onRequestRecreateInstruction,
     this.onRequestSavePlan,
     this.onRequestNewWork,
     this.occupancy,
     this.onOccupiedConcept,
+    this.instructionGenerated = false,
+    this.instructionStale = false,
   });
 
   final ProjectDesignState initial;
   final ValueChanged<ProjectDesignState> onChanged;
   final VoidCallback? onRequestCreateInstruction;
+  final VoidCallback? onRequestRecreateInstruction;
   final VoidCallback? onRequestSavePlan;
   final VoidCallback? onRequestNewWork;
   final ConceptOccupancyIndex? occupancy;
   final void Function(ConceptOccupancyView view)? onOccupiedConcept;
+  final bool instructionGenerated;
+  final bool instructionStale;
 
   @override
   State<ProjectDesignWizard> createState() => _ProjectDesignWizardState();
@@ -790,29 +796,53 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         if (synced.designMemo.trim().isNotEmpty)
           _kv('추가 메모', synced.designMemo),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilledButton.icon(
-              onPressed: synced.canCreateInstruction
-                  ? () {
-                      _emit(synced);
-                      widget.onRequestCreateInstruction?.call();
-                    }
-                  : null,
-              icon: const Icon(Icons.description_outlined, size: 18),
-              label: const Text('작업지시서 생성'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () {
-                _emit(synced);
-                widget.onRequestSavePlan?.call();
-              },
-              icon: const Icon(Icons.save_outlined, size: 18),
-              label: const Text('기획안만 저장'),
-            ),
-          ],
+        Builder(
+          builder: (_) {
+            final kind = InstructionCreateUx.kind(
+              generated: widget.instructionGenerated,
+              stale: widget.instructionStale,
+            );
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  key: const Key('planning_create_instruction'),
+                  onPressed:
+                      InstructionCreateUx.enabled(
+                        kind,
+                        canCreate: synced.canCreateInstruction,
+                      )
+                      ? () {
+                          _emit(synced);
+                          if (kind == InstructionCreateButtonKind.recreate) {
+                            (widget.onRequestRecreateInstruction ??
+                                    widget.onRequestCreateInstruction)
+                                ?.call();
+                          } else {
+                            widget.onRequestCreateInstruction?.call();
+                          }
+                        }
+                      : null,
+                  icon: Icon(
+                    kind == InstructionCreateButtonKind.completed
+                        ? Icons.check_circle_outline
+                        : Icons.description_outlined,
+                    size: 18,
+                  ),
+                  label: Text(InstructionCreateUx.label(kind)),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    _emit(synced);
+                    widget.onRequestSavePlan?.call();
+                  },
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text('기획안만 저장'),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );

@@ -81,13 +81,21 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   ControlDestination _selected = ControlDestination.sotong24RemoteControl;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   IdeaToPlanningSeed? _ideaSeed;
+  String? _workshopFocusInstructionId;
 
   /// 사업전략연구실 모바일/전체화면 읽기 시 총관제 상단 헤더 숨김.
   var _hideShellChrome = false;
 
-  void _onDestinationSelected(ControlDestination destination) {
+  void _onDestinationSelected(
+    ControlDestination destination, {
+    String? workshopInstructionId,
+  }) {
     setState(() {
       _selected = destination;
+      if (destination == ControlDestination.productWorkshop) {
+        final id = workshopInstructionId?.trim() ?? '';
+        _workshopFocusInstructionId = id.isEmpty ? null : id;
+      }
       if (destination != ControlDestination.aiBusinessAnalysis) {
         _ideaSeed = null;
       }
@@ -200,8 +208,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return AiBusinessAnalysisScreen(
           key: ValueKey(_ideaSeed?.title ?? 'wi_default'),
           ideaSeed: _ideaSeed,
-          onOpenProductWorkshop: () =>
-              _onDestinationSelected(ControlDestination.productWorkshop),
+          onOpenProductWorkshop: ({instructionId}) => _onDestinationSelected(
+            ControlDestination.productWorkshop,
+            workshopInstructionId: instructionId,
+          ),
           onOpenRemoteDiagnostics: () =>
               _onDestinationSelected(ControlDestination.sotong24RemoteControl),
         );
@@ -266,6 +276,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return const PublicServicesScreen();
       case ControlDestination.productWorkshop:
         return ProductWorkshopScreen(
+          key: ValueKey(_workshopFocusInstructionId ?? 'workshop_all'),
+          focusInstructionId: _workshopFocusInstructionId,
           onStartNewWork: () =>
               _onDestinationSelected(ControlDestination.aiBusinessAnalysis),
         );

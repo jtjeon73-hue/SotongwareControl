@@ -8,7 +8,7 @@ import '../services/instruction_transfer_types.dart';
 import '../services/work_instruction_validator.dart';
 import 'business_planning.dart';
 
-enum DevWorkDocSaveTarget { folder, downloadOnly }
+enum DevWorkDocSaveTarget { folder, downloadOnly, localOnly }
 
 enum DevWorkDocStatusKind {
   folderNotSet,

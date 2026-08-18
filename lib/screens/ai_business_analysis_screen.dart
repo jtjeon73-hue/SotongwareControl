@@ -14,7 +14,7 @@ class AiBusinessAnalysisScreen extends StatelessWidget {
   });
 
   final IdeaToPlanningSeed? ideaSeed;
-  final VoidCallback? onOpenProductWorkshop;
+  final void Function({String? instructionId})? onOpenProductWorkshop;
   final VoidCallback? onOpenRemoteDiagnostics;
 
   @override
