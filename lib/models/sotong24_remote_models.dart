@@ -50,6 +50,13 @@ class Sotong24WorkStatus {
   static const completed = 'completed';
   static const error = 'error';
   static const revision = 'revision';
+  static const notApplicable = 'not_applicable';
+
+  static bool isNotApplicable(String? status) =>
+      Sotong24UserFacingStatus.normalize(status) == notApplicable;
+
+  static bool countsAsCompleted(String? status) =>
+      Sotong24UserFacingStatus.normalize(status) == completed;
 
   static String labelKo(String status) {
     switch (status) {
@@ -71,6 +78,8 @@ class Sotong24WorkStatus {
       case 'revision_requested':
       case 'reworking':
         return '보완 중';
+      case notApplicable:
+        return '해당 없음';
       default:
         return status;
     }
@@ -367,10 +376,15 @@ class Sotong24RemoteProject {
         : (stages.isNotEmpty ? stages.length : 0);
     if (total <= 0) return reportedProgressPercent;
     if (stages.isEmpty) return reportedProgressPercent;
-    final completed = stages
-        .where((s) => s.status == Sotong24WorkStatus.completed)
+    final notApplicable = stages
+        .where((s) => Sotong24WorkStatus.isNotApplicable(s.status))
         .length;
-    return ((completed * 100) / total).round().clamp(0, 100);
+    final completed = stages
+        .where((s) => Sotong24WorkStatus.countsAsCompleted(s.status))
+        .length;
+    final denom = total - notApplicable;
+    if (denom <= 0) return 0;
+    return ((completed * 100) / denom).round().clamp(0, 100);
   }
 
   /// 카드/상세용 요약 — 「현재 단계」와 「전체 진행률」을 분리해 표시.
@@ -743,6 +757,9 @@ class Sotong24UserFacingStatus {
         approval == ApprovalStatus.pending ||
         stageApproval == ApprovalStatus.pending) {
       return Sotong24WorkStatus.awaitingApproval;
+    }
+    if (projectStatus == Sotong24WorkStatus.notApplicable) {
+      return Sotong24WorkStatus.notApplicable;
     }
     if (projectStatus == Sotong24WorkStatus.completed) {
       return Sotong24WorkStatus.completed;

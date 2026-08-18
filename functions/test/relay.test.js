@@ -257,6 +257,19 @@ describe("allowlist / validation", () => {
     );
   });
 
+  it("pickStageAllowlist accepts not_applicable", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "build_test",
+        stageNumber: 8,
+        status: "not_applicable",
+      },
+      { productType: "ebook", serverNowIso }
+    );
+    assert.equal(s.status, "not_applicable");
+    assert.equal(s.stageId, "build_test");
+  });
+
   it("ignores unexpected fields on stage", () => {
     const s = pickStageAllowlist(
       {
@@ -585,6 +598,65 @@ describe("relay HTTP handler", () => {
     );
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.stages.length, 18);
+  });
+
+  it("full_sync accepts not_applicable stages and stores the status", async () => {
+    const db = createMockDb();
+    const stages = EBOOK_STAGE_IDS.map((id, i) => ({
+      stageId: id,
+      stageNumber: i + 1,
+      status:
+        id === "build_test" || id === "deploy"
+          ? "not_applicable"
+          : i + 1 < 15
+            ? "completed"
+            : i + 1 === 15
+              ? "in_progress"
+              : "ready",
+    }));
+    const res = await call(
+      {
+        operation: "full_sync",
+        project: { ...sampleProject, status: "in_progress" },
+        stages,
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ok, true);
+    const build = db.store.get(
+      `sotong24work_projects/${sampleProject.projectId}/stages/build_test`
+    );
+    const deploy = db.store.get(
+      `sotong24work_projects/${sampleProject.projectId}/stages/deploy`
+    );
+    assert.equal(build.status, "not_applicable");
+    assert.equal(deploy.status, "not_applicable");
+  });
+
+  it("stage_sync accepts not_applicable and persists it", async () => {
+    const db = createMockDb();
+    const res = await call(
+      {
+        operation: "stage_sync",
+        project: { ...sampleProject, status: "in_progress" },
+        stage: {
+          stageId: "build_test",
+          stageNumber: 8,
+          status: "not_applicable",
+          approvalRequired: false,
+          approvalStatus: "not_required",
+        },
+      },
+      { db }
+    );
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ok, true);
+    const sdoc = db.store.get(
+      `sotong24work_projects/${sampleProject.projectId}/stages/build_test`
+    );
+    assert.equal(sdoc.status, "not_applicable");
+    assert.equal(sdoc.stageId, "build_test");
   });
 
   it("duplicate project_sync does not destroy data", async () => {

@@ -188,9 +188,6 @@ class TransferredWorkReconciliation {
     if (!evidence.hasEvidenceFor(instructionId)) {
       return '원격 기록 없음';
     }
-    if (exec.hasActualExecution) {
-      return WorkInstructionWorkshopPresentation.transferListBriefStatus(exec);
-    }
     if (evidence.hasProjectFor(instructionId)) {
       return WorkInstructionWorkshopPresentation.transferListBriefStatus(exec);
     }

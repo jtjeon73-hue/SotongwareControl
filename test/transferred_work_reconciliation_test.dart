@@ -103,34 +103,25 @@ void main() {
         topic: '리뷰 응대 문장 가이드 전자책',
         instructionId: id,
       );
+      final jobs = [
+        RemoteJobDoc(
+          jobId: 'job_b',
+          ownerUid: 'u',
+          title: plan.input.topic,
+          type: 'ebook',
+          status: 'running',
+          assignedAgentId: 'agent',
+          instructionId: id,
+        ),
+      ];
       final evidence = RemoteOperationalEvidence.fromRemote(
-        jobs: [
-          RemoteJobDoc(
-            jobId: 'job_b',
-            ownerUid: 'u',
-            title: plan.input.topic,
-            type: 'ebook',
-            status: 'queued',
-            assignedAgentId: 'agent',
-            instructionId: id,
-          ),
-        ],
+        jobs: jobs,
         projects: const [],
         remoteLoaded: true,
       );
       final exec = PlanExecutionIndex.fromRemoteProjects(
         const [],
-        jobs: [
-          RemoteJobDoc(
-            jobId: 'job_b',
-            ownerUid: 'u',
-            title: plan.input.topic,
-            type: 'ebook',
-            status: 'queued',
-            assignedAgentId: 'agent',
-            instructionId: id,
-          ),
-        ],
+        jobs: jobs,
       ).snapshotFor(plan);
 
       final label = TransferredWorkReconciliation.transferListStatusLabel(
@@ -138,6 +129,7 @@ void main() {
         evidence: evidence,
         instructionId: id,
       );
+      expect(exec.hasActualExecution, isTrue);
       expect(label, '제작공정 준비 중');
     });
 

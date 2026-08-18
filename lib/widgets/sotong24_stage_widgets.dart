@@ -96,6 +96,7 @@ class Sotong24StageStats {
       } else if (st == Sotong24WorkStatus.completed) {
         completed++;
       }
+      // not_applicable: 완료/진행 집계에서 제외.
     }
     return Sotong24StageStats(
       completed: completed,
@@ -111,6 +112,8 @@ String sotong24StatusGlyph(String status) {
   switch (Sotong24UserFacingStatus.normalize(status)) {
     case Sotong24WorkStatus.completed:
       return '✓';
+    case Sotong24WorkStatus.notApplicable:
+      return '—';
     case Sotong24WorkStatus.inProgress:
       return '●';
     case Sotong24WorkStatus.awaitingApproval:
@@ -308,7 +311,8 @@ class _Sotong24ExpandableStageTileState
   Widget build(BuildContext context) {
     final s = widget.stage;
     final def = widget.def;
-    final done = s.status == Sotong24WorkStatus.completed;
+    final done = Sotong24WorkStatus.countsAsCompleted(s.status);
+    final notApplicable = Sotong24WorkStatus.isNotApplicable(s.status);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -359,7 +363,7 @@ class _Sotong24ExpandableStageTileState
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                             fontSize: 15,
-                            color: done && !widget.isCurrent
+                            color: (done || notApplicable) && !widget.isCurrent
                                 ? ControlColors.textMuted
                                 : ControlColors.textPrimary,
                           ),

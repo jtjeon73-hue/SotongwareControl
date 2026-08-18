@@ -6,6 +6,7 @@ import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
 import 'package:sotong_ware_control/services/business_planning_service.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/widgets/sidebar_navigation.dart';
+import 'package:sotong_ware_control/widgets/sotong24_stage_widgets.dart';
 
 Sotong24RemoteProject _operationalEbookFromDemo() {
   final demo = Sotong24RemoteDemoCatalog.demoProjects().firstWhere(
@@ -394,5 +395,59 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('작업 목록'), findsOneWidget);
+  });
+
+  group('not_applicable stage contract', () {
+    test('표시는 해당 없음이며 완료로 집계하지 않는다', () {
+      expect(
+        Sotong24WorkStatus.labelKo(Sotong24WorkStatus.notApplicable),
+        '해당 없음',
+      );
+      expect(Sotong24WorkStatus.countsAsCompleted('not_applicable'), isFalse);
+      expect(Sotong24WorkStatus.isNotApplicable('not_applicable'), isTrue);
+      expect(sotong24StatusGlyph('not_applicable'), '—');
+    });
+
+    test('N/A 단계는 완료 수·진행률 분모에서 제외', () {
+      final project = Sotong24RemoteProject(
+        projectId: 'wi_na_progress',
+        title: '해당없음 집계',
+        productType: 'ebook',
+        currentStage: 1,
+        totalStages: 4,
+        progress: 0,
+        status: Sotong24WorkStatus.inProgress,
+        stages: const [
+          Sotong24RemoteStage(
+            stageId: 's1',
+            stageNumber: 1,
+            stageName: '진행',
+            status: Sotong24WorkStatus.inProgress,
+          ),
+          Sotong24RemoteStage(
+            stageId: 's2',
+            stageNumber: 2,
+            stageName: '완료',
+            status: Sotong24WorkStatus.completed,
+          ),
+          Sotong24RemoteStage(
+            stageId: 's3',
+            stageNumber: 3,
+            stageName: '해당없음A',
+            status: Sotong24WorkStatus.notApplicable,
+          ),
+          Sotong24RemoteStage(
+            stageId: 's4',
+            stageNumber: 4,
+            stageName: '해당없음B',
+            status: Sotong24WorkStatus.notApplicable,
+          ),
+        ],
+      );
+      expect(project.overallProgressPercent, 50);
+      final stats = Sotong24StageStats.fromProject(project);
+      expect(stats.completed, 1);
+      expect(stats.inProgress, 1);
+    });
   });
 }

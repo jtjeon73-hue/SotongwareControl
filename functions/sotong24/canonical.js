@@ -37,6 +37,7 @@ const WORK_STATUS = new Set([
   "completed",
   "error",
   "revision",
+  "not_applicable",
 ]);
 
 const APPROVAL_STATUS = new Set([
