@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/business_planning.dart';
 import '../models/dev_work_doc_status.dart';
@@ -24,6 +25,7 @@ import '../services/remote_agent_repository.dart';
 import '../services/remote_work_instruction_mirror.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../services/sotong24_workshop_presentation.dart';
+import '../services/work_instruction_delivery_presentation.dart';
 import '../services/work_instruction_remote_delivery.dart';
 import '../services/work_instruction_validator.dart';
 import '../services/work_instruction_workshop_presentation.dart';
@@ -31,6 +33,7 @@ import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/project_design/instruction_preview_panel.dart';
 import '../widgets/operational_collapsible_section.dart';
+import '../widgets/project_design/step7_delivery_panel.dart';
 import '../widgets/project_design/project_design_wizard.dart';
 
 /// 작업지시 제작소 본문 (로컬 규칙 기반).
@@ -91,6 +94,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   bool _loading = true;
   bool _transferBusy = false;
+  bool _agentRefreshBusy = false;
+  RemoteDeliveryResult? _lastTransferResult;
   bool _inputModeQuick = true;
 
   /// 새 ebook WI에만 Codex 1단계 pilot 정책 부착. 기존 WI에는 자동 삽입하지 않음.
@@ -297,14 +302,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
-  bool get _planReady {
-    final input = _currentInput;
-    if (_inputModeQuick) {
-      return _wizardState.step >= 4 && input.hasRequiredFields;
-    }
-    return input.hasRequiredFields;
-  }
-
   bool get _canCreateInstruction {
     final input = _currentInput;
     if (!input.hasRequiredFields) return false;
@@ -322,20 +319,37 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     return true;
   }
 
-  bool get _canTransfer {
-    if (_instruction == null) return false;
-    final result = _contractValidator.validate(
-      input: _currentInput,
-      instruction: _instruction!,
-    );
-    return result.canTransfer;
-  }
-
   ContractValidationResult? get _contractValidation {
     if (_instruction == null) return null;
     return _contractValidator.validate(
       input: _currentInput,
       instruction: _instruction!,
+    );
+  }
+
+  RemoteDeliveryResult? get _effectiveLastTransferResult {
+    if (_activeDoc?.wasTransferred == true) return null;
+    if (_lastTransferResult != null) return _lastTransferResult;
+    final doc = _activeDoc;
+    if (doc == null) return null;
+    if (PlanningStatus.normalize(doc.status) != PlanningStatus.transferFailed) {
+      return null;
+    }
+    return RemoteDeliveryResult.failed(
+      userMessage: doc.lastDeliveryErrorLabel ?? '',
+      errorCode: doc.lastDeliveryErrorCode,
+      jobId: doc.lastRemoteJobId ?? '',
+      commandId: doc.lastRemoteCommandId ?? '',
+    );
+  }
+
+  DeliveryStep7View get _step7DeliveryView {
+    return WorkInstructionDeliveryPresentation.resolve(
+      plan: _activeDoc,
+      validation: _contractValidation,
+      agents: _remoteAgents,
+      transferBusy: _transferBusy || _agentRefreshBusy,
+      lastResult: _effectiveLastTransferResult,
     );
   }
 
@@ -1117,11 +1131,24 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Future<void> _transferToWork() async {
-    if (_transferBusy) return;
+    if (_transferBusy || _agentRefreshBusy) return;
+    if (_activeDoc?.wasTransferred == true) return;
     if (_instruction == null) {
       _snack('먼저 작업지시서를 생성하세요.');
       return;
     }
+
+    final step7 = _step7DeliveryView;
+    if (step7.buttonState == DeliveryButtonState.failed &&
+        !step7.failure!.allowRetry) {
+      await _reconcileTransferStatus();
+      return;
+    }
+    if (step7.buttonState == DeliveryButtonState.blocked) {
+      _showValidationIssues();
+      return;
+    }
+    if (!step7.buttonEnabled) return;
     if (_needsVersionRecovery) {
       _snack('부분 저장 또는 충돌 상태입니다. 먼저 Active를 복구하세요.');
       await _openVersionDiagnoseAndRecover();
@@ -1290,6 +1317,42 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         if (!silent) _snack('전달할 작업지시서가 없습니다.');
         return;
       }
+      if (plan.wasTransferred) {
+        if (!silent) {
+          _snack('이미 전달된 작업지시입니다.');
+        }
+        return;
+      }
+
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final reconciled = await _delivery.reconcileExisting(
+        instructionId: instructionId,
+        ownerUid: uid,
+      );
+      if (reconciled != null && reconciled.delivered) {
+        final instruction = plan.instruction!;
+        final existing = _allPlans.firstWhere(
+          (p) => p.id == plan!.id,
+          orElse: () => plan!,
+        );
+        final doc = WorkInstructionRemoteDelivery.markDelivered(
+          plan: existing,
+          result: reconciled,
+          instruction: instruction,
+        );
+        await _store.upsertPlan(doc);
+        await _refreshPlans();
+        if (!mounted) return;
+        if (_activePlanId == plan.id) {
+          setState(() {
+            _activeDoc = doc;
+            _instruction = instruction;
+            _lastTransferResult = null;
+          });
+        }
+        if (!silent) _snack('소통24워크 Agent로 전달했습니다.');
+        return;
+      }
 
       Map<String, dynamic> payload = Map<String, dynamic>.from(
         plan.instruction!.toJson(),
@@ -1332,7 +1395,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         title: instruction.businessIdea,
       );
 
-      final uid = FirebaseAuth.instance.currentUser?.uid;
       final result = await _delivery.deliver(
         instructionId: instructionId,
         title: instruction.businessIdea.isNotEmpty
@@ -1378,7 +1440,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         setState(() {
           _activeDoc = doc;
           _instruction = instruction;
+          _lastTransferResult = result.delivered ? null : result;
         });
+      } else if (!result.delivered && !silent) {
+        setState(() => _lastTransferResult = result);
       }
       if (result.delivered) {
         if (!silent) {
@@ -1388,7 +1453,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           _snack('기존 작업을 Agent로 복구 전송했습니다.');
         }
       } else if (!silent) {
-        await _showTransferFailedDialog(result.userMessage);
+        final ambiguous =
+            result.errorCode == 'timeout' || result.errorCode == 'network';
+        if (ambiguous) {
+          await _reconcileTransferStatus(silent: true);
+        }
       } else {
         _snack(result.userMessage);
       }
@@ -1397,31 +1466,94 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
-  Future<void> _showTransferFailedDialog(String message) {
-    return showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('작업지시 전송에 실패했습니다'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              if (widget.onOpenRemoteDiagnostics != null) {
-                widget.onOpenRemoteDiagnostics!();
-              } else {
-                _snack('노트북 원격관제 > 개발/진단 도구에서 전송 기록을 확인하세요.');
-              }
-            },
-            child: const Text('원인 확인'),
-          ),
-        ],
-      ),
+  Future<void> _refreshAgentStatus() async {
+    if (_agentRefreshBusy) return;
+    setState(() => _agentRefreshBusy = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final agents = await _agentRepo
+          .watchAgents(ownerUid: uid)
+          .first
+          .timeout(const Duration(seconds: 4), onTimeout: () => _remoteAgents);
+      if (!mounted) return;
+      setState(() => _remoteAgents = agents);
+    } catch (_) {
+      if (mounted) _snack('Agent 상태를 다시 불러오지 못했습니다.');
+    } finally {
+      if (mounted) setState(() => _agentRefreshBusy = false);
+    }
+  }
+
+  Future<void> _reconcileTransferStatus({bool silent = false}) async {
+    final plan = _activeDoc;
+    final iid = _instruction?.instructionId.trim().isNotEmpty == true
+        ? _instruction!.instructionId
+        : plan?.stableInstructionId;
+    if (plan == null || iid == null || iid.isEmpty) return;
+    if (plan.wasTransferred) return;
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      await _refreshAgentStatus();
+      final reconciled = await _delivery.reconcileExisting(
+        instructionId: iid,
+        ownerUid: uid,
+      );
+      if (reconciled != null &&
+          reconciled.delivered &&
+          plan.instruction != null) {
+        final doc = WorkInstructionRemoteDelivery.markDelivered(
+          plan: plan,
+          result: reconciled,
+          instruction: plan.instruction,
+        );
+        await _store.upsertPlan(doc);
+        await _refreshPlans();
+        if (!mounted) return;
+        setState(() {
+          _activeDoc = doc;
+          _lastTransferResult = null;
+        });
+        if (!silent) _snack('이미 전달된 작업으로 확인되었습니다.');
+        return;
+      }
+      if (!silent) {
+        _snack('아직 전달 완료로 확인되지 않았습니다. 진단 도구에서 추가 확인하세요.');
+      }
+    } catch (_) {
+      if (!silent) _snack('상태 확인 중 오류가 발생했습니다.');
+    }
+  }
+
+  Future<void> _copyDeliveryGptMemo() async {
+    final step7 = _step7DeliveryView;
+    final memo = WorkInstructionDeliveryPresentation.transferGptMemo(
+      failure: step7.failure,
+      agentStatus: step7.agentStatus,
+      plan: _activeDoc,
+      validation: _contractValidation,
+      lastResult: _effectiveLastTransferResult,
     );
+    await Clipboard.setData(ClipboardData(text: memo));
+    _snack('문제 해결 메모를 복사했습니다.');
+  }
+
+  void _onDeliveryDiagnosticAction(DeliveryDiagnosticAction action) {
+    switch (action) {
+      case DeliveryDiagnosticAction.recheckStatus:
+        _reconcileTransferStatus();
+      case DeliveryDiagnosticAction.agentLinkTest:
+      case DeliveryDiagnosticAction.relayTest:
+      case DeliveryDiagnosticAction.deliveryPathTest:
+      case DeliveryDiagnosticAction.openRemoteControl:
+        widget.onOpenRemoteDiagnostics?.call();
+      case DeliveryDiagnosticAction.validationReview:
+        _showValidationIssues();
+      case DeliveryDiagnosticAction.openWorkshop:
+        widget.onOpenProductWorkshop?.call();
+      case DeliveryDiagnosticAction.copyGptMemo:
+        _copyDeliveryGptMemo();
+    }
   }
 
   Future<void> _mirrorActiveSoft({
@@ -1453,6 +1585,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _analysis = plan.analysis;
       _instruction = plan.instruction;
       _activeDoc = plan;
+      _lastTransferResult = null;
       _aiProductionPilot = plan.instruction?.aiExecution?.enabled == true;
       if (plan.input.wizardSelections != null) {
         _wizardState = PlanningWizardState.fromJson(
@@ -2153,148 +2286,26 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Widget _buildMainActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [if (!_isInstructionArchived) ..._buildTransferActions()],
-        ),
-        ..._buildActionHints(),
-      ],
-    );
-  }
-
-  List<Widget> _buildTransferActions() {
     if (_instruction == null ||
         !_isInstructionReady ||
         _isInstructionArchived) {
-      return const [];
+      return const SizedBox.shrink();
     }
-
-    // Inbox 직접 전달만 — 수동 다운로드와 완전히 분리 (다운로드는 DevWorkDoc 액션에만)
-    final failed =
-        _activeDoc != null &&
-        _execFor(_activeDoc!).primaryStatusLabel == '전송 실패';
-    return [
-      FilledButton.icon(
-        onPressed: (_canTransfer && !_transferBusy) ? _transferToWork : null,
-        icon: _transferBusy
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.upload_outlined, size: 18),
-        label: Text(
-          _transferBusy
-              ? '전달 중…'
-              : (_contractValidation?.isBlocked == true
-                    ? WorkInstructionWorkshopPresentation.blockedTransferButtonLabel()
-                    : (failed ? '다시 시도' : '소통24워크 Agent로 전달')),
-        ),
-      ),
-    ];
+    return _buildStep7DeliveryPanel();
   }
 
-  List<Widget> _buildActionHints() {
-    final hints = <Widget>[];
-
-    if (_instruction == null && _planReady) {
-      hints.add(
-        _actionHint(
-          _canCreateInstruction
-              ? (_devWorkDocFolderReady
-                    ? '작업지시서 v1을 생성할 준비가 되었습니다.'
-                    : 'DevWorkDoc 폴더를 설정하거나 JSON 다운로드로 시작하세요.')
-              : '주제·고객 문제·대상·결과·제작 형태를 완성하세요.',
-          _canCreateInstruction
-              ? '「작업지시서 v1 생성」 또는 「수동 가져오기용 JSON 다운로드」'
-              : '마법사를 완료한 뒤 다시 시도하세요.',
-        ),
-      );
-    }
-
-    if (_instruction != null &&
-        _isInstructionReady &&
-        !_isInstructionArchived) {
-      final online = WorkInstructionRemoteDelivery.pickTargetAgent(
-        _remoteAgents,
-      );
-      if (online == null) {
-        hints.add(
-          _actionHint(
-            '연결된 노트북 Agent가 없습니다.',
-            '노트북에서 소통24워크 Agent가 켜져 있는지 확인한 뒤 다시 시도하세요.',
-          ),
-        );
-      } else if (!_canTransfer) {
-        final validation = _contractValidation;
-        if (validation != null && !validation.canTransfer) {
-          hints.add(
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '확인할 항목이 ${WorkInstructionWorkshopPresentation.validationProblemLines(validation).length}개 있습니다.',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: ControlColors.textSecondary,
-                  ),
-                ),
-                for (final line
-                    in WorkInstructionWorkshopPresentation.validationProblemLines(
-                      validation,
-                    ).take(3))
-                  Text(
-                    line,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: ControlColors.textMuted,
-                    ),
-                  ),
-                TextButton(
-                  onPressed: _showValidationIssues,
-                  child: const Text('문제 항목 확인'),
-                ),
-              ],
-            ),
-          );
-        } else {
-          hints.add(_actionHint('보내기 전 확인이 필요합니다.', '아래 「문제 항목 확인」을 눌러 주세요.'));
-        }
-      }
-    }
-
-    if (hints.isEmpty) return const [];
-    return [const SizedBox(height: 8), ...hints];
-  }
-
-  Widget _actionHint(String reason, String nextAction) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            reason,
-            style: const TextStyle(
-              fontSize: 12,
-              color: ControlColors.textMuted,
-            ),
-          ),
-          Text(
-            nextAction,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: ControlColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildStep7DeliveryPanel() {
+    return Step7DeliveryPanel(
+      view: _step7DeliveryView,
+      onTransfer: _transferToWork,
+      onOpenRemoteDiagnostics: widget.onOpenRemoteDiagnostics,
+      onOpenProductWorkshop: widget.onOpenProductWorkshop,
+      onViewInstruction: _instruction != null
+          ? () => _showInstructionViewer()
+          : null,
+      onDiagnosticAction: _onDeliveryDiagnosticAction,
+      onCopyGptMemo: _copyDeliveryGptMemo,
+      onShowValidation: _showValidationIssues,
     );
   }
 

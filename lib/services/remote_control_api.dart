@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -97,6 +98,8 @@ class RemoteControlApi {
             body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      throw RemoteControlApiException('전달 확인이 지연되고 있습니다.', code: 'timeout');
     } catch (_) {
       throw RemoteControlApiException(
         '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.',

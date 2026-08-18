@@ -192,7 +192,9 @@ class WorkInstructionRemoteDelivery {
       case 'auth':
         return '전송 실패. 로그인을 확인한 뒤 다시 시도해 주세요.';
       case 'network':
-        return '전송 실패. 네트워크를 확인한 뒤 다시 시도해 주세요.';
+        return '통신 상태 확인이 필요합니다. 네트워크를 확인한 뒤 다시 시도해 주세요.';
+      case 'timeout':
+        return '전달 확인이 지연되고 있습니다. 상태를 먼저 확인해 주세요.';
       case 'job_failed':
         return '전송 실패. 작업 생성에 실패했습니다. 다시 시도가 필요합니다.';
       case 'start_failed':
@@ -268,6 +270,29 @@ class WorkInstructionRemoteDeliveryService {
     return _agents.watchAgents(ownerUid: ownerUid).first;
   }
 
+  /// Job + START_JOB 존재 여부만 확인 (쓰기 없음).
+  Future<RemoteDeliveryResult?> reconcileExisting({
+    required String instructionId,
+    String? ownerUid,
+  }) async {
+    final iid = instructionId.trim();
+    if (iid.isEmpty) return null;
+    final jobs = await _jobs(ownerUid);
+    final job = WorkInstructionRemoteDelivery.findJob(jobs, iid);
+    if (job == null) return null;
+    final start = WorkInstructionRemoteDelivery.findStartJob(
+      await _commands(job.jobId),
+    );
+    if (start == null) return null;
+    return RemoteDeliveryResult(
+      delivered: true,
+      jobId: job.jobId,
+      commandId: start.commandId,
+      agentId: job.assignedAgentId,
+      outcome: 'already_transferred',
+    );
+  }
+
   Future<RemoteDeliveryResult> deliver({
     required String instructionId,
     required String title,
@@ -302,6 +327,14 @@ class WorkInstructionRemoteDeliveryService {
         errorCode: 'protected_instruction',
         payload: map,
       );
+    }
+
+    final reconciled = await reconcileExisting(
+      instructionId: iid,
+      ownerUid: ownerUid,
+    );
+    if (reconciled != null) {
+      return reconciled.copyWith(payload: map);
     }
 
     final agents = await _agentList(ownerUid);

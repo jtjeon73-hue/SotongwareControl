@@ -284,27 +284,30 @@ void main() {
       expect(api.startCount, 1);
     });
 
-    test('4. 같은 instruction 재시도 → duplicate Job 없음', () async {
-      jobs = [job(id: 'job_keep', instructionId: 'wi_plan_1786083242850')];
-      commands['job_keep'] = const [
-        RemoteCommandDoc(
-          commandId: 'cmd_keep',
-          jobId: 'job_keep',
-          type: 'START_JOB',
-        ),
-      ];
-      final r = await service().deliver(
-        instructionId: 'wi_plan_1786083242850',
-        title: 't',
-        type: 'ebook',
-        payload: payload(),
-      );
-      expect(r.delivered, isTrue);
-      expect(r.jobId, 'job_keep');
-      expect(r.commandId, 'cmd_keep');
-      expect(api.createCount, 0);
-      expect(api.startCount, 0);
-    });
+    test(
+      '4. 같은 instruction 재시도 → duplicate Job 없음 (already_transferred)',
+      () async {
+        jobs = [job(id: 'job_keep', instructionId: 'wi_plan_1786083242850')];
+        commands['job_keep'] = const [
+          RemoteCommandDoc(
+            commandId: 'cmd_keep',
+            jobId: 'job_keep',
+            type: 'START_JOB',
+          ),
+        ];
+        final r = await service().deliver(
+          instructionId: 'wi_plan_1786083242850',
+          title: 't',
+          type: 'ebook',
+          payload: payload(),
+        );
+        expect(r.delivered, isTrue);
+        expect(r.jobId, 'job_keep');
+        expect(r.commandId, 'cmd_keep');
+        expect(api.createCount, 0);
+        expect(api.startCount, 0);
+      },
+    );
 
     test('5. Job 존재 + command 없음 → command만 복구', () async {
       jobs = [job(id: 'job_fix', instructionId: 'wi_plan_1786083242850')];
@@ -367,7 +370,8 @@ void main() {
         type: 'ebook',
         payload: payload(),
       );
-      expect(r.outcome, 'reused_in_progress');
+      expect(r.delivered, isTrue);
+      expect(r.outcome, 'already_transferred');
       expect(api.createCount, 0);
       expect(api.startCount, 0);
     });
