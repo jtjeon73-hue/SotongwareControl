@@ -97,6 +97,7 @@ class Sotong24RemoteStage {
     this.revision = 0,
     this.startedAt = '',
     this.completedAt = '',
+    this.workDurationMs = 0,
   });
 
   final String stageId;
@@ -123,6 +124,9 @@ class Sotong24RemoteStage {
 
   /// 실제 작업 완료. 없으면 빈 문자열.
   final String completedAt;
+
+  /// Agent가 보고한 실제 AI 작업시간(ms). 승인 대기 제외. 0이면 미보고.
+  final int workDurationMs;
 
   bool get hasOpenableResult =>
       openableResultUrl != null || openablePreviewUrl != null;
@@ -181,6 +185,7 @@ class Sotong24RemoteStage {
     if (revision > 0) 'revision': revision,
     if (startedAt.trim().isNotEmpty) 'startedAt': startedAt,
     if (completedAt.trim().isNotEmpty) 'completedAt': completedAt,
+    if (workDurationMs > 0) 'workDurationMs': workDurationMs,
   };
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -204,6 +209,7 @@ class Sotong24RemoteStage {
       revision: _asInt(map['revision']),
       startedAt: '${map['startedAt'] ?? ''}',
       completedAt: '${map['completedAt'] ?? ''}',
+      workDurationMs: _asInt(map['workDurationMs']),
     );
   }
 

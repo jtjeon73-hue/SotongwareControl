@@ -1,5 +1,4 @@
 import '../models/artifact_type.dart';
-import '../models/remote_agent_models.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
 
@@ -129,20 +128,34 @@ class Sotong24WorkshopPresentation {
     }
   }
 
-  /// 시작·완료 timestamp가 모두 있을 때만. 현재시각으로 승인대기를 포함하지 않는다.
+  /// Agent가 보고한 workDurationMs만 사용. 승인 대기·startedAt~completedAt 추정 금지.
   static Duration? stageWorkDuration(Sotong24RemoteStage stage) {
-    final start = DateTime.tryParse(stage.startedAt.trim());
-    final end = DateTime.tryParse(stage.completedAt.trim());
-    if (start == null || end == null) return null;
-    final d = end.toUtc().difference(start.toUtc());
-    if (d.isNegative || d.inSeconds <= 0) return null;
-    return d;
+    if (stage.workDurationMs <= 0) return null;
+    return Duration(milliseconds: stage.workDurationMs);
+  }
+
+  static String formatWorkDurationMs(int ms) {
+    if (ms <= 0) return '';
+    final d = Duration(milliseconds: ms);
+    if (d.inHours >= 1) {
+      final m = d.inMinutes.remainder(60);
+      final sec = d.inSeconds.remainder(60);
+      if (m > 0 && sec > 0) return '${d.inHours}시간 $m분 $sec초';
+      if (m > 0) return '${d.inHours}시간 $m분';
+      return '${d.inHours}시간';
+    }
+    if (d.inMinutes >= 1) {
+      final sec = d.inSeconds.remainder(60);
+      if (sec > 0) return '${d.inMinutes}분 $sec초';
+      return '${d.inMinutes}분';
+    }
+    return '${d.inSeconds}초';
   }
 
   static String stageDurationLine(Sotong24RemoteStage stage) {
-    final d = stageWorkDuration(stage);
-    if (d == null) return '';
-    return '소요시간 ${formatDurationKo(d)}';
+    final label = formatWorkDurationMs(stage.workDurationMs);
+    if (label.isEmpty) return '';
+    return '작업시간 $label';
   }
 
   static String stageRevisionLine(Sotong24RemoteStage stage) {
@@ -150,33 +163,45 @@ class Sotong24WorkshopPresentation {
     return '결과 버전 r${stage.revision}';
   }
 
-  /// 단계 작업 구간 합. 데이터가 없으면 빈 문자열 (가짜 누적 금지).
+  /// 단계 workDurationMs 합. 데이터가 없으면 빈 문자열 (가짜 누적 금지).
   static String totalWorkDurationLine(Sotong24RemoteProject project) {
-    var total = Duration.zero;
+    var totalMs = 0;
     var any = false;
     for (final s in project.stages) {
-      final d = stageWorkDuration(s);
-      if (d == null) continue;
-      total += d;
+      if (s.workDurationMs <= 0) continue;
+      totalMs += s.workDurationMs;
       any = true;
     }
     if (!any) return '';
-    return '전체 누적 작업시간: ${formatDurationKo(total)}';
+    return '전체 누적 작업시간: ${formatWorkDurationMs(totalMs)}';
   }
 
   static String stageTimingDetailNote(Sotong24RemoteStage stage) {
     final start = stage.startedAt.trim();
     final end = stage.completedAt.trim();
-    if (start.isEmpty && end.isEmpty) {
-      return '단계별 작업시간 실데이터 연동 필요';
+    if (start.isEmpty && end.isEmpty && stage.workDurationMs <= 0) {
+      return '작업시간 기록 없음';
     }
     final lines = <String>[];
-    if (start.isNotEmpty) lines.add('시작 시각 $start');
-    if (end.isNotEmpty) lines.add('완료 시각 $end');
+    if (start.isNotEmpty) lines.add('시작 ${_formatStageTimestamp(start)}');
+    if (end.isNotEmpty) lines.add('완료 ${_formatStageTimestamp(end)}');
     final dur = stageDurationLine(stage);
-    if (dur.isNotEmpty) lines.add(dur);
+    if (dur.isNotEmpty) {
+      lines.add(dur.replaceFirst('작업시간 ', '누적 실제 작업시간 '));
+    }
     if (stage.revision > 0) lines.add(stageRevisionLine(stage));
     return lines.join('\n');
+  }
+
+  static String _formatStageTimestamp(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    final local = dt.toLocal();
+    final month = local.month;
+    final day = local.day;
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$month/$day $hour:$minute';
   }
 
   static String listProgressSummary(Sotong24RemoteProject project) {

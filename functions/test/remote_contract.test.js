@@ -207,6 +207,66 @@ describe("remote agent contract V1", () => {
     assert.equal(a.state, "idle");
   });
 
+  it("12b heartbeat persists allowlisted aiUsage.codex", async () => {
+    const { agentId, agentToken } = await pairAndEnroll();
+    const res = await call(
+      db,
+      "/api/agent/heartbeat",
+      {
+        agentId,
+        state: "idle",
+        protocolVersion: "1.0",
+        aiUsage: {
+          codex: {
+            status: "ok",
+            collectedAt: "2026-08-18T02:00:00.000Z",
+            planType: "plus",
+            weekly: {
+              usedPercent: 18,
+              remainingPercent: 82,
+              windowDurationMins: 10080,
+              resetsAt: "2026-08-20T14:26:00.000Z",
+              resetsAtIso: "2026-08-20T14:26:00.000Z",
+            },
+            accessToken: "must-not-persist",
+          },
+        },
+      },
+      { token: agentToken }
+    );
+    assert.equal(res.statusCode, 200);
+    const a = db.store.get(`${COL.AGENTS}/${agentId}`);
+    assert.equal(a.aiUsage.codex.status, "ok");
+    assert.equal(a.aiUsage.codex.planType, "plus");
+    assert.equal(a.aiUsage.codex.weekly.usedPercent, 18);
+    assert.equal(a.aiUsage.codex.weekly.remainingPercent, 82);
+    assert.equal(a.aiUsage.codex.weekly.windowDurationMins, 10080);
+    assert.ok(!("accessToken" in a.aiUsage.codex));
+  });
+
+  it("12c malformed aiUsage does not fail heartbeat", async () => {
+    const { agentId, agentToken } = await pairAndEnroll();
+    const res = await call(
+      db,
+      "/api/agent/heartbeat",
+      {
+        agentId,
+        state: "idle",
+        protocolVersion: "1.0",
+        aiUsage: {
+          codex: {
+            status: "not_a_real_status",
+            weekly: { usedPercent: 18 },
+          },
+        },
+      },
+      { token: agentToken }
+    );
+    assert.equal(res.statusCode, 200);
+    const a = db.store.get(`${COL.AGENTS}/${agentId}`);
+    assert.ok(!a.aiUsage);
+  });
+
   // D. START_JOB lifecycle
   it("13-18 create-job start-job pull claim", async () => {
     const { agentId, agentToken } = await pairAndEnroll();

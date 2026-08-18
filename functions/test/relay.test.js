@@ -345,6 +345,90 @@ describe("allowlist / validation", () => {
       /storage_host_required/
     );
   });
+
+  it("passes legacy stage payload without timing fields", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "idea_clarify",
+        stageNumber: 1,
+        stageName: "아이디어 정리",
+        status: "in_progress",
+        summary: "진행",
+        resultUrl:
+          "https://storage.googleapis.com/sotongware-control.appspot.com/sotong24/artifacts/test/x/draft/r1/a.md",
+      },
+      { productType: "ebook", serverNowIso: "2026-08-18T00:00:00.000Z" }
+    );
+    assert.equal(s.stageId, "idea_clarify");
+    assert.ok(!("startedAt" in s));
+    assert.ok(!("workDurationMs" in s));
+    assert.ok(s.resultUrl.startsWith("https://storage.googleapis.com/"));
+  });
+
+  it("allows optional stage timing fields", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "idea_clarify",
+        stageNumber: 1,
+        status: "awaiting_approval",
+        startedAt: "2026-08-18T00:00:00.000Z",
+        completedAt: "2026-08-18T00:07:20.000Z",
+        workDurationMs: 440000,
+        revision: 2,
+      },
+      { productType: "ebook", serverNowIso: "2026-08-18T00:08:00.000Z" }
+    );
+    assert.equal(s.startedAt, "2026-08-18T00:00:00.000Z");
+    assert.equal(s.completedAt, "2026-08-18T00:07:20.000Z");
+    assert.equal(s.workDurationMs, 440000);
+    assert.equal(s.revision, 2);
+  });
+
+  it("allows startedAt only", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "idea_clarify",
+        stageNumber: 1,
+        status: "in_progress",
+        startedAt: "2026-08-18T00:00:00.000Z",
+      },
+      { productType: "ebook", serverNowIso: "2026-08-18T00:01:00.000Z" }
+    );
+    assert.equal(s.startedAt, "2026-08-18T00:00:00.000Z");
+    assert.ok(!("completedAt" in s));
+  });
+
+  it("rejects negative workDurationMs", () => {
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "idea_clarify",
+            stageNumber: 1,
+            status: "in_progress",
+            workDurationMs: -1,
+          },
+          { productType: "ebook", serverNowIso: "2026-08-18T00:00:00.000Z" }
+        ),
+      /out_of_range/
+    );
+  });
+
+  it("rejects string workDurationMs", () => {
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "idea_clarify",
+            stageNumber: 1,
+            status: "in_progress",
+            workDurationMs: "440000",
+          },
+          { productType: "ebook", serverNowIso: "2026-08-18T00:00:00.000Z" }
+        ),
+      /must_be_int/
+    );
+  });
 });
 
 describe("relay HTTP handler", () => {

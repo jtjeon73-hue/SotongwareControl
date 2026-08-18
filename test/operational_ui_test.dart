@@ -142,7 +142,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('remote_ops_dashboard')), findsOneWidget);
-      expect(find.textContaining('사용량: 수집 준비 중'), findsWidgets);
+      expect(find.textContaining('수집 준비 중'), findsWidgets);
       await tester.scrollUntilVisible(
         find.text('개발/진단 도구'),
         400,

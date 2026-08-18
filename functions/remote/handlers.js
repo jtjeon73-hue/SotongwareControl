@@ -21,6 +21,7 @@ const {
 const { httpError, sendOk } = require("./http");
 const { nowIso } = require("./log");
 const { assertProtocolVersion } = require("./auth");
+const { pickAiUsageCodex } = require("./ai_usage");
 
 const AGENT_STATES = new Set(Object.values(AGENT_STATE));
 const WORK_STATUSES = new Set(Object.values(WORK_STATUS));
@@ -129,6 +130,11 @@ async function handleHeartbeat(db, ctx, body) {
   if (body.currentStage != null) patch.currentStage = String(body.currentStage).slice(0, 128);
   // online is derived by clients from lastHeartbeatAt — keep mirror hint false here
   patch.online = false;
+
+  const aiUsage = pickAiUsageCodex(body);
+  if (aiUsage !== undefined) {
+    patch.aiUsage = aiUsage;
+  }
 
   await ctx.agentRef.set(patch, { merge: true });
   return {};

@@ -174,7 +174,7 @@ void main() {
       expect(Sotong24WorkshopPresentation.revisionLine(p), '');
     });
 
-    test('단계 시작·완료가 없으면 소요시간을 만들지 않는다', () {
+    test('workDurationMs 없으면 작업시간을 만들지 않는다', () {
       final p = project(
         id: 'wi_plan_1',
         title: '운영',
@@ -188,21 +188,35 @@ void main() {
       expect(Sotong24WorkshopPresentation.totalWorkDurationLine(p), '');
       expect(
         Sotong24WorkshopPresentation.stageTimingDetailNote(p.currentStageDoc!),
-        '단계별 작업시간 실데이터 연동 필요',
+        '작업시간 기록 없음',
       );
     });
 
-    test('단계 시작·완료가 있으면 소요시간을 표시한다', () {
+    test('startedAt·completedAt만 있어도 workDurationMs 없으면 작업시간 미표시', () {
+      final stage = Sotong24RemoteStage(
+        stageId: 'idea_clarify',
+        stageNumber: 1,
+        stageName: '아이디어 정리',
+        status: Sotong24WorkStatus.awaitingApproval,
+        startedAt: '2026-08-18T00:00:00.000Z',
+        completedAt: '2026-08-18T00:18:00.000Z',
+      );
+      expect(Sotong24WorkshopPresentation.stageDurationLine(stage), '');
+    });
+
+    test('workDurationMs가 있으면 작업시간을 표시한다', () {
       final stage = Sotong24RemoteStage(
         stageId: 'idea_clarify',
         stageNumber: 1,
         stageName: '아이디어 정리',
         status: Sotong24WorkStatus.completed,
-        startedAt: '2026-08-18T00:00:00.000Z',
-        completedAt: '2026-08-18T00:18:00.000Z',
+        workDurationMs: 440000,
         revision: 2,
       );
-      expect(Sotong24WorkshopPresentation.stageDurationLine(stage), '소요시간 18분');
+      expect(
+        Sotong24WorkshopPresentation.stageDurationLine(stage),
+        '작업시간 7분 20초',
+      );
       expect(Sotong24WorkshopPresentation.stageRevisionLine(stage), '결과 버전 r2');
       final p = project(
         id: 'wi_plan_1',
@@ -212,7 +226,7 @@ void main() {
       );
       expect(
         Sotong24WorkshopPresentation.totalWorkDurationLine(p),
-        '전체 누적 작업시간: 18분',
+        '전체 누적 작업시간: 7분 20초',
       );
     });
 

@@ -102,6 +102,17 @@ function assertInt(value, field, { min, max, required = false } = {}) {
   return n;
 }
 
+function assertIntStrict(value, field, { min, max, required = false } = {}) {
+  if (value === undefined || value === null || value === "") {
+    if (required) reject("invalid_argument", `${field} required`);
+    return undefined;
+  }
+  if (typeof value !== "number") {
+    reject("invalid_argument", `${field} must_be_int`);
+  }
+  return assertInt(value, field, { min, max, required });
+}
+
 function assertBool(value, field) {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "boolean") reject("invalid_argument", `${field} must_be_bool`);
@@ -245,6 +256,12 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
   );
   const approvalRequired = assertBool(input.approvalRequired, "approvalRequired");
   const clientUpdatedAt = assertIsoOptional(input.updatedAt, "updatedAt");
+  const startedAt = assertIsoOptional(input.startedAt, "startedAt");
+  const completedAt = assertIsoOptional(input.completedAt, "completedAt");
+  const workDurationMs = assertIntStrict(input.workDurationMs, "workDurationMs", {
+    min: 0,
+  });
+  const revision = assertInt(input.revision, "revision", { min: 0 });
 
   if (productType === "ebook") {
     const meta = EBOOK_STAGE_BY_ID.get(stageId);
@@ -281,6 +298,10 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
   if (previewUrl !== undefined) out.previewUrl = previewUrl;
   if (approvalRequired !== undefined) out.approvalRequired = approvalRequired;
   if (approvalStatus !== undefined) out.approvalStatus = approvalStatus;
+  if (startedAt !== undefined) out.startedAt = startedAt;
+  if (completedAt !== undefined) out.completedAt = completedAt;
+  if (workDurationMs !== undefined) out.workDurationMs = workDurationMs;
+  if (revision !== undefined) out.revision = revision;
   out.updatedAt = serverNowIso;
   out.serverReceivedAt = serverNowIso;
   if (clientUpdatedAt !== undefined) out.clientUpdatedAt = clientUpdatedAt;

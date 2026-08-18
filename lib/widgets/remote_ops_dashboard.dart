@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
+import '../services/codex_usage_presentation.dart';
 import '../services/ops_health_check.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
@@ -132,7 +133,10 @@ class RemoteOpsDashboard extends StatelessWidget {
           _WorkerLine(
             name: 'Codex',
             status: _workerStatus(primaryAgent),
-            usage: '수집 준비 중',
+            usage: CodexUsagePresentation.fallbackUsageText(primaryAgent),
+            usageLines: CodexUsagePresentation.viewFor(
+              primaryAgent,
+            )?.detailLines,
           ),
           const SizedBox(height: 6),
           _WorkerLine(
@@ -489,14 +493,23 @@ class _LabeledBlock extends StatelessWidget {
 }
 
 class _WorkerLine extends StatelessWidget {
-  const _WorkerLine({required this.name, required this.status, this.usage});
+  const _WorkerLine({
+    required this.name,
+    required this.status,
+    this.usage,
+    this.usageLines,
+  });
 
   final String name;
   final String status;
   final String? usage;
+  final List<String>? usageLines;
 
   @override
   Widget build(BuildContext context) {
+    final lines = usageLines ?? const <String>[];
+    final showSingleUsage = lines.isEmpty && usage != null && usage!.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -510,11 +523,31 @@ class _WorkerLine extends StatelessWidget {
             ),
           ],
         ),
-        if (usage != null && usage!.isNotEmpty)
+        if (lines.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final line in lines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 1),
+                    child: Text(
+                      line,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: ControlColors.textMuted,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          )
+        else if (showSingleUsage)
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              '사용량: $usage',
+              usage!,
               style: const TextStyle(
                 fontSize: 12,
                 color: ControlColors.textMuted,

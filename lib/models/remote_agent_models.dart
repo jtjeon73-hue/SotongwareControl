@@ -17,6 +17,7 @@ class RemoteAgentDoc {
     this.lastHeartbeatAt,
     this.updatedAt,
     this.lastError = '',
+    this.codexUsage,
   });
 
   final String agentId;
@@ -31,6 +32,7 @@ class RemoteAgentDoc {
   final DateTime? lastHeartbeatAt;
   final DateTime? updatedAt;
   final String lastError;
+  final CodexUsageTelemetry? codexUsage;
 
   bool isOnline({
     DateTime? now,
@@ -100,9 +102,111 @@ class RemoteAgentDoc {
       currentStage: '${map['currentStage'] ?? ''}',
       lastHeartbeatAt: _ts(map['lastHeartbeatAt']),
       updatedAt: _ts(map['updatedAt']),
-      lastError: '${map['lastError'] ?? ''}',
+      lastError: _lastErrorText(map['lastError']),
+      codexUsage: CodexUsageTelemetry.fromAgentMap(map),
     );
   }
+}
+
+/// Agent heartbeat `aiUsage.codex` telemetry (allowlisted fields only).
+class CodexUsageTelemetry {
+  const CodexUsageTelemetry({
+    this.status = '',
+    this.collectedAt,
+    this.planType = '',
+    this.weekly,
+  });
+
+  final String status;
+  final DateTime? collectedAt;
+  final String planType;
+  final CodexWeeklyUsage? weekly;
+
+  static CodexUsageTelemetry? fromAgentMap(Map<String, dynamic> map) {
+    final aiUsage = map['aiUsage'];
+    if (aiUsage is! Map) return null;
+    final codex = aiUsage['codex'];
+    if (codex is! Map) return null;
+    return CodexUsageTelemetry.fromMap(codex);
+  }
+
+  factory CodexUsageTelemetry.fromMap(Map<dynamic, dynamic> map) {
+    CodexWeeklyUsage? weekly;
+    final weeklyRaw = map['weekly'];
+    if (weeklyRaw is Map) {
+      weekly = CodexWeeklyUsage.fromMap(weeklyRaw);
+    }
+    return CodexUsageTelemetry(
+      status: '${map['status'] ?? ''}'.trim(),
+      collectedAt: _parseIso('${map['collectedAt'] ?? ''}'),
+      planType: '${map['planType'] ?? ''}'.trim(),
+      weekly: weekly,
+    );
+  }
+}
+
+class CodexWeeklyUsage {
+  const CodexWeeklyUsage({
+    this.usedPercent,
+    this.remainingPercent,
+    this.windowDurationMins,
+    this.resetsAt,
+    this.resetsAtIso,
+  });
+
+  final int? usedPercent;
+  final int? remainingPercent;
+  final int? windowDurationMins;
+  final DateTime? resetsAt;
+  final DateTime? resetsAtIso;
+
+  factory CodexWeeklyUsage.fromMap(Map<dynamic, dynamic> map) {
+    return CodexWeeklyUsage(
+      usedPercent: _optionalPercent(map['usedPercent']),
+      remainingPercent: _optionalPercent(map['remainingPercent']),
+      windowDurationMins: _optionalPositiveInt(map['windowDurationMins']),
+      resetsAt: _parseIso('${map['resetsAt'] ?? ''}'),
+      resetsAtIso: _parseIso('${map['resetsAtIso'] ?? ''}'),
+    );
+  }
+
+  DateTime? get resetAt => resetsAtIso ?? resetsAt;
+}
+
+int? _optionalPercent(dynamic v) {
+  if (v is int) return v >= 0 && v <= 100 ? v : null;
+  if (v is num) {
+    final n = v.round();
+    return n >= 0 && n <= 100 ? n : null;
+  }
+  return null;
+}
+
+int? _optionalPositiveInt(dynamic v) {
+  if (v is int) return v > 0 ? v : null;
+  if (v is num) {
+    final n = v.round();
+    return n > 0 ? n : null;
+  }
+  return null;
+}
+
+DateTime? _parseIso(String raw) {
+  final s = raw.trim();
+  if (s.isEmpty) return null;
+  return DateTime.tryParse(s);
+}
+
+String _lastErrorText(dynamic raw) {
+  if (raw == null) return '';
+  if (raw is String) return raw;
+  if (raw is Map) {
+    final message = '${raw['message'] ?? ''}'.trim();
+    final code = '${raw['code'] ?? ''}'.trim();
+    if (message.isNotEmpty && code.isNotEmpty) return '$code: $message';
+    return message.isNotEmpty ? message : code;
+  }
+  return '$raw';
 }
 
 enum RemoteAgentUiKind { online, offline, running, waitingApproval, error }
