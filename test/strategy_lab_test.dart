@@ -158,11 +158,8 @@ void main() {
     expect(find.text('연구주제 목록'), findsOneWidget);
 
     final second = allStrategyArticles[1];
-    await tester.scrollUntilVisible(
-      find.text(second.title),
-      200,
-      scrollable: find.byType(Scrollable).last,
-    );
+    await tester.ensureVisible(find.text(second.title).last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text(second.title).last);
     await tester.pumpAndSettle();
     expect(find.text('연구주제 목록'), findsNothing);

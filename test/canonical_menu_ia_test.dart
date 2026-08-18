@@ -16,9 +16,9 @@ void main() {
     final menus = SidebarNavigation.canonicalDestinations;
     expect(menus.length, 17);
     expect(menus.map((e) => e.label).toList(), [
+      '노트북 원격관제',
       '작업지시 제작소',
       'AI 제작공정',
-      '노트북 원격관제',
       '표준제작 가이드',
       '산업자동화SW개발부',
       '전자책 개발부',

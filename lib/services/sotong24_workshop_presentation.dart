@@ -27,6 +27,18 @@ class Sotong24WorkshopPresentation {
   static bool isTestProject(Sotong24RemoteProject project) =>
       testKind(project) != WorkshopTestKind.none;
 
+  /// 운영 화면에 노출할 실제 작업 (데모·TEST·불완전 제외).
+  static List<Sotong24RemoteProject> operationalProjects(
+    Iterable<Sotong24RemoteProject> projects,
+  ) {
+    return projects
+        .where((p) => !p.isDemo && !p.isIncompleteListing && !isTestProject(p))
+        .toList();
+  }
+
+  static bool hasOperationalWork(Iterable<Sotong24RemoteProject> projects) =>
+      operationalProjects(projects).isNotEmpty;
+
   /// 카드/상세 제목 (사용자 SSOT).
   static String displayTitle(Sotong24RemoteProject project) {
     final t = project.title.trim();

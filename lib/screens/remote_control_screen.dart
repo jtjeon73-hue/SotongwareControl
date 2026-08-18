@@ -216,6 +216,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                         RemoteOpsDashboard(
                           agents: agents,
                           workshops: workshops,
+                          jobs: jobs,
                           refreshing: _dashboardRefreshing,
                           onRefresh: _refreshDashboard,
                         ),

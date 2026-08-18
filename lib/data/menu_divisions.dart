@@ -22,9 +22,9 @@ class MenuDivisionCatalog {
     id: 'planning_execution',
     title: '운영 관제',
     destinations: [
+      ControlDestination.sotong24RemoteControl,
       ControlDestination.aiBusinessAnalysis,
       ControlDestination.productWorkshop,
-      ControlDestination.sotong24RemoteControl,
       ControlDestination.standardProductionGuide,
     ],
   );

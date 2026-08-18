@@ -192,6 +192,7 @@ class PlanExecutionStatusResolver {
       merged: merged,
       runState: runState,
       planStatus: planStatus,
+      remoteEvidence: remoteEvidence,
     );
 
     final isDeliveredOnly =
@@ -465,16 +466,15 @@ class PlanExecutionStatusResolver {
     required PlanExecutionRemoteHints merged,
     required String runState,
     required String planStatus,
+    required bool remoteEvidence,
   }) {
     if (!isPostTransfer) return false;
+    if (!remoteEvidence) return false;
     if (merged.hasAnyExecutionEvidence) return true;
-    if (runState != PlanRunState.notStarted) return true;
-    if (planStatus == PlanningStatus.inProgress ||
-        planStatus == PlanningStatus.imported ||
-        planStatus == PlanningStatus.completed) {
-      return true;
-    }
-    return false;
+    return runState == PlanRunState.working ||
+        runState == PlanRunState.reworking ||
+        runState == PlanRunState.awaitingApproval ||
+        runState == PlanRunState.revisionRequested;
   }
 
   static String _displayTitle(

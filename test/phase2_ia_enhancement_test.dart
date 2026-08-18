@@ -5,6 +5,7 @@ import 'package:sotong_ware_control/data/idea_bank_seed.dart';
 import 'package:sotong_ware_control/data/menu_divisions.dart';
 import 'package:sotong_ware_control/data/sotong24_workflows.dart';
 import 'package:sotong_ware_control/models/artifact_type.dart';
+import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/services/business_planning_service.dart';
 import 'package:sotong_ware_control/services/idea_bank_store.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
@@ -112,7 +113,26 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    final repo = Sotong24RemoteRepository(forceMemory: true);
+    final demo = Sotong24RemoteDemoCatalog.demoProjects().firstWhere(
+      (p) => p.projectId == Sotong24RemoteDemoCatalog.demoProjectId,
+    );
+    final repo = Sotong24RemoteRepository(
+      forceMemory: true,
+      memorySeed: [
+        Sotong24RemoteProject(
+          projectId: 'wi_ops_phase2_overflow',
+          title: demo.title,
+          productType: demo.productType,
+          currentStage: demo.currentStage,
+          totalStages: demo.totalStages,
+          progress: demo.progress,
+          status: demo.status,
+          approvalStatus: demo.approvalStatus,
+          stages: demo.stages,
+          isDemo: false,
+        ),
+      ],
+    );
     addTearDown(repo.dispose);
 
     await tester.pumpWidget(
@@ -123,7 +143,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('AI 제작공정'), findsWidgets);
     expect(find.textContaining('지금 할 일'), findsNothing); // 목록 화면
-    expect(find.textContaining('완료'), findsWidgets);
+    expect(find.textContaining('현재 제작'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(

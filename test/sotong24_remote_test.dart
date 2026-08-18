@@ -7,6 +7,30 @@ import 'package:sotong_ware_control/services/business_planning_service.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/widgets/sidebar_navigation.dart';
 
+Sotong24RemoteProject _operationalEbookFromDemo() {
+  final demo = Sotong24RemoteDemoCatalog.demoProjects().firstWhere(
+    (p) => p.projectId == Sotong24RemoteDemoCatalog.demoProjectId,
+  );
+  return Sotong24RemoteProject(
+    projectId: 'wi_ops_ui_display_test',
+    title: demo.title,
+    productType: demo.productType,
+    contentSubtype: demo.contentSubtype,
+    currentStage: demo.currentStage,
+    totalStages: demo.totalStages,
+    progress: demo.progress,
+    status: demo.status,
+    approvalStatus: demo.approvalStatus,
+    pcStatus: demo.pcStatus,
+    lastHeartbeat: demo.lastHeartbeat,
+    startedAt: demo.startedAt,
+    createdAt: demo.createdAt,
+    updatedAt: demo.updatedAt,
+    isDemo: false,
+    stages: demo.stages,
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -326,7 +350,10 @@ void main() {
   });
 
   testWidgets('AI 제작공정 화면·모바일 폭 표시', (tester) async {
-    final repo = Sotong24RemoteRepository(forceMemory: true);
+    final repo = Sotong24RemoteRepository(
+      forceMemory: true,
+      memorySeed: [_operationalEbookFromDemo()],
+    );
     addTearDown(repo.dispose);
 
     tester.view.physicalSize = const Size(390, 844);
@@ -350,7 +377,10 @@ void main() {
   });
 
   testWidgets('데스크톱 폭에서도 오버플로 없음', (tester) async {
-    final repo = Sotong24RemoteRepository(forceMemory: true);
+    final repo = Sotong24RemoteRepository(
+      forceMemory: true,
+      memorySeed: [_operationalEbookFromDemo()],
+    );
     addTearDown(repo.dispose);
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;

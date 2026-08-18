@@ -1,15 +1,49 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:sotong_ware_control/app.dart';
+import 'package:sotong_ware_control/models/remote_agent_models.dart';
 import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
 import 'package:sotong_ware_control/screens/remote_control_screen.dart';
 import 'package:sotong_ware_control/screens/standard_production_guide_screen.dart';
+import 'package:sotong_ware_control/services/auth_service.dart';
 import 'package:sotong_ware_control/services/remote_agent_repository.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
+import 'package:sotong_ware_control/state/control_scope.dart';
+import 'package:sotong_ware_control/state/control_state.dart';
+import 'package:sotong_ware_control/widgets/remote_ops_dashboard.dart';
+
+class _FakeAuth implements AuthClient {
+  @override
+  Stream<User?> get authStateChanges => const Stream.empty();
+
+  @override
+  User? get currentUser => null;
+
+  @override
+  bool get isAuthorized => false;
+
+  @override
+  Future<void> setPersistence({required bool keepSignedIn}) async {}
+
+  @override
+  Future<AuthResult> signIn({
+    required String adminId,
+    required String password,
+    required bool keepSignedIn,
+  }) async => const AuthResult.failure(AuthFailureReason.invalidCredentials);
+
+  @override
+  Future<void> signOut() async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  final now = DateTime.utc(2026, 8, 18, 0, 0, 0);
 
   group('운영 UI', () {
     testWidgets('표준제작 가이드 홈·카테고리', (tester) async {
@@ -32,6 +66,32 @@ void main() {
       await tester.tap(find.text('전자책 제작'));
       await tester.pumpAndSettle();
       expect(find.textContaining('전자책'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('AI 제작공정 — projects 0건이면 demo·과거 작업 미표시', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final repo = Sotong24RemoteRepository(
+        forceMemory: true,
+        memorySeed: const [],
+      );
+      addTearDown(repo.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: ProductWorkshopScreen(repository: repo)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('현재 진행 중인 작업이 없습니다.'), findsOneWidget);
+      expect(find.textContaining('Firestore'), findsNothing);
+      expect(find.textContaining('데모'), findsNothing);
+      expect(find.textContaining('50대 초보도'), findsNothing);
+      expect(find.text('승인 대기'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -92,6 +152,111 @@ void main() {
       );
       expect(find.text('상태 재확인'), findsOneWidget);
       expect(find.text('샘플 작업지시서 E2E 테스트'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('원격관제 — stale currentJobId·jobs 0이면 과거 작업 미표시', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final agentRepo = RemoteAgentRepository(
+        forceMemory: true,
+        memoryAgents: [
+          RemoteAgentDoc(
+            agentId: 'agent_live',
+            ownerUid: 'uid',
+            deviceName: 'LAPTOP-OPS',
+            state: 'idle',
+            enabled: true,
+            currentJobId: 'wi_stale_deleted_job',
+            currentStage: '13단계 배포',
+            lastHeartbeatAt: now.subtract(const Duration(seconds: 20)),
+          ),
+        ],
+        memoryJobs: const [],
+      );
+      final workshopRepo = Sotong24RemoteRepository(
+        forceMemory: true,
+        memorySeed: const [],
+      );
+      addTearDown(workshopRepo.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RemoteControlScreen(
+              repository: agentRepo,
+              workshopRepository: workshopRepo,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('온라인'), findsOneWidget);
+      expect(find.text('정상'), findsOneWidget);
+      expect(find.text('대기'), findsOneWidget);
+      expect(find.text('현재 진행 중인 작업 없음'), findsOneWidget);
+      expect(find.textContaining('50대 초보도'), findsNothing);
+      expect(find.textContaining('13단계'), findsNothing);
+      expect(find.text('0건'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('RemoteOpsDashboard — heartbeat stale이면 오프라인', (tester) async {
+      final staleHb = DateTime.now().toUtc().subtract(
+        const Duration(minutes: 5),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: RemoteOpsDashboard(
+              agents: [
+                RemoteAgentDoc(
+                  agentId: 'agent_off',
+                  ownerUid: 'uid',
+                  deviceName: 'LAPTOP-OFF',
+                  state: 'idle',
+                  enabled: true,
+                  lastHeartbeatAt: staleHb,
+                ),
+              ],
+              workshops: const [],
+              onRefresh: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('오프라인'), findsWidgets);
+      expect(find.text('응답 없음'), findsOneWidget);
+      expect(find.textContaining('Agent 연결이 끊겼습니다'), findsOneWidget);
+    });
+
+    testWidgets('로그인 셸 기본 화면 = 노트북 원격관제', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final controlState = ControlState();
+      await controlState.initialize();
+
+      await tester.pumpWidget(
+        ControlScope(
+          notifier: controlState,
+          child: MaterialApp(
+            home: ControlCenterShell(authService: _FakeAuth()),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.textContaining('노트북·Agent'), findsOneWidget);
+      expect(find.byKey(const Key('remote_ops_dashboard')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

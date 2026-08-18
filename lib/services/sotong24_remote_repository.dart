@@ -11,8 +11,8 @@ import 'firebase_ready.dart';
 /// Firestore: sotong24work_projects/{projectId}
 ///   stages/{stageId}, requests/{requestId}
 ///
-/// Firebase 미연결·오류 시 데모 데이터(isDemo=true)로 UI를 유지한다.
-/// 실제 제품 문서를 삭제·마이그레이션하지 않는다.
+/// Firebase 미연결 시에만 메모리 시드(테스트·오프라인)를 사용한다.
+/// Firestore 연결 후 문서가 0건이면 빈 목록을 반환한다(데모 fallback 없음).
 class Sotong24RemoteRepository {
   Sotong24RemoteRepository({
     this._db,
@@ -22,7 +22,10 @@ class Sotong24RemoteRepository {
   }) : _guard = guard ?? const Sotong24RemoteApprovalGuard(),
        _forceMemory = forceMemory ?? false {
     _memory = List<Sotong24RemoteProject>.from(
-      memorySeed ?? Sotong24RemoteDemoCatalog.demoProjects(),
+      memorySeed ??
+          (forceMemory == true
+              ? Sotong24RemoteDemoCatalog.demoProjects()
+              : const []),
     );
     _memoryRequests = {
       for (final p in _memory)
@@ -68,7 +71,7 @@ class Sotong24RemoteRepository {
 
     return _projects!.snapshots().asyncMap((snap) async {
       if (snap.docs.isEmpty) {
-        return List<Sotong24RemoteProject>.unmodifiable(_memory);
+        return const <Sotong24RemoteProject>[];
       }
       final list = <Sotong24RemoteProject>[];
       for (final doc in snap.docs) {

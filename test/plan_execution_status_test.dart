@@ -180,6 +180,21 @@ void main() {
       );
       expect(PlanUserFacingStatus.label(plan, execution: exec), '승인대기');
     });
+
+    test('imported만 있고 remote 증거 없으면 실제 실행 아님', () {
+      final plan = _plan(
+        id: 'plan_stale_import',
+        instructionId: 'wi_stale_import',
+        status: PlanningStatus.imported,
+        hasWi: true,
+        lastTransferMode: PlanProgressStatus.folderMode,
+      );
+      final exec = PlanExecutionStatusResolver.resolve(plan);
+      expect(exec.isPostTransfer, isTrue);
+      expect(exec.hasActualExecution, isFalse);
+      expect(exec.primaryStatusLabel, '전달됨 · 미실행');
+      expect(exec.productionProgressLine, isNot(contains('0/18')));
+    });
   });
 
   group('PlanExecutionIndex', () {

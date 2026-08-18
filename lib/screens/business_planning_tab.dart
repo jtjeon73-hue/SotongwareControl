@@ -29,6 +29,7 @@ import '../services/project_design_engine.dart';
 import '../services/remote_agent_repository.dart';
 import '../services/remote_work_instruction_mirror.dart';
 import '../services/sotong24_remote_repository.dart';
+import '../services/sotong24_workshop_presentation.dart';
 import '../services/work_instruction_remote_delivery.dart';
 import '../services/work_instruction_validator.dart';
 import '../theme/control_theme.dart';
@@ -151,6 +152,16 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   PlanExecutionSnapshot _execFor(BusinessPlanDocument plan) =>
       _executionIndex.snapshotFor(plan);
+
+  bool get _showWorkshopEmptyPrep {
+    if (Sotong24WorkshopPresentation.hasOperationalWork(_remoteProjects)) {
+      return false;
+    }
+    if (_remoteJobs.isNotEmpty) return false;
+    final doc = _activeDoc;
+    if (doc == null) return true;
+    return !_execFor(doc).hasActualExecution;
+  }
 
   @override
   void dispose() {
@@ -2361,6 +2372,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   String _userFacingProgressHint() {
+    if (_showWorkshopEmptyPrep) {
+      return '아래에서 새 작업지시를 만들어 시작하세요.';
+    }
     final doc = _activeDoc;
     if (doc != null) {
       final exec = _execFor(doc);
@@ -2613,7 +2627,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildBanner(),
-          if (_planReady || _activeDoc != null) ...[
+          if (_showWorkshopEmptyPrep) ...[
+            const SizedBox(height: 10),
+            _buildEmptyWorkshopPrepBanner(),
+          ] else if (_planReady || _activeDoc != null) ...[
             const SizedBox(height: 10),
             _buildProgressBanner(),
           ],
@@ -2784,6 +2801,59 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyWorkshopPrepBanner() {
+    return Material(
+      elevation: 1,
+      borderRadius: BorderRadius.circular(10),
+      color: ControlColors.surfaceMuted,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: ControlColors.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.play_circle_outline,
+              size: 20,
+              color: ControlColors.teal,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    '새 작업 준비',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: ControlColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '현재 진행 중인 작업이 없습니다.\n'
+                    '아래에서 새 작업지시를 만들어 시작하세요.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: ControlColors.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            StatusBadge(label: '새 작업 준비', color: ControlColors.teal),
+          ],
+        ),
       ),
     );
   }

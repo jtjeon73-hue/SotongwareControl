@@ -12,9 +12,14 @@ import '../widgets/sotong24_stage_widgets.dart';
 /// AI 제작공정 — 전송된 작업의 단계 진행·승인·보완 화면.
 /// 내부 destination key는 `productWorkshop`을 유지한다.
 class ProductWorkshopScreen extends StatefulWidget {
-  const ProductWorkshopScreen({super.key, this.repository});
+  const ProductWorkshopScreen({
+    super.key,
+    this.repository,
+    this.onStartNewWork,
+  });
 
   final Sotong24RemoteRepository? repository;
+  final VoidCallback? onStartNewWork;
 
   @override
   State<ProductWorkshopScreen> createState() => _ProductWorkshopScreenState();
@@ -62,13 +67,15 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
         }
 
         final filtered = projects.where(_filter.matches).toList();
-        final primary = filtered.where((p) => !p.isIncompleteListing).toList();
+        final primary = filtered
+            .where((p) => !p.isDemo && !p.isIncompleteListing)
+            .toList();
         final incomplete = filtered
-            .where((p) => p.isIncompleteListing)
+            .where((p) => p.isIncompleteListing && !p.isDemo)
             .toList();
-        final realWork = primary
-            .where((p) => !Sotong24WorkshopPresentation.isTestProject(p))
-            .toList();
+        final realWork = Sotong24WorkshopPresentation.operationalProjects(
+          primary,
+        );
         final testWork = primary
             .where(Sotong24WorkshopPresentation.isTestProject)
             .toList();
@@ -88,7 +95,8 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
             .where((p) => p.userFacingStatus == Sotong24WorkStatus.completed)
             .toList();
         final focus = _pickFocusProject(projects);
-        final anyDemo = projects.any((p) => p.isDemo);
+        final isEmpty =
+            realWork.isEmpty && testWork.isEmpty && incomplete.isEmpty;
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -108,49 +116,41 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                 height: 1.35,
               ),
             ),
-            if (anyDemo) ...[
-              const SizedBox(height: 10),
-              _InfoBanner(
-                text: _repo.usesMemory
-                    ? 'Firebase 미연결 — 데모(연동 전) 데이터로 표시합니다. 실제 제품 데이터와 구분됩니다.'
-                    : 'Firestore에 프로젝트가 없어 데모(연동 전) 샘플을 함께 표시합니다.',
-              ),
-            ],
             const SizedBox(height: 14),
-            if (focus != null) _CurrentWorkCard(project: focus),
-            if (focus == null) const _InfoBanner(text: '진행 중인 제작 프로젝트가 없습니다.'),
-            const SizedBox(height: 16),
-            Text(
-              '작업 목록',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final f in Sotong24ProjectFilter.values)
-                  ChoiceChip(
-                    label: Text(
-                      f.labelKo,
-                      style: const TextStyle(fontSize: 14),
+            if (focus != null)
+              _CurrentWorkCard(project: focus)
+            else if (isEmpty)
+              _EmptyWorkshopCard(onStartNewWork: widget.onStartNewWork)
+            else
+              const _InfoBanner(text: '진행 중인 제작 프로젝트가 없습니다.'),
+            if (!isEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                '작업 목록',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final f in Sotong24ProjectFilter.values)
+                    ChoiceChip(
+                      label: Text(
+                        f.labelKo,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      selected: _filter == f,
+                      onSelected: (_) => setState(() => _filter = f),
                     ),
-                    selected: _filter == f,
-                    onSelected: (_) => setState(() => _filter = f),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
             if (realWork.isEmpty && testWork.isEmpty && incomplete.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text(
-                  '해당 조건의 프로젝트가 없습니다.',
-                  style: TextStyle(color: ControlColors.textMuted),
-                ),
-              )
+              const SizedBox.shrink()
             else ...[
               if (awaiting.isNotEmpty) ...[
                 const _SectionHeader(
@@ -228,13 +228,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
   }
 
   Sotong24RemoteProject? _pickFocusProject(List<Sotong24RemoteProject> all) {
-    final real = all
-        .where(
-          (p) =>
-              !p.isIncompleteListing &&
-              !Sotong24WorkshopPresentation.isTestProject(p),
-        )
-        .toList();
+    final real = Sotong24WorkshopPresentation.operationalProjects(all);
     if (real.isEmpty) return null;
     for (final p in real) {
       if (p.userFacingStatus == Sotong24WorkStatus.awaitingApproval) {
@@ -1050,6 +1044,51 @@ class _DemoBadge extends StatelessWidget {
       child: const Text(
         '데모',
         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+}
+
+class _EmptyWorkshopCard extends StatelessWidget {
+  const _EmptyWorkshopCard({this.onStartNewWork});
+
+  final VoidCallback? onStartNewWork;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ControlColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ControlColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '현재 진행 중인 작업이 없습니다.',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '작업지시 제작소에서 새 작업을 시작해 주세요.',
+            style: TextStyle(
+              fontSize: 13.5,
+              color: ControlColors.textSecondary,
+              height: 1.35,
+            ),
+          ),
+          if (onStartNewWork != null) ...[
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: onStartNewWork,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('새 작업 만들기'),
+            ),
+          ],
+        ],
       ),
     );
   }

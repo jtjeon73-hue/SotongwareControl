@@ -78,7 +78,7 @@ class ControlCenterShell extends StatefulWidget {
 }
 
 class _ControlCenterShellState extends State<ControlCenterShell> {
-  ControlDestination _selected = ControlDestination.aiBusinessAnalysis;
+  ControlDestination _selected = ControlDestination.sotong24RemoteControl;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   IdeaToPlanningSeed? _ideaSeed;
 
@@ -131,7 +131,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
     );
     if (confirmed == true) {
       setState(() {
-        _selected = ControlDestination.aiBusinessAnalysis;
+        _selected = ControlDestination.sotong24RemoteControl;
         _ideaSeed = null;
       });
       await widget.authService.signOut();
@@ -261,7 +261,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.publicServices:
         return const PublicServicesScreen();
       case ControlDestination.productWorkshop:
-        return const ProductWorkshopScreen();
+        return ProductWorkshopScreen(
+          onStartNewWork: () =>
+              _onDestinationSelected(ControlDestination.aiBusinessAnalysis),
+        );
       case ControlDestination.sotong24RemoteControl:
         return RemoteControlScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.autoPromotion:

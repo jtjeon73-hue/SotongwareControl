@@ -12,13 +12,18 @@ class RemoteOpsDashboard extends StatelessWidget {
     required this.agents,
     required this.workshops,
     required this.onRefresh,
+    this.jobs = const [],
     this.refreshing = false,
   });
 
   final List<RemoteAgentDoc> agents;
   final List<Sotong24RemoteProject> workshops;
+  final List<RemoteJobDoc> jobs;
   final VoidCallback onRefresh;
   final bool refreshing;
+
+  List<Sotong24RemoteProject> get _operationalWorkshops =>
+      Sotong24WorkshopPresentation.operationalProjects(workshops);
 
   @override
   Widget build(BuildContext context) {
@@ -27,27 +32,22 @@ class RemoteOpsDashboard extends StatelessWidget {
         ? onlineAgents.first
         : (agents.isNotEmpty ? agents.first : null);
 
-    final realProjects = workshops
-        .where(
-          (p) =>
-              !p.isIncompleteListing &&
-              !Sotong24WorkshopPresentation.isTestProject(p),
-        )
-        .toList();
+    final operational = _operationalWorkshops;
 
     Sotong24RemoteProject? currentWork;
-    for (final p in realProjects) {
+    for (final p in operational) {
       if (p.userFacingStatus == Sotong24WorkStatus.awaitingApproval) {
         currentWork = p;
         break;
       }
     }
-    currentWork ??= realProjects.cast<Sotong24RemoteProject?>().firstWhere(
+    currentWork ??= operational.cast<Sotong24RemoteProject?>().firstWhere(
       (p) => p!.userFacingStatus != Sotong24WorkStatus.completed,
-      orElse: () => realProjects.isEmpty ? null : realProjects.first,
+      orElse: () => operational.isEmpty ? null : operational.first,
     );
+    if (operational.isEmpty) currentWork = null;
 
-    final waitingCount = realProjects
+    final waitingCount = operational
         .where((p) => p.userFacingStatus == Sotong24WorkStatus.awaitingApproval)
         .length;
 
@@ -55,6 +55,12 @@ class RemoteOpsDashboard extends StatelessWidget {
     final lastSeenText = lastSeen == null
         ? '—'
         : _relativeKo(lastSeen.toLocal());
+
+    final alerts = _buildAlerts(
+      primaryAgent: primaryAgent,
+      waitingCount: waitingCount,
+      currentWork: currentWork,
+    );
 
     return Container(
       key: const Key('remote_ops_dashboard'),
@@ -75,6 +81,8 @@ class RemoteOpsDashboard extends StatelessWidget {
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 14),
+          const _SectionLabel('시스템 상태'),
+          const SizedBox(height: 8),
           _StatusRow(
             label: '노트북',
             value: primaryAgent == null
@@ -90,45 +98,15 @@ class RemoteOpsDashboard extends StatelessWidget {
                 : (primaryAgent.isOnline() ? '정상' : '응답 없음'),
             ok: primaryAgent?.isOnline() == true,
           ),
-          const Divider(height: 24),
+          const SizedBox(height: 10),
           _LabeledBlock(
-            label: '현재 작업',
-            child: _currentWorkBlock(currentWork, primaryAgent),
-          ),
-          const SizedBox(height: 12),
-          _LabeledBlock(
-            label: '승인 대기',
+            label: 'Agent 상태',
             child: Text(
-              waitingCount == 0 &&
-                      primaryAgent?.state != 'waiting_approval' &&
-                      primaryAgent?.state != 'awaiting_user_approval' &&
-                      primaryAgent?.state != 'pending_review'
-                  ? '없음'
-                  : (waitingCount == 0 ? 'Agent 승인 대기' : '$waitingCount건'),
+              _agentOperationalState(primaryAgent),
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
-          const Divider(height: 24),
-          _LabeledBlock(
-            label: 'AI 작업자',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _WorkerLine(
-                  name: 'Codex',
-                  status: _workerStatus(primaryAgent),
-                  usage: '수집 준비 중',
-                ),
-                const SizedBox(height: 6),
-                _WorkerLine(
-                  name: 'Cursor',
-                  status: _cursorStatus(primaryAgent),
-                  usage: '수집 준비 중',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _LabeledBlock(
             label: '최근 연결',
             child: Text(
@@ -136,6 +114,41 @@ class RemoteOpsDashboard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
+          const Divider(height: 24),
+          const _SectionLabel('AI 사용량'),
+          const SizedBox(height: 8),
+          _WorkerLine(
+            name: 'Codex',
+            status: _workerStatus(primaryAgent),
+            usage: '수집 준비 중',
+          ),
+          const SizedBox(height: 6),
+          _WorkerLine(
+            name: 'Cursor',
+            status: _cursorStatus(primaryAgent),
+            usage: '수집 준비 중',
+          ),
+          const Divider(height: 24),
+          const _SectionLabel('현재 진행 작업'),
+          const SizedBox(height: 8),
+          _currentWorkBlock(currentWork, primaryAgent),
+          const SizedBox(height: 12),
+          _LabeledBlock(
+            label: '승인 대기',
+            child: Text(
+              waitingCount == 0 ? '0건' : '$waitingCount건',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (alerts.isNotEmpty) ...[
+            const Divider(height: 24),
+            const _SectionLabel('중요 알림'),
+            const SizedBox(height: 8),
+            for (final alert in alerts) ...[
+              _AlertLine(text: alert),
+              const SizedBox(height: 6),
+            ],
+          ],
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: refreshing ? null : onRefresh,
@@ -151,6 +164,46 @@ class RemoteOpsDashboard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  List<String> _buildAlerts({
+    required RemoteAgentDoc? primaryAgent,
+    required int waitingCount,
+    required Sotong24RemoteProject? currentWork,
+  }) {
+    final alerts = <String>[];
+    if (waitingCount > 0) {
+      alerts.add('승인 필요: $waitingCount건');
+    }
+    if (primaryAgent != null && !primaryAgent.isOnline()) {
+      alerts.add('Agent 연결이 끊겼습니다');
+    }
+    if (currentWork?.userFacingStatus == Sotong24WorkStatus.error) {
+      alerts.add('작업 오류 — 상세를 확인하세요');
+    }
+    return alerts;
+  }
+
+  static String _agentOperationalState(RemoteAgentDoc? agent) {
+    if (agent == null) return '—';
+    if (!agent.isOnline()) return '오프라인';
+    switch (agent.state) {
+      case 'idle':
+        return '대기';
+      case 'running':
+      case 'receiving_job':
+        return '작업 중';
+      case 'waiting_approval':
+      case 'awaiting_user_approval':
+      case 'pending_review':
+        return '승인 대기';
+      case 'revision_requested':
+        return '보완 요청';
+      case 'error':
+        return '오류';
+      default:
+        return agent.stateLabelKo;
+    }
   }
 
   static String _workerStatus(RemoteAgentDoc? agent) {
@@ -170,7 +223,20 @@ class RemoteOpsDashboard extends StatelessWidget {
     }
   }
 
-  static Widget _currentWorkBlock(
+  static bool _agentJobIsLive(
+    RemoteAgentDoc? agent,
+    List<RemoteJobDoc> jobs,
+    List<Sotong24RemoteProject> operationalWorkshops,
+  ) {
+    final jobId = agent?.currentJobId.trim() ?? '';
+    if (jobId.isEmpty) return false;
+    if (jobs.any((j) => j.jobId == jobId || j.instructionId == jobId)) {
+      return true;
+    }
+    return operationalWorkshops.any((p) => p.projectId == jobId);
+  }
+
+  Widget _currentWorkBlock(
     Sotong24RemoteProject? currentWork,
     RemoteAgentDoc? agent,
   ) {
@@ -179,6 +245,15 @@ class RemoteOpsDashboard extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            currentWork.productTypeLabel,
+            style: const TextStyle(
+              color: ControlColors.teal,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
           Text(
             currentWork.title,
             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -209,16 +284,13 @@ class RemoteOpsDashboard extends StatelessWidget {
         ],
       );
     }
-    final jobId = agent?.currentJobId.trim() ?? '';
-    final stage = agent?.currentStage.trim() ?? '';
-    if (jobId.isNotEmpty || stage.isNotEmpty) {
+    if (_agentJobIsLive(agent, jobs, _operationalWorkshops)) {
+      final jobId = agent!.currentJobId.trim();
+      final stage = agent.currentStage.trim();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            jobId.isEmpty ? '진행 중' : jobId,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
+          Text(jobId, style: const TextStyle(fontWeight: FontWeight.w700)),
           if (stage.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
@@ -231,14 +303,14 @@ class RemoteOpsDashboard extends StatelessWidget {
           ],
           const SizedBox(height: 4),
           Text(
-            '상태: ${agent?.stateLabelKo ?? '—'}',
+            '상태: ${agent.stateLabelKo}',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
         ],
       );
     }
     return const Text(
-      '진행 중인 실제 작업 없음',
+      '현재 진행 중인 작업 없음',
       style: TextStyle(color: ControlColors.textSecondary),
     );
   }
@@ -254,6 +326,46 @@ class RemoteOpsDashboard extends StatelessWidget {
     if (diff.inSeconds < 60) return '${diff.inSeconds}초 전';
     if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
     return '${diff.inHours}시간 전';
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: ControlColors.textMuted,
+      ),
+    );
+  }
+}
+
+class _AlertLine extends StatelessWidget {
+  const _AlertLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.info_outline,
+          size: 16,
+          color: ControlColors.accentWarm,
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 13))),
+      ],
+    );
   }
 }
 
