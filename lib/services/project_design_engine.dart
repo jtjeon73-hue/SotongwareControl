@@ -293,6 +293,7 @@ class ProjectDesignEngine {
 
     final wizardJson = synced.toWizardState().toJson();
     wizardJson['selectedConcepts'] = selected.map((e) => e.toJson()).toList();
+    wizardJson['wizardSessionId'] = synced.wizardSessionId;
     wizardJson['fieldStatuses'] = {
       'topic': synced.topicStatus.name,
       'problem': synced.problemStatus.name,

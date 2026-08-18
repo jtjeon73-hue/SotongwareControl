@@ -25,6 +25,7 @@ class BusinessPlanningStore {
   static const conflictSnapshotsKey = 'business_planning_conflict_snapshots_v1';
   static const failedTransferListCleanupKey =
       'business_planning_failed_transfer_list_cleanup_v1';
+  static const parkedDraftInputKey = 'business_planning_parked_draft_input_v1';
 
   final BusinessPlanMirrorService _mirror;
 
@@ -582,6 +583,24 @@ class BusinessPlanningStore {
   Future<void> saveDraftInput(BusinessPlanInput input) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(draftInputKey, jsonEncode(input.toJson()));
+  }
+
+  Future<BusinessPlanInput?> loadParkedDraftInput() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(parkedDraftInputKey);
+    if (raw == null || raw.isEmpty) return null;
+    return BusinessPlanInput.fromJson(
+      Map<String, dynamic>.from(jsonDecode(raw) as Map),
+    );
+  }
+
+  Future<void> saveParkedDraftInput(BusinessPlanInput? input) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (input == null) {
+      await prefs.remove(parkedDraftInputKey);
+      return;
+    }
+    await prefs.setString(parkedDraftInputKey, jsonEncode(input.toJson()));
   }
 
   static String newPlanId([DateTime? now]) {

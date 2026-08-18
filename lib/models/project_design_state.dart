@@ -50,13 +50,20 @@ class ProjectDesignState {
     this.customerStatus = DesignFieldStatus.undecided,
     this.planningConfirmed = false,
     this.combinedDirection = '',
+    String? wizardSessionId,
   }) : selectedAudiences = selectedAudiences ?? [],
        selectedTopicIds = selectedTopicIds ?? [],
        selectedConceptIds = selectedConceptIds ?? [],
        userAddedConcepts = userAddedConcepts ?? [],
-       productionSelections = productionSelections ?? {};
+       productionSelections = productionSelections ?? {},
+       wizardSessionId =
+           wizardSessionId ??
+           'wiz_${DateTime.now().toUtc().millisecondsSinceEpoch}';
 
   int step;
+
+  /// 새 작업 / 이어하기를 구분하는 세션 id. autosave와 복원 경로를 분리한다.
+  String wizardSessionId;
   String? artifactType;
   String? contentSubtype;
   List<String> selectedAudiences;
@@ -119,8 +126,22 @@ class ProjectDesignState {
       desiredOutcome.trim().isNotEmpty &&
       planningConfirmed;
 
+  bool get hasWizardProgress =>
+      hasArtifact ||
+      selectedAudiences.isNotEmpty ||
+      customAudience.trim().isNotEmpty ||
+      selectedConceptIds.isNotEmpty ||
+      selectedTopicIds.isNotEmpty ||
+      userAddedConcepts.isNotEmpty ||
+      designMemo.trim().isNotEmpty ||
+      topic.trim().isNotEmpty ||
+      customerProblem.trim().isNotEmpty ||
+      desiredOutcome.trim().isNotEmpty ||
+      planningConfirmed;
+
   ProjectDesignState copy() => ProjectDesignState(
     step: step,
+    wizardSessionId: wizardSessionId,
     artifactType: artifactType,
     contentSubtype: contentSubtype,
     selectedAudiences: List<String>.from(selectedAudiences),
@@ -159,7 +180,7 @@ class ProjectDesignState {
     }
     return PlanningWizardState(
       mode: 'quick',
-      step: 4,
+      step: step,
       artifactType: artifactType,
       contentSubtype: contentSubtype,
       artifactAnswers: answers,
@@ -174,6 +195,8 @@ class ProjectDesignState {
         'outcomeStatus': outcomeStatus.name,
         'customerStatus': customerStatus.name,
         'planningConfirmed': planningConfirmed ? 'true' : 'false',
+        'designStep': '$step',
+        'wizardSessionId': wizardSessionId,
         if (combinedDirection.trim().isNotEmpty)
           'combinedDirection': combinedDirection.trim(),
         if (userAddedConcepts.isNotEmpty)
@@ -208,8 +231,13 @@ class ProjectDesignState {
     final memo = (w.customTexts['designMemo'] ?? w.customTexts['notes'] ?? '')
         .trim();
 
+    final restoredStep = int.tryParse(w.customTexts['designStep'] ?? '');
     return ProjectDesignState(
-      step: ProjectDesignStep.artifact,
+      step: (restoredStep ?? ProjectDesignStep.artifact).clamp(
+        0,
+        ProjectDesignStep.count - 1,
+      ),
+      wizardSessionId: w.customTexts['wizardSessionId'],
       artifactType: w.artifactType,
       contentSubtype: w.contentSubtype,
       selectedAudiences: audiences,
@@ -239,6 +267,7 @@ class ProjectDesignState {
 
   Map<String, dynamic> toJson() => {
     'step': step,
+    'wizardSessionId': wizardSessionId,
     'artifactType': artifactType,
     'contentSubtype': contentSubtype,
     'selectedAudiences': selectedAudiences,
@@ -284,6 +313,9 @@ class ProjectDesignState {
     }
     return ProjectDesignState(
       step: (json['step'] as num?)?.toInt() ?? 0,
+      wizardSessionId: json['wizardSessionId'] == null
+          ? null
+          : '${json['wizardSessionId']}',
       artifactType: json['artifactType'] == null
           ? null
           : '${json['artifactType']}',

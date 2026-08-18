@@ -5,6 +5,7 @@ import '../../models/artifact_type.dart';
 import '../../models/concept_candidate.dart';
 import '../../models/project_design_state.dart';
 import '../../services/project_design_engine.dart';
+import '../../services/work_instruction_concept_occupancy.dart';
 import '../../services/work_instruction_workshop_presentation.dart';
 import '../../theme/control_theme.dart';
 import 'concept_picker_panel.dart';
@@ -17,12 +18,18 @@ class ProjectDesignWizard extends StatefulWidget {
     required this.onChanged,
     this.onRequestCreateInstruction,
     this.onRequestSavePlan,
+    this.onRequestNewWork,
+    this.occupancy,
+    this.onOccupiedConcept,
   });
 
   final ProjectDesignState initial;
   final ValueChanged<ProjectDesignState> onChanged;
   final VoidCallback? onRequestCreateInstruction;
   final VoidCallback? onRequestSavePlan;
+  final VoidCallback? onRequestNewWork;
+  final ConceptOccupancyIndex? occupancy;
+  final void Function(ConceptOccupancyView view)? onOccupiedConcept;
 
   @override
   State<ProjectDesignWizard> createState() => _ProjectDesignWizardState();
@@ -269,6 +276,9 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                     child: _ArtifactSelectCard(
                       key: ValueKey('artifact-${card.id}'),
                       selected: _state.artifactType == card.id,
+                      selectedKey: _state.artifactType == card.id
+                          ? Key('planning_artifact_${card.id}_selected')
+                          : null,
                       title: card.title,
                       subtitle: card.subtitle,
                       icon: _artifactIcon(card.iconName),
@@ -324,6 +334,9 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           children: [
             for (final a in ProjectDesignCatalog.audiences)
               FilterChip(
+                key: _state.selectedAudiences.contains(a.id)
+                    ? Key('planning_audience_${a.id}_selected')
+                    : Key('planning_audience_${a.id}'),
                 label: Text(a.label),
                 selected: _state.selectedAudiences.contains(a.id),
                 onSelected: (on) {
@@ -374,6 +387,10 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           candidates: concepts,
           selectedIds: _state.selectedConceptIds,
           userAdded: _state.userAddedConcepts,
+          occupancy: widget.occupancy,
+          artifactType: _state.artifactType ?? '',
+          audiences: _state.selectedAudiences,
+          onOccupiedTap: widget.onOccupiedConcept,
           onSelectionChanged: (ids) {
             var next = _state.copy()..selectedConceptIds = ids;
             next.planningConfirmed = false;
@@ -390,6 +407,16 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
               artifactType: _state.artifactType ?? '',
               audiences: _state.selectedAudiences,
             );
+            final occ = widget.occupancy?.viewFor(
+              conceptId: added.id,
+              artifactType: _state.artifactType ?? '',
+              title: added.title,
+              audiences: _state.selectedAudiences,
+            );
+            if (occ != null && occ.isOccupied) {
+              widget.onOccupiedConcept?.call(occ);
+              return;
+            }
             var next = _state.copy();
             next.userAddedConcepts = [...next.userAddedConcepts, added];
             next.selectedConceptIds = [...next.selectedConceptIds, added.id];
@@ -821,6 +848,10 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
       children: [
         TextButton(
           onPressed: () {
+            if (widget.onRequestNewWork != null) {
+              widget.onRequestNewWork!();
+              return;
+            }
             _emit(ProjectDesignState());
             _syncControllers();
             _review = null;
@@ -849,6 +880,7 @@ class _ArtifactSelectCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     required this.onTap,
+    this.selectedKey,
   });
 
   final bool selected;
@@ -856,10 +888,12 @@ class _ArtifactSelectCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final VoidCallback onTap;
+  final Key? selectedKey;
 
   @override
   Widget build(BuildContext context) {
     return Material(
+      key: selectedKey,
       color: selected
           ? ControlColors.tealSoft.withValues(alpha: 0.45)
           : ControlColors.surface,

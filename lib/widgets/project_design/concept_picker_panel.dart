@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/concept_candidate.dart';
 import '../../services/concept_recommendation_provider.dart';
+import '../../services/work_instruction_concept_occupancy.dart';
 import '../../theme/control_theme.dart';
 
 /// Concept recommendation picker — TOP10 / category / search / expand / user add.
@@ -13,6 +14,10 @@ class ConceptPickerPanel extends StatefulWidget {
     required this.onSelectionChanged,
     required this.onAddUserConcept,
     this.userAdded = const [],
+    this.occupancy,
+    this.artifactType = '',
+    this.audiences = const [],
+    this.onOccupiedTap,
   });
 
   final List<ConceptCandidate> candidates;
@@ -20,6 +25,10 @@ class ConceptPickerPanel extends StatefulWidget {
   final ValueChanged<List<String>> onSelectionChanged;
   final void Function(String title, String memo) onAddUserConcept;
   final List<ConceptCandidate> userAdded;
+  final ConceptOccupancyIndex? occupancy;
+  final String artifactType;
+  final List<String> audiences;
+  final void Function(ConceptOccupancyView view)? onOccupiedTap;
 
   @override
   State<ConceptPickerPanel> createState() => _ConceptPickerPanelState();
@@ -65,6 +74,11 @@ class _ConceptPickerPanelState extends State<ConceptPickerPanel> {
   }
 
   void _toggle(String id, bool on) {
+    final occ = _occupancyForId(id);
+    if (occ.isOccupied) {
+      widget.onOccupiedTap?.call(occ);
+      return;
+    }
     final next = List<String>.from(widget.selectedIds);
     if (on) {
       if (!next.contains(id)) next.add(id);
@@ -72,6 +86,30 @@ class _ConceptPickerPanelState extends State<ConceptPickerPanel> {
       next.remove(id);
     }
     widget.onSelectionChanged(next);
+  }
+
+  ConceptOccupancyView _occupancyForId(String id) {
+    final index = widget.occupancy;
+    if (index == null) return ConceptOccupancyView.available;
+    ConceptCandidate? concept;
+    for (final c in [...widget.userAdded, ...widget.candidates]) {
+      if (c.id == id) {
+        concept = c;
+        break;
+      }
+    }
+    if (concept != null) {
+      return index.viewForCandidate(
+        concept,
+        artifactType: widget.artifactType,
+        audiences: widget.audiences,
+      );
+    }
+    return index.viewFor(
+      conceptId: id,
+      artifactType: widget.artifactType,
+      audiences: widget.audiences,
+    );
   }
 
   Future<void> _openAddIdea() async {
@@ -194,6 +232,7 @@ class _ConceptPickerPanelState extends State<ConceptPickerPanel> {
               rank: i + 1,
               concept: visible[i],
               selected: widget.selectedIds.contains(visible[i].id),
+              occupancy: _occupancyForId(visible[i].id),
               onChanged: (on) => _toggle(visible[i].id, on),
             ),
         const SizedBox(height: 8),
@@ -235,20 +274,24 @@ class _ConceptCard extends StatelessWidget {
     required this.concept,
     required this.selected,
     required this.onChanged,
+    this.occupancy = ConceptOccupancyView.available,
   });
 
   final int rank;
   final ConceptCandidate concept;
   final bool selected;
   final ValueChanged<bool> onChanged;
+  final ConceptOccupancyView occupancy;
 
   @override
   Widget build(BuildContext context) {
+    final occupied = occupancy.isOccupied;
     return Card(
+      key: Key('planning_concept_card_${concept.id}'),
       margin: const EdgeInsets.only(bottom: 8),
       color: selected ? ControlColors.tealSoft.withValues(alpha: 0.35) : null,
       child: InkWell(
-        onTap: () => onChanged(!selected),
+        onTap: occupied ? () => onChanged(false) : () => onChanged(!selected),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -258,18 +301,32 @@ class _ConceptCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Checkbox(
-                    value: selected,
-                    onChanged: (v) => onChanged(v == true),
+                    value: selected && !occupied,
+                    onChanged: occupied ? null : (v) => onChanged(v == true),
                   ),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          concept.isUserAdded
-                              ? concept.title
-                              : '$rank. ${concept.title}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              concept.isUserAdded
+                                  ? concept.title
+                                  : '$rank. ${concept.title}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: occupied
+                                    ? ControlColors.textSecondary
+                                    : ControlColors.textPrimary,
+                              ),
+                            ),
+                            if (occupancy.badgeLabel.isNotEmpty)
+                              _OccupancyBadge(view: occupancy),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -321,6 +378,40 @@ class _ConceptCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(label, style: const TextStyle(fontSize: 11)),
+    );
+  }
+}
+
+class _OccupancyBadge extends StatelessWidget {
+  const _OccupancyBadge({required this.view});
+
+  final ConceptOccupancyView view;
+
+  @override
+  Widget build(BuildContext context) {
+    final inProgress = view.state == ConceptWorkState.inProgress;
+    return Container(
+      key: Key(
+        inProgress
+            ? 'planning_concept_badge_in_progress'
+            : 'planning_concept_badge_completed',
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: inProgress ? ControlColors.warningBg : ControlColors.tealSoft,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: inProgress ? ControlColors.accentWarm : ControlColors.teal,
+        ),
+      ),
+      child: Text(
+        view.badgeLabel,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: inProgress ? ControlColors.accentWarm : ControlColors.teal,
+        ),
+      ),
     );
   }
 }

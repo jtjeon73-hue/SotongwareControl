@@ -25,9 +25,11 @@ import '../services/remote_agent_repository.dart';
 import '../services/remote_work_instruction_mirror.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../services/sotong24_workshop_presentation.dart';
+import '../services/work_instruction_concept_occupancy.dart';
 import '../services/work_instruction_delivery_presentation.dart';
 import '../services/work_instruction_remote_delivery.dart';
 import '../services/work_instruction_validator.dart';
+import '../services/work_instruction_wizard_session.dart';
 import '../services/work_instruction_workshop_presentation.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
@@ -111,6 +113,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   DevWorkDocWriteResult? _lastDevWorkDocResult;
   Timer? _draftTimer;
   Timer? _wizardTimer;
+  bool _showResumeBanner = false;
+  BusinessPlanInput? _resumeInput;
+  String? _resumePlanId;
 
   static const _artifactOptions = [
     ...ArtifactType.allSelectable,
@@ -147,6 +152,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   PlanExecutionIndex get _executionIndex =>
       PlanExecutionIndex.fromRemoteProjects(_remoteProjects, jobs: _remoteJobs);
+
+  ConceptOccupancyIndex get _conceptOccupancy => ConceptOccupancyIndex.build(
+    plans: _allPlans,
+    projects: _remoteProjects,
+    jobs: _remoteJobs,
+    execution: _executionIndex,
+  );
 
   PlanExecutionSnapshot _execFor(BusinessPlanDocument plan) =>
       _executionIndex.snapshotFor(plan);
@@ -222,41 +234,42 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         agents = const [];
       }
       if (!mounted) return;
+      final plans = BusinessPlanningStore.dedupeById(boot.plans);
+      final currentResumable = WorkInstructionWizardSession.isUnsentResumable(
+        draft,
+        plans,
+      );
+      final parked = await _store.loadParkedDraftInput();
+      if (!mounted) return;
+      final parkedResumable = WorkInstructionWizardSession.isUnsentResumable(
+        parked,
+        plans,
+      );
+      BusinessPlanInput? resumeInput;
+      String? resumePlanId;
+      if (currentResumable) {
+        resumeInput = draft;
+      } else if (parkedResumable) {
+        resumeInput = parked;
+      }
+      if (boot.activePlanId != null) {
+        final match = plans.where((p) => p.id == boot.activePlanId);
+        if (match.isNotEmpty && !match.first.wasTransferred) {
+          resumePlanId = boot.activePlanId;
+          resumeInput ??= match.first.input;
+        }
+      }
       setState(() {
-        _allPlans = BusinessPlanningStore.dedupeById(boot.plans);
-        _activePlanId = boot.activePlanId;
+        _allPlans = plans;
         _devDocState = devDoc;
         _remoteAgents = agents;
         _loading = false;
-        if (boot.activePlanId != null) {
-          final match = boot.plans.where((p) => p.id == boot.activePlanId);
-          if (match.isNotEmpty) {
-            final plan = match.first;
-            _instructionId = plan.stableInstructionId;
-            _version = plan.version;
-            _applyInput(plan.input);
-            _analysis = plan.analysis;
-            _instruction = plan.instruction;
-            _activeDoc = plan;
-            _aiProductionPilot = plan.instruction?.aiExecution?.enabled == true;
-            if (plan.input.wizardSelections != null) {
-              _wizardState = PlanningWizardState.fromJson(
-                plan.input.wizardSelections!,
-              );
-              _designState = ProjectDesignState.fromWizardState(_wizardState);
-              _inputModeQuick = _wizardState.mode != 'advanced';
-            }
-          }
-        } else if (draft != null) {
-          _applyInput(draft);
-          if (draft.wizardSelections != null) {
-            _wizardState = PlanningWizardState.fromJson(
-              draft.wizardSelections!,
-            );
-            _designState = ProjectDesignState.fromWizardState(_wizardState);
-            _inputModeQuick = _wizardState.mode != 'advanced';
-          }
-        }
+        _resetWizardToNewSession();
+        _resumeInput = resumeInput;
+        _resumePlanId = resumePlanId;
+        _showResumeBanner =
+            resumeInput != null &&
+            WorkInstructionWizardSession.isUnsentResumable(resumeInput, plans);
       });
       _consumeIdeaSeedIfNeeded();
       unawaited(_maybeRepairOrphan());
@@ -1608,20 +1621,42 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
+  void _resetWizardToNewSession() {
+    _activePlanId = null;
+    _instructionId = null;
+    _version = 1;
+    _analysis = null;
+    _instruction = null;
+    _activeDoc = null;
+    _lastTransferResult = null;
+    _aiProductionPilot = true;
+    _inputModeQuick = true;
+    _wizardState = PlanningWizardState(mode: 'quick');
+    _designState = WorkInstructionWizardSession.emptyDesign();
+    _applyInput(const BusinessPlanInput());
+  }
+
+  Future<void> _parkCurrentDraftIfNeeded() async {
+    final current = _currentInput;
+    if (!WorkInstructionWizardSession.isUnsentResumable(current, _allPlans)) {
+      return;
+    }
+    await _store.saveParkedDraftInput(current);
+    _resumeInput = current;
+    if (_activePlanId != null &&
+        _activeDoc != null &&
+        !_activeDoc!.wasTransferred) {
+      _resumePlanId = _activePlanId;
+    }
+  }
+
   void _startNewPlan({IdeaToPlanningSeed? seed}) {
     FocusManager.instance.primaryFocus?.unfocus();
+    unawaited(_parkCurrentDraftIfNeeded());
     final s = seed ?? widget.ideaSeed;
     setState(() {
-      _activePlanId = null;
-      _instructionId = null;
-      _version = 1;
-      _analysis = null;
-      _instruction = null;
-      _activeDoc = null;
-      _aiProductionPilot = true;
-      _inputModeQuick = true;
-      _wizardState = PlanningWizardState(mode: 'quick');
-      _designState = ProjectDesignState();
+      _resetWizardToNewSession();
+      _showResumeBanner = false;
       if (s != null && s.title.trim().isNotEmpty) {
         final notes = [
           if (s.description.trim().isNotEmpty) s.description.trim(),
@@ -1635,8 +1670,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             notes: notes,
           ),
         );
-      } else {
-        _applyInput(const BusinessPlanInput());
       }
     });
     unawaited(_store.persistActivePlanId(null));
@@ -1644,6 +1677,58 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (s != null && s.title.trim().isNotEmpty) {
       _snack('아이디어「${s.title}」을(를) 새 기획으로 불러왔습니다.');
     }
+  }
+
+  void _resumeDraft() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (_resumePlanId != null) {
+      final match = _allPlans.where(
+        (p) => p.id == _resumePlanId && !p.wasTransferred,
+      );
+      if (match.isNotEmpty) {
+        _loadPlan(match.first, silent: true);
+        setState(() => _showResumeBanner = false);
+        unawaited(_store.saveParkedDraftInput(null));
+        return;
+      }
+    }
+    final input = _resumeInput;
+    if (input == null || !WorkInstructionWizardSession.hasProgress(input)) {
+      setState(() => _showResumeBanner = false);
+      return;
+    }
+    setState(() {
+      _applyInput(input);
+      _designState = WorkInstructionWizardSession.restoreDesign(input);
+      _wizardState = _designState.toWizardState();
+      _inputModeQuick = _wizardState.mode != 'advanced';
+      _activePlanId = null;
+      _instructionId = null;
+      _version = 1;
+      _analysis = null;
+      _instruction = null;
+      _activeDoc = null;
+      _lastTransferResult = null;
+      _showResumeBanner = false;
+    });
+    unawaited(_store.saveParkedDraftInput(null));
+    _persistDraft();
+  }
+
+  void _onOccupiedConcept(ConceptOccupancyView view) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(view.guidance),
+        action: widget.onOpenProductWorkshop == null
+            ? null
+            : SnackBarAction(
+                label: 'AI 제작공정에서 보기',
+                onPressed: widget.onOpenProductWorkshop!,
+              ),
+      ),
+    );
   }
 
   String? _appliedIdeaSeedId;
@@ -1749,6 +1834,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildBanner(),
+          if (_showResumeBanner) ...[
+            const SizedBox(height: 10),
+            _buildResumeDraftBanner(),
+          ],
           if (_showWorkshopEmptyPrep) ...[
             const SizedBox(height: 10),
             _buildEmptyWorkshopPrepBanner(),
@@ -1758,10 +1847,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           const SizedBox(height: 12),
           if (_inputModeQuick)
             ProjectDesignWizard(
+              key: ValueKey(_designState.wizardSessionId),
               initial: _designState,
+              occupancy: _conceptOccupancy,
               onChanged: _onDesignChanged,
               onRequestSavePlan: () => _savePlan(),
               onRequestCreateInstruction: () => _createOrPromptInstruction(),
+              onRequestNewWork: _startNewPlan,
+              onOccupiedConcept: _onOccupiedConcept,
             )
           else
             _buildAdvancedForm(),
@@ -2054,6 +2147,51 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildResumeDraftBanner() {
+    return Material(
+      key: const Key('planning_resume_draft_banner'),
+      elevation: 1,
+      borderRadius: BorderRadius.circular(10),
+      color: ControlColors.warningBg,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: ControlColors.accentWarm.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '이전에 작성하던 작업이 있습니다.',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton(
+                  key: const Key('planning_resume_draft_button'),
+                  onPressed: _resumeDraft,
+                  child: const Text('이어하기'),
+                ),
+                OutlinedButton(
+                  key: const Key('planning_new_work_button'),
+                  onPressed: () => _startNewPlan(),
+                  child: const Text('새 작업 시작'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
