@@ -4,6 +4,7 @@ import '../data/sotong24_workflows.dart';
 import '../models/instruction_contract.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
+import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
 import 'result_link_button.dart';
 
@@ -328,55 +329,79 @@ class _Sotong24ExpandableStageTileState
             borderRadius: BorderRadius.circular(10),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    sotong24StatusGlyph(s.status),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: widget.isCurrent
-                          ? ControlColors.teal
-                          : ControlColors.textMuted,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        sotong24StatusGlyph(s.status),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: widget.isCurrent
+                              ? ControlColors.teal
+                              : ControlColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          '${s.stageNumber}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          s.stageName,
+                          style: TextStyle(
+                            fontWeight: widget.isCurrent
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            fontSize: 15,
+                            color: done && !widget.isCurrent
+                                ? ControlColors.textMuted
+                                : ControlColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        Sotong24WorkStatus.labelKo(
+                          Sotong24UserFacingStatus.normalize(s.status),
+                        ),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: widget.isCurrent
+                              ? ControlColors.teal
+                              : ControlColors.textSecondary,
+                        ),
+                      ),
+                      Icon(
+                        _open ? Icons.expand_less : Icons.expand_more,
+                        color: ControlColors.textMuted,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 28,
-                    child: Text(
-                      '${s.stageNumber}',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      s.stageName,
-                      style: TextStyle(
-                        fontWeight: widget.isCurrent
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        fontSize: 15,
-                        color: done && !widget.isCurrent
-                            ? ControlColors.textMuted
-                            : ControlColors.textPrimary,
+                  if (Sotong24WorkshopPresentation.stageDurationLine(
+                        s,
+                      ).isNotEmpty ||
+                      Sotong24WorkshopPresentation.stageRevisionLine(
+                        s,
+                      ).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 36),
+                      child: Text(
+                        [
+                          Sotong24WorkshopPresentation.stageDurationLine(s),
+                          Sotong24WorkshopPresentation.stageRevisionLine(s),
+                        ].where((e) => e.isNotEmpty).join(' · '),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: ControlColors.textSecondary,
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    Sotong24WorkStatus.labelKo(
-                      Sotong24UserFacingStatus.normalize(s.status),
-                    ),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: widget.isCurrent
-                          ? ControlColors.teal
-                          : ControlColors.textSecondary,
-                    ),
-                  ),
-                  Icon(
-                    _open ? Icons.expand_less : Icons.expand_more,
-                    color: ControlColors.textMuted,
-                  ),
                 ],
               ),
             ),
@@ -417,6 +442,10 @@ class _Sotong24ExpandableStageTileState
                   ),
                   if (s.errorMessage.isNotEmpty)
                     _line('오류', s.errorMessage, danger: true),
+                  _line(
+                    '작업시간',
+                    Sotong24WorkshopPresentation.stageTimingDetailNote(s),
+                  ),
                   _line('다음 단계', def?.nextHint ?? ''),
                 ],
               ),

@@ -365,6 +365,15 @@ class _Sotong24RemoteDetailScreenState
                   project,
                 ).replaceFirst('전체 진행률 ', ''),
               ),
+              if (Sotong24WorkshopPresentation.totalWorkDurationLine(
+                project,
+              ).isNotEmpty)
+                _Kv(
+                  '전체 누적 작업시간',
+                  Sotong24WorkshopPresentation.totalWorkDurationLine(
+                    project,
+                  ).replaceFirst('전체 누적 작업시간: ', ''),
+                ),
               _Kv('PC', Sotong24PcLinkStatus.labelKo(project.resolvedPcStatus)),
               const SizedBox(height: 6),
               ClipRRect(
@@ -663,6 +672,16 @@ class _CurrentWorkCard extends StatelessWidget {
           if (Sotong24WorkshopPresentation.revisionLine(project).isNotEmpty)
             Text(
               Sotong24WorkshopPresentation.revisionLine(project),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          if (project.currentStageDoc != null &&
+              Sotong24WorkshopPresentation.stageDurationLine(
+                project.currentStageDoc!,
+              ).isNotEmpty)
+            Text(
+              Sotong24WorkshopPresentation.stageDurationLine(
+                project.currentStageDoc!,
+              ),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
           Text(

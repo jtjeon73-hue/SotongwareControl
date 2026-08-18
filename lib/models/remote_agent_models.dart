@@ -16,6 +16,7 @@ class RemoteAgentDoc {
     this.currentStage = '',
     this.lastHeartbeatAt,
     this.updatedAt,
+    this.lastError = '',
   });
 
   final String agentId;
@@ -29,6 +30,7 @@ class RemoteAgentDoc {
   final String currentStage;
   final DateTime? lastHeartbeatAt;
   final DateTime? updatedAt;
+  final String lastError;
 
   bool isOnline({
     DateTime? now,
@@ -98,6 +100,7 @@ class RemoteAgentDoc {
       currentStage: '${map['currentStage'] ?? ''}',
       lastHeartbeatAt: _ts(map['lastHeartbeatAt']),
       updatedAt: _ts(map['updatedAt']),
+      lastError: '${map['lastError'] ?? ''}',
     );
   }
 }
@@ -301,6 +304,26 @@ int _int(dynamic v, int fallback) {
   if (v is int) return v;
   if (v is num) return v.toInt();
   return int.tryParse('$v') ?? fallback;
+}
+
+/// 완료된 Job만. 현재시각-시작시각으로 승인대기를 포함하지 않는다.
+String? jobCompletedDurationLabel(RemoteJobDoc job) {
+  final start = job.startedAt;
+  final end = job.completedAt;
+  if (start == null || end == null) return null;
+  final d = end.difference(start);
+  if (d.isNegative || d.inSeconds <= 0) return null;
+  return formatDurationKo(d);
+}
+
+String formatDurationKo(Duration d) {
+  if (d.isNegative || d.inSeconds <= 0) return '';
+  if (d.inHours >= 1) {
+    final m = d.inMinutes.remainder(60);
+    return m > 0 ? '${d.inHours}시간 $m분' : '${d.inHours}시간';
+  }
+  if (d.inMinutes >= 1) return '${d.inMinutes}분';
+  return '${d.inSeconds}초';
 }
 
 String formatRelativeKo(DateTime? at, {DateTime? now}) {

@@ -248,7 +248,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '만들고 싶은 결과물을 선택하세요. 선택 전에는 다음 단계로 이동할 수 없습니다.',
+          '만들고 싶은 사업유형을 선택하세요. 선택 전에는 다음 단계로 이동할 수 없습니다.',
           style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
         ),
         const SizedBox(height: 12),
@@ -807,13 +807,23 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
   }
 
   Widget _buildNav() {
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
+        TextButton(
+          onPressed: () {
+            _emit(ProjectDesignState());
+            _syncControllers();
+            _review = null;
+          },
+          child: const Text('취소'),
+        ),
         OutlinedButton(
           onPressed: _state.step > 0 ? _goBack : null,
           child: const Text('이전'),
         ),
-        const Spacer(),
         if (_state.step < ProjectDesignStep.finalize)
           FilledButton(
             onPressed: _canGoNext() ? _goNext : null,

@@ -204,6 +204,12 @@ void main() {
       );
       await tester.tap(find.text('개발/진단 도구'));
       await tester.pumpAndSettle();
+      expect(find.text('Agent 연결 테스트'), findsWidgets);
+      await tester.scrollUntilVisible(
+        find.text('샘플 작업지시서 E2E 테스트'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('샘플 작업지시서 E2E 테스트'), findsOneWidget);
       expect(find.text('샘플 작업지시서 생성'), findsOneWidget);
       expect(find.text('Cursor 자동실행 TEST'), findsOneWidget);
@@ -283,16 +289,12 @@ void main() {
       );
       await tester.tap(find.text('Agent 상태 자세히'));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('작업 보내기'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
       expect(find.textContaining('작업지시 대기'), findsWidgets);
-      expect(find.text('작업 보내기'), findsOneWidget);
+      expect(find.text('작업 보내기'), findsNothing);
+      expect(find.text('상세 보기'), findsOneWidget);
     });
 
-    testWidgets('offline agent disables send', (tester) async {
+    testWidgets('offline agent has no send button', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -328,15 +330,8 @@ void main() {
       );
       await tester.tap(find.text('Agent 상태 자세히'));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('작업 보내기'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      final btn = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, '작업 보내기'),
-      );
-      expect(btn.onPressed, isNull);
+      expect(find.text('작업 보내기'), findsNothing);
+      expect(find.textContaining('작업지시 대기'), findsWidgets);
     });
 
     testWidgets('job list shows running filter content', (tester) async {

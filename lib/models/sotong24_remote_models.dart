@@ -95,6 +95,8 @@ class Sotong24RemoteStage {
     this.activeRequestId = '',
     this.updatedAt = '',
     this.revision = 0,
+    this.startedAt = '',
+    this.completedAt = '',
   });
 
   final String stageId;
@@ -115,6 +117,12 @@ class Sotong24RemoteStage {
 
   /// Agent/stage_sync가 보낸 최신 revision. 0이면 미보고.
   final int revision;
+
+  /// 실제 작업 시작. 없으면 빈 문자열 — 가짜 소요시간을 계산하지 않는다.
+  final String startedAt;
+
+  /// 실제 작업 완료. 없으면 빈 문자열.
+  final String completedAt;
 
   bool get hasOpenableResult =>
       openableResultUrl != null || openablePreviewUrl != null;
@@ -171,6 +179,8 @@ class Sotong24RemoteStage {
     'activeRequestId': activeRequestId,
     'updatedAt': updatedAt,
     if (revision > 0) 'revision': revision,
+    if (startedAt.trim().isNotEmpty) 'startedAt': startedAt,
+    if (completedAt.trim().isNotEmpty) 'completedAt': completedAt,
   };
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -192,6 +202,8 @@ class Sotong24RemoteStage {
       activeRequestId: '${map['activeRequestId'] ?? ''}',
       updatedAt: '${map['updatedAt'] ?? ''}',
       revision: _asInt(map['revision']),
+      startedAt: '${map['startedAt'] ?? ''}',
+      completedAt: '${map['completedAt'] ?? ''}',
     );
   }
 
@@ -219,6 +231,8 @@ class Sotong24RemoteStage {
       activeRequestId: activeRequestId ?? this.activeRequestId,
       updatedAt: updatedAt ?? this.updatedAt,
       revision: revision,
+      startedAt: startedAt,
+      completedAt: completedAt,
     );
   }
 }

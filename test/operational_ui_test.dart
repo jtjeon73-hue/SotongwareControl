@@ -43,8 +43,6 @@ class _FakeAuth implements AuthClient {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  final now = DateTime.utc(2026, 8, 18, 0, 0, 0);
-
   group('운영 UI', () {
     testWidgets('표준제작 가이드 홈·카테고리', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
@@ -171,7 +169,9 @@ void main() {
             enabled: true,
             currentJobId: 'wi_stale_deleted_job',
             currentStage: '13단계 배포',
-            lastHeartbeatAt: now.subtract(const Duration(seconds: 20)),
+            lastHeartbeatAt: DateTime.now().toUtc().subtract(
+              const Duration(seconds: 20),
+            ),
           ),
         ],
         memoryJobs: const [],
@@ -197,7 +197,7 @@ void main() {
       expect(find.text('온라인'), findsOneWidget);
       expect(find.text('정상'), findsOneWidget);
       expect(find.text('대기'), findsOneWidget);
-      expect(find.text('현재 진행 중인 작업 없음'), findsOneWidget);
+      expect(find.text('현재 진행 중인 작업이 없습니다.'), findsOneWidget);
       expect(find.textContaining('50대 초보도'), findsNothing);
       expect(find.textContaining('13단계'), findsNothing);
       expect(find.text('0건'), findsOneWidget);

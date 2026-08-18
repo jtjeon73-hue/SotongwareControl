@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
+import '../services/ops_health_check.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
 
@@ -14,6 +15,8 @@ class RemoteOpsDashboard extends StatelessWidget {
     required this.onRefresh,
     this.jobs = const [],
     this.refreshing = false,
+    this.onOpenWorkshop,
+    this.onOpenDiagnostics,
   });
 
   final List<RemoteAgentDoc> agents;
@@ -21,6 +24,8 @@ class RemoteOpsDashboard extends StatelessWidget {
   final List<RemoteJobDoc> jobs;
   final VoidCallback onRefresh;
   final bool refreshing;
+  final VoidCallback? onOpenWorkshop;
+  final VoidCallback? onOpenDiagnostics;
 
   List<Sotong24RemoteProject> get _operationalWorkshops =>
       Sotong24WorkshopPresentation.operationalProjects(workshops);
@@ -61,6 +66,13 @@ class RemoteOpsDashboard extends StatelessWidget {
       waitingCount: waitingCount,
       currentWork: currentWork,
     );
+
+    final health = OpsHealthCheck.evaluate(
+      agents: agents,
+      jobs: jobs,
+      workshops: workshops,
+    );
+    final suggested = health.suggestedCheck;
 
     return Container(
       key: const Key('remote_ops_dashboard'),
@@ -148,6 +160,28 @@ class RemoteOpsDashboard extends StatelessWidget {
               _AlertLine(text: alert),
               const SizedBox(height: 6),
             ],
+          ],
+          const Divider(height: 24),
+          const _SectionLabel('점검 안내'),
+          const SizedBox(height: 8),
+          Text(
+            health.overallLabelKo,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          if (health.overall != OpsHealthLevel.ok && suggested != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              suggested.summary,
+              style: const TextStyle(
+                fontSize: 13,
+                color: ControlColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: onOpenDiagnostics,
+              child: Text(suggested.title),
+            ),
           ],
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -246,7 +280,11 @@ class RemoteOpsDashboard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            currentWork.productTypeLabel,
+            currentWork.productTypeLabel.isNotEmpty
+                ? Sotong24WorkshopPresentation.businessTypeLabel(
+                    currentWork.productType,
+                  )
+                : currentWork.productTypeLabel,
             style: const TextStyle(
               color: ControlColors.teal,
               fontWeight: FontWeight.w700,
@@ -281,6 +319,13 @@ class RemoteOpsDashboard extends StatelessWidget {
             '상태: ${currentWork.userFacingStatusLabel}',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+          if (onOpenWorkshop != null) ...[
+            const SizedBox(height: 10),
+            FilledButton(
+              onPressed: onOpenWorkshop,
+              child: const Text('AI 제작공정에서 계속 보기'),
+            ),
+          ],
         ],
       );
     }
@@ -306,11 +351,18 @@ class RemoteOpsDashboard extends StatelessWidget {
             '상태: ${agent.stateLabelKo}',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+          if (onOpenWorkshop != null) ...[
+            const SizedBox(height: 10),
+            FilledButton(
+              onPressed: onOpenWorkshop,
+              child: const Text('AI 제작공정에서 계속 보기'),
+            ),
+          ],
         ],
       );
     }
     return const Text(
-      '현재 진행 중인 작업 없음',
+      '현재 진행 중인 작업이 없습니다.',
       style: TextStyle(color: ControlColors.textSecondary),
     );
   }

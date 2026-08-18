@@ -415,6 +415,11 @@ void main() {
       );
       await tester.tap(find.text('개발/진단 도구'));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('샘플 작업지시서 E2E 테스트'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
 
       expect(find.text('샘플 작업지시서 E2E 테스트'), findsOneWidget);
       expect(find.text('샘플 작업지시서 생성'), findsOneWidget);

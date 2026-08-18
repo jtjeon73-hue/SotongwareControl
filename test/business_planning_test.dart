@@ -245,7 +245,7 @@ void main() {
     expect(latest.single.version, 2);
   });
 
-  testWidgets('화면 제목과 설계 엔진 기본 진입', (tester) async {
+  testWidgets('화면 제목과 단계형 wizard 기본 진입', (tester) async {
     tester.view.physicalSize = const Size(1366, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -256,11 +256,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('작업지시 제작소'), findsOneWidget);
-    expect(find.textContaining('Project Design Engine'), findsWidgets);
-    expect(find.text('설계 엔진'), findsOneWidget);
+    expect(find.text('사업유형 선택'), findsOneWidget);
     expect(find.text('전자책'), findsWidgets);
-    expect(find.text('결과물 선택'), findsOneWidget);
-    // 긴 텍스트 입력 라벨이 기본 노출되지 않음
+    expect(find.text('다음'), findsOneWidget);
+    expect(find.text('이전'), findsOneWidget);
+    expect(find.text('취소'), findsOneWidget);
+    expect(find.text('설계 엔진'), findsNothing);
     expect(find.text('사업 주제 *'), findsNothing);
   });
 
@@ -272,6 +273,8 @@ void main() {
     await tester.pumpWidget(
       const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
     );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('직접 입력으로 만들기'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('직접 입력'));
     await tester.pumpAndSettle();

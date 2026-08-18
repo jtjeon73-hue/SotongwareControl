@@ -16,13 +16,13 @@ class ProjectDesignStep {
   static const finalize = 6;
 
   static const labels = [
-    '결과물 선택',
+    '사업유형 선택',
     '대상 고객',
-    'AI 추천 컨셉',
+    '핵심 내용',
     '세부 기획',
-    '제작 정보',
-    '최종 기획 확인',
-    '작업지시서',
+    '필요한 최소 설정',
+    '최종 확인',
+    '작업지시 생성',
   ];
 
   static const count = 7;

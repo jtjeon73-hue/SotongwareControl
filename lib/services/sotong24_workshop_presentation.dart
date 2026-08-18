@@ -1,3 +1,5 @@
+import '../models/artifact_type.dart';
+import '../models/remote_agent_models.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
 
@@ -116,8 +118,80 @@ class Sotong24WorkshopPresentation {
     return '결과 버전 r$r';
   }
 
+  static String businessTypeLabel(String productType) {
+    switch (ArtifactType.normalize(productType)) {
+      case ArtifactType.site:
+        return '지식사이트';
+      case ArtifactType.promoSite:
+        return '마케팅사이트';
+      default:
+        return ArtifactType.labelKo(productType);
+    }
+  }
+
+  /// 시작·완료 timestamp가 모두 있을 때만. 현재시각으로 승인대기를 포함하지 않는다.
+  static Duration? stageWorkDuration(Sotong24RemoteStage stage) {
+    final start = DateTime.tryParse(stage.startedAt.trim());
+    final end = DateTime.tryParse(stage.completedAt.trim());
+    if (start == null || end == null) return null;
+    final d = end.toUtc().difference(start.toUtc());
+    if (d.isNegative || d.inSeconds <= 0) return null;
+    return d;
+  }
+
+  static String stageDurationLine(Sotong24RemoteStage stage) {
+    final d = stageWorkDuration(stage);
+    if (d == null) return '';
+    return '소요시간 ${formatDurationKo(d)}';
+  }
+
+  static String stageRevisionLine(Sotong24RemoteStage stage) {
+    if (stage.revision <= 0) return '';
+    return '결과 버전 r${stage.revision}';
+  }
+
+  /// 단계 작업 구간 합. 데이터가 없으면 빈 문자열 (가짜 누적 금지).
+  static String totalWorkDurationLine(Sotong24RemoteProject project) {
+    var total = Duration.zero;
+    var any = false;
+    for (final s in project.stages) {
+      final d = stageWorkDuration(s);
+      if (d == null) continue;
+      total += d;
+      any = true;
+    }
+    if (!any) return '';
+    return '전체 누적 작업시간: ${formatDurationKo(total)}';
+  }
+
+  static String stageTimingDetailNote(Sotong24RemoteStage stage) {
+    final start = stage.startedAt.trim();
+    final end = stage.completedAt.trim();
+    if (start.isEmpty && end.isEmpty) {
+      return '단계별 작업시간 실데이터 연동 필요';
+    }
+    final lines = <String>[];
+    if (start.isNotEmpty) lines.add('시작 시각 $start');
+    if (end.isNotEmpty) lines.add('완료 시각 $end');
+    final dur = stageDurationLine(stage);
+    if (dur.isNotEmpty) lines.add(dur);
+    if (stage.revision > 0) lines.add(stageRevisionLine(stage));
+    return lines.join('\n');
+  }
+
   static String listProgressSummary(Sotong24RemoteProject project) {
-    return '${currentStageLine(project)}\n${overallProgressLine(project)}';
+    final lines = <String>[
+      currentStageLine(project),
+      overallProgressLine(project),
+    ];
+    final rev = revisionLine(project);
+    if (rev.isNotEmpty) lines.add(rev);
+    final stage = project.currentStageDoc;
+    if (stage != null) {
+      final duration = stageDurationLine(stage);
+      if (duration.isNotEmpty) lines.add(duration);
+    }
+    return lines.join('\n');
   }
 
   static String nowTodoHeadline(Sotong24RemoteProject project) =>

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../config/remote_control_env.dart';
 import '../models/artifact_type.dart';
 import '../models/remote_agent_models.dart';
 import '../services/auth_service.dart';
@@ -21,6 +20,8 @@ import '../widgets/remote_cursor_autostart_panel.dart';
 import '../widgets/remote_codex_unattended_panel.dart';
 import '../widgets/remote_ops_dashboard.dart';
 import '../widgets/operational_collapsible_section.dart';
+import '../widgets/ops_health_panel.dart';
+import '../services/ops_health_check.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../theme/control_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -58,8 +59,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   late final RemoteAgentRepository _repo =
       widget.repository ?? RemoteAgentRepository();
   late final RemoteControlApi _api = widget.api ?? RemoteControlApi();
-  late final RemoteWorkInstructionSource _instructions =
-      widget.instructionSource ?? RemoteWorkInstructionSource();
   late final RemoteE2eSampleService _e2e =
       widget.e2eService ?? RemoteE2eSampleService();
   late final RemoteCursorAutostartTestService _cursor =
@@ -71,10 +70,11 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   var _ownsWorkshop = false;
 
   String _jobFilter = 'all';
-  bool _sending = false;
   bool _e2eBusy = false;
   bool _cursorBusy = false;
   bool _codexBusy = false;
+  bool _diagnosticsOpen = false;
+  Key _diagnosticsKey = const ValueKey('remote_diagnostics_closed');
   RemoteE2eSampleSession _e2eSession = const RemoteE2eSampleSession();
   RemoteE2eSampleSession _cursorSession = const RemoteE2eSampleSession();
   RemoteE2eSampleSession _codexSession = const RemoteE2eSampleSession();
@@ -84,6 +84,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   void initState() {
     super.initState();
     _ownsWorkshop = widget.workshopRepository == null;
+    widget.instructionSource;
     _refreshE2eSession();
     _refreshCursorSession();
     _refreshCodexSession();
@@ -118,6 +119,13 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
       _refreshCodexSession(),
     ]);
     if (mounted) setState(() => _dashboardRefreshing = false);
+  }
+
+  void _openDiagnostics() {
+    setState(() {
+      _diagnosticsOpen = true;
+      _diagnosticsKey = UniqueKey();
+    });
   }
 
   Sotong24RemoteProject? _matchWorkshop(
@@ -189,6 +197,11 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                   workshopCurrentStage: codexMatched?.currentStage,
                   workshopTotalStages: codexMatched?.totalStages,
                 );
+                final healthReport = OpsHealthCheck.evaluate(
+                  agents: agents,
+                  jobs: jobs,
+                  workshops: workshops,
+                );
                 return LayoutBuilder(
                   builder: (context, constraints) {
                     final narrow = constraints.maxWidth < 900;
@@ -219,6 +232,12 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                           jobs: jobs,
                           refreshing: _dashboardRefreshing,
                           onRefresh: _refreshDashboard,
+                          onOpenWorkshop: widget.onNavigate == null
+                              ? null
+                              : () => widget.onNavigate!(
+                                  ControlDestination.productWorkshop,
+                                ),
+                          onOpenDiagnostics: _openDiagnostics,
                         ),
                         const SizedBox(height: 16),
                         if (agents.isEmpty)
@@ -226,7 +245,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                         else
                           OperationalCollapsibleSection(
                             title: 'Agent 상태 자세히',
-                            subtitle: '연결·전송·상세 정보',
+                            subtitle: '연결·heartbeat·현재 작업',
                             sectionKey: const Key('remote_agent_details'),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -244,10 +263,14 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: _AgentCard(
                                       agent: a,
-                                      busy: _sending,
-                                      onSend: () => _startSendFlow(context, a),
                                       onDetail: () =>
                                           _openAgentDetail(context, a),
+                                      onOpenPlanning: widget.onNavigate == null
+                                          ? null
+                                          : () => widget.onNavigate!(
+                                              ControlDestination
+                                                  .aiBusinessAnalysis,
+                                            ),
                                     ),
                                   ),
                               ],
@@ -272,10 +295,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                                   padding: const EdgeInsets.only(bottom: 10),
                                   child: _JobCard(
                                     job: j,
-                                    agentName: _agentName(
-                                      agents,
-                                      j.assignedAgentId,
-                                    ),
                                     onOpen: () => _openJobDetail(context, j),
                                   ),
                                 ),
@@ -298,11 +317,39 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                         const SizedBox(height: 12),
                         OperationalCollapsibleSection(
                           title: '개발/진단 도구',
-                          subtitle: 'E2E·Cursor·Codex TEST — 운영 중에는 접어 두세요',
-                          sectionKey: const Key('remote_dev_tools'),
+                          subtitle: '버튼으로 점검 · 운영 작업은 만들지 않습니다',
+                          initiallyExpanded: _diagnosticsOpen,
+                          sectionKey: _diagnosticsKey,
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              OpsHealthPanel(
+                                report: healthReport,
+                                onRunAll: () {
+                                  setState(() {});
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        healthReport.overallLabelKo,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                '개발자 TEST 전송',
+                                style: TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                '샘플 작업 생성 — 운영에 사용하지 마세요',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: ControlColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                               RemoteE2eSamplePanel(
                                 view: e2eView,
                                 busy: _e2eBusy,
@@ -395,13 +442,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     }
   }
 
-  String _agentName(List<RemoteAgentDoc> agents, String id) {
-    for (final a in agents) {
-      if (a.agentId == id) return a.deviceName;
-    }
-    return id.isEmpty ? '—' : id;
-  }
-
   Future<void> _openPairing(BuildContext context) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -423,84 +463,6 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
         builder: (_) => _JobDetailPage(repo: _repo, jobId: job.jobId),
       ),
     );
-  }
-
-  Future<void> _startSendFlow(
-    BuildContext context,
-    RemoteAgentDoc agent,
-  ) async {
-    if (!agent.isOnline()) {
-      _toast(context, '노트북이 오프라인입니다. Agent가 켜져 있는지 확인해 주세요.');
-      return;
-    }
-    final picked = await showModalBottomSheet<ActiveWorkInstructionRef>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (ctx) => _PickInstructionSheet(source: _instructions),
-    );
-    if (picked == null || !context.mounted) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('작업을 전송하시겠습니까?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(ArtifactType.labelKo(picked.artifactType)),
-            const SizedBox(height: 6),
-            Text(
-              picked.title,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            Text('대상: ${agent.deviceName}'),
-            Text('총 단계: ${picked.totalStages}단계'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('소통24워크 Agent로 전송'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-
-    final payload = _instructions.payloadMap(picked);
-    if (payload == null) {
-      _toast(context, '작업지시서 형식이 올바르지 않습니다.');
-      return;
-    }
-
-    setState(() => _sending = true);
-    try {
-      final jobId = await _api.createJob(
-        type: picked.artifactType,
-        title: picked.title,
-        assignedAgentId: agent.agentId,
-        totalStages: picked.totalStages,
-      );
-      final idem = 'idem_${picked.instructionId}_v${picked.version}_$jobId';
-      await _api.startJob(jobId: jobId, payload: payload, idempotencyKey: idem);
-      if (!context.mounted) return;
-      _toast(context, '작업지시를 전송했습니다. 접수·진행 상태를 확인해 주세요.');
-    } on RemoteControlApiException catch (e) {
-      if (context.mounted) _toast(context, e.userMessage);
-    } catch (_) {
-      if (context.mounted) {
-        _toast(context, '전송에 실패했습니다. 잠시 후 다시 시도해 주세요.');
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
   }
 
   void _toast(BuildContext context, String msg) {
@@ -855,15 +817,13 @@ class _EmptyAgentsCard extends StatelessWidget {
 class _AgentCard extends StatelessWidget {
   const _AgentCard({
     required this.agent,
-    required this.busy,
-    required this.onSend,
     required this.onDetail,
+    this.onOpenPlanning,
   });
 
   final RemoteAgentDoc agent;
-  final bool busy;
-  final VoidCallback onSend;
   final VoidCallback onDetail;
+  final VoidCallback? onOpenPlanning;
 
   @override
   Widget build(BuildContext context) {
@@ -899,25 +859,16 @@ class _AgentCard extends StatelessWidget {
           Text('장치: ${agent.deviceName}'),
           if (agent.appVersion.isNotEmpty) Text('앱 버전: ${agent.appVersion}'),
           Text('마지막 연결: ${formatRelativeKo(agent.lastHeartbeatAt)}'),
-          const SizedBox(height: 8),
-          Text(
-            '현재 작업: ${agent.currentJobId.isEmpty ? '없음' : agent.currentJobId}',
-          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              FilledButton(
-                onPressed: busy || !agent.isOnline() ? null : onSend,
-                child: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('작업 보내기'),
-              ),
+              if (onOpenPlanning != null)
+                FilledButton(
+                  onPressed: onOpenPlanning,
+                  child: const Text('작업지시 제작소로 이동'),
+                ),
               OutlinedButton(onPressed: onDetail, child: const Text('상세 보기')),
             ],
           ),
@@ -976,14 +927,9 @@ class _JobFilterChips extends StatelessWidget {
 }
 
 class _JobCard extends StatelessWidget {
-  const _JobCard({
-    required this.job,
-    required this.agentName,
-    required this.onOpen,
-  });
+  const _JobCard({required this.job, required this.onOpen});
 
   final RemoteJobDoc job;
-  final String agentName;
   final VoidCallback onOpen;
 
   @override
@@ -1010,11 +956,10 @@ class _JobCard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
+            Text('단계: ${job.currentStage.isEmpty ? '—' : job.currentStage}'),
             Text('상태: ${job.statusLabelKo}'),
-            Text(
-              '진행: ${job.progress} · ${job.currentStage.isEmpty ? '—' : job.currentStage}',
-            ),
-            Text('Agent: $agentName'),
+            if (jobCompletedDurationLabel(job) != null)
+              Text('소요시간: ${jobCompletedDurationLabel(job)}'),
             Text('업데이트: ${formatRelativeKo(job.updatedAt)}'),
             Align(
               alignment: Alignment.centerRight,
@@ -1199,139 +1144,6 @@ class _PairingSheetState extends State<_PairingSheet> {
   }
 }
 
-class _PickInstructionSheet extends StatefulWidget {
-  const _PickInstructionSheet({required this.source});
-  final RemoteWorkInstructionSource source;
-
-  @override
-  State<_PickInstructionSheet> createState() => _PickInstructionSheetState();
-}
-
-class _PickInstructionSheetState extends State<_PickInstructionSheet> {
-  String _artifact = ArtifactType.ebook;
-  late Future<List<ActiveWorkInstructionRef>> _future;
-  final _paste = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _future = widget.source.listActive(_artifact);
-  }
-
-  @override
-  void dispose() {
-    _paste.dispose();
-    super.dispose();
-  }
-
-  void _reload(String artifact) {
-    setState(() {
-      _artifact = artifact;
-      _future = widget.source.listActive(artifact);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scroll) {
-        return ListView(
-          controller: scroll,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              '작업지시서 선택',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '원격에 저장된 Active 작업지시를 선택하거나, 비상용으로 JSON을 붙여넣습니다.',
-              style: TextStyle(color: ControlColors.textSecondary),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 6,
-              children: [
-                for (final a in ArtifactType.allSelectable)
-                  ChoiceChip(
-                    label: Text(ArtifactType.labelKo(a)),
-                    selected: _artifact == a,
-                    onSelected: (_) => _reload(a),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            FutureBuilder<List<ActiveWorkInstructionRef>>(
-              future: _future,
-              builder: (context, snap) {
-                if (snap.connectionState != ConnectionState.done) {
-                  return const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final list = snap.data ?? const [];
-                if (list.isEmpty) {
-                  return Text(
-                    '원격 작업지시서가 없습니다.\n'
-                    'PC의 작업지시 제작소에서 작업지시서를 저장하면 여기에 표시됩니다.',
-                    style: TextStyle(color: ControlColors.textMuted),
-                  );
-                }
-                return Column(
-                  children: [
-                    for (final item in list)
-                      ListTile(
-                        title: Text(item.title),
-                        subtitle: Text(
-                          '${item.instructionId} · v${item.version}',
-                        ),
-                        onTap: () => Navigator.pop(context, item),
-                      ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _paste,
-              maxLines: 6,
-              decoration: const InputDecoration(
-                labelText: '작업지시 JSON 붙여넣기',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: () {
-                final ref = widget.source.parseJsonText(
-                  _paste.text,
-                  artifactHint: _artifact,
-                );
-                if (ref == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('작업지시서 형식이 올바르지 않습니다.')),
-                  );
-                  return;
-                }
-                Navigator.pop(context, ref);
-              },
-              child: const Text('붙여넣은 JSON 사용'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
 class _AgentDetailPage extends StatelessWidget {
   const _AgentDetailPage({required this.agent});
   final RemoteAgentDoc agent;
@@ -1346,22 +1158,46 @@ class _AgentDetailPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _kv('장치명', agent.deviceName),
-          _kv('Agent ID', shortId),
           _kv('상태', agent.stateLabelKo),
           _kv('온라인', agent.isOnline() ? '예' : '아니오'),
-          _kv('앱 버전', agent.appVersion.isEmpty ? '—' : agent.appVersion),
-          _kv('프로토콜', agent.protocolVersion),
-          _kv('현재 Job', agent.currentJobId.isEmpty ? '없음' : agent.currentJobId),
+          _kv('heartbeat', formatRelativeKo(agent.lastHeartbeatAt)),
           _kv(
-            '현재 Stage',
-            agent.currentStage.isEmpty ? '—' : agent.currentStage,
+            'Relay',
+            agent.isOnline()
+                ? 'heartbeat 갱신됨 (간접 확인)'
+                : '확인 필요 — 전용 Relay 필드 없음',
           ),
-          _kv('마지막 heartbeat', formatRelativeKo(agent.lastHeartbeatAt)),
-          const SizedBox(height: 12),
-          Text(
-            'Agent token은 표시하지 않습니다.',
-            style: TextStyle(color: ControlColors.textMuted, fontSize: 12),
+          _kv('현재 작업', agent.currentJobId.isEmpty ? '없음' : agent.currentJobId),
+          _kv('현재 단계', agent.currentStage.isEmpty ? '—' : agent.currentStage),
+          _kv(
+            '최근 오류',
+            agent.lastError.trim().isEmpty ? '없음' : agent.lastError.trim(),
+          ),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text(
+                '진단정보 보기',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              children: [
+                _kv('장치명', agent.deviceName),
+                _kv('Agent ID', shortId),
+                _kv('앱 버전', agent.appVersion.isEmpty ? '—' : agent.appVersion),
+                _kv('프로토콜', agent.protocolVersion),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Agent token은 표시하지 않습니다.',
+                    style: TextStyle(
+                      color: ControlColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1419,48 +1255,48 @@ class _JobDetailPage extends StatelessWidget {
                     ),
                   ),
                   Text('상태: ${job.statusLabelKo}'),
+                  Text(
+                    '단계: ${job.currentStage.isEmpty ? '—' : job.currentStage}',
+                  ),
+                  if (jobCompletedDurationLabel(job) != null)
+                    Text('소요시간: ${jobCompletedDurationLabel(job)}'),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(value: pct == 0 ? null : pct),
                   Text('전체 진행률 ${job.progress}%'),
-                  const SizedBox(height: 16),
-                  if (job.status == 'waiting_approval') ...[
-                    Text(
-                      '승인/보완',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
+                  const SizedBox(height: 12),
+                  Theme(
+                    data: Theme.of(
+                      context,
+                    ).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text(
+                        '진단정보 보기',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       children: [
-                        OutlinedButton(
-                          onPressed: null,
-                          child: const Text('결과 확인'),
+                        Text('jobId: ${job.jobId}'),
+                        Text(
+                          'instructionId: ${job.instructionId.isEmpty ? '—' : job.instructionId}',
                         ),
-                        FilledButton(
-                          onPressed: RemoteControlEnv.approveStageEnabled
-                              ? () {}
-                              : null,
-                          child: const Text('승인'),
-                        ),
-                        OutlinedButton(
-                          onPressed: RemoteControlEnv.requestRevisionEnabled
-                              ? () {}
-                              : null,
-                          child: const Text('보완 요청'),
+                        Text(
+                          'assignedAgentId: ${job.assignedAgentId.isEmpty ? '—' : job.assignedAgentId}',
                         ),
                       ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6, bottom: 12),
-                      child: Text(
-                        '승인·보완은 다음 단계에서 Agent와 연결됩니다.',
-                        style: TextStyle(
-                          color: ControlColors.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '승인·보완은 AI 제작공정에서 진행합니다.',
+                    style: TextStyle(
+                      color: ControlColors.textMuted,
+                      fontSize: 12,
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     '단계',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(

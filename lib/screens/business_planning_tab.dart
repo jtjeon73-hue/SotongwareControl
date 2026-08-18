@@ -2630,12 +2630,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           if (_showWorkshopEmptyPrep) ...[
             const SizedBox(height: 10),
             _buildEmptyWorkshopPrepBanner(),
-          ] else if (_planReady || _activeDoc != null) ...[
-            const SizedBox(height: 10),
-            _buildProgressBanner(),
           ],
           const SizedBox(height: 12),
-          _buildModeToggle(),
+          _buildTransferredInstructionList(),
           const SizedBox(height: 12),
           if (_inputModeQuick)
             ProjectDesignWizard(
@@ -2646,7 +2643,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             )
           else
             _buildAdvancedForm(),
-          if (_planReady) ...[
+          if (_instruction != null) ...[
             const SizedBox(height: 12),
             _buildSendSummaryCard(),
             const SizedBox(height: 12),
@@ -2654,37 +2651,48 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           ],
           const SizedBox(height: 12),
           OperationalCollapsibleSection(
+            title: '직접 입력으로 만들기',
+            subtitle: '설계 엔진 대신 직접 입력',
+            sectionKey: const Key('planning_advanced_input'),
+            child: _buildModeToggle(),
+          ),
+          const SizedBox(height: 12),
+          OperationalCollapsibleSection(
             title: 'AI 제작설정 보기',
             subtitle: '파일럿 정책·Codex·승인 방식',
             sectionKey: const Key('planning_ai_settings'),
             child: _buildAiProductionPilotCard(),
           ),
-          if (_planReady) ...[
-            const SizedBox(height: 12),
-            OperationalCollapsibleSection(
-              title: '진행 단계',
-              subtitle: '기획 → 작업지시 → 전달 → 진행',
-              child: _buildWorkflowStepStrip(),
-            ),
-            const SizedBox(height: 12),
-            OperationalCollapsibleSection(
-              title: '상세 기획·작업지시 보기',
-              subtitle: '검토·JSON·계약 미리보기',
-              sectionKey: const Key('planning_detail_review'),
-              child: _buildReviewCard(),
-            ),
-          ],
           const SizedBox(height: 12),
           OperationalCollapsibleSection(
             title: '고급/진단정보',
             subtitle: 'PC 작업공간·Inbox·DevWorkDoc 상태',
             sectionKey: const Key('planning_diagnostics'),
-            child: _buildWorkspaceStatusStrip(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildWorkspaceStatusStrip(),
+                if (_planReady || _activeDoc != null) ...[
+                  const SizedBox(height: 12),
+                  _buildProgressBanner(),
+                  const SizedBox(height: 12),
+                  _buildWorkflowStepStrip(),
+                  const SizedBox(height: 12),
+                  _buildReviewCard(),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _buildStatusPrimaryActions(),
+                  ),
+                ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           OperationalCollapsibleSection(
             title: '저장된 기획 목록',
-            subtitle: 'Planning Library',
+            subtitle: '필요할 때만 펼치세요',
             sectionKey: const Key('planning_library'),
             child: PlanLibraryPanel(
               plans: _allPlans,
@@ -2715,6 +2723,132 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           ),
         ],
       ),
+    );
+  }
+
+  List<BusinessPlanDocument> get _transferredPlans {
+    final latest = BusinessPlanningStore.latestByInstructionId(_allPlans);
+    final sent = latest.where((p) {
+      if (p.wasTransferred) return true;
+      return (p.lastTransferAt ?? '').trim().isNotEmpty;
+    }).toList();
+    sent.sort((a, b) {
+      final ta =
+          DateTime.tryParse(a.lastTransferAt ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final tb =
+          DateTime.tryParse(b.lastTransferAt ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return tb.compareTo(ta);
+    });
+    return sent;
+  }
+
+  String _formatTransferTime(String? iso) {
+    final t = DateTime.tryParse(iso ?? '');
+    if (t == null) return '—';
+    final local = t.toLocal();
+    final now = DateTime.now();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    if (local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day) {
+      return '오늘 $hh:$mm';
+    }
+    return '${local.month}/${local.day} $hh:$mm';
+  }
+
+  String _transferStatusLabel(BusinessPlanDocument plan) {
+    final exec = _execFor(plan);
+    if (exec.primaryStatusLabel == '전송 실패') return '전송 실패';
+    if (plan.wasTransferred) return '전송 완료';
+    return '전송됨';
+  }
+
+  Widget _buildTransferredInstructionList() {
+    final sent = _transferredPlans;
+    if (sent.isEmpty) return const SizedBox.shrink();
+    return Column(
+      key: const Key('planning_transferred_list'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          '전송 작업지시 목록',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '전송 이후 진행은 AI 제작공정에서 관리합니다.',
+          style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
+        ),
+        const SizedBox(height: 8),
+        for (final plan in sent)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Material(
+              color: ControlColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () async {
+                  _loadPlan(plan);
+                  await _showInstructionViewer();
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: ControlColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ArtifactType.labelKo(plan.input.resolvedArtifactType),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: ControlColors.teal,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        plan.input.topic.trim().isEmpty
+                            ? '(제목 없음)'
+                            : plan.input.topic.trim(),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTransferTime(plan.lastTransferAt),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: ControlColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        _transferStatusLabel(plan),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () async {
+                            _loadPlan(plan);
+                            await _showInstructionViewer();
+                          },
+                          child: const Text('상세보기'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -2994,10 +3128,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Widget _buildBanner() {
-    final pilotOn =
-        _aiProductionPilot &&
-        (_artifactType == ArtifactType.undecided ||
-            ArtifactType.normalize(_artifactType) == ArtifactType.ebook);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -3006,17 +3136,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: ControlColors.border),
       ),
-      child: Text(
-        pilotOn
-            ? 'Project Design Engine — 선택과 승인 중심으로 기획합니다. '
-                  '파일럿: 새 전자책 작업지시서에 Codex 1단계 AI 제작이 포함될 수 있습니다. '
-                  '1단계 후 사용자 승인이 필요하며 자동 배포는 없습니다.'
-            : 'Project Design Engine — 선택과 승인 중심으로 기획합니다. '
-                  'AI 자동 실행은 이 지시서에 포함되지 않으며, 실제 제작·배포는 소통24워크 Agent에서 진행합니다.',
-        style: const TextStyle(
-          fontSize: 12.5,
-          color: ControlColors.textSecondary,
-        ),
+      child: const Text(
+        '새 작업을 순서대로 만들고 Sotong24Work로 보냅니다. 전송 후 진행은 AI 제작공정에서 관리합니다.',
+        style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
       ),
     );
   }
@@ -3295,31 +3417,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: [
-            if (!_isInstructionArchived)
-              FilledButton.icon(
-                onPressed: _hasSomeContent ? () => _savePlan() : null,
-                icon: const Icon(Icons.save_outlined, size: 18),
-                label: const Text('임시 저장'),
-              ),
-            ..._buildStatusPrimaryActions(),
-            if (!_isInstructionArchived) ..._buildTransferActions(),
-          ],
+          children: [if (!_isInstructionArchived) ..._buildTransferActions()],
         ),
         ..._buildActionHints(),
-        if (_instruction != null ||
-            _isInstructionArchived ||
-            _hasSomeContent) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () => _showOtherActionsMenu(context),
-              icon: const Icon(Icons.more_horiz, size: 18),
-              label: const Text('기타 작업'),
-            ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: () => _showOtherActionsMenu(context),
+            child: const Text('기타 작업'),
           ),
-        ],
+        ),
       ],
     );
   }
