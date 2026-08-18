@@ -5,6 +5,7 @@ import 'package:sotong_ware_control/models/remote_agent_models.dart';
 import 'package:sotong_ware_control/services/instruction_contract_validator.dart';
 import 'package:sotong_ware_control/services/plan_progress_status.dart';
 import 'package:sotong_ware_control/services/remote_control_api.dart';
+import 'package:sotong_ware_control/services/transferred_work_reconciliation.dart';
 import 'package:sotong_ware_control/services/work_instruction_delivery_presentation.dart';
 import 'package:sotong_ware_control/services/work_instruction_remote_delivery.dart';
 import 'package:sotong_ware_control/widgets/project_design/step7_delivery_panel.dart';
@@ -50,6 +51,30 @@ void main() {
     ),
   );
 
+  RemoteOperationalEvidence remoteEvidenceWithJob(String instructionId) =>
+      RemoteOperationalEvidence.fromRemote(
+        jobs: [
+          RemoteJobDoc(
+            jobId: 'job_1',
+            ownerUid: 'u',
+            title: '테스트 전자책',
+            type: 'ebook',
+            status: 'queued',
+            assignedAgentId: 'a1',
+            instructionId: instructionId,
+          ),
+        ],
+        projects: const [],
+        remoteLoaded: true,
+      );
+
+  RemoteOperationalEvidence cleanRemoteEvidence() =>
+      RemoteOperationalEvidence.fromRemote(
+        jobs: const [],
+        projects: const [],
+        remoteLoaded: true,
+      );
+
   group('WorkInstructionDeliveryPresentation', () {
     test('online/fresh → 전달 가능 표시', () {
       final view = WorkInstructionDeliveryPresentation.agentStatus([
@@ -83,7 +108,44 @@ void main() {
       expect(view.readinessLine, contains('상태 확인'));
     });
 
-    test('sent 상태 — refresh 후에도 유지', () {
+    test('sent 상태 — remote job 확인 후 success panel', () {
+      final plan = transferredPlan();
+      final step7 = WorkInstructionDeliveryPresentation.resolve(
+        plan: plan,
+        validation: const ContractValidationResult(
+          level: ContractValidationLevel.valid,
+          issues: [],
+        ),
+        agents: [onlineAgent()],
+        transferBusy: false,
+        now: now,
+        remoteEvidence: remoteEvidenceWithJob('wi_p1'),
+      );
+      expect(step7.buttonState, DeliveryButtonState.sent);
+      expect(step7.buttonEnabled, isFalse);
+      expect(step7.showSuccessPanel, isTrue);
+      expect(step7.remoteDeliveryVerified, isTrue);
+      expect(plan.wasTransferred, isTrue);
+    });
+
+    test('local transferred but remote missing → success panel 숨김', () {
+      final plan = transferredPlan();
+      final step7 = WorkInstructionDeliveryPresentation.resolve(
+        plan: plan,
+        validation: const ContractValidationResult(
+          level: ContractValidationLevel.valid,
+          issues: [],
+        ),
+        agents: [onlineAgent()],
+        transferBusy: false,
+        now: now,
+        remoteEvidence: cleanRemoteEvidence(),
+      );
+      expect(step7.showSuccessPanel, isFalse);
+      expect(step7.failure?.title, '원격 작업 기록 없음');
+    });
+
+    test('remote evidence pending → 확인 중', () {
       final plan = transferredPlan();
       final step7 = WorkInstructionDeliveryPresentation.resolve(
         plan: plan,
@@ -95,10 +157,9 @@ void main() {
         transferBusy: false,
         now: now,
       );
-      expect(step7.buttonState, DeliveryButtonState.sent);
-      expect(step7.buttonEnabled, isFalse);
-      expect(step7.showSuccessPanel, isTrue);
-      expect(plan.wasTransferred, isTrue);
+      expect(step7.showSuccessPanel, isFalse);
+      expect(step7.remoteEvidencePending, isTrue);
+      expect(step7.buttonLabel, contains('확인 중'));
     });
 
     test('timeout 실패 — 재전송 즉시 허용 안 함', () {
@@ -230,6 +291,7 @@ void main() {
       agents: [onlineAgent()],
       transferBusy: false,
       now: now,
+      remoteEvidence: remoteEvidenceWithJob('wi_p1'),
     );
 
     var transferCount = 0;
@@ -267,6 +329,7 @@ void main() {
       transferBusy: false,
       now: now,
       operationalProjectReady: false,
+      remoteEvidence: remoteEvidenceWithJob('wi_p1'),
     );
     expect(step7.workshopPhase, WorkshopHandoffPhase.preparing);
     expect(step7.showSuccessPanel, isTrue);
@@ -283,6 +346,7 @@ void main() {
       transferBusy: false,
       now: now,
       operationalProjectReady: true,
+      remoteEvidence: remoteEvidenceWithJob('wi_p1'),
     );
     expect(step7.workshopPhase, WorkshopHandoffPhase.registered);
   });
@@ -301,6 +365,7 @@ void main() {
       agents: [onlineAgent()],
       transferBusy: false,
       now: now,
+      remoteEvidence: remoteEvidenceWithJob('wi_p1'),
     );
 
     await tester.pumpWidget(
@@ -338,6 +403,7 @@ void main() {
       transferBusy: false,
       now: now,
       operationalProjectReady: true,
+      remoteEvidence: remoteEvidenceWithJob('wi_p1'),
     );
 
     await tester.pumpWidget(

@@ -1,7 +1,12 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../data/sotong24_workflows.dart';
+import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
+import '../services/remote_agent_repository.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
@@ -15,11 +20,13 @@ class ProductWorkshopScreen extends StatefulWidget {
   const ProductWorkshopScreen({
     super.key,
     this.repository,
+    this.agentRepository,
     this.onStartNewWork,
     this.focusInstructionId,
   });
 
   final Sotong24RemoteRepository? repository;
+  final RemoteAgentRepository? agentRepository;
   final VoidCallback? onStartNewWork;
   final String? focusInstructionId;
 
@@ -29,9 +36,13 @@ class ProductWorkshopScreen extends StatefulWidget {
 
 class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
   late final Sotong24RemoteRepository _repo;
+  late final RemoteAgentRepository _agentRepo;
   var _ownsRepo = false;
   var _filter = Sotong24ProjectFilter.all;
   String? _openedFocusForId;
+  List<Sotong24RemoteProject>? _serverRefreshProjects;
+  List<RemoteJobDoc> _remoteJobs = const [];
+  bool _recheckBusy = false;
 
   @override
   void initState() {
@@ -42,6 +53,49 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
       _repo = Sotong24RemoteRepository();
       _ownsRepo = true;
     }
+    if (widget.agentRepository != null) {
+      _agentRepo = widget.agentRepository!;
+    } else {
+      _agentRepo = RemoteAgentRepository();
+    }
+    _remoteJobs = _agentRepo.snapshotJobs();
+    unawaited(_loadRemoteJobs());
+  }
+
+  Future<void> _loadRemoteJobs() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final jobs = await _agentRepo.fetchJobsFromServer(ownerUid: uid);
+      if (mounted) setState(() => _remoteJobs = jobs);
+    } catch (_) {}
+  }
+
+  Future<void> _recheckFromServer() async {
+    if (_recheckBusy) return;
+    setState(() => _recheckBusy = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final results = await Future.wait([
+        _repo.fetchProjectsFromServer(),
+        _agentRepo.fetchJobsFromServer(ownerUid: uid),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _serverRefreshProjects = results[0] as List<Sotong24RemoteProject>;
+        _remoteJobs = results[1] as List<RemoteJobDoc>;
+      });
+    } finally {
+      if (mounted) setState(() => _recheckBusy = false);
+    }
+  }
+
+  bool _hasRemoteJobFor(String instructionId) {
+    final id = instructionId.trim();
+    if (id.isEmpty) return false;
+    for (final job in _remoteJobs) {
+      if (job.instructionId.trim() == id) return true;
+    }
+    return false;
   }
 
   @override
@@ -66,7 +120,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
         if (snap.hasError) {
           return _ErrorBody(message: '${snap.error}');
         }
-        final projects = snap.data;
+        final projects = _serverRefreshProjects ?? snap.data;
         if (projects == null) {
           return const Center(
             child: SizedBox(
@@ -145,7 +199,12 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
             ),
             const SizedBox(height: 14),
             if (waiting)
-              _PreparingWorkshopCard(onRecheck: () => setState(() {}))
+              _PreparingWorkshopCard(
+                onRecheck: _recheckFromServer,
+                recheckBusy: _recheckBusy,
+                agentDeliveryConfirmed:
+                    focusId.isEmpty || _hasRemoteJobFor(focusId),
+              )
             else if (focus != null)
               _CurrentWorkCard(project: focus)
             else if (isEmpty)
@@ -1085,9 +1144,15 @@ class _DemoBadge extends StatelessWidget {
 }
 
 class _PreparingWorkshopCard extends StatelessWidget {
-  const _PreparingWorkshopCard({this.onRecheck});
+  const _PreparingWorkshopCard({
+    this.onRecheck,
+    this.recheckBusy = false,
+    this.agentDeliveryConfirmed = true,
+  });
 
   final VoidCallback? onRecheck;
+  final bool recheckBusy;
+  final bool agentDeliveryConfirmed;
 
   @override
   Widget build(BuildContext context) {
@@ -1108,9 +1173,16 @@ class _PreparingWorkshopCard extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Agent가 작업지시는 정상 수신했습니다.',
-            style: TextStyle(
+          Text(
+            agentDeliveryConfirmed
+                ? 'Agent가 작업지시는 정상 수신했습니다.'
+                : '서버에서 작업지시 전송 기록을 찾지 못했습니다.',
+            key: Key(
+              agentDeliveryConfirmed
+                  ? 'workshop_agent_received'
+                  : 'workshop_agent_missing',
+            ),
+            style: const TextStyle(
               fontSize: 13.5,
               color: ControlColors.textSecondary,
               height: 1.35,
@@ -1120,8 +1192,14 @@ class _PreparingWorkshopCard extends StatelessWidget {
             const SizedBox(height: 12),
             OutlinedButton(
               key: const Key('workshop_recheck_status'),
-              onPressed: onRecheck,
-              child: const Text('상태 재확인'),
+              onPressed: recheckBusy ? null : onRecheck,
+              child: recheckBusy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('상태 재확인'),
             ),
           ],
         ],

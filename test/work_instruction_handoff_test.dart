@@ -4,6 +4,8 @@ import 'package:sotong_ware_control/models/artifact_type.dart';
 import 'package:sotong_ware_control/models/project_design_state.dart';
 import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
+import 'package:sotong_ware_control/models/remote_agent_models.dart';
+import 'package:sotong_ware_control/services/remote_agent_repository.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/services/sotong24_workshop_presentation.dart';
 import 'package:sotong_ware_control/services/work_instruction_workshop_presentation.dart';
@@ -193,11 +195,27 @@ void main() {
       );
       addTearDown(repo.dispose);
 
+      final agentRepo = RemoteAgentRepository(
+        forceMemory: true,
+        memoryJobs: [
+          RemoteJobDoc(
+            jobId: 'job_new',
+            ownerUid: 'u',
+            title: newTitle,
+            type: 'ebook',
+            status: 'queued',
+            assignedAgentId: 'agent',
+            instructionId: newId,
+          ),
+        ],
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: ProductWorkshopScreen(
               repository: repo,
+              agentRepository: agentRepo,
               focusInstructionId: newId,
             ),
           ),
@@ -207,7 +225,7 @@ void main() {
 
       expect(find.byKey(const Key('workshop_preparing_card')), findsOneWidget);
       expect(find.text('AI 제작공정을 준비하고 있습니다.'), findsOneWidget);
-      expect(find.text('Agent가 작업지시는 정상 수신했습니다.'), findsOneWidget);
+      expect(find.byKey(const Key('workshop_agent_received')), findsOneWidget);
       expect(find.text('상태 재확인'), findsOneWidget);
       expect(find.text(oldTitle), findsNothing);
       expect(find.text(newTitle), findsNothing);

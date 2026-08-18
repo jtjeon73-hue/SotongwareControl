@@ -3,16 +3,28 @@ import '../data/project_design_catalog.dart';
 import '../models/business_planning.dart';
 import '../services/business_planning_store.dart';
 import '../services/instruction_contract_validator.dart';
+import '../services/plan_execution_index.dart';
 import '../services/plan_execution_status.dart';
+import '../services/transferred_work_reconciliation.dart';
 
 /// 작업지시 제작소 — 운영 UI 표시 helper.
 class WorkInstructionWorkshopPresentation {
   WorkInstructionWorkshopPresentation._();
 
   /// Sotong24Work 원격 전송 성공(wasTransferred)만 목록에 포함.
+  /// [evidence]가 주어지면 remote job/project/plan mirror가 있는 건만 표시.
   static List<BusinessPlanDocument> successfulTransfers(
-    List<BusinessPlanDocument> all,
-  ) {
+    List<BusinessPlanDocument> all, {
+    RemoteOperationalEvidence? evidence,
+    PlanExecutionIndex? execution,
+  }) {
+    if (evidence != null) {
+      return TransferredWorkReconciliation.operationalTransfers(
+        all,
+        evidence: evidence,
+        execution: execution,
+      );
+    }
     final latest = BusinessPlanningStore.latestByInstructionId(all);
     final sent = latest.where((p) => p.wasTransferred).toList();
     sent.sort((a, b) {
@@ -40,12 +52,14 @@ class WorkInstructionWorkshopPresentation {
         if (exec.productionCurrentStage > 0) {
           return '진행 중 · ${exec.productionCurrentStage}단계';
         }
-        return '진행 중';
+        if (exec.hasActualExecution) return '진행 중';
+        return '제작공정 준비 중';
       case PlanRunState.completed:
         return '완료';
       case PlanRunState.error:
         return '오류';
       default:
+        if (exec.isDeliveredOnly) return '제작공정 준비 중';
         if (exec.hasActualExecution && exec.productionCurrentStage > 0) {
           return '진행 중 · ${exec.productionCurrentStage}단계';
         }

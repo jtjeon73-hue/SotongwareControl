@@ -5,6 +5,7 @@ import '../services/instruction_contract_validator.dart';
 import '../services/ops_health_check.dart';
 import '../services/work_instruction_remote_delivery.dart';
 import '../services/work_instruction_workshop_presentation.dart';
+import '../services/transferred_work_reconciliation.dart';
 
 /// STEP 7 — Agent 전달 UI 상태 (presentation only).
 enum DeliveryButtonState { ready, sending, sent, failed, blocked }
@@ -86,6 +87,8 @@ class DeliveryStep7View {
     required this.failure,
     required this.validationLines,
     this.workshopPhase = WorkshopHandoffPhase.none,
+    this.remoteDeliveryVerified = false,
+    this.remoteEvidencePending = false,
   });
 
   final AgentDeliveryStatusView agentStatus;
@@ -96,6 +99,8 @@ class DeliveryStep7View {
   final DeliveryFailureView? failure;
   final List<String> validationLines;
   final WorkshopHandoffPhase workshopPhase;
+  final bool remoteDeliveryVerified;
+  final bool remoteEvidencePending;
 }
 
 class WorkInstructionDeliveryPresentation {
@@ -167,6 +172,7 @@ class WorkInstructionDeliveryPresentation {
     RemoteDeliveryResult? lastResult,
     DateTime? now,
     bool operationalProjectReady = false,
+    RemoteOperationalEvidence? remoteEvidence,
   }) {
     final agentView = agentStatus(agents, now: now);
     final validationLines = validation == null
@@ -176,6 +182,46 @@ class WorkInstructionDeliveryPresentation {
           );
 
     if (plan?.wasTransferred == true) {
+      final evidenceLoaded = remoteEvidence?.remoteLoaded == true;
+      final remoteVerified =
+          evidenceLoaded &&
+          TransferredWorkReconciliation.hasRemoteDeliveryEvidence(
+            plan!,
+            remoteEvidence!,
+          );
+
+      if (evidenceLoaded && !remoteVerified) {
+        return DeliveryStep7View(
+          agentStatus: agentView,
+          buttonState: DeliveryButtonState.failed,
+          buttonLabel: '상태 재확인',
+          buttonEnabled: true,
+          showSuccessPanel: false,
+          failure: const DeliveryFailureView(
+            kind: DeliveryFailureKind.unknown,
+            title: '원격 작업 기록 없음',
+            body: '로컬에는 전송 완료로 저장되어 있으나 서버에 작업이 없습니다.',
+            guidance: '백엔드가 정리된 상태라면 새 작업지시를 생성·전송하세요.',
+            primaryAction: DeliveryDiagnosticAction.recheckStatus,
+            allowRetry: false,
+          ),
+          validationLines: validationLines,
+        );
+      }
+
+      if (!evidenceLoaded) {
+        return DeliveryStep7View(
+          agentStatus: agentView,
+          buttonState: DeliveryButtonState.sending,
+          buttonLabel: '원격 상태 확인 중…',
+          buttonEnabled: false,
+          showSuccessPanel: false,
+          failure: null,
+          validationLines: validationLines,
+          remoteEvidencePending: true,
+        );
+      }
+
       return DeliveryStep7View(
         agentStatus: agentView,
         buttonState: DeliveryButtonState.sent,
@@ -187,6 +233,7 @@ class WorkInstructionDeliveryPresentation {
         workshopPhase: operationalProjectReady
             ? WorkshopHandoffPhase.registered
             : WorkshopHandoffPhase.preparing,
+        remoteDeliveryVerified: remoteVerified,
       );
     }
 

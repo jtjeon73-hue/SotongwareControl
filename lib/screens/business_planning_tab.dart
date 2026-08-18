@@ -31,6 +31,7 @@ import '../services/work_instruction_remote_delivery.dart';
 import '../services/work_instruction_validator.dart';
 import '../services/work_instruction_wizard_session.dart';
 import '../services/work_instruction_workshop_presentation.dart';
+import '../services/transferred_work_reconciliation.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/project_design/instruction_preview_panel.dart';
@@ -106,6 +107,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   List<RemoteAgentDoc> _remoteAgents = const [];
   List<RemoteJobDoc> _remoteJobs = const [];
   List<Sotong24RemoteProject> _remoteProjects = const [];
+  bool _remoteEvidenceLoaded = false;
+  bool _remoteRefreshBusy = false;
   StreamSubscription<List<Sotong24RemoteProject>>? _remoteProjectsSub;
   StreamSubscription<List<RemoteJobDoc>>? _remoteJobsSub;
   StreamSubscription<List<RemoteAgentDoc>>? _remoteAgentsSub;
@@ -134,13 +137,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _loadInitial();
     _remoteProjectsSub = _remoteRepo.watchProjects().listen((projects) {
       if (!mounted) return;
-      setState(() => _remoteProjects = projects);
+      setState(() {
+        _remoteProjects = projects;
+        _remoteEvidenceLoaded = true;
+      });
+      unawaited(_reconcileLocalTransfers());
     });
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       _remoteJobsSub = _agentRepo.watchJobs(ownerUid: uid).listen((jobs) {
         if (!mounted) return;
-        setState(() => _remoteJobs = jobs);
+        setState(() {
+          _remoteJobs = jobs;
+          _remoteEvidenceLoaded = true;
+        });
+        unawaited(_reconcileLocalTransfers());
         unawaited(_maybeRepairOrphan());
       });
       _remoteAgentsSub = _agentRepo.watchAgents(ownerUid: uid).listen((agents) {
@@ -152,6 +163,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   PlanExecutionIndex get _executionIndex =>
       PlanExecutionIndex.fromRemoteProjects(_remoteProjects, jobs: _remoteJobs);
+
+  RemoteOperationalEvidence get _remoteEvidence =>
+      RemoteOperationalEvidence.fromRemote(
+        jobs: _remoteJobs,
+        projects: _remoteProjects,
+        remoteLoaded: _remoteEvidenceLoaded,
+      );
 
   ConceptOccupancyIndex get _conceptOccupancy => ConceptOccupancyIndex.build(
     plans: _allPlans,
@@ -273,6 +291,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       });
       _consumeIdeaSeedIfNeeded();
       unawaited(_maybeRepairOrphan());
+      unawaited(_refreshRemoteOperationalState(fromServer: true));
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -361,9 +380,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       plan: _activeDoc,
       validation: _contractValidation,
       agents: _remoteAgents,
-      transferBusy: _transferBusy || _agentRefreshBusy,
+      transferBusy: _transferBusy || _agentRefreshBusy || _remoteRefreshBusy,
       lastResult: _effectiveLastTransferResult,
       operationalProjectReady: _operationalProjectReady,
+      remoteEvidence: _remoteEvidence,
     );
   }
 
@@ -459,6 +479,47 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _refreshRemoteOperationalState({bool fromServer = false}) async {
+    if (_remoteRefreshBusy) return;
+    _remoteRefreshBusy = true;
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (fromServer) {
+        final results = await Future.wait([
+          _agentRepo.fetchJobsFromServer(ownerUid: uid),
+          _remoteRepo.fetchProjectsFromServer(),
+        ]);
+        if (!mounted) return;
+        setState(() {
+          _remoteJobs = results[0] as List<RemoteJobDoc>;
+          _remoteProjects = results[1] as List<Sotong24RemoteProject>;
+          _remoteEvidenceLoaded = true;
+        });
+      } else if (mounted) {
+        setState(() => _remoteEvidenceLoaded = true);
+      }
+      await _reconcileLocalTransfers();
+    } catch (_) {
+      if (mounted) setState(() => _remoteEvidenceLoaded = true);
+      await _reconcileLocalTransfers();
+    } finally {
+      _remoteRefreshBusy = false;
+    }
+  }
+
+  Future<void> _reconcileLocalTransfers() async {
+    if (!_remoteEvidenceLoaded) return;
+    final evidence = _remoteEvidence;
+    final result = TransferredWorkReconciliation.reconcilePlans(
+      _allPlans,
+      evidence,
+    );
+    if (!result.changed) return;
+    await _store.savePlans(result.plans);
+    if (!mounted) return;
+    setState(() => _allPlans = BusinessPlanningStore.dedupeById(result.plans));
   }
 
   Future<void> _refreshPlans() async {
@@ -1532,7 +1593,24 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ? _instruction!.instructionId
         : plan?.stableInstructionId;
     if (plan == null || iid == null || iid.isEmpty) return;
-    if (plan.wasTransferred) return;
+    if (plan.wasTransferred) {
+      await _refreshRemoteOperationalState(fromServer: true);
+      if (!silent && mounted) {
+        final evidence = _remoteEvidence;
+        if (evidence.remoteLoaded &&
+            !TransferredWorkReconciliation.hasRemoteDeliveryEvidence(
+              plan,
+              evidence,
+            )) {
+          _snack('원격 작업 기록을 찾지 못했습니다.');
+        } else if (_operationalProjectReady) {
+          _snack('제작공정 등록 완료');
+        } else {
+          _snack('AI 제작공정을 준비하고 있습니다.');
+        }
+      }
+      return;
+    }
 
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -1608,8 +1686,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   void _recheckWorkshopStatus() {
+    unawaited(_recheckWorkshopStatusAsync());
+  }
+
+  Future<void> _recheckWorkshopStatusAsync() async {
+    await _refreshRemoteOperationalState(fromServer: true);
     if (!mounted) return;
-    setState(() {});
+    final id = (_instruction?.instructionId ?? _instructionId ?? '').trim();
+    final evidence = _remoteEvidence;
+    if (id.isNotEmpty &&
+        evidence.remoteLoaded &&
+        !evidence.hasJobFor(id) &&
+        !evidence.hasProjectFor(id)) {
+      _snack('원격 작업 기록을 찾지 못했습니다.');
+      return;
+    }
     _snack(_operationalProjectReady ? '제작공정 등록 완료' : 'AI 제작공정을 준비하고 있습니다.');
   }
 
@@ -1941,14 +2032,22 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   List<BusinessPlanDocument> get _transferredPlans =>
-      WorkInstructionWorkshopPresentation.successfulTransfers(_allPlans);
+      WorkInstructionWorkshopPresentation.successfulTransfers(
+        _allPlans,
+        evidence: _remoteEvidence,
+        execution: _executionIndex,
+      );
 
   String _formatTransferTime(String? iso) =>
       WorkInstructionWorkshopPresentation.formatTransferTime(iso);
 
   String _transferStatusLabel(BusinessPlanDocument plan) {
     final exec = _execFor(plan);
-    return WorkInstructionWorkshopPresentation.transferListBriefStatus(exec);
+    return TransferredWorkReconciliation.transferListStatusLabel(
+      exec: exec,
+      evidence: _remoteEvidence,
+      instructionId: plan.stableInstructionId,
+    );
   }
 
   Widget _buildTransferredInstructionList() {

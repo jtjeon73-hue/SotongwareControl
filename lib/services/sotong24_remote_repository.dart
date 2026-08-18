@@ -85,6 +85,40 @@ class Sotong24RemoteRepository {
     });
   }
 
+  /// Explicit server read — deleted/missing project의 stale cache 회피.
+  Future<List<Sotong24RemoteProject>> fetchProjectsFromServer() async {
+    if (usesMemory || _projects == null) {
+      return List.unmodifiable(_memory);
+    }
+    final snap = await _projects!.get(const GetOptions(source: Source.server));
+    if (snap.docs.isEmpty) return const [];
+    final list = <Sotong24RemoteProject>[];
+    for (final doc in snap.docs) {
+      final stages = await _loadStagesFromServer(doc.id);
+      list.add(
+        Sotong24RemoteProject.fromMap(doc.data(), id: doc.id, stages: stages),
+      );
+    }
+    list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return list;
+  }
+
+  Future<List<Sotong24RemoteStage>> _loadStagesFromServer(
+    String projectId,
+  ) async {
+    final col = _projects;
+    if (col == null) return const [];
+    final snap = await col
+        .doc(projectId)
+        .collection('stages')
+        .get(const GetOptions(source: Source.server));
+    final stages = snap.docs
+        .map((d) => Sotong24RemoteStage.fromMap(d.data(), id: d.id))
+        .toList();
+    stages.sort((a, b) => a.stageNumber.compareTo(b.stageNumber));
+    return stages;
+  }
+
   Stream<List<Sotong24RemoteProject>> _watchMemoryProjects() async* {
     yield List<Sotong24RemoteProject>.unmodifiable(_memory);
     yield* _memoryController.stream;

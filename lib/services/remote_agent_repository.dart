@@ -81,6 +81,26 @@ class RemoteAgentRepository {
     });
   }
 
+  /// Explicit server read — stale offline/cache snapshot 회피.
+  Future<List<RemoteJobDoc>> fetchJobsFromServer({String? ownerUid}) async {
+    if (usesMemory || _jobs == null) {
+      return ownerUid == null || ownerUid.isEmpty
+          ? List.of(_memoryJobs)
+          : _memoryJobs.where((j) => j.ownerUid == ownerUid).toList();
+    }
+    Query<Map<String, dynamic>> q = _jobs!;
+    if (ownerUid != null && ownerUid.isNotEmpty) {
+      q = q.where('ownerUid', isEqualTo: ownerUid);
+    }
+    final snap = await q
+        .orderBy('updatedAt', descending: true)
+        .get(const GetOptions(source: Source.server));
+    return snap.docs
+        .map((d) => RemoteJobDoc.fromMap(d.data(), id: d.id))
+        .where((j) => j.jobId.isNotEmpty)
+        .toList();
+  }
+
   Stream<RemoteJobDoc?> watchJob(String jobId) {
     if (usesMemory || _jobs == null) {
       RemoteJobDoc? found;
@@ -136,6 +156,13 @@ class RemoteAgentRepository {
         return RemoteAgentDoc.fromMap(a.data()!, id: a.id);
       },
     );
+  }
+
+  /// Memory/offline snapshot for immediate UI bootstrap.
+  List<RemoteJobDoc> snapshotJobs({String? ownerUid}) {
+    if (!usesMemory) return const [];
+    if (ownerUid == null || ownerUid.isEmpty) return List.of(_memoryJobs);
+    return _memoryJobs.where((j) => j.ownerUid == ownerUid).toList();
   }
 
   /// Test helper.
