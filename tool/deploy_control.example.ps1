@@ -11,6 +11,7 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 
 $AdminEmail = "YOUR_ADMIN_EMAIL_HERE"
 $AdminUid = "YOUR_ADMIN_UID_HERE"
+$FcmWebVapidKey = "" # Optional. Empty keeps notification delivery outbox_only.
 
 if ([string]::IsNullOrWhiteSpace($AdminEmail) -or $AdminEmail -eq "YOUR_ADMIN_EMAIL_HERE") {
   Write-Error "Admin email is not configured in deploy_control.local.ps1"
@@ -31,7 +32,7 @@ flutter test
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "== release build (admin email/UID via dart-define) =="
-flutter build web --release --base-href / "--dart-define=SOTONG_ADMIN_AUTH_EMAIL=$AdminEmail" "--dart-define=SOTONG_ADMIN_UID=$AdminUid"
+flutter build web --release --base-href / "--dart-define=SOTONG_ADMIN_AUTH_EMAIL=$AdminEmail" "--dart-define=SOTONG_ADMIN_UID=$AdminUid" "--dart-define=SOTONG_FCM_WEB_VAPID_KEY=$FcmWebVapidKey"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 python -c @"

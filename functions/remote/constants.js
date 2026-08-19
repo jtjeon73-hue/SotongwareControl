@@ -58,6 +58,27 @@ const COL = Object.freeze({
   JOBS: "jobs",
   PAIRING: "pairingSessions",
   USERS: "users",
+  PROJECTS: "sotong24work_projects",
+  MONITORING_CONFIG: "monitoring_config",
+  NOTIFICATION_EVENTS: "notificationEvents",
+});
+
+const ACTIVITY_STATE = Object.freeze({
+  AI_REQUESTING: "ai_requesting",
+  CODEX_RUNNING: "codex_running",
+  RESULT_VALIDATING: "result_validating",
+  RESULT_UPLOADING: "result_uploading",
+  APPROVAL_PREPARING: "approval_preparing",
+});
+
+const ACTIVITY_TYPE = Object.freeze({
+  AI_DISPATCH: "ai_dispatch",
+  EXECUTOR_STATE_CHANGE: "executor_state_change",
+  RESULT_GENERATED: "result_generated",
+  RESULT_VALIDATED: "result_validated",
+  ARTIFACT_UPLOAD: "artifact_upload",
+  STAGE_STATUS: "stage_status",
+  APPROVAL_TRANSITION: "approval_transition",
 });
 
 module.exports = {
@@ -72,4 +93,6 @@ module.exports = {
   PULL_MAX_LIMIT,
   MAX_BODY_BYTES,
   COL,
+  ACTIVITY_STATE,
+  ACTIVITY_TYPE,
 };

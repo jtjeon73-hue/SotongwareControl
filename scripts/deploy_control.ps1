@@ -4,6 +4,7 @@
 # 필수: tool\deploy_control.local.ps1 (gitignore)
 #   $AdminEmail = "..."
 #   $AdminUid = "..."
+# 선택: $FcmWebVapidKey = "..."  # 없으면 알림은 outbox_only로 유지
 #
 # 비밀번호는 스크립트에 넣지 마세요.
 # dart-define 없는 flutter build web --release 만으로 운영 배포하지 마세요.
@@ -28,9 +29,11 @@ if (-not (Test-Path $LocalScript)) {
 # 로컬 파일에서 변수만 추출 (비밀번호 없는 파일)
 $AdminEmail = $null
 $AdminUid = $null
+$FcmWebVapidKey = $null
 Get-Content $LocalScript | ForEach-Object {
   if ($_ -match '^\s*\$AdminEmail\s*=\s*"([^"]+)"') { $AdminEmail = $Matches[1] }
   if ($_ -match '^\s*\$AdminUid\s*=\s*"([^"]+)"') { $AdminUid = $Matches[1] }
+  if ($_ -match '^\s*\$FcmWebVapidKey\s*=\s*"([^"]+)"') { $FcmWebVapidKey = $Matches[1] }
 }
 
 if ([string]::IsNullOrWhiteSpace($AdminEmail) -or $AdminEmail -eq "YOUR_ADMIN_EMAIL_HERE") {
@@ -38,6 +41,12 @@ if ([string]::IsNullOrWhiteSpace($AdminEmail) -or $AdminEmail -eq "YOUR_ADMIN_EM
 }
 if ([string]::IsNullOrWhiteSpace($AdminUid) -or $AdminUid -eq "YOUR_ADMIN_UID_HERE") {
   Write-Error "관리자 인증 설정 누락 (AdminUid) — 운영 빌드 중단"
+}
+$HasFcmWebVapidKey = -not [string]::IsNullOrWhiteSpace($FcmWebVapidKey) -and
+  $FcmWebVapidKey -ne "YOUR_FCM_WEB_VAPID_KEY_HERE"
+if (-not $HasFcmWebVapidKey) {
+  $FcmWebVapidKey = ""
+  Write-Warning "FCM Web VAPID 설정 없음 — Push 등록은 비활성화하고 outbox_only로 배포합니다."
 }
 
 Write-Host "== Firebase project check =="
@@ -61,7 +70,7 @@ flutter test
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "== release build (admin email/UID via dart-define, quoted for PowerShell) =="
-flutter build web --release --base-href / "--dart-define=SOTONG_ADMIN_AUTH_EMAIL=$AdminEmail" "--dart-define=SOTONG_ADMIN_UID=$AdminUid"
+flutter build web --release --base-href / "--dart-define=SOTONG_ADMIN_AUTH_EMAIL=$AdminEmail" "--dart-define=SOTONG_ADMIN_UID=$AdminUid" "--dart-define=SOTONG_FCM_WEB_VAPID_KEY=$FcmWebVapidKey"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 python -c @"
@@ -70,11 +79,15 @@ html = Path('build/web/index.html').read_text(encoding='utf-8')
 js = Path('build/web/main.dart.js').read_text(encoding='utf-8', errors='ignore')
 email = '''$AdminEmail'''
 uid = '''$AdminUid'''
-print('base_href_ok', 'base href=\"/\"' in html or \"base href='/'\" in html)
+vapid = '''$FcmWebVapidKey'''
+double_quoted_base = 'base href=' + chr(34) + '/' + chr(34)
+single_quoted_base = 'base href=' + chr(39) + '/' + chr(39)
+print('base_href_ok', double_quoted_base in html or single_quoted_base in html)
 print('admin_email_configured', email in js and len(email.strip()) > 0)
 print('admin_uid_configured', uid in js and len(uid.strip()) > 0)
+print('fcm_vapid_configured', len(vapid.strip()) > 0 and vapid in js)
 if email not in js or uid not in js:
-    raise SystemExit('Admin dart-define missing from build output — abort deploy')
+    raise SystemExit('Required admin dart-define missing from build output — abort deploy')
 "@
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

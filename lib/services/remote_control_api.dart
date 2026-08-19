@@ -165,6 +165,16 @@ class RemoteControlApi {
     );
   }
 
+  Future<void> registerNotificationToken({
+    required String token,
+    String platform = 'web',
+  }) async {
+    await _post('/api/control/register-notification-token', {
+      'token': token,
+      'platform': platform,
+    });
+  }
+
   Future<String> createJob({
     required String type,
     required String title,

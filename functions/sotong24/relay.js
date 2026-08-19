@@ -6,13 +6,14 @@ const {
   pickStageAllowlist,
   pickRequestAllowlist,
   parseRequestPollInput,
+  parseRequestAppliedInput,
   assertProjectStageAlignment,
   assertOperations,
   sortRequestsNewestFirst,
   reject,
   REQUEST_POLL_MAX_READ,
 } = require("./validate");
-const { upsertProject, upsertStages } = require("./writer");
+const { upsertProject, upsertStages, markRequestWorkflowApplied } = require("./writer");
 const { getProjectDoc, listRequestDocs } = require("./reader");
 const { createRateLimiter } = require("./rate_limit");
 const {
@@ -200,6 +201,27 @@ async function handleRelayRequest(req, res, deps) {
         requests,
         serverReceivedAt: serverNowIso,
         elapsedMs: Date.now() - started,
+      });
+      return;
+    }
+
+    if (operation === "request_applied") {
+      const receipt = parseRequestAppliedInput(body);
+      const result = await markRequestWorkflowApplied(db, receipt, serverNowIso);
+      safeLog({
+        op: operation,
+        projectId: receipt.projectId,
+        stageId: receipt.completedStageId,
+        result: result.idempotent ? "idempotent" : "ok",
+      });
+      res.status(200).json({
+        ok: true,
+        operation,
+        projectId: receipt.projectId,
+        requestId: receipt.requestId,
+        workflowApplied: true,
+        idempotent: result.idempotent,
+        serverReceivedAt: serverNowIso,
       });
       return;
     }

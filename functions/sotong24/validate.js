@@ -255,6 +255,7 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
     MAX_STR.resultPreview
   );
   const approvalRequired = assertBool(input.approvalRequired, "approvalRequired");
+  const criteriaMet = assertBool(input.criteriaMet, "criteriaMet");
   const clientUpdatedAt = assertIsoOptional(input.updatedAt, "updatedAt");
   const startedAt = assertIsoOptional(input.startedAt, "startedAt");
   const completedAt = assertIsoOptional(input.completedAt, "completedAt");
@@ -297,11 +298,21 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
   if (resultUrl !== undefined) out.resultUrl = resultUrl;
   if (previewUrl !== undefined) out.previewUrl = previewUrl;
   if (approvalRequired !== undefined) out.approvalRequired = approvalRequired;
+  if (criteriaMet !== undefined) out.criteriaMet = criteriaMet;
   if (approvalStatus !== undefined) out.approvalStatus = approvalStatus;
   if (startedAt !== undefined) out.startedAt = startedAt;
   if (completedAt !== undefined) out.completedAt = completedAt;
   if (workDurationMs !== undefined) out.workDurationMs = workDurationMs;
   if (revision !== undefined) out.revision = revision;
+  if (
+    (status === "completed" || status === "awaiting_approval") &&
+    criteriaMet !== true
+  ) {
+    reject("failed-precondition", "completed_stage_requires_criteriaMet_true");
+  }
+  if (status === "awaiting_approval" && approvalRequired !== true) {
+    reject("failed-precondition", "awaiting_approval_requires_approvalRequired_true");
+  }
   out.updatedAt = serverNowIso;
   out.serverReceivedAt = serverNowIso;
   if (clientUpdatedAt !== undefined) out.clientUpdatedAt = clientUpdatedAt;
@@ -315,11 +326,36 @@ function assertOperations(op) {
     "stage_sync",
     "full_sync",
     "request_poll",
+    "request_applied",
     "artifact_upload_init",
     "artifact_upload_complete",
   ]);
   if (!allowed.has(op)) reject("invalid_argument", "operation invalid");
   return op;
+}
+
+function parseRequestAppliedInput(body) {
+  if (!isPlainObject(body)) reject("invalid_argument", "body required");
+  const allowed = new Set([
+    "operation",
+    "projectId",
+    "requestId",
+    "completedStageId",
+    "nextStageIdPrepared",
+  ]);
+  for (const key of Object.keys(body)) {
+    if (!allowed.has(key)) reject("invalid_argument", `unexpected_field:${key}`);
+  }
+  const nextStageIdPrepared = String(body.nextStageIdPrepared || "").trim();
+  if (nextStageIdPrepared) {
+    assertSafeId(nextStageIdPrepared, "nextStageIdPrepared");
+  }
+  return {
+    projectId: assertSafeId(body.projectId, "projectId"),
+    requestId: assertSafeId(body.requestId, "requestId"),
+    completedStageId: assertSafeId(body.completedStageId, "completedStageId"),
+    nextStageIdPrepared,
+  };
 }
 
 /**
@@ -462,6 +498,9 @@ function pickRequestAllowlist(raw, { docId, expectedProjectId, currentStageId })
     return null;
   }
 
+  const revision = Number.isInteger(Number(raw.revision))
+    ? Math.max(0, Number(raw.revision))
+    : 0;
   return {
     requestId,
     projectId,
@@ -472,6 +511,10 @@ function pickRequestAllowlist(raw, { docId, expectedProjectId, currentStageId })
     createdAt,
     updatedAt,
     processedAt,
+    revision,
+    processed: raw.processed === true,
+    workflowApplied: raw.workflowApplied === true,
+    workflowAppliedAt: toIsoStringMaybe(raw.workflowAppliedAt) || "",
   };
 }
 
@@ -498,6 +541,7 @@ module.exports = {
   pickStageAllowlist,
   pickRequestAllowlist,
   parseRequestPollInput,
+  parseRequestAppliedInput,
   assertProjectStageAlignment,
   assertOperations,
   assertSafeId,

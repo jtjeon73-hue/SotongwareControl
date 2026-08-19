@@ -11,6 +11,8 @@ const {
   PULL_MAX_LIMIT,
   ONLINE_WITHIN_MS,
   COMMAND_TYPE,
+  ACTIVITY_STATE,
+  ACTIVITY_TYPE,
 } = require("./constants");
 const {
   sha256Hex,
@@ -22,9 +24,41 @@ const { httpError, sendOk } = require("./http");
 const { nowIso } = require("./log");
 const { assertProtocolVersion } = require("./auth");
 const { pickAiUsageCodex } = require("./ai_usage");
+const { loadPolicy, enqueueNotification } = require("./monitoring");
 
 const AGENT_STATES = new Set(Object.values(AGENT_STATE));
 const WORK_STATUSES = new Set(Object.values(WORK_STATUS));
+const ACTIVITY_STATES = new Set(Object.values(ACTIVITY_STATE));
+const ACTIVITY_TYPES = new Set(Object.values(ACTIVITY_TYPE));
+
+async function mirrorMonitoring(db, instructionId, stageId, stagePatch, projectPatch) {
+  if (!instructionId || !stageId) return;
+  const projectRef = db.collection(COL.PROJECTS).doc(instructionId);
+  const projectSnap = await projectRef.get();
+  if (!projectSnap.exists) return;
+  await db.runTransaction(async (tx) => {
+    await tx.set(projectRef.collection("stages").doc(stageId), stagePatch, { merge: true });
+    await tx.set(projectRef, projectPatch, { merge: true });
+  });
+}
+
+async function queueNotificationSafely(db, data) {
+  try {
+    const policy = await loadPolicy(db);
+    return await enqueueNotification(db, data, policy);
+  } catch (err) {
+    // Notification is an observer. A delivery/outbox failure must never roll
+    // back or alter the authoritative stage/job transition.
+    console.error(JSON.stringify({
+      type: "notification_enqueue_failed",
+      eventType: data.eventType,
+      jobId: data.jobId || "",
+      stageId: data.stageId || "",
+      code: String(err && (err.code || err.message) || "error").slice(0, 160),
+    }));
+    return { created: false, error: true };
+  }
+}
 
 function isPlainObject(v) {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -300,7 +334,6 @@ async function handleReportJob(db, ctx, body) {
   const status = String(body.status || "").trim();
   if (!jobId) throw httpError(400, "invalid_payload", "jobId required");
   if (!WORK_STATUSES.has(status)) throw httpError(400, "invalid_payload", "status invalid");
-
   const jobRef = db.collection(COL.JOBS).doc(jobId);
   const snap = await jobRef.get();
   if (!snap.exists) throw httpError(404, "not_found", "job_missing");
@@ -322,6 +355,18 @@ async function handleReportJob(db, ctx, body) {
   if (status === WORK_STATUS.RUNNING && !job.startedAt) patch.startedAt = ts;
   if (status === WORK_STATUS.COMPLETED) patch.completedAt = ts;
   await jobRef.set(patch, { merge: true });
+  if (status === WORK_STATUS.COMPLETED) {
+    await queueNotificationSafely(db, {
+      ownerUid: job.ownerUid || ctx.agent.ownerUid || "",
+      instructionId: job.instructionId || "",
+      jobId,
+      stageId: String(body.currentStage || job.currentStage || ""),
+      stageNumber: Number(body.currentStageNumber || job.currentStageNumber) || 18,
+      stageName: "최종 제작",
+      revision: Number(body.revision) || 1,
+      eventType: "production_completed",
+    });
+  }
   return {};
 }
 
@@ -332,6 +377,14 @@ async function handleReportStage(db, ctx, body) {
   if (!stageId) throw httpError(400, "invalid_payload", "stageId required");
   if (!jobId) throw httpError(400, "invalid_payload", "jobId required");
   if (!WORK_STATUSES.has(status)) throw httpError(400, "invalid_payload", "status invalid");
+  const reportsCompletion =
+    status === WORK_STATUS.COMPLETED || status === WORK_STATUS.WAITING_APPROVAL;
+  if (reportsCompletion && body.criteriaMet !== true) {
+    throw httpError(409, "failed_precondition", "criteriaMet_true_required");
+  }
+  if (status === WORK_STATUS.WAITING_APPROVAL && body.approvalRequired !== true) {
+    throw httpError(409, "failed_precondition", "approvalRequired_true_required");
+  }
 
   const jobRef = db.collection(COL.JOBS).doc(jobId);
   const jobSnap = await jobRef.get();
@@ -353,12 +406,136 @@ async function handleReportStage(db, ctx, body) {
   if (body.summary != null) patch.summary = String(body.summary).slice(0, 2000);
   if (body.stageName != null) patch.stageName = String(body.stageName).slice(0, 120);
   if (body.stageNumber != null) patch.stageNumber = Number(body.stageNumber) || 0;
-  if (!prev.exists) patch.startedAt = ts;
+  if (body.revision != null) patch.revision = Math.max(1, Number(body.revision) || 1);
+  if (body.approvalRequired != null) patch.approvalRequired = body.approvalRequired === true;
+  if (body.criteriaMet != null) patch.criteriaMet = body.criteriaMet === true;
+  const previous = prev.exists ? prev.data() || {} : {};
+  const activeStatus = new Set([
+    WORK_STATUS.CLAIMED,
+    WORK_STATUS.RUNNING,
+    WORK_STATUS.REWORKING,
+  ]);
+  if (!previous.startedAt && activeStatus.has(status)) patch.startedAt = ts;
+  patch.lastActivityAt = ts;
+  patch.activityType = status === WORK_STATUS.WAITING_APPROVAL
+    ? ACTIVITY_TYPE.APPROVAL_TRANSITION
+    : ACTIVITY_TYPE.STAGE_STATUS;
+  if (status === WORK_STATUS.RUNNING || status === WORK_STATUS.REWORKING) {
+    patch.activityState = ACTIVITY_STATE.CODEX_RUNNING;
+  }
+  if (status === WORK_STATUS.WAITING_APPROVAL) {
+    patch.activityState = ACTIVITY_STATE.APPROVAL_PREPARING;
+  }
   if (status === WORK_STATUS.COMPLETED) patch.completedAt = ts;
 
-  await stageRef.set(patch, { merge: true });
-  await jobRef.set({ currentStage: stageId, updatedAt: ts }, { merge: true });
+  const jobPatch = {
+    currentStage: stageId,
+    updatedAt: ts,
+    lastActivityAt: ts,
+    ...(body.criteriaMet != null ? { currentStageCriteriaMet: body.criteriaMet === true } : {}),
+    ...(body.approvalRequired != null ? { approvalRequired: body.approvalRequired === true } : {}),
+  };
+  // An approval gate belongs to the job as well as the stage. Persist both in
+  // one transaction so a successful report-stage can never leave job=running.
+  if (status === WORK_STATUS.WAITING_APPROVAL) {
+    jobPatch.status = WORK_STATUS.WAITING_APPROVAL;
+  }
+  await db.runTransaction(async (tx) => {
+    await tx.set(stageRef, patch, { merge: true });
+    await tx.set(jobRef, jobPatch, { merge: true });
+  });
+  await mirrorMonitoring(
+    db,
+    String(job.instructionId || "").trim(),
+    stageId,
+    {
+      status,
+      ...(patch.criteriaMet != null ? { criteriaMet: patch.criteriaMet } : {}),
+      ...(patch.approvalRequired != null ? { approvalRequired: patch.approvalRequired } : {}),
+      ...(patch.revision != null ? { revision: patch.revision } : {}),
+      ...(patch.startedAt ? { startedAt: patch.startedAt } : {}),
+      lastActivityAt: ts,
+      activityState: patch.activityState || String(previous.activityState || ""),
+      activityType: patch.activityType,
+      updatedAt: ts,
+    },
+    {
+      lastActivityAt: ts,
+      updatedAt: ts,
+      currentStageId: stageId,
+      ...(status === WORK_STATUS.WAITING_APPROVAL
+        ? { status: "awaiting_approval", approvalStatus: "pending" }
+        : {}),
+    }
+  );
+  if (status === WORK_STATUS.WAITING_APPROVAL) {
+    const revision = Math.max(1, Number(body.revision || previous.revision) || 1);
+    await queueNotificationSafely(db, {
+      ownerUid: job.ownerUid || ctx.agent.ownerUid || "",
+      instructionId: job.instructionId || "",
+      jobId,
+      stageId,
+      stageNumber: Number(body.stageNumber || previous.stageNumber) || 0,
+      stageName: String(body.stageName || previous.stageName || stageId),
+      revision,
+      eventType: revision > 1 ? "revision_completed" : "approval_required",
+    });
+  }
   return {};
+}
+
+async function handleReportActivity(db, ctx, body) {
+  const jobId = String(body.jobId || ctx.agent.currentJobId || "").trim();
+  const stageId = String(body.stageId || "").trim();
+  const activityState = String(body.activityState || "").trim();
+  const activityType = String(body.activityType || "").trim();
+  if (!jobId || !stageId) {
+    throw httpError(400, "invalid_payload", "jobId_and_stageId required");
+  }
+  if (!ACTIVITY_STATES.has(activityState) || !ACTIVITY_TYPES.has(activityType)) {
+    throw httpError(400, "invalid_payload", "activity invalid");
+  }
+  const jobRef = db.collection(COL.JOBS).doc(jobId);
+  const stageRef = jobRef.collection("stages").doc(stageId);
+  const [jobSnap, stageSnap] = await Promise.all([jobRef.get(), stageRef.get()]);
+  if (!jobSnap.exists) throw httpError(404, "not_found", "job_missing");
+  const job = jobSnap.data() || {};
+  if (job.assignedAgentId && job.assignedAgentId !== ctx.agentId) {
+    throw httpError(403, "forbidden", "agent_mismatch");
+  }
+  const previous = stageSnap.exists ? stageSnap.data() || {} : {};
+  const ts = nowIso();
+  const stagePatch = {
+    stageId,
+    stageNumber: Number(body.stageNumber || previous.stageNumber) || 0,
+    lastActivityAt: ts,
+    activityState,
+    activityType,
+    revision: Math.max(1, Number(body.revision || previous.revision) || 1),
+    updatedAt: ts,
+  };
+  if (!previous.startedAt) stagePatch.startedAt = ts;
+  if (body.progress != null) {
+    stagePatch.activityProgress = Math.max(0, Math.min(100, Number(body.progress) || 0));
+  }
+  await db.runTransaction(async (tx) => {
+    await tx.set(stageRef, stagePatch, { merge: true });
+    await tx.set(jobRef, {
+      currentStage: stageId,
+      currentStageNumber: stagePatch.stageNumber,
+      lastActivityAt: ts,
+      activityState,
+      updatedAt: ts,
+    }, { merge: true });
+  });
+  await mirrorMonitoring(
+    db,
+    String(body.instructionId || job.instructionId || "").trim(),
+    stageId,
+    stagePatch,
+    { lastActivityAt: ts, activityState, updatedAt: ts }
+  );
+  return { lastActivityAt: ts };
 }
 
 async function handleReportError(db, ctx, body) {
@@ -384,6 +561,16 @@ async function handleReportError(db, ctx, body) {
         code,
         message,
         createdAt: ts,
+      });
+      await queueNotificationSafely(db, {
+        ownerUid: job.ownerUid || ctx.agent.ownerUid || "",
+        instructionId: body.instructionId || job.instructionId || "",
+        jobId,
+        stageId: body.stageId || job.currentStage || "",
+        stageNumber: body.stageNumber || job.currentStageNumber || 0,
+        stageName: body.stageName || "AI 제작 단계",
+        revision: body.revision || 1,
+        eventType: "work_error",
       });
     }
   }
@@ -425,6 +612,24 @@ async function handleCreatePairing(db, uid, body = {}) {
     expiresAt,
     ttlSeconds: Math.floor(PAIRING_TTL_MS / 1000),
   };
+}
+
+async function handleRegisterNotificationToken(db, uid, body = {}) {
+  const token = String(body.token || "").trim();
+  const platform = String(body.platform || "web").trim().slice(0, 20);
+  if (token.length < 20 || token.length > 4096) {
+    throw httpError(400, "invalid_payload", "token invalid");
+  }
+  const tokenId = sha256Hex(token);
+  const ts = nowIso();
+  await db.collection(COL.USERS).doc(uid).collection("notificationTokens").doc(tokenId).set({
+    token,
+    platform,
+    enabled: true,
+    updatedAt: ts,
+    createdAt: ts,
+  }, { merge: true });
+  return { tokenId };
 }
 
 async function handleCreateJob(db, uid, body) {
@@ -694,8 +899,10 @@ module.exports = {
   handleReportState,
   handleReportJob,
   handleReportStage,
+  handleReportActivity,
   handleReportError,
   handleCreatePairing,
+  handleRegisterNotificationToken,
   handleCreateJob,
   handleStartJob,
   handleDeliverInstruction,

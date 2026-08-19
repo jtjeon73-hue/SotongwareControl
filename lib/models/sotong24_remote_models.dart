@@ -100,6 +100,7 @@ class Sotong24RemoteStage {
     this.resultUrl = '',
     this.previewUrl = '',
     this.approvalRequired = false,
+    this.criteriaMet = false,
     this.approvalStatus = ApprovalStatus.notRequired,
     this.activeRequestId = '',
     this.updatedAt = '',
@@ -107,6 +108,10 @@ class Sotong24RemoteStage {
     this.startedAt = '',
     this.completedAt = '',
     this.workDurationMs = 0,
+    this.lastActivityAt = '',
+    this.activityState = '',
+    this.activityType = '',
+    this.activityProgress = 0,
   });
 
   final String stageId;
@@ -121,6 +126,7 @@ class Sotong24RemoteStage {
   final String resultUrl;
   final String previewUrl;
   final bool approvalRequired;
+  final bool criteriaMet;
   final String approvalStatus;
   final String activeRequestId;
   final String updatedAt;
@@ -136,6 +142,10 @@ class Sotong24RemoteStage {
 
   /// Agent가 보고한 실제 AI 작업시간(ms). 승인 대기 제외. 0이면 미보고.
   final int workDurationMs;
+  final String lastActivityAt;
+  final String activityState;
+  final String activityType;
+  final int activityProgress;
 
   bool get hasOpenableResult =>
       openableResultUrl != null || openablePreviewUrl != null;
@@ -188,6 +198,7 @@ class Sotong24RemoteStage {
     'resultUrl': resultUrl,
     'previewUrl': previewUrl,
     'approvalRequired': approvalRequired,
+    'criteriaMet': criteriaMet,
     'approvalStatus': approvalStatus,
     'activeRequestId': activeRequestId,
     'updatedAt': updatedAt,
@@ -195,6 +206,10 @@ class Sotong24RemoteStage {
     if (startedAt.trim().isNotEmpty) 'startedAt': startedAt,
     if (completedAt.trim().isNotEmpty) 'completedAt': completedAt,
     if (workDurationMs > 0) 'workDurationMs': workDurationMs,
+    if (lastActivityAt.trim().isNotEmpty) 'lastActivityAt': lastActivityAt,
+    if (activityState.trim().isNotEmpty) 'activityState': activityState,
+    if (activityType.trim().isNotEmpty) 'activityType': activityType,
+    if (activityProgress > 0) 'activityProgress': activityProgress,
   };
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -212,6 +227,7 @@ class Sotong24RemoteStage {
       resultUrl: '${map['resultUrl'] ?? ''}',
       previewUrl: '${map['previewUrl'] ?? ''}',
       approvalRequired: map['approvalRequired'] == true,
+      criteriaMet: map['criteriaMet'] == true,
       approvalStatus: '${map['approvalStatus'] ?? ApprovalStatus.notRequired}',
       activeRequestId: '${map['activeRequestId'] ?? ''}',
       updatedAt: '${map['updatedAt'] ?? ''}',
@@ -219,6 +235,10 @@ class Sotong24RemoteStage {
       startedAt: '${map['startedAt'] ?? ''}',
       completedAt: '${map['completedAt'] ?? ''}',
       workDurationMs: _asInt(map['workDurationMs']),
+      lastActivityAt: '${map['lastActivityAt'] ?? ''}',
+      activityState: '${map['activityState'] ?? ''}',
+      activityType: '${map['activityType'] ?? ''}',
+      activityProgress: _asInt(map['activityProgress']).clamp(0, 100),
     );
   }
 
@@ -226,8 +246,10 @@ class Sotong24RemoteStage {
     String? status,
     String? summary,
     String? approvalStatus,
+    bool? criteriaMet,
     String? activeRequestId,
     String? updatedAt,
+    int? revision,
   }) {
     return Sotong24RemoteStage(
       stageId: stageId,
@@ -242,12 +264,18 @@ class Sotong24RemoteStage {
       resultUrl: resultUrl,
       previewUrl: previewUrl,
       approvalRequired: approvalRequired,
+      criteriaMet: criteriaMet ?? this.criteriaMet,
       approvalStatus: approvalStatus ?? this.approvalStatus,
       activeRequestId: activeRequestId ?? this.activeRequestId,
       updatedAt: updatedAt ?? this.updatedAt,
-      revision: revision,
+      revision: revision ?? this.revision,
       startedAt: startedAt,
       completedAt: completedAt,
+      workDurationMs: workDurationMs,
+      lastActivityAt: lastActivityAt,
+      activityState: activityState,
+      activityType: activityType,
+      activityProgress: activityProgress,
     );
   }
 }
@@ -263,6 +291,10 @@ class Sotong24RemoteRequest {
     this.createdAt = '',
     this.updatedAt = '',
     this.processedAt = '',
+    this.revision = 0,
+    this.processed = false,
+    this.workflowApplied = false,
+    this.workflowAppliedAt = '',
   });
 
   final String requestId;
@@ -276,6 +308,10 @@ class Sotong24RemoteRequest {
   final String createdAt;
   final String updatedAt;
   final String processedAt;
+  final int revision;
+  final bool processed;
+  final bool workflowApplied;
+  final String workflowAppliedAt;
 
   Map<String, dynamic> toMap() => {
     'requestId': requestId,
@@ -287,6 +323,10 @@ class Sotong24RemoteRequest {
     'createdAt': createdAt,
     'updatedAt': updatedAt,
     'processedAt': processedAt,
+    if (revision > 0) 'revision': revision,
+    'processed': processed,
+    'workflowApplied': workflowApplied,
+    if (workflowAppliedAt.isNotEmpty) 'workflowAppliedAt': workflowAppliedAt,
   };
 
   factory Sotong24RemoteRequest.fromMap(
@@ -303,6 +343,10 @@ class Sotong24RemoteRequest {
       createdAt: '${map['createdAt'] ?? ''}',
       updatedAt: '${map['updatedAt'] ?? ''}',
       processedAt: '${map['processedAt'] ?? ''}',
+      revision: _asInt(map['revision']),
+      processed: map['processed'] == true,
+      workflowApplied: map['workflowApplied'] == true,
+      workflowAppliedAt: '${map['workflowAppliedAt'] ?? ''}',
     );
   }
 }
@@ -321,6 +365,8 @@ class Sotong24RemoteProject {
     this.pcStatus = Sotong24PcLinkStatus.offline,
     this.lastHeartbeat = '',
     this.startedAt = '',
+    this.lastActivityAt = '',
+    this.activityState = '',
     this.createdAt = '',
     this.updatedAt = '',
     this.isDemo = false,
@@ -339,6 +385,8 @@ class Sotong24RemoteProject {
   final String pcStatus;
   final String lastHeartbeat;
   final String startedAt;
+  final String lastActivityAt;
+  final String activityState;
   final String createdAt;
   final String updatedAt;
   final bool isDemo;
@@ -445,6 +493,8 @@ class Sotong24RemoteProject {
     'pcStatus': pcStatus,
     'lastHeartbeat': lastHeartbeat,
     'startedAt': startedAt,
+    'lastActivityAt': lastActivityAt,
+    'activityState': activityState,
     'createdAt': createdAt,
     'updatedAt': updatedAt,
     'isDemo': isDemo,
@@ -471,6 +521,8 @@ class Sotong24RemoteProject {
       pcStatus: '${map['pcStatus'] ?? ''}',
       lastHeartbeat: '${map['lastHeartbeat'] ?? ''}',
       startedAt: '${map['startedAt'] ?? ''}',
+      lastActivityAt: '${map['lastActivityAt'] ?? ''}',
+      activityState: '${map['activityState'] ?? ''}',
       createdAt: '${map['createdAt'] ?? ''}',
       updatedAt: '${map['updatedAt'] ?? ''}',
       isDemo: map['isDemo'] == true,
@@ -499,6 +551,8 @@ class Sotong24RemoteProject {
       pcStatus: pcStatus,
       lastHeartbeat: lastHeartbeat,
       startedAt: startedAt,
+      lastActivityAt: lastActivityAt,
+      activityState: activityState,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDemo: isDemo,
@@ -519,7 +573,8 @@ class Sotong24RemoteApprovalGuard {
   /// 사용자 액션용 requestId 할당.
   ///
   /// - active/preferred 가 아직 없거나 pending(미처리)이면 재사용 (더블클릭·Agent 슬롯)
-  /// - 이미 approved/revision_requested 로 처리된 id면 **새 id** (보완 후 r2 재승인)
+  /// - 같은 revision의 terminal id는 재사용해 guard가 중복 제출을 차단
+  /// - stage revision이 증가한 경우에만 새 id 발급 (보완 후 r2 재승인)
   static String allocateRequestId({
     required Sotong24RemoteStage stage,
     required Iterable<Sotong24RemoteRequest> existingRequests,
@@ -540,9 +595,15 @@ class Sotong24RemoteApprovalGuard {
       }
       final alreadyDecided =
           found != null && isTerminalDecisionStatus(found.status);
+      final stageRevision = stage.revision > 0 ? stage.revision : 1;
+      final requestRevision = found != null && found.revision > 0
+          ? found.revision
+          : 1;
+      final sameRevision = requestRevision == stageRevision;
       if (!alreadyDecided) {
         return hint;
       }
+      if (sameRevision) return hint;
     }
 
     final stamp = (now ?? DateTime.now().toUtc()).microsecondsSinceEpoch;
@@ -580,10 +641,13 @@ class Sotong24RemoteApprovalGuard {
       return '현재 단계가 아닙니다. 화면을 새로고침한 뒤 다시 시도해 주세요.';
     }
     final awaiting =
-        stage.status == Sotong24WorkStatus.awaitingApproval ||
-        stage.approvalStatus == ApprovalStatus.pending;
-    if (!awaiting) {
+        Sotong24UserFacingStatus.normalize(stage.status) ==
+        Sotong24WorkStatus.awaitingApproval;
+    if (!awaiting || !stage.approvalRequired || !stage.criteriaMet) {
       return '승인 대기 상태가 아닙니다. 잠시 후 상태를 새로 확인해 주세요.';
+    }
+    if (isTerminalDecisionStatus(stage.approvalStatus)) {
+      return '승인·보완 요청을 Agent가 처리 중입니다. 잠시 후 상태를 새로 확인해 주세요.';
     }
 
     Sotong24RemoteRequest? activeReq;
@@ -592,6 +656,14 @@ class Sotong24RemoteApprovalGuard {
         activeReq = r;
       }
       if (r.stageId != stageId) continue;
+
+      final stageRevision = stage.revision > 0 ? stage.revision : 1;
+      final requestRevision = r.revision > 0 ? r.revision : 1;
+      if (isTerminalDecisionStatus(r.status) &&
+          requestRevision == stageRevision) {
+        return '현재 결과 버전의 승인·보완 요청은 이미 Agent가 처리 중입니다. '
+            '다음 단계 또는 새 보완 결과를 기다려 주세요.';
+      }
 
       // 동일 requestId 재전송(더블클릭/재시도) 차단
       if (r.requestId == requestId && isTerminalDecisionStatus(r.status)) {
@@ -656,6 +728,7 @@ class Sotong24RemoteDemoCatalog {
           userAttention: i + 1 == 13 ? '표지 제목 크기와 3장 사례 구성을 확인해 주세요.' : '',
           previewUrl: i + 1 == 13 ? 'https://sotongware-control.web.app' : '',
           approvalRequired: i + 1 == 13 || i + 1 >= 16,
+          criteriaMet: i + 1 <= 13,
           approvalStatus: i + 1 == 13
               ? ApprovalStatus.pending
               : ApprovalStatus.notRequired,
@@ -787,6 +860,18 @@ class Sotong24UserFacingStatus {
     final status = effective(project);
     if (status == Sotong24WorkStatus.completed) return false;
     if (status == Sotong24WorkStatus.error) return false;
+    final stageApproval = project.currentStageDoc?.approvalStatus ?? '';
+    final stage = project.currentStageDoc;
+    if (stage == null ||
+        !stage.approvalRequired ||
+        !stage.criteriaMet ||
+        Sotong24UserFacingStatus.normalize(stage.status) !=
+            Sotong24WorkStatus.awaitingApproval) {
+      return false;
+    }
+    if (Sotong24RemoteApprovalGuard.isTerminalDecisionStatus(stageApproval)) {
+      return false;
+    }
     return status == Sotong24WorkStatus.awaitingApproval;
   }
 
@@ -810,6 +895,9 @@ class Sotong24UserFacingStatus {
       case Sotong24WorkStatus.revision:
         return '보완 작업이 진행될 예정입니다.';
       case Sotong24WorkStatus.awaitingApproval:
+        if (stage?.approvalStatus == ApprovalStatus.approved) {
+          return '승인 요청을 전송했습니다. Agent가 다음 단계를 준비 중입니다.';
+        }
         if (stage?.hasOpenableResult == true) {
           return '결과물을 확인한 뒤 승인 또는 보완을 선택하세요.';
         }

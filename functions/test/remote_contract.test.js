@@ -6,6 +6,11 @@ const { handleApiRequest } = require("../remote/router");
 const { createMemoryDb } = require("../remote/memory_db");
 const { sha256Hex } = require("../remote/crypto_util");
 const { COL, PROTOCOL_VERSION } = require("../remote/constants");
+const {
+  evaluateStageHealth,
+  enqueueNotification,
+  normalizePolicy,
+} = require("../remote/monitoring");
 
 function mockRes() {
   return {
@@ -412,12 +417,20 @@ describe("remote agent contract V1", () => {
         jobId,
         stageId: "launch",
         status: "waiting_approval",
+        criteriaMet: true,
+        approvalRequired: true,
+        revision: 1,
         protocolVersion: "1.0",
       },
       { token: agentToken }
     );
     assert.equal(r2.statusCode, 200);
     assert.ok(db.store.get(`${COL.JOBS}/${jobId}/stages/launch`));
+    assert.equal(
+      db.store.get(`${COL.JOBS}/${jobId}/stages/launch`).status,
+      "waiting_approval"
+    );
+    assert.equal(db.store.get(`${COL.JOBS}/${jobId}`).status, "waiting_approval");
     const r3 = await call(
       db,
       "/api/agent/report-error",
@@ -577,5 +590,193 @@ describe("remote agent contract V1", () => {
     });
     assert.equal(a.body.jobId, b.body.jobId);
     assert.equal(b.body.idempotent, true);
+  });
+
+  async function monitoringJob(instructionId = "wi_plan_monitoring") {
+    const { agentId, agentToken } = await pairAndEnroll();
+    const created = await control(db, "/api/control/create-job", {
+      title: "monitoring",
+      type: "ebook",
+      assignedAgentId: agentId,
+      instructionId,
+    });
+    return { agentId, agentToken, jobId: created.body.jobId, instructionId };
+  }
+
+  it("stage start uses server time even when a ready document already exists", async () => {
+    const env = await monitoringJob("wi_plan_monitor_start");
+    db.store.set(`${COL.JOBS}/${env.jobId}/stages/idea_clarify`, {
+      stageId: "idea_clarify", status: "ready", startedAt: null,
+    });
+    const res = await call(db, "/api/agent/report-stage", {
+      jobId: env.jobId,
+      stageId: "idea_clarify",
+      stageNumber: 1,
+      stageName: "아이디어 정리",
+      status: "running",
+      startedAt: "2020-01-01T00:00:00.000Z",
+    }, { token: env.agentToken });
+    assert.equal(res.statusCode, 200);
+    const stage = db.store.get(`${COL.JOBS}/${env.jobId}/stages/idea_clarify`);
+    assert.ok(stage.startedAt);
+    assert.notEqual(stage.startedAt, "2020-01-01T00:00:00.000Z");
+    assert.equal(stage.lastActivityAt, stage.updatedAt);
+  });
+
+  it("explicit work activity updates lastActivityAt but heartbeat does not", async () => {
+    const env = await monitoringJob("wi_plan_monitor_activity");
+    const activity = await call(db, "/api/agent/report-activity", {
+      jobId: env.jobId,
+      instructionId: env.instructionId,
+      stageId: "idea_clarify",
+      stageNumber: 1,
+      revision: 1,
+      activityState: "codex_running",
+      activityType: "executor_state_change",
+      progress: 5,
+      timestamp: "2020-01-01T00:00:00.000Z",
+    }, { token: env.agentToken });
+    assert.equal(activity.statusCode, 200);
+    const key = `${COL.JOBS}/${env.jobId}/stages/idea_clarify`;
+    const before = db.store.get(key).lastActivityAt;
+    assert.notEqual(before, "2020-01-01T00:00:00.000Z");
+    await call(db, "/api/agent/heartbeat", {
+      agentId: env.agentId,
+      state: "running",
+      currentJobId: env.jobId,
+      currentStage: "idea_clarify",
+      protocolVersion: PROTOCOL_VERSION,
+    }, { token: env.agentToken });
+    assert.equal(db.store.get(key).lastActivityAt, before);
+  });
+
+  it("waiting approval creates one idempotent approval notification", async () => {
+    const env = await monitoringJob("wi_plan_monitor_approval");
+    db.store.set(`${COL.PROJECTS}/${env.instructionId}`, {
+      projectId: env.instructionId,
+      currentStageId: "idea_clarify",
+      status: "in_progress",
+    });
+    const body = {
+      jobId: env.jobId,
+      stageId: "idea_clarify",
+      stageNumber: 1,
+      stageName: "아이디어 정리",
+      revision: 1,
+      approvalRequired: true,
+      criteriaMet: true,
+      status: "waiting_approval",
+    };
+    const first = await call(db, "/api/agent/report-stage", body, { token: env.agentToken });
+    const second = await call(db, "/api/agent/report-stage", body, { token: env.agentToken });
+    assert.equal(first.statusCode, 200);
+    assert.equal(second.statusCode, 200);
+    const events = [...db.store.entries()].filter(([key]) => key.startsWith(`${COL.NOTIFICATION_EVENTS}/`));
+    assert.equal(events.length, 1);
+    assert.equal(events[0][1].eventType, "approval_required");
+    const job = db.store.get(`${COL.JOBS}/${env.jobId}`);
+    const jobStage = db.store.get(`${COL.JOBS}/${env.jobId}/stages/idea_clarify`);
+    const project = db.store.get(`${COL.PROJECTS}/${env.instructionId}`);
+    const projectStage = db.store.get(`${COL.PROJECTS}/${env.instructionId}/stages/idea_clarify`);
+    assert.equal(job.status, "waiting_approval");
+    assert.equal(job.currentStageCriteriaMet, true);
+    assert.equal(jobStage.criteriaMet, true);
+    assert.equal(project.status, "awaiting_approval");
+    assert.equal(projectStage.criteriaMet, true);
+  });
+
+  it("waiting approval rejects incomplete criteria before writing", async () => {
+    const env = await monitoringJob("wi_plan_monitor_incomplete");
+    const res = await call(db, "/api/agent/report-stage", {
+      jobId: env.jobId,
+      stageId: "problem_validate",
+      stageNumber: 2,
+      approvalRequired: true,
+      criteriaMet: false,
+      status: "waiting_approval",
+    }, { token: env.agentToken });
+    assert.equal(res.statusCode, 409);
+    assert.equal(
+      db.store.has(`${COL.JOBS}/${env.jobId}/stages/problem_validate`),
+      false
+    );
+  });
+
+  it("revision r2 completion uses a distinct one-time notification", async () => {
+    const env = await monitoringJob("wi_plan_monitor_r2");
+    const body = {
+      jobId: env.jobId,
+      stageId: "problem_validation",
+      stageNumber: 2,
+      stageName: "고객 문제 검증",
+      revision: 2,
+      approvalRequired: true,
+      criteriaMet: true,
+      status: "waiting_approval",
+    };
+    await call(db, "/api/agent/report-stage", body, { token: env.agentToken });
+    await call(db, "/api/agent/report-stage", body, { token: env.agentToken });
+    const events = [...db.store.values()].filter((v) => v.eventType === "revision_completed");
+    assert.equal(events.length, 1);
+    assert.match(events[0].body, /r2/);
+  });
+
+  it("health detects inactivity and offline without changing a long-running job", () => {
+    const nowMs = Date.parse("2026-08-19T01:00:00.000Z");
+    const policy = normalizePolicy({
+      offlineAfterSeconds: 600,
+      noActivityAfterSeconds: 300,
+      defaultExpectedMaxSeconds: 120,
+    });
+    const job = { status: "running", startedAt: "2026-08-19T00:00:00.000Z" };
+    const stage = {
+      stageId: "idea_clarify",
+      status: "running",
+      startedAt: "2026-08-19T00:00:00.000Z",
+      lastActivityAt: "2026-08-19T00:58:00.000Z",
+    };
+    const delayed = evaluateStageHealth({
+      job,
+      stage,
+      agent: { state: "running", lastHeartbeatAt: "2026-08-19T00:59:30.000Z" },
+      policy,
+      nowMs,
+    });
+    assert.equal(delayed.state, "delayed");
+    assert.equal(delayed.shouldNotify, false);
+    assert.equal(job.status, "running");
+
+    const inactive = evaluateStageHealth({
+      job,
+      stage: { ...stage, lastActivityAt: "2026-08-19T00:40:00.000Z" },
+      agent: { state: "running", lastHeartbeatAt: "2026-08-19T00:59:30.000Z" },
+      policy,
+      nowMs,
+    });
+    assert.equal(inactive.state, "inactive");
+    const offline = evaluateStageHealth({
+      job,
+      stage,
+      agent: { state: "running", lastHeartbeatAt: "2026-08-19T00:40:00.000Z" },
+      policy,
+      nowMs,
+    });
+    assert.equal(offline.state, "offline");
+    assert.equal(job.status, "running");
+  });
+
+  it("notification key separates revisions and deduplicates identical events", async () => {
+    const common = {
+      ownerUid: "user_a", instructionId: "wi_plan_keys", jobId: "job_x",
+      stageId: "idea_clarify", stageNumber: 1, stageName: "아이디어 정리",
+      eventType: "approval_required",
+    };
+    const a = await enqueueNotification(db, { ...common, revision: 1 });
+    const duplicate = await enqueueNotification(db, { ...common, revision: 1 });
+    const r2 = await enqueueNotification(db, { ...common, revision: 2 });
+    assert.equal(a.created, true);
+    assert.equal(duplicate.created, false);
+    assert.equal(r2.created, true);
+    assert.notEqual(a.id, r2.id);
   });
 });

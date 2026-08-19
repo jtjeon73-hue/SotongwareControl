@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
+import '../models/sotong24_monitoring.dart';
 import 'business_planning_service.dart';
 import 'firebase_ready.dart';
 
@@ -55,6 +56,23 @@ class Sotong24RemoteRepository {
       StreamController<List<Sotong24RemoteProject>>.broadcast();
 
   static const collectionName = 'sotong24work_projects';
+  static const monitoringConfigCollection = 'monitoring_config';
+
+  Future<Sotong24MonitoringPolicy> fetchMonitoringPolicy() async {
+    if (usesMemory) return const Sotong24MonitoringPolicy();
+    try {
+      final db = _db ?? FirebaseFirestore.instance;
+      final snap = await db
+          .collection(monitoringConfigCollection)
+          .doc('default')
+          .get();
+      return snap.exists
+          ? Sotong24MonitoringPolicy.fromMap(snap.data() ?? const {})
+          : const Sotong24MonitoringPolicy();
+    } catch (_) {
+      return const Sotong24MonitoringPolicy();
+    }
+  }
 
   bool get usesMemory => _forceMemory || !isFirebaseReady();
 
@@ -188,9 +206,11 @@ class Sotong24RemoteRepository {
         resultUrl: s.resultUrl,
         previewUrl: s.previewUrl,
         approvalRequired: true,
+        criteriaMet: true,
         approvalStatus: ApprovalStatus.pending,
         activeRequestId: s.activeRequestId,
         updatedAt: now,
+        revision: (s.revision > 0 ? s.revision : 1) + 1,
       );
     }).toList();
     final updated = project.copyWith(
@@ -303,6 +323,8 @@ class Sotong24RemoteRepository {
       createdAt: now,
       updatedAt: now,
       processedAt: now,
+      revision: stage.revision > 0 ? stage.revision : 1,
+      processed: true,
     );
 
     if (usesMemory || _projects == null || project.isDemo) {
@@ -317,23 +339,20 @@ class Sotong24RemoteRepository {
 
     try {
       final doc = _projects!.doc(projectId);
-      await doc.collection('requests').doc(resolvedId).set(request.toMap());
-      await doc.collection('stages').doc(stageId).set({
+      final firestore = _db ?? FirebaseFirestore.instance;
+      final batch = firestore.batch();
+      batch.set(doc.collection('requests').doc(resolvedId), request.toMap());
+      batch.set(doc.collection('stages').doc(stageId), {
         'approvalStatus': decision,
-        'status': decision == ApprovalStatus.approved
-            ? Sotong24WorkStatus.completed
-            : Sotong24WorkStatus.revision,
         'activeRequestId': resolvedId,
         'updatedAt': now,
         if (message.isNotEmpty) 'userAttention': message,
       }, SetOptions(merge: true));
-      await doc.set({
+      batch.set(doc, {
         'approvalStatus': decision,
-        'status': decision == ApprovalStatus.approved
-            ? Sotong24WorkStatus.inProgress
-            : Sotong24WorkStatus.revision,
         'updatedAt': now,
       }, SetOptions(merge: true));
+      await batch.commit();
       return null;
     } catch (e) {
       return '저장에 실패했습니다. 네트워크·권한을 확인해 주세요. ($e)';
@@ -351,22 +370,18 @@ class Sotong24RemoteRepository {
       if (s.stageId != stageId) return s;
       return s.copyWith(
         approvalStatus: decision,
-        status: decision == ApprovalStatus.approved
-            ? Sotong24WorkStatus.completed
-            : Sotong24WorkStatus.revision,
+        // The Agent owns execution status. A phone decision must not claim
+        // completed/reworking before workflowApplied is persisted by the PC.
+        status: s.status,
         activeRequestId: request.requestId,
         updatedAt: now,
         summary: request.message.isNotEmpty ? request.message : s.summary,
       );
     }).toList();
 
-    final nextStatus = decision == ApprovalStatus.approved
-        ? Sotong24WorkStatus.inProgress
-        : Sotong24WorkStatus.revision;
-
     final updated = project.copyWith(
       stages: stages,
-      status: nextStatus,
+      status: project.status,
       approvalStatus: decision,
       updatedAt: now,
     );

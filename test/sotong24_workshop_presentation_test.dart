@@ -38,6 +38,12 @@ void main() {
               stageNumber: 1,
               stageName: '아이디어 정리',
               status: stageStatus,
+              approvalRequired:
+                  Sotong24UserFacingStatus.normalize(stageStatus) ==
+                  Sotong24WorkStatus.awaitingApproval,
+              criteriaMet:
+                  Sotong24UserFacingStatus.normalize(stageStatus) ==
+                  Sotong24WorkStatus.awaitingApproval,
               approvalStatus: stageApproval,
               resultUrl: resultUrl,
             ),
@@ -133,6 +139,19 @@ void main() {
       expect(p.showApprovalActions, isTrue);
     });
 
+    test('승인 제출 후 Agent 적용 전에는 승인 대기를 유지하고 버튼을 숨긴다', () {
+      final p = project(
+        id: 'wi_plan_approval_inflight',
+        title: '운영 승인 반영 중',
+        status: Sotong24WorkStatus.awaitingApproval,
+        stageStatus: Sotong24WorkStatus.awaitingApproval,
+        stageApproval: ApprovalStatus.approved,
+      );
+      expect(p.userFacingStatus, Sotong24WorkStatus.awaitingApproval);
+      expect(p.showApprovalActions, isFalse);
+      expect(p.nowTodoHeadline(), '승인 요청을 전송했습니다. Agent가 다음 단계를 준비 중입니다.');
+    });
+
     test('awaiting_user_approval / pending_review alias → 승인 대기', () {
       final a = project(
         id: 'wi_plan_1786083242850',
@@ -143,6 +162,28 @@ void main() {
       expect(a.userFacingStatus, Sotong24WorkStatus.awaitingApproval);
       expect(a.userFacingStatusLabel, '승인 대기');
       expect(a.showApprovalActions, isTrue);
+    });
+
+    test('criteriaMet=false이면 승인 대기 표시여도 버튼을 숨긴다', () {
+      final p = project(
+        id: 'wi_plan_incomplete_gate',
+        title: '완료기준 동기화 중',
+        status: Sotong24WorkStatus.awaitingApproval,
+        stages: const [
+          Sotong24RemoteStage(
+            stageId: 'problem_validate',
+            stageNumber: 2,
+            stageName: '고객 문제 검증',
+            status: Sotong24WorkStatus.awaitingApproval,
+            approvalRequired: true,
+            criteriaMet: false,
+            approvalStatus: ApprovalStatus.pending,
+          ),
+        ],
+        currentStage: 2,
+      );
+      expect(p.userFacingStatus, Sotong24WorkStatus.awaitingApproval);
+      expect(p.showApprovalActions, isFalse);
     });
 
     test('revision 필드가 있으면 결과 버전을 표시한다', () {

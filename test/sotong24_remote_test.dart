@@ -109,6 +109,10 @@ void main() {
       after.stages.firstWhere((s) => s.stageId == stage.stageId).approvalStatus,
       ApprovalStatus.approved,
     );
+    expect(after.status, Sotong24WorkStatus.awaitingApproval);
+    expect(after.currentStageDoc!.status, Sotong24WorkStatus.awaitingApproval);
+    expect(after.showApprovalActions, isFalse);
+    expect(after.nowTodoHeadline(), '승인 요청을 전송했습니다. Agent가 다음 단계를 준비 중입니다.');
 
     // 동일 requestId 재승인 거부
     expect(
@@ -168,18 +172,24 @@ void main() {
     );
     final after = await repo.getProject(project.projectId);
     expect(after!.approvalStatus, ApprovalStatus.revisionRequested);
-    expect(after.status, Sotong24WorkStatus.revision);
+    // Raw execution status stays Agent-owned until the request is applied.
+    expect(after.status, Sotong24WorkStatus.awaitingApproval);
+    expect(after.currentStageDoc!.status, Sotong24WorkStatus.awaitingApproval);
+    expect(after.userFacingStatus, Sotong24WorkStatus.revision);
+    expect(after.showApprovalActions, isFalse);
   });
 
-  test('allocateRequestId: pending은 재사용, 처리완료면 신규', () {
+  test('allocateRequestId: 동일 revision terminal은 재사용, r2만 신규', () {
     final stage = Sotong24RemoteStage(
       stageId: 'stage_07_outline',
       stageNumber: 7,
       stageName: '아웃라인',
       status: Sotong24WorkStatus.awaitingApproval,
       approvalRequired: true,
+      criteriaMet: true,
       approvalStatus: ApprovalStatus.pending,
       activeRequestId: 'req_rev_A',
+      revision: 1,
     );
     final existing = [
       const Sotong24RemoteRequest(
@@ -189,6 +199,7 @@ void main() {
         requestType: 'revision_request',
         status: ApprovalStatus.revisionRequested,
         processedAt: '2026-08-15T12:00:00.000Z',
+        revision: 1,
       ),
     ];
     final next = Sotong24RemoteApprovalGuard.allocateRequestId(
@@ -197,9 +208,16 @@ void main() {
       preferred: 'req_rev_A',
       now: DateTime.utc(2026, 8, 15, 12, 30),
     );
-    expect(next, isNot(equals('req_rev_A')));
-    expect(next, isNotEmpty);
-    expect(next, startsWith('req_stage_07_outline_'));
+    expect(next, 'req_rev_A');
+
+    final r2 = Sotong24RemoteApprovalGuard.allocateRequestId(
+      stage: stage.copyWith(revision: 2),
+      existingRequests: existing,
+      preferred: 'req_rev_A',
+      now: DateTime.utc(2026, 8, 15, 12, 30),
+    );
+    expect(r2, isNot(equals('req_rev_A')));
+    expect(r2, startsWith('req_stage_07_outline_'));
 
     final open = Sotong24RemoteApprovalGuard.allocateRequestId(
       stage: stage.copyWith(activeRequestId: 'req_pending_open'),
@@ -308,6 +326,7 @@ void main() {
                     ? Sotong24WorkStatus.awaitingApproval
                     : Sotong24WorkStatus.ready),
           approvalRequired: i + 1 == 8,
+          criteriaMet: i + 1 <= 8,
           approvalStatus: i + 1 == 8
               ? ApprovalStatus.pending
               : ApprovalStatus.notRequired,

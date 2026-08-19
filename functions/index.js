@@ -8,10 +8,13 @@
  */
 const functions = require("firebase-functions");
 const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { handleRelayRequest } = require("./sotong24/relay");
 const { handleApiRequest } = require("./remote/router");
+const { evaluateActiveJobs, deliverNotificationEvent } = require("./remote/monitoring");
 const { createAdminStorageDeps } = require("./sotong24/artifact");
 
 if (!admin.apps.length) {
@@ -133,6 +136,26 @@ exports.api = onRequest(
     await handleApiRequest(req, res, {
       db: admin.firestore(),
     });
+  }
+);
+
+/** Observer-only monitoring. It emits idempotent events and never changes jobs/stages. */
+exports.monitorStageHealth = onSchedule(
+  { schedule: "every 5 minutes", timeZone: "Asia/Seoul", maxInstances: 1 },
+  async () => {
+    await evaluateActiveJobs(admin.firestore());
+  }
+);
+
+/** FCM delivery is doubly gated by notification event + monitoring config mode. */
+exports.deliverNotificationEvent = onDocumentCreated(
+  "notificationEvents/{eventId}",
+  async (event) => {
+    await deliverNotificationEvent(
+      admin.firestore(),
+      admin.messaging(),
+      event.params.eventId
+    );
   }
 );
 

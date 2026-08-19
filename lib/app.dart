@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'data/business_departments/business_department_catalog.dart';
 import 'data/sample_business_data.dart';
@@ -33,6 +35,8 @@ import 'screens/study/study_notes_and_more_screens.dart';
 import 'screens/standard_production_guide_screen.dart';
 import 'screens/system_settings_screen.dart';
 import 'services/auth_service.dart';
+import 'services/firebase_ready.dart';
+import 'services/sotong24_notification_service.dart';
 import 'state/control_scope.dart';
 import 'state/control_state.dart';
 import 'theme/control_theme.dart';
@@ -82,6 +86,49 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   IdeaToPlanningSeed? _ideaSeed;
   String? _workshopFocusInstructionId;
+  String? _workshopFocusStageId;
+  Sotong24NotificationService? _notificationService;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyDeepLink(Uri.base);
+    if (isFirebaseReady()) {
+      _notificationService = Sotong24NotificationService();
+      unawaited(
+        _notificationService!
+            .initialize(onOpen: _applyDeepLink)
+            .catchError((_) {}),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    final notificationService = _notificationService;
+    if (notificationService != null) {
+      unawaited(notificationService.dispose());
+    }
+    super.dispose();
+  }
+
+  void _applyDeepLink(Uri uri) {
+    if (uri.queryParameters['screen'] != 'ai-production') return;
+    final projectId = uri.queryParameters['projectId']?.trim() ?? '';
+    final stageId = uri.queryParameters['stageId']?.trim() ?? '';
+    if (projectId.isEmpty) return;
+    setState(() {
+      _selected = ControlDestination.productWorkshop;
+      _workshopFocusInstructionId = projectId;
+      _workshopFocusStageId = stageId.isEmpty ? null : stageId;
+    });
+  }
+
+  Future<bool> _enableNotifications() async {
+    final service = _notificationService;
+    if (service == null) return false;
+    return service.enable();
+  }
 
   /// 사업전략연구실 모바일/전체화면 읽기 시 총관제 상단 헤더 숨김.
   var _hideShellChrome = false;
@@ -95,6 +142,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       if (destination == ControlDestination.productWorkshop) {
         final id = workshopInstructionId?.trim() ?? '';
         _workshopFocusInstructionId = id.isEmpty ? null : id;
+        _workshopFocusStageId = null;
       }
       if (destination != ControlDestination.aiBusinessAnalysis) {
         _ideaSeed = null;
@@ -278,6 +326,8 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
         return ProductWorkshopScreen(
           key: ValueKey(_workshopFocusInstructionId ?? 'workshop_all'),
           focusInstructionId: _workshopFocusInstructionId,
+          focusStageId: _workshopFocusStageId,
+          onEnableNotifications: _enableNotifications,
           onStartNewWork: () =>
               _onDestinationSelected(ControlDestination.aiBusinessAnalysis),
         );

@@ -27,6 +27,7 @@ void main() {
               ? Sotong24WorkStatus.awaitingApproval
               : Sotong24WorkStatus.ready,
           approvalRequired: i == awaitingAt,
+          criteriaMet: i <= completed || i == awaitingAt,
           approvalStatus: i == awaitingAt
               ? ApprovalStatus.pending
               : ApprovalStatus.notRequired,
@@ -607,7 +608,9 @@ void main() {
       final after = await repo.getProject(project.projectId);
       expect(after, isNotNull);
       expect(after!.approvalStatus, ApprovalStatus.revisionRequested);
-      expect(after.status, Sotong24WorkStatus.revision);
+      expect(after.status, Sotong24WorkStatus.awaitingApproval);
+      expect(after.userFacingStatus, Sotong24WorkStatus.revision);
+      expect(after.showApprovalActions, isFalse);
       final stage = after.stages.firstWhere((s) => s.stageNumber == 7);
       expect(stage.summary, msg);
       expect(stage.approvalStatus, ApprovalStatus.revisionRequested);

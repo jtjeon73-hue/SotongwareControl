@@ -132,6 +132,13 @@ function createMockDb() {
   return {
     store,
     writes,
+    async runTransaction(callback) {
+      const tx = {
+        get: (ref) => ref.get(),
+        set: (ref, data, opts) => ref.set(data, opts),
+      };
+      return callback(tx);
+    },
     collection(name) {
       return collectionRef([], name);
     },
@@ -281,6 +288,7 @@ describe("allowlist / validation", () => {
         summary: "미리보기",
         resultPreview: "ok",
         approvalRequired: true,
+        criteriaMet: true,
         workReport: "SHOULD_NOT_PERSIST",
         fullManuscript: "SECRET",
       },
@@ -297,6 +305,8 @@ describe("allowlist / validation", () => {
         stageId: "draft",
         stageNumber: 7,
         status: "awaiting_approval",
+        approvalRequired: true,
+        criteriaMet: true,
         resultUrl:
           "https://storage.googleapis.com/sotongware-control.appspot.com/sotong24/artifacts/test/x/draft/r1/a.md",
         previewUrl:
@@ -384,6 +394,8 @@ describe("allowlist / validation", () => {
         stageId: "idea_clarify",
         stageNumber: 1,
         status: "awaiting_approval",
+        approvalRequired: true,
+        criteriaMet: true,
         startedAt: "2026-08-18T00:00:00.000Z",
         completedAt: "2026-08-18T00:07:20.000Z",
         workDurationMs: 440000,
@@ -395,6 +407,35 @@ describe("allowlist / validation", () => {
     assert.equal(s.completedAt, "2026-08-18T00:07:20.000Z");
     assert.equal(s.workDurationMs, 440000);
     assert.equal(s.revision, 2);
+  });
+
+  it("rejects approval-ready status without the completion contract", () => {
+    assert.throws(
+      () => pickStageAllowlist(
+        {
+          stageId: "problem_validate",
+          stageNumber: 2,
+          status: "awaiting_approval",
+          approvalRequired: true,
+          criteriaMet: false,
+        },
+        { productType: "ebook", serverNowIso }
+      ),
+      /completed_stage_requires_criteriaMet_true/
+    );
+    assert.throws(
+      () => pickStageAllowlist(
+        {
+          stageId: "problem_validate",
+          stageNumber: 2,
+          status: "awaiting_approval",
+          approvalRequired: false,
+          criteriaMet: true,
+        },
+        { productType: "ebook", serverNowIso }
+      ),
+      /awaiting_approval_requires_approvalRequired_true/
+    );
   });
 
   it("allows startedAt only", () => {
@@ -532,6 +573,7 @@ describe("relay HTTP handler", () => {
       status: "awaiting_approval",
       approvalStatus: "pending",
       approvalRequired: true,
+      criteriaMet: true,
       summary: "출시 대기",
       resultPreview: "preview",
     };
@@ -552,6 +594,49 @@ describe("relay HTTP handler", () => {
     assert.equal(sdoc.stageName, "공개 및 공유");
   });
 
+  it("same revision sync cannot reopen a terminal approval, r2 can become pending", async () => {
+    const db = createMockDb();
+    const path = `sotong24work_projects/${sampleProject.projectId}/stages/launch`;
+    db.store.set(path, {
+      stageId: "launch",
+      stageNumber: 15,
+      status: "awaiting_approval",
+      criteriaMet: true,
+      approvalRequired: true,
+      approvalStatus: "approved",
+      activeRequestId: "req_launch_r1",
+      revision: 1,
+    });
+    const base = {
+      stageId: "launch",
+      stageNumber: 15,
+      status: "awaiting_approval",
+      criteriaMet: true,
+      approvalRequired: true,
+      approvalStatus: "pending",
+    };
+    const same = await call({
+      operation: "stage_sync",
+      project: sampleProject,
+      stage: { ...base, revision: 1, activeRequestId: "req_reopened" },
+    }, { db });
+    assert.equal(same.statusCode, 200);
+    assert.equal(db.store.get(path).approvalStatus, "approved");
+    assert.equal(db.store.get(path).activeRequestId, "req_launch_r1");
+
+    const r2 = await call({
+      operation: "stage_sync",
+      project: sampleProject,
+      stage: { ...base, revision: 2, activeRequestId: "req_launch_r2" },
+    }, { db });
+    assert.equal(r2.statusCode, 200);
+    assert.equal(db.store.get(path).approvalStatus, "pending");
+    // activeRequestId is phone-owned and not part of the Agent allowlist. The
+    // r2 submit guard allocates a new id because the stored r1 request differs.
+    assert.equal(db.store.get(path).activeRequestId, "req_launch_r1");
+    assert.equal(db.store.get(path).revision, 2);
+  });
+
   it("stage_sync persists resultUrl/previewUrl", async () => {
     const db = createMockDb();
     const resultUrl =
@@ -564,6 +649,8 @@ describe("relay HTTP handler", () => {
           stageId: "draft",
           stageNumber: 7,
           status: "awaiting_approval",
+          approvalRequired: true,
+          criteriaMet: true,
           resultUrl,
           previewUrl: resultUrl,
           workReport: "NOPE",
@@ -586,6 +673,8 @@ describe("relay HTTP handler", () => {
       stageId: id,
       stageNumber: i + 1,
       status: i + 1 < 15 ? "completed" : i + 1 === 15 ? "awaiting_approval" : "ready",
+      criteriaMet: i + 1 <= 15,
+      approvalRequired: i + 1 === 15,
       approvalStatus: i + 1 === 15 ? "pending" : "not_required",
     }));
     const res = await call(
@@ -613,6 +702,7 @@ describe("relay HTTP handler", () => {
             : i + 1 === 15
               ? "in_progress"
               : "ready",
+      criteriaMet: i + 1 < 15 && id !== "build_test" && id !== "deploy",
     }));
     const res = await call(
       {
@@ -792,6 +882,43 @@ describe("request_poll", () => {
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.requests.length, 1);
     assert.equal(res.body.requests[0].requestId, "req_new");
+  });
+
+  it("request_applied stores one idempotent workflow receipt", async () => {
+    const db = createMockDb();
+    seedProject(db, projectId, { currentStageId: "launch" });
+    seedRequest(db, projectId, "req_apply_once", {
+      requestId: "req_apply_once",
+      projectId,
+      stageId: "launch",
+      requestType: "approve",
+      status: "approved",
+      createdAt: "2026-08-11T06:00:00.000Z",
+      updatedAt: "2026-08-11T06:00:00.000Z",
+    });
+    const body = {
+      operation: "request_applied",
+      projectId,
+      requestId: "req_apply_once",
+      completedStageId: "launch",
+      nextStageIdPrepared: "measure",
+    };
+    const first = await call(body, { db });
+    const second = await call(body, { db });
+    assert.equal(first.statusCode, 200);
+    assert.equal(first.body.idempotent, false);
+    assert.equal(second.statusCode, 200);
+    assert.equal(second.body.idempotent, true);
+    const saved = db.store.get(
+      `sotong24work_projects/${projectId}/requests/req_apply_once`
+    );
+    assert.equal(saved.processed, true);
+    assert.equal(saved.workflowApplied, true);
+    assert.equal(saved.completedStageId, "launch");
+    assert.equal(saved.nextStageIdPrepared, "measure");
+
+    const conflict = await call({ ...body, nextStageIdPrepared: "learn" }, { db });
+    assert.equal(conflict.statusCode, 409);
   });
 
   it("rejects path injection projectId", async () => {

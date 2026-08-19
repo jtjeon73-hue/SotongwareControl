@@ -17,8 +17,10 @@ const {
   handleReportState,
   handleReportJob,
   handleReportStage,
+  handleReportActivity,
   handleReportError,
   handleCreatePairing,
+  handleRegisterNotificationToken,
   handleCreateJob,
   handleStartJob,
   handleDeliverInstruction,
@@ -77,6 +79,8 @@ async function handleApiRequest(req, res, deps) {
       "/agent/report-job": handleReportJob,
       "/api/agent/report-stage": handleReportStage,
       "/agent/report-stage": handleReportStage,
+      "/api/agent/report-activity": handleReportActivity,
+      "/agent/report-activity": handleReportActivity,
       "/api/agent/report-error": handleReportError,
       "/agent/report-error": handleReportError,
     };
@@ -102,6 +106,10 @@ async function handleApiRequest(req, res, deps) {
         const { uid } = await authenticateControl(req, deps);
         logCtx = { type: path, agentId: null };
         return handleCreatePairing(db, uid, body);
+      },
+      "/api/control/register-notification-token": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleRegisterNotificationToken(db, uid, body);
       },
       "/api/control/create-job": async () => {
         const { uid } = await authenticateControl(req, deps);
