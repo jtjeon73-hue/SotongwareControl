@@ -789,6 +789,23 @@ describe("remote agent contract V1", () => {
     });
     assert.equal(offline.state, "offline");
     assert.equal(job.status, "running");
+
+    const awaiting = evaluateStageHealth({
+      job: { ...job, status: "waiting_approval" },
+      stage: {
+        ...stage,
+        status: "waiting_approval",
+        completedAt: "2026-08-19T00:10:00.000Z",
+        lastActivityAt: "2026-08-19T00:10:00.000Z",
+      },
+      agent: { state: "idle", lastHeartbeatAt: "2026-08-19T00:10:00.000Z" },
+      policy,
+      nowMs,
+    });
+    assert.equal(awaiting.state, "awaiting_user");
+    assert.equal(awaiting.shouldNotify, false);
+    assert.equal(awaiting.elapsedSeconds, 600);
+    assert.equal(awaiting.approvalWaitSeconds, 3000);
   });
 
   it("notification key separates revisions and deduplicates identical events", async () => {

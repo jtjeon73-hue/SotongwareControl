@@ -1,6 +1,13 @@
 import 'sotong24_remote_models.dart';
 
-enum Sotong24StageHealth { healthy, delayed, inactive, offline, error }
+enum Sotong24StageHealth {
+  healthy,
+  delayed,
+  awaitingUser,
+  inactive,
+  offline,
+  error,
+}
 
 class Sotong24DurationRange {
   const Sotong24DurationRange({
@@ -90,6 +97,7 @@ class Sotong24StageMonitoringSnapshot {
     required this.heartbeatAge,
     required this.agentOnline,
     required this.activityLabel,
+    this.approvalWaitAge,
     this.expectedRange,
   });
 
@@ -99,6 +107,7 @@ class Sotong24StageMonitoringSnapshot {
   final Duration? heartbeatAge;
   final bool agentOnline;
   final String activityLabel;
+  final Duration? approvalWaitAge;
   final Sotong24DurationRange? expectedRange;
 
   String get healthLabel {
@@ -107,6 +116,8 @@ class Sotong24StageMonitoringSnapshot {
         return '정상 진행';
       case Sotong24StageHealth.delayed:
         return '예상보다 오래 걸림';
+      case Sotong24StageHealth.awaitingUser:
+        return '사용자 승인 대기';
       case Sotong24StageHealth.inactive:
         return '응답 확인 필요';
       case Sotong24StageHealth.offline:
@@ -138,14 +149,25 @@ class Sotong24StageMonitoring {
           ? stage.lastActivityAt
           : project.lastActivityAt,
     );
-    final elapsed = age(
+    final startedAt = DateTime.tryParse(
       stage.startedAt.isNotEmpty ? stage.startedAt : project.startedAt,
+    )?.toUtc();
+    final completedAt = DateTime.tryParse(stage.completedAt)?.toUtc();
+    final elapsed = startedAt == null
+        ? null
+        : ((completedAt ?? clock).difference(startedAt).isNegative
+              ? Duration.zero
+              : (completedAt ?? clock).difference(startedAt));
+    final approvalWaitAge = age(
+      stage.completedAt.isNotEmpty ? stage.completedAt : stage.lastActivityAt,
     );
     final online = heartbeatAge != null && heartbeatAge <= policy.offlineAfter;
     final status = Sotong24UserFacingStatus.normalize(stage.status);
     late final Sotong24StageHealth health;
     if (status == Sotong24WorkStatus.error || stage.errorMessage.isNotEmpty) {
       health = Sotong24StageHealth.error;
+    } else if (status == Sotong24WorkStatus.awaitingApproval) {
+      health = Sotong24StageHealth.awaitingUser;
     } else if (!online) {
       health = Sotong24StageHealth.offline;
     } else if (activityAge == null || activityAge > policy.noActivityAfter) {
@@ -164,6 +186,9 @@ class Sotong24StageMonitoring {
       heartbeatAge: heartbeatAge,
       agentOnline: online,
       activityLabel: activityLabel(stage.activityState),
+      approvalWaitAge: status == Sotong24WorkStatus.awaitingApproval
+          ? approvalWaitAge
+          : null,
       expectedRange: policy.expectedRangeFor(stage.stageId),
     );
   }

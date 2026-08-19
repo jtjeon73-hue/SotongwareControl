@@ -90,4 +90,27 @@ void main() {
     );
     expect(result.health, Sotong24StageHealth.offline);
   });
+
+  test('waiting approval freezes work time and never becomes inactivity', () {
+    final awaiting = Sotong24RemoteStage(
+      stageId: 'idea_clarify',
+      stageNumber: 1,
+      stageName: '아이디어 정리',
+      status: Sotong24WorkStatus.awaitingApproval,
+      startedAt: '2026-08-19T00:00:00.000Z',
+      completedAt: '2026-08-19T00:02:00.000Z',
+      lastActivityAt: '2026-08-19T00:02:00.000Z',
+      activityState: 'approval_preparing',
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(heartbeat: '2026-08-19T00:02:00.000Z', stage: awaiting),
+      stage: awaiting,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T01:02:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.awaitingUser);
+    expect(result.healthLabel, '사용자 승인 대기');
+    expect(result.elapsed, const Duration(minutes: 2));
+    expect(result.approvalWaitAge, const Duration(hours: 1));
+  });
 }

@@ -52,6 +52,13 @@ function ageSeconds(value, nowMs) {
   return Math.max(0, (nowMs - at) / 1000);
 }
 
+function durationSeconds(startValue, endValue, nowMs) {
+  const start = millis(startValue);
+  const end = millis(endValue);
+  if (!Number.isFinite(start)) return NaN;
+  return Math.max(0, ((Number.isFinite(end) ? end : nowMs) - start) / 1000);
+}
+
 function stageExpectedRange(policy, stageId) {
   const raw = policy.stageExpectedDurations[String(stageId || "")] || {};
   const sampleCount = Number(raw.sampleCount) || 0;
@@ -69,6 +76,15 @@ function evaluateStageHealth({ job, stage, agent, policy: rawPolicy, nowMs = Dat
     return { state: "error", shouldNotify: true };
   }
   const heartbeatAgeSeconds = ageSeconds(agent.lastHeartbeatAt, nowMs);
+  if (status === WORK_STATUS.WAITING_APPROVAL || status === "awaiting_approval") {
+    return {
+      state: "awaiting_user",
+      shouldNotify: false,
+      heartbeatAgeSeconds,
+      elapsedSeconds: durationSeconds(stage.startedAt || job.startedAt, stage.completedAt, nowMs),
+      approvalWaitSeconds: ageSeconds(stage.completedAt || stage.lastActivityAt, nowMs),
+    };
+  }
   if (heartbeatAgeSeconds > policy.offlineAfterSeconds) {
     return { state: "offline", shouldNotify: true, heartbeatAgeSeconds };
   }

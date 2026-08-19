@@ -927,6 +927,7 @@ class _StageMonitoringPanel extends StatelessWidget {
     final healthColor = switch (snapshot.health) {
       Sotong24StageHealth.healthy => ControlColors.teal,
       Sotong24StageHealth.delayed => Colors.orange.shade800,
+      Sotong24StageHealth.awaitingUser => ControlColors.teal,
       Sotong24StageHealth.inactive ||
       Sotong24StageHealth.offline => ControlColors.accentRose,
       Sotong24StageHealth.error => Colors.red.shade800,
@@ -949,11 +950,15 @@ class _StageMonitoringPanel extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
-            '진행 중 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} 경과',
+            snapshot.health == Sotong24StageHealth.awaitingUser
+                ? '작업 완료 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
+                : '진행 중 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} 경과',
             style: const TextStyle(fontSize: 13),
           ),
           Text(
-            'Agent ${snapshot.agentOnline ? snapshot.healthLabel : '오프라인'} · 마지막 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
+            snapshot.health == Sotong24StageHealth.awaitingUser
+                ? '사용자 승인 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.approvalWaitAge)}'
+                : 'Agent ${snapshot.agentOnline ? snapshot.healthLabel : '오프라인'} · 마지막 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
             style: TextStyle(
               fontSize: 13,
               color: healthColor,

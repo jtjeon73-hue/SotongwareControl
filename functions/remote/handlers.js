@@ -25,7 +25,11 @@ const { nowIso } = require("./log");
 const { assertProtocolVersion } = require("./auth");
 const { pickAiUsageCodex } = require("./ai_usage");
 const { loadPolicy, enqueueNotification } = require("./monitoring");
-const { mergeMonotonicStage } = require("../sotong24/writer");
+const {
+  mergeMonotonicStage,
+  mergeMonotonicProject,
+} = require("../sotong24/writer");
+const { EBOOK_STAGE_BY_ID } = require("../sotong24/canonical");
 
 const AGENT_STATES = new Set(Object.values(AGENT_STATE));
 const WORK_STATUSES = new Set(Object.values(WORK_STATUS));
@@ -440,6 +444,8 @@ async function handleReportStage(db, ctx, body) {
 
   const jobPatch = {
     currentStage: stageId,
+    currentStageNumber: Number(body.stageNumber || previous.stageNumber) ||
+      EBOOK_STAGE_BY_ID.get(stageId)?.order || 0,
     updatedAt: ts,
     lastActivityAt: ts,
     ...(body.criteriaMet != null ? { currentStageCriteriaMet: body.criteriaMet === true } : {}),
@@ -449,6 +455,14 @@ async function handleReportStage(db, ctx, body) {
   // one transaction so a successful report-stage can never leave job=running.
   if (status === WORK_STATUS.WAITING_APPROVAL) {
     jobPatch.status = WORK_STATUS.WAITING_APPROVAL;
+  } else if (activeStatus.has(status)) {
+    jobPatch.status = status === WORK_STATUS.REWORKING
+      ? WORK_STATUS.REWORKING
+      : WORK_STATUS.RUNNING;
+  } else if (status === WORK_STATUS.COMPLETED) {
+    jobPatch.status = EBOOK_STAGE_BY_ID.get(stageId)?.terminal
+      ? WORK_STATUS.COMPLETED
+      : WORK_STATUS.RUNNING;
   }
   const instructionId = String(job.instructionId || "").trim();
   const projectRef = instructionId
@@ -459,18 +473,22 @@ async function handleReportStage(db, ctx, body) {
     : null;
   await db.runTransaction(async (tx) => {
     const snapshots = await Promise.all([
+      tx.get(jobRef),
       tx.get(stageRef),
       ...(projectRef ? [tx.get(projectRef), tx.get(projectStageRef)] : []),
     ]);
-    const currentJobStage = snapshots[0].exists
-      ? snapshots[0].data() || {}
+    const currentJob = snapshots[0].exists ? snapshots[0].data() || {} : {};
+    const currentJobStage = snapshots[1].exists
+      ? snapshots[1].data() || {}
       : {};
     const safeJobStage = mergeMonotonicStage(currentJobStage, patch);
+    const safeJob = mergeMonotonicProject(currentJob, jobPatch);
     tx.set(stageRef, safeJobStage, { merge: true });
-    tx.set(jobRef, jobPatch, { merge: true });
-    if (projectRef && snapshots[1].exists) {
-      const currentProjectStage = snapshots[2].exists
-        ? snapshots[2].data() || {}
+    tx.set(jobRef, safeJob, { merge: true });
+    if (projectRef && snapshots[2].exists) {
+      const currentProject = snapshots[2].data() || {};
+      const currentProjectStage = snapshots[3].exists
+        ? snapshots[3].data() || {}
         : {};
       const projectStagePatch = mergeMonotonicStage(currentProjectStage, {
         ...patch,
@@ -478,15 +496,25 @@ async function handleReportStage(db, ctx, body) {
         activityState: patch.activityState || String(previous.activityState || ""),
       });
       tx.set(projectStageRef, projectStagePatch, { merge: true });
-      tx.set(projectRef, {
+      const projectStatus = projectStagePatch.status === "awaiting_approval"
+        ? "awaiting_approval"
+        : EBOOK_STAGE_BY_ID.get(stageId)?.terminal &&
+            projectStagePatch.status === "completed"
+          ? "completed"
+          : "in_progress";
+      const safeProject = mergeMonotonicProject(currentProject, {
+        currentStage: Number(projectStagePatch.stageNumber) ||
+          EBOOK_STAGE_BY_ID.get(stageId)?.order || 0,
         currentStageId: stageId,
+        status: projectStatus,
         lastActivityAt: ts,
         activityState: projectStagePatch.activityState || "",
         updatedAt: ts,
         ...(projectStagePatch.status === "awaiting_approval"
-          ? { status: "awaiting_approval", approvalStatus: "pending" }
+          ? { approvalStatus: "pending" }
           : {}),
-      }, { merge: true });
+      });
+      tx.set(projectRef, safeProject, { merge: true });
     }
   });
   if (status === WORK_STATUS.WAITING_APPROVAL) {
