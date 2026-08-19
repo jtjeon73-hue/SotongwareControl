@@ -637,6 +637,54 @@ describe("relay HTTP handler", () => {
     assert.equal(db.store.get(path).revision, 2);
   });
 
+  it("same revision stale full_sync cannot regress awaiting approval or its project rollup", async () => {
+    const db = createMockDb();
+    const projectPath = `sotong24work_projects/${sampleProject.projectId}`;
+    const stagePath = `${projectPath}/stages/launch`;
+    db.store.set(projectPath, {
+      ...sampleProject,
+      status: "awaiting_approval",
+      approvalStatus: "pending",
+    });
+    db.store.set(stagePath, {
+      stageId: "launch",
+      stageNumber: 15,
+      status: "awaiting_approval",
+      criteriaMet: true,
+      approvalRequired: true,
+      approvalStatus: "pending",
+      revision: 1,
+      lastActivityAt: "2026-08-19T02:39:16.313Z",
+      activityState: "approval_preparing",
+    });
+
+    const staleStages = EBOOK_STAGE_IDS.map((id, index) => ({
+      stageId: id,
+      stageNumber: index + 1,
+      status: index + 1 < 15 ? "completed" : index + 1 === 15 ? "in_progress" : "ready",
+      criteriaMet: index + 1 < 15,
+      approvalRequired: false,
+      approvalStatus: "not_required",
+      revision: 1,
+    }));
+    const res = await call({
+      operation: "full_sync",
+      project: { ...sampleProject, status: "in_progress", approvalStatus: "not_required" },
+      stages: staleStages,
+    }, { db });
+
+    assert.equal(res.statusCode, 200);
+    const stage = db.store.get(stagePath);
+    const project = db.store.get(projectPath);
+    assert.equal(stage.status, "awaiting_approval");
+    assert.equal(stage.criteriaMet, true);
+    assert.equal(stage.approvalRequired, true);
+    assert.equal(stage.lastActivityAt, "2026-08-19T02:39:16.313Z");
+    assert.equal(stage.activityState, "approval_preparing");
+    assert.equal(project.status, "awaiting_approval");
+    assert.equal(project.approvalStatus, "pending");
+  });
+
   it("stage_sync persists resultUrl/previewUrl", async () => {
     const db = createMockDb();
     const resultUrl =

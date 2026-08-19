@@ -13,7 +13,11 @@ const {
   reject,
   REQUEST_POLL_MAX_READ,
 } = require("./validate");
-const { upsertProject, upsertStages, markRequestWorkflowApplied } = require("./writer");
+const {
+  upsertProject,
+  upsertProjectAndStages,
+  markRequestWorkflowApplied,
+} = require("./writer");
 const { getProjectDoc, listRequestDocs } = require("./reader");
 const { createRateLimiter } = require("./rate_limit");
 const {
@@ -316,8 +320,7 @@ async function handleRelayRequest(req, res, deps) {
       })
     );
 
-    const projectResult = await upsertProject(db, project);
-    const stageResults = await upsertStages(db, project.projectId, stages);
+    const syncResult = await upsertProjectAndStages(db, project, stages);
 
     safeLog({ op: operation, projectId: project.projectId, result: "ok" });
     res.status(200).json({
@@ -325,8 +328,8 @@ async function handleRelayRequest(req, res, deps) {
       operation,
       projectId: project.projectId,
       serverReceivedAt: serverNowIso,
-      created: projectResult.created,
-      stages: stageResults,
+      created: syncResult.project.created,
+      stages: syncResult.stages,
       elapsedMs: Date.now() - started,
     });
   } catch (err) {

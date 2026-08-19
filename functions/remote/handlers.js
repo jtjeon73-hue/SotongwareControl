@@ -25,6 +25,7 @@ const { nowIso } = require("./log");
 const { assertProtocolVersion } = require("./auth");
 const { pickAiUsageCodex } = require("./ai_usage");
 const { loadPolicy, enqueueNotification } = require("./monitoring");
+const { mergeMonotonicStage } = require("../sotong24/writer");
 
 const AGENT_STATES = new Set(Object.values(AGENT_STATE));
 const WORK_STATUSES = new Set(Object.values(WORK_STATUS));
@@ -370,6 +371,15 @@ async function handleReportJob(db, ctx, body) {
   return {};
 }
 
+function toProjectStageStatus(status) {
+  if (status === WORK_STATUS.WAITING_APPROVAL) return "awaiting_approval";
+  if (status === WORK_STATUS.RUNNING || status === WORK_STATUS.REWORKING ||
+      status === WORK_STATUS.CLAIMED) return "in_progress";
+  if (status === WORK_STATUS.FAILED) return "error";
+  if (status === WORK_STATUS.REVISION_REQUESTED) return "revision";
+  return status;
+}
+
 async function handleReportStage(db, ctx, body) {
   const stageId = String(body.stageId || "").trim();
   const status = String(body.status || "").trim();
@@ -426,7 +436,7 @@ async function handleReportStage(db, ctx, body) {
   if (status === WORK_STATUS.WAITING_APPROVAL) {
     patch.activityState = ACTIVITY_STATE.APPROVAL_PREPARING;
   }
-  if (status === WORK_STATUS.COMPLETED) patch.completedAt = ts;
+  if (reportsCompletion && !previous.completedAt) patch.completedAt = ts;
 
   const jobPatch = {
     currentStage: stageId,
@@ -440,34 +450,45 @@ async function handleReportStage(db, ctx, body) {
   if (status === WORK_STATUS.WAITING_APPROVAL) {
     jobPatch.status = WORK_STATUS.WAITING_APPROVAL;
   }
+  const instructionId = String(job.instructionId || "").trim();
+  const projectRef = instructionId
+    ? db.collection(COL.PROJECTS).doc(instructionId)
+    : null;
+  const projectStageRef = projectRef
+    ? projectRef.collection("stages").doc(stageId)
+    : null;
   await db.runTransaction(async (tx) => {
-    await tx.set(stageRef, patch, { merge: true });
-    await tx.set(jobRef, jobPatch, { merge: true });
-  });
-  await mirrorMonitoring(
-    db,
-    String(job.instructionId || "").trim(),
-    stageId,
-    {
-      status,
-      ...(patch.criteriaMet != null ? { criteriaMet: patch.criteriaMet } : {}),
-      ...(patch.approvalRequired != null ? { approvalRequired: patch.approvalRequired } : {}),
-      ...(patch.revision != null ? { revision: patch.revision } : {}),
-      ...(patch.startedAt ? { startedAt: patch.startedAt } : {}),
-      lastActivityAt: ts,
-      activityState: patch.activityState || String(previous.activityState || ""),
-      activityType: patch.activityType,
-      updatedAt: ts,
-    },
-    {
-      lastActivityAt: ts,
-      updatedAt: ts,
-      currentStageId: stageId,
-      ...(status === WORK_STATUS.WAITING_APPROVAL
-        ? { status: "awaiting_approval", approvalStatus: "pending" }
-        : {}),
+    const snapshots = await Promise.all([
+      tx.get(stageRef),
+      ...(projectRef ? [tx.get(projectRef), tx.get(projectStageRef)] : []),
+    ]);
+    const currentJobStage = snapshots[0].exists
+      ? snapshots[0].data() || {}
+      : {};
+    const safeJobStage = mergeMonotonicStage(currentJobStage, patch);
+    tx.set(stageRef, safeJobStage, { merge: true });
+    tx.set(jobRef, jobPatch, { merge: true });
+    if (projectRef && snapshots[1].exists) {
+      const currentProjectStage = snapshots[2].exists
+        ? snapshots[2].data() || {}
+        : {};
+      const projectStagePatch = mergeMonotonicStage(currentProjectStage, {
+        ...patch,
+        status: toProjectStageStatus(status),
+        activityState: patch.activityState || String(previous.activityState || ""),
+      });
+      tx.set(projectStageRef, projectStagePatch, { merge: true });
+      tx.set(projectRef, {
+        currentStageId: stageId,
+        lastActivityAt: ts,
+        activityState: projectStagePatch.activityState || "",
+        updatedAt: ts,
+        ...(projectStagePatch.status === "awaiting_approval"
+          ? { status: "awaiting_approval", approvalStatus: "pending" }
+          : {}),
+      }, { merge: true });
     }
-  );
+  });
   if (status === WORK_STATUS.WAITING_APPROVAL) {
     const revision = Math.max(1, Number(body.revision || previous.revision) || 1);
     await queueNotificationSafely(db, {

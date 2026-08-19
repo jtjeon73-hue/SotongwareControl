@@ -681,8 +681,34 @@ describe("remote agent contract V1", () => {
     assert.equal(job.status, "waiting_approval");
     assert.equal(job.currentStageCriteriaMet, true);
     assert.equal(jobStage.criteriaMet, true);
+    assert.equal(jobStage.approvalRequired, true);
     assert.equal(project.status, "awaiting_approval");
+    assert.equal(project.currentStageId, "idea_clarify");
+    assert.equal(projectStage.status, "awaiting_approval");
     assert.equal(projectStage.criteriaMet, true);
+    assert.equal(projectStage.approvalRequired, true);
+    assert.equal(projectStage.revision, 1);
+    assert.ok(jobStage.completedAt);
+    assert.ok(projectStage.completedAt);
+    assert.ok(projectStage.lastActivityAt);
+    assert.equal(projectStage.activityState, "approval_preparing");
+
+    const stale = await call(db, "/api/agent/report-stage", {
+      ...body,
+      status: "running",
+      criteriaMet: false,
+      approvalRequired: false,
+    }, { token: env.agentToken });
+    assert.equal(stale.statusCode, 200);
+    assert.equal(
+      db.store.get(`${COL.JOBS}/${env.jobId}/stages/idea_clarify`).status,
+      "waiting_approval"
+    );
+    assert.equal(
+      db.store.get(`${COL.PROJECTS}/${env.instructionId}/stages/idea_clarify`).status,
+      "awaiting_approval"
+    );
+    assert.equal(db.store.get(`${COL.PROJECTS}/${env.instructionId}`).status, "awaiting_approval");
   });
 
   it("waiting approval rejects incomplete criteria before writing", async () => {
