@@ -6,6 +6,9 @@ enum Sotong24StageHealth {
   awaitingUser,
   inactive,
   offline,
+  pausedQuota,
+  pausedNetwork,
+  stalled,
   error,
 }
 
@@ -122,6 +125,12 @@ class Sotong24StageMonitoringSnapshot {
         return '응답 확인 필요';
       case Sotong24StageHealth.offline:
         return 'Agent 오프라인';
+      case Sotong24StageHealth.pausedQuota:
+        return 'AI 사용량 초기화 대기';
+      case Sotong24StageHealth.pausedNetwork:
+        return '네트워크 복구 대기';
+      case Sotong24StageHealth.stalled:
+        return '작업 정체';
       case Sotong24StageHealth.error:
         return '오류';
     }
@@ -164,7 +173,17 @@ class Sotong24StageMonitoring {
     final online = heartbeatAge != null && heartbeatAge <= policy.offlineAfter;
     final status = Sotong24UserFacingStatus.normalize(stage.status);
     late final Sotong24StageHealth health;
-    if (status == Sotong24WorkStatus.error || stage.errorMessage.isNotEmpty) {
+    if (status == Sotong24WorkStatus.pausedQuota) {
+      health = Sotong24StageHealth.pausedQuota;
+    } else if (status == Sotong24WorkStatus.pausedNetwork) {
+      health = Sotong24StageHealth.pausedNetwork;
+    } else if (status == Sotong24WorkStatus.stalled) {
+      health = Sotong24StageHealth.stalled;
+    } else if (status == Sotong24WorkStatus.error ||
+        status == Sotong24WorkStatus.aiProcessFailed ||
+        status == Sotong24WorkStatus.resultValidationFailed ||
+        status == Sotong24WorkStatus.stageTransitionFailed ||
+        stage.errorMessage.isNotEmpty) {
       health = Sotong24StageHealth.error;
     } else if (status == Sotong24WorkStatus.awaitingApproval) {
       health = Sotong24StageHealth.awaitingUser;
@@ -205,6 +224,18 @@ class Sotong24StageMonitoring {
         return '결과물 업로드 중';
       case 'approval_preparing':
         return '승인 대기 준비 중';
+      case 'paused_quota':
+        return 'AI 사용량 초기화 대기';
+      case 'paused_network':
+        return '네트워크 복구 대기';
+      case 'stalled':
+        return '작업 정체 감지';
+      case 'ai_process_failed':
+        return 'AI 실행 실패';
+      case 'result_validation_failed':
+        return '결과 검증 실패';
+      case 'stage_transition_failed':
+        return '단계 전환 실패';
       default:
         return 'Agent 상태 확인 중';
     }

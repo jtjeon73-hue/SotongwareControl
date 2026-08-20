@@ -8,7 +8,7 @@
   "scripts": {
     "lint": "node -c index.js && node -c sotong24/relay.js && node -c sotong24/validate.js && node -c sotong24/auth.js && node -c sotong24/writer.js && node -c sotong24/reader.js && node -c sotong24/canonical.js && node -c sotong24/state_machine.js && node -c sotong24/rate_limit.js && node -c sotong24/artifact.js && node -c remote/router.js && node -c remote/handlers.js && node -c remote/monitoring.js && node -c remote/auth.js && node -c remote/constants.js && node -c remote/crypto_util.js && node -c remote/http.js && node -c remote/log.js && node -c remote/memory_db.js",
     "build": "npm run lint",
-    "test": "node --test test/relay.test.js test/remote_contract.test.js test/artifact_relay.test.js test/state_machine_e2e.test.js",
+    "test": "node --test test/relay.test.js test/remote_contract.test.js test/artifact_relay.test.js test/state_machine_e2e.test.js test/operational_state_contract.test.js",
     "test:relay": "node --test test/relay.test.js test/artifact_relay.test.js",
     "test:remote": "node --test test/remote_contract.test.js",
     "test:emulator": "node test/remote_emulator_e2e.js",

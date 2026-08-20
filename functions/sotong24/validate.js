@@ -187,6 +187,14 @@ function pickProjectAllowlist(input, { serverNowIso }) {
     "contentSubtype",
     MAX_STR.generic
   );
+	const idLooksTest = projectId.startsWith("wi_test_") || projectId.includes("e2e");
+	const isTest = input.isTest === undefined ? idLooksTest : assertBool(input.isTest, "isTest");
+	const environment = input.environment === undefined
+	  ? (isTest ? "test" : "production")
+	  : assertEnum(input.environment, "environment", new Set(["production", "test"]));
+	if ((environment === "test") !== (isTest === true) || (idLooksTest && !isTest)) {
+	  reject("invalid_argument", "environment_isTest_mismatch");
+	}
 
   // 예상 외 필드는 무시 (그대로 쓰지 않음)
   const out = {
@@ -202,6 +210,8 @@ function pickProjectAllowlist(input, { serverNowIso }) {
   if (approvalStatus !== undefined) out.approvalStatus = approvalStatus;
   if (pcStatus !== undefined) out.pcStatus = pcStatus;
   if (startedAt !== undefined) out.startedAt = startedAt;
+	out.environment = environment;
+	out.isTest = isTest === true;
 
   // Flutter heartbeat: 서버 수신 시각을 lastHeartbeat로 사용 (PC 시계 조작 완화)
   out.lastHeartbeat = serverNowIso;

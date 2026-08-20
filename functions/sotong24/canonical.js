@@ -50,6 +50,12 @@ const WORK_STATUS = new Set([
   "error",
   "revision",
   "not_applicable",
+  "paused_quota",
+  "paused_network",
+  "stalled",
+  "ai_process_failed",
+  "result_validation_failed",
+  "stage_transition_failed",
 ]);
 
 const APPROVAL_STATUS = new Set([

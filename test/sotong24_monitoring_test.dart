@@ -12,6 +12,7 @@ void main() {
   Sotong24RemoteProject project({
     required String heartbeat,
     required Sotong24RemoteStage stage,
+    String status = Sotong24WorkStatus.inProgress,
   }) {
     return Sotong24RemoteProject(
       projectId: 'wi_test_monitor',
@@ -20,7 +21,7 @@ void main() {
       currentStage: 1,
       totalStages: 18,
       progress: 0,
-      status: Sotong24WorkStatus.inProgress,
+      status: status,
       lastHeartbeat: heartbeat,
       stages: [stage],
     );
@@ -112,5 +113,28 @@ void main() {
     expect(result.healthLabel, '사용자 승인 대기');
     expect(result.elapsed, const Duration(minutes: 2));
     expect(result.approvalWaitAge, const Duration(hours: 1));
+  });
+
+  test('quota pause is explicit even when errorMessage is present', () {
+    final paused = Sotong24RemoteStage(
+      stageId: 'project_setup',
+      stageNumber: 5,
+      stageName: '프로젝트 생성 또는 불러오기',
+      status: Sotong24WorkStatus.pausedQuota,
+      errorMessage: 'quota_exhausted',
+      activityState: 'paused_quota',
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(
+        heartbeat: '2026-08-19T00:04:50.000Z',
+        stage: paused,
+        status: Sotong24WorkStatus.pausedQuota,
+      ),
+      stage: paused,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T00:05:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.pausedQuota);
+    expect(result.activityLabel, 'AI 사용량 초기화 대기');
   });
 }

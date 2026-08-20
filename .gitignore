@@ -70,3 +70,7 @@ config/admin_auth.local.json
 !/DevWorkDoc/**/.gitkeep
 
 functions/.secret.local
+
+# Operational evidence/backups are local and may contain user work data.
+/ops_backup/
+/functions/ERROR

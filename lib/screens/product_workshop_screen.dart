@@ -930,6 +930,9 @@ class _StageMonitoringPanel extends StatelessWidget {
       Sotong24StageHealth.awaitingUser => ControlColors.teal,
       Sotong24StageHealth.inactive ||
       Sotong24StageHealth.offline => ControlColors.accentRose,
+      Sotong24StageHealth.pausedQuota => Colors.amber.shade900,
+      Sotong24StageHealth.pausedNetwork => Colors.orange.shade900,
+      Sotong24StageHealth.stalled => ControlColors.accentRose,
       Sotong24StageHealth.error => Colors.red.shade800,
     };
     final expected = snapshot.expectedRange;

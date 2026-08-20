@@ -32,6 +32,12 @@ const WORK_STATUS = Object.freeze({
   FAILED: "failed",
   CANCELLED: "cancelled",
   PAUSED: "paused",
+  PAUSED_QUOTA: "paused_quota",
+  PAUSED_NETWORK: "paused_network",
+  STALLED: "stalled",
+  AI_PROCESS_FAILED: "ai_process_failed",
+  RESULT_VALIDATION_FAILED: "result_validation_failed",
+  STAGE_TRANSITION_FAILED: "stage_transition_failed",
 });
 
 /** Agent::StateKey wire values */
@@ -40,8 +46,19 @@ const AGENT_STATE = Object.freeze({
   IDLE: "idle",
   RECEIVING_JOB: "receiving_job",
   RUNNING: "running",
+  RUNNING_AI: "running_ai",
+  GENERATING_RESULT: "generating_result",
+  VALIDATING_RESULT: "validating_result",
+  TRANSITIONING_STAGE: "transitioning_stage",
   WAITING_APPROVAL: "waiting_approval",
+  PAUSED_QUOTA: "paused_quota",
+  PAUSED_NETWORK: "paused_network",
+  STALLED: "stalled",
+  AI_PROCESS_FAILED: "ai_process_failed",
+  RESULT_VALIDATION_FAILED: "result_validation_failed",
+  STAGE_TRANSITION_FAILED: "stage_transition_failed",
   REVISION_REQUESTED: "revision_requested",
+  COMPLETED: "completed",
   ERROR: "error",
   OFFLINE: "offline",
 });
@@ -69,6 +86,12 @@ const ACTIVITY_STATE = Object.freeze({
   RESULT_VALIDATING: "result_validating",
   RESULT_UPLOADING: "result_uploading",
   APPROVAL_PREPARING: "approval_preparing",
+  PAUSED_QUOTA: "paused_quota",
+  PAUSED_NETWORK: "paused_network",
+  STALLED: "stalled",
+  AI_PROCESS_FAILED: "ai_process_failed",
+  RESULT_VALIDATION_FAILED: "result_validation_failed",
+  STAGE_TRANSITION_FAILED: "stage_transition_failed",
 });
 
 const ACTIVITY_TYPE = Object.freeze({

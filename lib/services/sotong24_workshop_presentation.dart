@@ -10,6 +10,15 @@ class Sotong24WorkshopPresentation {
   static WorkshopTestKind testKind(Sotong24RemoteProject project) {
     final id = project.projectId.trim();
     final title = project.title.trim();
+    if (project.isTest || project.environment == 'test') {
+      if (RemoteCodexUnattendedMarkers.isCodexTestInstructionId(id)) {
+        return WorkshopTestKind.codex;
+      }
+      if (RemoteCursorAutostartMarkers.isCursorTestInstructionId(id)) {
+        return WorkshopTestKind.cursor;
+      }
+      return WorkshopTestKind.e2e;
+    }
     if (RemoteCodexUnattendedMarkers.isCodexTestInstructionId(id) ||
         RemoteCodexUnattendedMarkers.isCodexTestTitle(title)) {
       return WorkshopTestKind.codex;

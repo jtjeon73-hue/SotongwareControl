@@ -51,6 +51,12 @@ class Sotong24WorkStatus {
   static const error = 'error';
   static const revision = 'revision';
   static const notApplicable = 'not_applicable';
+  static const pausedQuota = 'paused_quota';
+  static const pausedNetwork = 'paused_network';
+  static const stalled = 'stalled';
+  static const aiProcessFailed = 'ai_process_failed';
+  static const resultValidationFailed = 'result_validation_failed';
+  static const stageTransitionFailed = 'stage_transition_failed';
 
   static bool isNotApplicable(String? status) =>
       Sotong24UserFacingStatus.normalize(status) == notApplicable;
@@ -80,6 +86,18 @@ class Sotong24WorkStatus {
         return '보완 중';
       case notApplicable:
         return '해당 없음';
+      case pausedQuota:
+        return 'AI 사용량 초기화 대기';
+      case pausedNetwork:
+        return '네트워크 복구 대기';
+      case stalled:
+        return '작업 정체';
+      case aiProcessFailed:
+        return 'AI 실행 실패';
+      case resultValidationFailed:
+        return '결과 검증 실패';
+      case stageTransitionFailed:
+        return '단계 전환 실패';
       default:
         return status;
     }
@@ -370,6 +388,8 @@ class Sotong24RemoteProject {
     this.createdAt = '',
     this.updatedAt = '',
     this.isDemo = false,
+    this.environment = 'production',
+    this.isTest = false,
     this.stages = const [],
   });
 
@@ -390,6 +410,8 @@ class Sotong24RemoteProject {
   final String createdAt;
   final String updatedAt;
   final bool isDemo;
+  final String environment;
+  final bool isTest;
   final List<Sotong24RemoteStage> stages;
 
   String get productTypeLabel {
@@ -498,6 +520,8 @@ class Sotong24RemoteProject {
     'createdAt': createdAt,
     'updatedAt': updatedAt,
     'isDemo': isDemo,
+    'environment': environment,
+    'isTest': isTest,
   };
 
   factory Sotong24RemoteProject.fromMap(
@@ -526,6 +550,8 @@ class Sotong24RemoteProject {
       createdAt: '${map['createdAt'] ?? ''}',
       updatedAt: '${map['updatedAt'] ?? ''}',
       isDemo: map['isDemo'] == true,
+      environment: '${map['environment'] ?? 'production'}',
+      isTest: map['isTest'] == true,
       stages: stages,
     );
   }
@@ -556,6 +582,8 @@ class Sotong24RemoteProject {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDemo: isDemo,
+      environment: environment,
+      isTest: isTest,
       stages: stages ?? this.stages,
     );
   }
@@ -815,6 +843,17 @@ class Sotong24UserFacingStatus {
     final approval = project.approvalStatus.trim();
     final stageApproval = (stage?.approvalStatus ?? '').trim();
 
+    const interruptions = {
+      Sotong24WorkStatus.pausedQuota,
+      Sotong24WorkStatus.pausedNetwork,
+      Sotong24WorkStatus.stalled,
+      Sotong24WorkStatus.aiProcessFailed,
+      Sotong24WorkStatus.resultValidationFailed,
+      Sotong24WorkStatus.stageTransitionFailed,
+    };
+    if (interruptions.contains(stageStatus)) return stageStatus;
+    if (interruptions.contains(projectStatus)) return projectStatus;
+
     if (projectStatus == Sotong24WorkStatus.error ||
         stageStatus == Sotong24WorkStatus.error) {
       return Sotong24WorkStatus.error;
@@ -908,6 +947,18 @@ class Sotong24UserFacingStatus {
         return '작업이 완료되었습니다.';
       case Sotong24WorkStatus.ready:
         return '다음 단계 시작을 기다리고 있습니다.';
+      case Sotong24WorkStatus.pausedQuota:
+        return 'AI 사용량이 초기화되면 이 단계부터 자동으로 다시 시작합니다.';
+      case Sotong24WorkStatus.pausedNetwork:
+        return '네트워크 연결이 복구되면 이 단계부터 다시 시도합니다.';
+      case Sotong24WorkStatus.stalled:
+        return '작업 활동이 제한시간 동안 없어 복구 확인이 필요합니다.';
+      case Sotong24WorkStatus.aiProcessFailed:
+        return 'AI 프로세스 실행이 실패했습니다. 제한된 재시도 후 상세 원인을 표시합니다.';
+      case Sotong24WorkStatus.resultValidationFailed:
+        return '생성 결과가 단계 완료 기준을 통과하지 못했습니다.';
+      case Sotong24WorkStatus.stageTransitionFailed:
+        return '결과는 준비됐지만 다음 단계 전환에 실패했습니다.';
       default:
         return '$stageLabel 상태를 확인해 주세요.';
     }

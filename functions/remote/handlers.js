@@ -381,6 +381,10 @@ function toProjectStageStatus(status) {
       status === WORK_STATUS.CLAIMED) return "in_progress";
   if (status === WORK_STATUS.FAILED) return "error";
   if (status === WORK_STATUS.REVISION_REQUESTED) return "revision";
+  if (status === WORK_STATUS.PAUSED_QUOTA || status === WORK_STATUS.PAUSED_NETWORK ||
+      status === WORK_STATUS.STALLED || status === WORK_STATUS.AI_PROCESS_FAILED ||
+      status === WORK_STATUS.RESULT_VALIDATION_FAILED ||
+      status === WORK_STATUS.STAGE_TRANSITION_FAILED) return status;
   return status;
 }
 
@@ -429,6 +433,14 @@ async function handleReportStage(db, ctx, body) {
     WORK_STATUS.RUNNING,
     WORK_STATUS.REWORKING,
   ]);
+  const interruptionStatus = new Set([
+    WORK_STATUS.PAUSED_QUOTA,
+    WORK_STATUS.PAUSED_NETWORK,
+    WORK_STATUS.STALLED,
+    WORK_STATUS.AI_PROCESS_FAILED,
+    WORK_STATUS.RESULT_VALIDATION_FAILED,
+    WORK_STATUS.STAGE_TRANSITION_FAILED,
+  ]);
   if (!previous.startedAt && activeStatus.has(status)) patch.startedAt = ts;
   patch.lastActivityAt = ts;
   patch.activityType = status === WORK_STATUS.WAITING_APPROVAL
@@ -439,6 +451,10 @@ async function handleReportStage(db, ctx, body) {
   }
   if (status === WORK_STATUS.WAITING_APPROVAL) {
     patch.activityState = ACTIVITY_STATE.APPROVAL_PREPARING;
+  }
+  if (interruptionStatus.has(status)) {
+    patch.activityState = status;
+    patch.errorMessage = String(body.summary || status).slice(0, 2000);
   }
   if (reportsCompletion && !previous.completedAt) patch.completedAt = ts;
 
@@ -463,6 +479,9 @@ async function handleReportStage(db, ctx, body) {
     jobPatch.status = EBOOK_STAGE_BY_ID.get(stageId)?.terminal
       ? WORK_STATUS.COMPLETED
       : WORK_STATUS.RUNNING;
+  } else if (interruptionStatus.has(status)) {
+    jobPatch.status = status;
+    jobPatch.pauseReason = status;
   }
   const instructionId = String(job.instructionId || "").trim();
   const projectRef = instructionId
@@ -498,6 +517,8 @@ async function handleReportStage(db, ctx, body) {
       tx.set(projectStageRef, projectStagePatch, { merge: true });
       const projectStatus = projectStagePatch.status === "awaiting_approval"
         ? "awaiting_approval"
+        : interruptionStatus.has(projectStagePatch.status)
+          ? projectStagePatch.status
         : EBOOK_STAGE_BY_ID.get(stageId)?.terminal &&
             projectStagePatch.status === "completed"
           ? "completed"
@@ -693,6 +714,16 @@ async function handleCreateJob(db, uid, body) {
   if (agent.ownerUid !== uid) throw httpError(403, "forbidden", "agent_owner_mismatch");
 
   const instructionId = String(body.instructionId || "").trim();
+	const inferredTest = instructionId.startsWith("wi_test_") ||
+	  instructionId.includes("e2e") || /^\[test\]/i.test(title);
+	const isTest = body.isTest === true || inferredTest;
+	const environment = isTest ? "test" : "production";
+	if (body.environment && String(body.environment) !== environment) {
+	  throw httpError(400, "invalid_payload", "environment_isTest_mismatch");
+	}
+	if (body.isTest === false && inferredTest) {
+	  throw httpError(400, "invalid_payload", "test_marker_isTest_mismatch");
+	}
   if (instructionId) {
     const existing = await findJobByInstructionId(db, uid, instructionId);
     if (existing) {
@@ -717,6 +748,8 @@ async function handleCreateJob(db, uid, body) {
     startedAt: null,
     completedAt: null,
     updatedAt: ts,
+	  environment,
+	  isTest,
   };
   if (instructionId) doc.instructionId = instructionId;
   await db.collection(COL.JOBS).doc(jobId).set(doc);

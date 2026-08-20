@@ -19,6 +19,8 @@ void main() {
     String approvalStatus = ApprovalStatus.notRequired,
     String stageApproval = ApprovalStatus.notRequired,
     String resultUrl = '',
+    String environment = 'production',
+    bool isTest = false,
     List<Sotong24RemoteStage>? stages,
   }) {
     return Sotong24RemoteProject(
@@ -30,6 +32,8 @@ void main() {
       progress: 0,
       status: status,
       approvalStatus: approvalStatus,
+      environment: environment,
+      isTest: isTest,
       stages:
           stages ??
           [
@@ -106,6 +110,22 @@ void main() {
       expect(
         Sotong24WorkshopPresentation.displayTitle(real),
         '50대 초보도 따라 하는 AI 전자책 첫 출간',
+      );
+
+      final explicitlyMarked = project(
+        id: 'wi_plan_looks_normal',
+        title: '정상처럼 보이는 제목',
+        status: Sotong24WorkStatus.ready,
+        environment: 'test',
+        isTest: true,
+      );
+      expect(
+        Sotong24WorkshopPresentation.isTestProject(explicitlyMarked),
+        isTrue,
+      );
+      expect(
+        Sotong24WorkshopPresentation.operationalProjects([explicitlyMarked]),
+        isEmpty,
       );
     });
 

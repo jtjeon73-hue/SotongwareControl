@@ -72,6 +72,19 @@ function stageExpectedRange(policy, stageId) {
 function evaluateStageHealth({ job, stage, agent, policy: rawPolicy, nowMs = Date.now() }) {
   const policy = normalizePolicy(rawPolicy);
   const status = String(stage.status || job.status || "");
+  if (status === WORK_STATUS.PAUSED_QUOTA || agent.state === "paused_quota") {
+    return { state: "paused_quota", reason: "ai_quota_exhausted", shouldNotify: false };
+  }
+  if (status === WORK_STATUS.PAUSED_NETWORK || agent.state === "paused_network") {
+    return { state: "paused_network", reason: "network_unavailable", shouldNotify: false };
+  }
+  if (status === WORK_STATUS.STALLED || agent.state === "stalled") {
+    return { state: "stalled", reason: "activity_timeout", shouldNotify: true };
+  }
+  if ([WORK_STATUS.AI_PROCESS_FAILED, WORK_STATUS.RESULT_VALIDATION_FAILED,
+    WORK_STATUS.STAGE_TRANSITION_FAILED].includes(status)) {
+    return { state: "error", reason: status, shouldNotify: true };
+  }
   if (status === WORK_STATUS.FAILED || agent.state === "error" || stage.errorMessage) {
     return { state: "error", shouldNotify: true };
   }
@@ -174,7 +187,15 @@ async function enqueueNotification(db, data, rawPolicy) {
 async function evaluateActiveJobs(db, nowMs = Date.now()) {
   const policy = await loadPolicy(db);
   const jobsSnap = await db.collection(COL.JOBS).get();
-  const active = new Set([WORK_STATUS.CLAIMED, WORK_STATUS.RUNNING, WORK_STATUS.REWORKING]);
+  const active = new Set([
+    WORK_STATUS.CLAIMED,
+    WORK_STATUS.RUNNING,
+    WORK_STATUS.REWORKING,
+    WORK_STATUS.STALLED,
+    WORK_STATUS.AI_PROCESS_FAILED,
+    WORK_STATUS.RESULT_VALIDATION_FAILED,
+    WORK_STATUS.STAGE_TRANSITION_FAILED,
+  ]);
   const results = [];
   for (const doc of jobsSnap.docs) {
     const job = doc.data() || {};
@@ -190,6 +211,7 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     let eventType = "";
     if (health.state === "offline") eventType = "agent_offline";
     if (health.state === "inactive") eventType = "activity_stalled";
+    if (health.state === "stalled") eventType = "activity_stalled";
     if (health.state === "error") eventType = "work_error";
     if (!eventType) continue;
     const out = await enqueueNotification(db, {
