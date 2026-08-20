@@ -27,6 +27,7 @@ const {
   finalizeUpload,
   scrubErrorText,
 } = require("./artifact");
+const { isRunCancellationTombstoned } = require("../remote/cancellation");
 
 const MAX_BODY_BYTES = 100 * 1024;
 const rateLimiter = createRateLimiter({ windowMs: 60_000, max: 30 });
@@ -252,6 +253,9 @@ async function handleRelayRequest(req, res, deps) {
         updatedAt: projectInput.updatedAt,
       };
       const project = pickProjectAllowlist(minimal, { serverNowIso });
+      if (await isRunCancellationTombstoned(db, project.projectId)) {
+        reject("run_cancelled", "cancelled project is immutable", 409);
+      }
       const hbDoc = {
         projectId: project.projectId,
         pcStatus: project.pcStatus || "online",
@@ -282,6 +286,9 @@ async function handleRelayRequest(req, res, deps) {
 
     if (!projectInput) reject("invalid_argument", "project required");
     const project = pickProjectAllowlist(projectInput, { serverNowIso });
+    if (await isRunCancellationTombstoned(db, project.projectId)) {
+      reject("run_cancelled", "cancelled project is immutable", 409);
+    }
 
     if (operation === "project_sync") {
       const result = await upsertProject(db, project);

@@ -594,6 +594,39 @@ describe("relay HTTP handler", () => {
     assert.equal(sdoc.stageName, "공개 및 공유");
   });
 
+  it("cancel tombstone rejects late heartbeat and project mirror recreation", async () => {
+    const db = createMockDb();
+    db.store.set("cancelOperations/cancel_late_mirror", {
+      projectId: sampleProject.projectId,
+      status: "completed",
+    });
+
+    const heartbeat = await call(
+      {
+        operation: "heartbeat",
+        project: {
+          projectId: sampleProject.projectId,
+          productType: "ebook",
+          pcStatus: "online",
+        },
+      },
+      { db }
+    );
+    const mirror = await call(
+      { operation: "project_sync", project: sampleProject },
+      { db }
+    );
+
+    assert.equal(heartbeat.statusCode, 409);
+    assert.equal(heartbeat.body.code, "run_cancelled");
+    assert.equal(mirror.statusCode, 409);
+    assert.equal(mirror.body.code, "run_cancelled");
+    assert.equal(
+      db.store.has(`sotong24work_projects/${sampleProject.projectId}`),
+      false
+    );
+  });
+
   it("same revision sync cannot reopen a terminal approval, r2 can become pending", async () => {
     const db = createMockDb();
     const path = `sotong24work_projects/${sampleProject.projectId}/stages/launch`;

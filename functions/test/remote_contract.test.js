@@ -1047,10 +1047,16 @@ describe("remote agent contract V1", () => {
       `sotong24/artifacts/prod/${iid}/`,
       `sotong24/artifacts/test/${iid}/`,
     ]);
+    // A sync already queued before the acknowledgment may arrive late.
+    db.store.set(`${COL.PROJECTS}/${iid}`, {
+      projectId: iid, ownerUid: "user_a", status: "cancelled",
+    });
     const again = await finalizeCancelledRun(db, {
       uid: "user_a", operationId: opId, jobId, instructionId: iid,
       projectId: iid, agentId,
     });
     assert.equal(again.idempotent, true);
+    assert.equal(again.deleted.projects, 1);
+    assert.equal(db.store.has(`${COL.PROJECTS}/${iid}`), false);
   });
 });

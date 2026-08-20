@@ -16,6 +16,15 @@ function operationId(uid, jobId, instructionId) {
   return `cancel_${sha256Hex(`${uid}|${jobId}|${instructionId}`).slice(0, 32)}`;
 }
 
+async function isRunCancellationTombstoned(db, projectId) {
+  const snap = await db.collection(CANCEL_OPERATIONS).get();
+  return snap.docs.some((doc) => {
+    const op = doc.data() || {};
+    return String(op.projectId || "") === projectId &&
+      ["requested", "finalizing", "completed"].includes(String(op.status || ""));
+  });
+}
+
 async function deleteCollection(ref) {
   const snap = await ref.get();
   for (const doc of snap.docs) await doc.ref.delete();
@@ -61,14 +70,15 @@ async function finalizeCancelledRun(db, spec, deps = {}) {
   const opRef = db.collection(CANCEL_OPERATIONS).doc(opId);
   const opSnap = await opRef.get();
   const existing = opSnap.exists ? (opSnap.data() || {}) : {};
-  if (existing.status === "completed") {
-    return { state: "completed", idempotent: true, operationId: opId };
+  const wasCompleted = existing.status === "completed";
+  if (!wasCompleted) {
+    await opRef.set({ status: "finalizing", updatedAt: nowIso() }, { merge: true });
   }
-  await opRef.set({ status: "finalizing", updatedAt: nowIso() }, { merge: true });
 
   const jobRef = db.collection(COL.JOBS).doc(jobId);
   const projectRef = db.collection(COL.PROJECTS).doc(projectId);
   const jobSnap = await jobRef.get();
+  const projectSnap = await projectRef.get();
   if (jobSnap.exists) {
     const job = jobSnap.data() || {};
     if (String(job.ownerUid || "") !== uid ||
@@ -116,13 +126,13 @@ async function finalizeCancelledRun(db, spec, deps = {}) {
   const completedAt = nowIso();
   const result = {
     state: "completed",
-    idempotent: false,
+    idempotent: wasCompleted,
     operationId: opId,
     deleted: {
       jobs: jobSnap.exists ? 1 : 0,
       jobCommands: job.commands,
       jobStages: job.stages,
-      projects: 1,
+      projects: projectSnap.exists ? 1 : 0,
       projectStages: project.stages,
       projectRequests: project.requests,
       workInstructions,
@@ -165,7 +175,14 @@ async function handleCancelJob(db, uid, body, deps = {}) {
       throw httpError(409, "run_mismatch", "cancel operation mismatch");
     }
     if (op.status === "completed") {
-      return { state: "completed", idempotent: true, operationId: opId };
+      return finalizeCancelledRun(db, {
+        uid,
+        operationId: opId,
+        jobId,
+        instructionId,
+        projectId,
+        agentId: op.agentId,
+      }, deps);
     }
   }
 
@@ -262,6 +279,7 @@ module.exports = {
   CANCEL_OPERATIONS,
   PROTECTED_AGENT_ID,
   operationId,
+  isRunCancellationTombstoned,
   handleCancelJob,
   finalizeCancelledRun,
   finalizeCancelRequestEvent,
