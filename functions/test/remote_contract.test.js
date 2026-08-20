@@ -215,6 +215,21 @@ describe("remote agent contract V1", () => {
     assert.ok(a.lastHeartbeatAt);
     assert.notEqual(a.lastHeartbeatAt, "2020-01-01T00:00:00.000Z");
     assert.equal(a.state, "idle");
+    assert.equal(a.deviceName, "PC");
+
+    const blankName = await call(
+      db,
+      "/api/agent/heartbeat",
+      {
+        agentId,
+        state: "idle",
+        deviceName: "",
+        protocolVersion: "1.0",
+      },
+      { token: agentToken }
+    );
+    assert.equal(blankName.statusCode, 200);
+    assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).deviceName, "PC");
   });
 
   it("12b heartbeat persists allowlisted aiUsage.codex", async () => {

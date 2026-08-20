@@ -164,7 +164,8 @@ async function handleHeartbeat(db, ctx, body) {
     protocolVersion: PROTOCOL_VERSION,
   };
   if (state) patch.state = state;
-  if (body.deviceName != null) patch.deviceName = String(body.deviceName).slice(0, 120);
+  const deviceName = String(body.deviceName || "").trim().slice(0, 120);
+  if (deviceName) patch.deviceName = deviceName;
   if (body.appVersion != null) patch.appVersion = String(body.appVersion).slice(0, 120);
   if (body.currentJobId != null) patch.currentJobId = String(body.currentJobId).slice(0, 128);
   if (body.currentStage != null) patch.currentStage = String(body.currentStage).slice(0, 128);
