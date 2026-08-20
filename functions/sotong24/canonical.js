@@ -55,6 +55,7 @@ const WORK_STATUS = new Set([
   "stalled",
   "ai_process_failed",
   "result_validation_failed",
+  "result_validation_retrying",
   "stage_transition_failed",
 ]);
 

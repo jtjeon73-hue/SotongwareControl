@@ -235,6 +235,66 @@ void main() {
       expect(Sotong24WorkshopPresentation.revisionLine(p), '');
     });
 
+    test('validation retry 1/3과 final failure를 구분해 표시한다', () {
+      const retryStage = Sotong24RemoteStage(
+        stageId: 'problem_validate',
+        stageNumber: 2,
+        stageName: '고객 문제 검증',
+        status: Sotong24WorkStatus.resultValidationRetrying,
+        activityState: 'validation_retry_waiting',
+        attemptCount: 1,
+        maxAttempts: 4,
+        retryCount: 1,
+        maxRetries: 3,
+        nextRetryAt: '2026-08-20T08:03:30.000Z',
+        retryable: true,
+        failureReason: 'problem_validate_problem_signals_insufficient',
+      );
+      final retryProject = project(
+        id: 'wi_plan_retry',
+        title: '재시도 표시',
+        status: Sotong24WorkStatus.resultValidationRetrying,
+        currentStage: 2,
+        stages: const [retryStage],
+      );
+      expect(
+        retryProject.nowTodoHeadline(stage: retryStage),
+        contains('자동 재시도 1/3'),
+      );
+      expect(
+        Sotong24WorkshopPresentation.retryCountdownLine(
+          retryStage,
+          now: DateTime.parse('2026-08-20T08:03:06.000Z'),
+        ),
+        '다음 재시도까지 24초',
+      );
+      expect(
+        Sotong24WorkshopPresentation.validationFailureSummary(
+          retryStage.failureReason,
+        ),
+        '고객 문제 신호가 부족함',
+      );
+
+      final finalProject = project(
+        id: 'wi_plan_retry_final',
+        title: '최종 실패 표시',
+        status: Sotong24WorkStatus.resultValidationFailed,
+        currentStage: 2,
+        stages: const [
+          Sotong24RemoteStage(
+            stageId: 'problem_validate',
+            stageNumber: 2,
+            stageName: '고객 문제 검증',
+            status: Sotong24WorkStatus.resultValidationFailed,
+            maxRetries: 3,
+            retryable: false,
+          ),
+        ],
+      );
+      expect(finalProject.userFacingStatusLabel, '결과 검증 최종 실패');
+      expect(finalProject.nowTodoHeadline(), contains('자동 재시도 3회'));
+    });
+
     test('workDurationMs 없으면 작업시간을 만들지 않는다', () {
       final p = project(
         id: 'wi_plan_1',

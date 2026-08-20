@@ -233,7 +233,9 @@ class Sotong24StageMonitoring {
       case 'ai_process_failed':
         return 'AI 실행 실패';
       case 'result_validation_failed':
-        return '결과 검증 실패';
+        return '결과 검증 최종 실패';
+      case 'validation_retry_waiting':
+        return '결과 검증 자동 재시도 대기';
       case 'stage_transition_failed':
         return '단계 전환 실패';
       default:

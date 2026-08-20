@@ -54,6 +54,22 @@ class RemoteAgentDoc {
         return '작업지시 수신 중';
       case 'running':
         return '작업 진행 중';
+      case 'running_ai':
+        return 'AI 실행 중';
+      case 'generating_result':
+        return '결과 생성 중';
+      case 'validating_result':
+        return '결과 검증 중';
+      case 'validation_retry_waiting':
+        return '결과 검증 자동 재시도 대기';
+      case 'transitioning_stage':
+        return '다음 단계 전환 중';
+      case 'paused_quota':
+        return 'AI 사용량 초기화 대기';
+      case 'paused_network':
+        return '네트워크 복구 대기';
+      case 'result_validation_failed':
+        return '결과 검증 최종 실패';
       case 'waiting_approval':
       case 'awaiting_user_approval':
       case 'pending_review':
@@ -83,6 +99,11 @@ class RemoteAgentDoc {
         return RemoteAgentUiKind.waitingApproval;
       case 'running':
       case 'receiving_job':
+      case 'running_ai':
+      case 'generating_result':
+      case 'validating_result':
+      case 'validation_retry_waiting':
+      case 'transitioning_stage':
         return RemoteAgentUiKind.running;
       default:
         return RemoteAgentUiKind.online;
@@ -270,6 +291,10 @@ class RemoteJobDoc {
         return '취소';
       case 'paused':
         return '일시정지';
+      case 'result_validation_retrying':
+        return '결과 검증 자동 재시도 대기';
+      case 'result_validation_failed':
+        return '결과 검증 최종 실패';
       default:
         return status;
     }

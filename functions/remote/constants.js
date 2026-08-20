@@ -37,6 +37,7 @@ const WORK_STATUS = Object.freeze({
   STALLED: "stalled",
   AI_PROCESS_FAILED: "ai_process_failed",
   RESULT_VALIDATION_FAILED: "result_validation_failed",
+  RESULT_VALIDATION_RETRYING: "result_validation_retrying",
   STAGE_TRANSITION_FAILED: "stage_transition_failed",
 });
 
@@ -56,6 +57,7 @@ const AGENT_STATE = Object.freeze({
   STALLED: "stalled",
   AI_PROCESS_FAILED: "ai_process_failed",
   RESULT_VALIDATION_FAILED: "result_validation_failed",
+  VALIDATION_RETRY_WAITING: "validation_retry_waiting",
   STAGE_TRANSITION_FAILED: "stage_transition_failed",
   REVISION_REQUESTED: "revision_requested",
   COMPLETED: "completed",
@@ -91,6 +93,7 @@ const ACTIVITY_STATE = Object.freeze({
   STALLED: "stalled",
   AI_PROCESS_FAILED: "ai_process_failed",
   RESULT_VALIDATION_FAILED: "result_validation_failed",
+  VALIDATION_RETRY_WAITING: "validation_retry_waiting",
   STAGE_TRANSITION_FAILED: "stage_transition_failed",
 });
 

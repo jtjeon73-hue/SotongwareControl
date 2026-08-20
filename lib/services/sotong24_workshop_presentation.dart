@@ -227,6 +227,42 @@ class Sotong24WorkshopPresentation {
     return '결과 버전 r${stage.revision}';
   }
 
+  static String validationFailureSummary(String reason) {
+    switch (reason.trim()) {
+      case 'problem_validate_interview_evidence_missing':
+        return '실제 인터뷰 근거가 확인되지 않음';
+      case 'problem_validate_public_sources_insufficient':
+        return '공개 출처가 부족함';
+      case 'problem_validate_problem_signals_insufficient':
+        return '고객 문제 신호가 부족함';
+      case 'problem_validate_comparison_missing':
+        return '인터뷰 비교표가 누락됨';
+      case 'problem_validate_hypotheses_missing':
+        return '핵심 가설 검증이 누락됨';
+      case 'problem_validate_positioning_missing':
+        return '수정 포지셔닝이 누락됨';
+      case 'output_missing':
+        return '결과 파일이 없음';
+      case 'output_empty':
+        return '결과 파일이 비어 있음';
+      case 'output_too_short':
+      case 'output_too_few_lines':
+        return '결과 내용이 완료 기준보다 짧음';
+      default:
+        return reason.trim().isEmpty ? '검증 기준을 통과하지 못함' : '결과 형식 또는 필수 근거 미충족';
+    }
+  }
+
+  static String retryCountdownLine(Sotong24RemoteStage stage, {DateTime? now}) {
+    final at = DateTime.tryParse(stage.nextRetryAt);
+    if (at == null) return '';
+    final remaining = at.toUtc().difference((now ?? DateTime.now()).toUtc());
+    if (remaining.isNegative || remaining == Duration.zero) {
+      return '다음 재시도 시작 대기 중';
+    }
+    return '다음 재시도까지 ${remaining.inSeconds + (remaining.inMilliseconds % 1000 == 0 ? 0 : 1)}초';
+  }
+
   /// 단계 workDurationMs 합. 데이터가 없으면 빈 문자열 (가짜 누적 금지).
   static String totalWorkDurationLine(Sotong24RemoteProject project) {
     var totalMs = 0;

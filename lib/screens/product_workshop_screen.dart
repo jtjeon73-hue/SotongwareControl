@@ -565,6 +565,20 @@ class _Sotong24RemoteDetailScreenState
                       _Kv('stageId', stage.stageId),
                       _Kv('stage status', stage.status),
                       _Kv('criteriaMet', '${stage.criteriaMet}'),
+                      if (stage.attemptCount > 0)
+                        _Kv(
+                          'attemptCount',
+                          '${stage.attemptCount}/${stage.maxAttempts}',
+                        ),
+                      if (stage.retryCount > 0)
+                        _Kv(
+                          'retryCount',
+                          '${stage.retryCount}/${stage.maxRetries}',
+                        ),
+                      if (stage.nextRetryAt.isNotEmpty)
+                        _Kv('nextRetryAt', stage.nextRetryAt),
+                      if (stage.failureReason.isNotEmpty)
+                        _Kv('failureReason', stage.failureReason),
                     ],
                     _Kv('project status', project.status),
                     _Kv('approvalStatus', project.approvalStatus),
@@ -961,20 +975,74 @@ class _StageMonitoringPanel extends StatelessWidget {
           Text(
             snapshot.health == Sotong24StageHealth.awaitingUser
                 ? '사용자 승인 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.approvalWaitAge)}'
-                : 'Agent ${snapshot.agentOnline ? snapshot.healthLabel : '오프라인'} · 마지막 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
+                : 'PC/Agent ${snapshot.agentOnline ? '온라인' : '오프라인'} · heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}',
             style: TextStyle(
               fontSize: 13,
               color: healthColor,
               fontWeight: FontWeight.w600,
             ),
           ),
-          Text(
-            snapshot.activityLabel,
-            style: const TextStyle(
-              fontSize: 13,
-              color: ControlColors.textSecondary,
+          if (snapshot.health != Sotong24StageHealth.awaitingUser)
+            Text(
+              '현재 작업 · ${snapshot.activityLabel} · 마지막 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
+              style: const TextStyle(fontSize: 13),
             ),
-          ),
+          if (snapshot.health == Sotong24StageHealth.awaitingUser)
+            Text(
+              snapshot.activityLabel,
+              style: const TextStyle(
+                fontSize: 13,
+                color: ControlColors.textSecondary,
+              ),
+            ),
+          if (stage.status == Sotong24WorkStatus.resultValidationRetrying ||
+              stage.activityState == 'validation_retry_waiting') ...[
+            const SizedBox(height: 3),
+            Text(
+              '결과 검증 실패 · 자동 재시도 ${stage.retryCount}/${stage.maxRetries > 0 ? stage.maxRetries : 3}',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.orange.shade900,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (Sotong24WorkshopPresentation.retryCountdownLine(
+              stage,
+            ).isNotEmpty)
+              Text(
+                Sotong24WorkshopPresentation.retryCountdownLine(stage),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textSecondary,
+                ),
+              ),
+            if (stage.failureReason.isNotEmpty)
+              Text(
+                '원인: ${Sotong24WorkshopPresentation.validationFailureSummary(stage.failureReason)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textSecondary,
+                ),
+              ),
+          ],
+          if (stage.status == Sotong24WorkStatus.resultValidationFailed) ...[
+            const SizedBox(height: 3),
+            Text(
+              '결과 검증 최종 실패 · 자동 재시도 ${stage.maxRetries > 0 ? stage.maxRetries : 3}회 소진',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.red.shade800,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              '원인: ${Sotong24WorkshopPresentation.validationFailureSummary(stage.failureReason)}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: ControlColors.textSecondary,
+              ),
+            ),
+          ],
           if (!compact && stage.startedAt.isNotEmpty)
             Text(
               '시작 ${_formatTime(stage.startedAt)}',

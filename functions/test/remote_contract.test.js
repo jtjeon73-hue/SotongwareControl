@@ -650,6 +650,55 @@ describe("remote agent contract V1", () => {
     assert.equal(db.store.get(key).lastActivityAt, before);
   });
 
+  it("mirrors validation retry metadata and clears waiting state on retry start", async () => {
+    const env = await monitoringJob("wi_plan_validation_retry");
+    db.store.set(`${COL.PROJECTS}/${env.instructionId}`, {
+      projectId: env.instructionId,
+      currentStageId: "problem_validate",
+      currentStage: 2,
+      status: "in_progress",
+    });
+    const retry = await call(db, "/api/agent/report-activity", {
+      jobId: env.jobId,
+      instructionId: env.instructionId,
+      stageId: "problem_validate",
+      stageNumber: 2,
+      revision: 1,
+      activityState: "validation_retry_waiting",
+      activityType: "executor_state_change",
+      attemptCount: 1,
+      maxAttempts: 4,
+      retryCount: 1,
+      maxRetries: 3,
+      nextRetryAt: "2026-08-20T08:03:00.000Z",
+      failureType: "validation",
+      failureReason: "problem_validate_problem_signals_insufficient",
+      retryable: true,
+    }, { token: env.agentToken });
+    assert.equal(retry.statusCode, 200);
+    const stageKey = `${COL.JOBS}/${env.jobId}/stages/problem_validate`;
+    assert.equal(db.store.get(stageKey).retryCount, 1);
+    assert.equal(db.store.get(stageKey).retryable, true);
+    assert.equal(db.store.get(stageKey).activityState, "validation_retry_waiting");
+    assert.equal(
+      db.store.get(`${COL.PROJECTS}/${env.instructionId}/stages/problem_validate`).nextRetryAt,
+      "2026-08-20T08:03:00.000Z"
+    );
+
+    const started = await call(db, "/api/agent/report-stage", {
+      jobId: env.jobId,
+      stageId: "problem_validate",
+      stageNumber: 2,
+      revision: 1,
+      status: "running",
+    }, { token: env.agentToken });
+    assert.equal(started.statusCode, 200);
+    assert.equal(db.store.get(stageKey).status, "running");
+    assert.equal(db.store.get(stageKey).attemptCount, 1);
+    assert.equal(db.store.get(stageKey).retryable, false);
+    assert.equal(db.store.get(stageKey).nextRetryAt, "");
+  });
+
   it("waiting approval creates one idempotent approval notification", async () => {
     const env = await monitoringJob("wi_plan_monitor_approval");
     db.store.set(`${COL.PROJECTS}/${env.instructionId}`, {

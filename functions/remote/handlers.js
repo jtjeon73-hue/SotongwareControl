@@ -383,6 +383,7 @@ function toProjectStageStatus(status) {
   if (status === WORK_STATUS.REVISION_REQUESTED) return "revision";
   if (status === WORK_STATUS.PAUSED_QUOTA || status === WORK_STATUS.PAUSED_NETWORK ||
       status === WORK_STATUS.STALLED || status === WORK_STATUS.AI_PROCESS_FAILED ||
+      status === WORK_STATUS.RESULT_VALIDATION_RETRYING ||
       status === WORK_STATUS.RESULT_VALIDATION_FAILED ||
       status === WORK_STATUS.STAGE_TRANSITION_FAILED) return status;
   return status;
@@ -427,7 +428,22 @@ async function handleReportStage(db, ctx, body) {
   if (body.revision != null) patch.revision = Math.max(1, Number(body.revision) || 1);
   if (body.approvalRequired != null) patch.approvalRequired = body.approvalRequired === true;
   if (body.criteriaMet != null) patch.criteriaMet = body.criteriaMet === true;
+  for (const field of ["attemptCount", "maxAttempts", "retryCount", "maxRetries"]) {
+    if (body[field] != null) patch[field] = Math.max(0, Number(body[field]) || 0);
+  }
+  if (body.nextRetryAt != null) patch.nextRetryAt = String(body.nextRetryAt).slice(0, 80);
+  if (body.failureReason != null) patch.failureReason = String(body.failureReason).slice(0, 240);
+  if (body.failureType != null) patch.failureType = String(body.failureType).slice(0, 40);
+  if (body.retryable != null) patch.retryable = body.retryable === true;
   const previous = prev.exists ? prev.data() || {} : {};
+  for (const field of ["attemptCount", "maxAttempts", "retryCount", "maxRetries",
+    "failureType", "failureReason"]) {
+    if (patch[field] == null && previous[field] != null) patch[field] = previous[field];
+  }
+  if (status === WORK_STATUS.RUNNING || status === WORK_STATUS.REWORKING) {
+    patch.retryable = false;
+    patch.nextRetryAt = "";
+  }
   const activeStatus = new Set([
     WORK_STATUS.CLAIMED,
     WORK_STATUS.RUNNING,
@@ -438,6 +454,7 @@ async function handleReportStage(db, ctx, body) {
     WORK_STATUS.PAUSED_NETWORK,
     WORK_STATUS.STALLED,
     WORK_STATUS.AI_PROCESS_FAILED,
+    WORK_STATUS.RESULT_VALIDATION_RETRYING,
     WORK_STATUS.RESULT_VALIDATION_FAILED,
     WORK_STATUS.STAGE_TRANSITION_FAILED,
   ]);
@@ -449,10 +466,13 @@ async function handleReportStage(db, ctx, body) {
   if (status === WORK_STATUS.RUNNING || status === WORK_STATUS.REWORKING) {
     patch.activityState = ACTIVITY_STATE.CODEX_RUNNING;
   }
+  if (status === WORK_STATUS.RESULT_VALIDATION_RETRYING) {
+    patch.activityState = ACTIVITY_STATE.VALIDATION_RETRY_WAITING;
+  }
   if (status === WORK_STATUS.WAITING_APPROVAL) {
     patch.activityState = ACTIVITY_STATE.APPROVAL_PREPARING;
   }
-  if (interruptionStatus.has(status)) {
+  if (interruptionStatus.has(status) && status !== WORK_STATUS.RESULT_VALIDATION_RETRYING) {
     patch.activityState = status;
     patch.errorMessage = String(body.summary || status).slice(0, 2000);
   }
@@ -466,6 +486,12 @@ async function handleReportStage(db, ctx, body) {
     lastActivityAt: ts,
     ...(body.criteriaMet != null ? { currentStageCriteriaMet: body.criteriaMet === true } : {}),
     ...(body.approvalRequired != null ? { approvalRequired: body.approvalRequired === true } : {}),
+    ...(patch.attemptCount != null ? { attemptCount: patch.attemptCount } : {}),
+    ...(patch.maxAttempts != null ? { maxAttempts: patch.maxAttempts } : {}),
+    ...(patch.retryCount != null ? { retryCount: patch.retryCount } : {}),
+    ...(patch.maxRetries != null ? { maxRetries: patch.maxRetries } : {}),
+    ...(patch.nextRetryAt != null ? { nextRetryAt: patch.nextRetryAt } : {}),
+    ...(patch.retryable != null ? { retryable: patch.retryable } : {}),
   };
   // An approval gate belongs to the job as well as the stage. Persist both in
   // one transaction so a successful report-stage can never leave job=running.
@@ -479,6 +505,8 @@ async function handleReportStage(db, ctx, body) {
     jobPatch.status = EBOOK_STAGE_BY_ID.get(stageId)?.terminal
       ? WORK_STATUS.COMPLETED
       : WORK_STATUS.RUNNING;
+  } else if (status === WORK_STATUS.RESULT_VALIDATION_RETRYING) {
+    jobPatch.status = status;
   } else if (interruptionStatus.has(status)) {
     jobPatch.status = status;
     jobPatch.pauseReason = status;
@@ -531,6 +559,18 @@ async function handleReportStage(db, ctx, body) {
         lastActivityAt: ts,
         activityState: projectStagePatch.activityState || "",
         updatedAt: ts,
+        ...(projectStagePatch.attemptCount != null
+          ? { attemptCount: projectStagePatch.attemptCount } : {}),
+        ...(projectStagePatch.maxAttempts != null
+          ? { maxAttempts: projectStagePatch.maxAttempts } : {}),
+        ...(projectStagePatch.retryCount != null
+          ? { retryCount: projectStagePatch.retryCount } : {}),
+        ...(projectStagePatch.maxRetries != null
+          ? { maxRetries: projectStagePatch.maxRetries } : {}),
+        ...(projectStagePatch.nextRetryAt != null
+          ? { nextRetryAt: projectStagePatch.nextRetryAt } : {}),
+        ...(projectStagePatch.retryable != null
+          ? { retryable: projectStagePatch.retryable } : {}),
         ...(projectStagePatch.status === "awaiting_approval"
           ? { approvalStatus: "pending" }
           : {}),
@@ -588,6 +628,13 @@ async function handleReportActivity(db, ctx, body) {
   if (body.progress != null) {
     stagePatch.activityProgress = Math.max(0, Math.min(100, Number(body.progress) || 0));
   }
+  for (const field of ["attemptCount", "maxAttempts", "retryCount", "maxRetries"]) {
+    if (body[field] != null) stagePatch[field] = Math.max(0, Number(body[field]) || 0);
+  }
+  if (body.nextRetryAt != null) stagePatch.nextRetryAt = String(body.nextRetryAt).slice(0, 80);
+  if (body.failureReason != null) stagePatch.failureReason = String(body.failureReason).slice(0, 240);
+  if (body.failureType != null) stagePatch.failureType = String(body.failureType).slice(0, 40);
+  if (body.retryable != null) stagePatch.retryable = body.retryable === true;
   await db.runTransaction(async (tx) => {
     await tx.set(stageRef, stagePatch, { merge: true });
     await tx.set(jobRef, {

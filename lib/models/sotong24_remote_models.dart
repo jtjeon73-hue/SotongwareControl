@@ -56,6 +56,7 @@ class Sotong24WorkStatus {
   static const stalled = 'stalled';
   static const aiProcessFailed = 'ai_process_failed';
   static const resultValidationFailed = 'result_validation_failed';
+  static const resultValidationRetrying = 'result_validation_retrying';
   static const stageTransitionFailed = 'stage_transition_failed';
 
   static bool isNotApplicable(String? status) =>
@@ -95,7 +96,9 @@ class Sotong24WorkStatus {
       case aiProcessFailed:
         return 'AI 실행 실패';
       case resultValidationFailed:
-        return '결과 검증 실패';
+        return '결과 검증 최종 실패';
+      case resultValidationRetrying:
+        return '결과 검증 실패 · 자동 재시도 대기';
       case stageTransitionFailed:
         return '단계 전환 실패';
       default:
@@ -130,6 +133,14 @@ class Sotong24RemoteStage {
     this.activityState = '',
     this.activityType = '',
     this.activityProgress = 0,
+    this.attemptCount = 0,
+    this.maxAttempts = 0,
+    this.retryCount = 0,
+    this.maxRetries = 0,
+    this.nextRetryAt = '',
+    this.retryable = false,
+    this.failureReason = '',
+    this.failureType = '',
   });
 
   final String stageId;
@@ -164,6 +175,14 @@ class Sotong24RemoteStage {
   final String activityState;
   final String activityType;
   final int activityProgress;
+  final int attemptCount;
+  final int maxAttempts;
+  final int retryCount;
+  final int maxRetries;
+  final String nextRetryAt;
+  final bool retryable;
+  final String failureReason;
+  final String failureType;
 
   bool get hasOpenableResult =>
       openableResultUrl != null || openablePreviewUrl != null;
@@ -228,6 +247,14 @@ class Sotong24RemoteStage {
     if (activityState.trim().isNotEmpty) 'activityState': activityState,
     if (activityType.trim().isNotEmpty) 'activityType': activityType,
     if (activityProgress > 0) 'activityProgress': activityProgress,
+    if (attemptCount > 0) 'attemptCount': attemptCount,
+    if (maxAttempts > 0) 'maxAttempts': maxAttempts,
+    if (retryCount > 0) 'retryCount': retryCount,
+    if (maxRetries > 0) 'maxRetries': maxRetries,
+    if (nextRetryAt.trim().isNotEmpty) 'nextRetryAt': nextRetryAt,
+    'retryable': retryable,
+    if (failureReason.trim().isNotEmpty) 'failureReason': failureReason,
+    if (failureType.trim().isNotEmpty) 'failureType': failureType,
   };
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -257,6 +284,14 @@ class Sotong24RemoteStage {
       activityState: '${map['activityState'] ?? ''}',
       activityType: '${map['activityType'] ?? ''}',
       activityProgress: _asInt(map['activityProgress']).clamp(0, 100),
+      attemptCount: _asInt(map['attemptCount']),
+      maxAttempts: _asInt(map['maxAttempts']),
+      retryCount: _asInt(map['retryCount']),
+      maxRetries: _asInt(map['maxRetries']),
+      nextRetryAt: '${map['nextRetryAt'] ?? ''}',
+      retryable: map['retryable'] == true,
+      failureReason: '${map['failureReason'] ?? ''}',
+      failureType: '${map['failureType'] ?? ''}',
     );
   }
 
@@ -294,6 +329,14 @@ class Sotong24RemoteStage {
       activityState: activityState,
       activityType: activityType,
       activityProgress: activityProgress,
+      attemptCount: attemptCount,
+      maxAttempts: maxAttempts,
+      retryCount: retryCount,
+      maxRetries: maxRetries,
+      nextRetryAt: nextRetryAt,
+      retryable: retryable,
+      failureReason: failureReason,
+      failureType: failureType,
     );
   }
 }
@@ -849,6 +892,7 @@ class Sotong24UserFacingStatus {
       Sotong24WorkStatus.stalled,
       Sotong24WorkStatus.aiProcessFailed,
       Sotong24WorkStatus.resultValidationFailed,
+      Sotong24WorkStatus.resultValidationRetrying,
       Sotong24WorkStatus.stageTransitionFailed,
     };
     if (interruptions.contains(stageStatus)) return stageStatus;
@@ -956,7 +1000,14 @@ class Sotong24UserFacingStatus {
       case Sotong24WorkStatus.aiProcessFailed:
         return 'AI 프로세스 실행이 실패했습니다. 제한된 재시도 후 상세 원인을 표시합니다.';
       case Sotong24WorkStatus.resultValidationFailed:
-        return '생성 결과가 단계 완료 기준을 통과하지 못했습니다.';
+        final retries = stage?.maxRetries ?? 0;
+        return retries > 0
+            ? '결과 검증이 최종 실패했습니다. 자동 재시도 $retries회가 모두 소진되었습니다.'
+            : '생성 결과가 단계 완료 기준을 통과하지 못했습니다.';
+      case Sotong24WorkStatus.resultValidationRetrying:
+        final current = stage?.retryCount ?? 0;
+        final max = stage?.maxRetries ?? 3;
+        return '결과 검증 실패 · 자동 재시도 $current/$max 대기 중입니다.';
       case Sotong24WorkStatus.stageTransitionFailed:
         return '결과는 준비됐지만 다음 단계 전환에 실패했습니다.';
       default:

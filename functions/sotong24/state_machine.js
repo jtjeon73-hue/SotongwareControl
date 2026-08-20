@@ -13,6 +13,7 @@ const STATUS_RANK = Object.freeze({
   stalled: 1,
   ai_process_failed: 1,
   result_validation_failed: 1,
+  result_validation_retrying: 1,
   stage_transition_failed: 1,
   awaiting_approval: 2,
   waiting_approval: 2,
@@ -34,6 +35,14 @@ const AUTHORITATIVE_STAGE_FIELDS = Object.freeze([
   "previewUrl",
   "artifactUrl",
   "artifactPreviewUrl",
+  "attemptCount",
+  "maxAttempts",
+  "retryCount",
+  "maxRetries",
+  "nextRetryAt",
+  "retryable",
+  "failureType",
+  "failureReason",
 ]);
 
 function normalizedRevision(value) {
@@ -52,7 +61,10 @@ function mergeMonotonicStage(previous, incoming) {
   const staleRevision = incomingRevision < previousRevision;
   const sameRevisionRegression = incomingRevision === previousRevision &&
     statusRank(prior.status) > statusRank(next.status);
-  if (!staleRevision && !sameRevisionRegression) return next;
+  const staleRetryAttempt = incomingRevision === previousRevision &&
+    statusRank(next.status) <= 1 && Number(prior.attemptCount || 0) > 0 &&
+    Number(next.attemptCount || 0) < Number(prior.attemptCount || 0);
+  if (!staleRevision && !sameRevisionRegression && !staleRetryAttempt) return next;
 
   for (const field of AUTHORITATIVE_STAGE_FIELDS) {
     if (prior[field] !== undefined) next[field] = prior[field];
@@ -86,7 +98,10 @@ function mergeMonotonicProject(previous, incoming) {
   const regressedStage = priorOrder > 0 && nextOrder > 0 && nextOrder < priorOrder;
   const sameStageRegression = priorOrder > 0 && priorOrder === nextOrder &&
     statusRank(prior.status) > statusRank(next.status);
-  if (!regressedStage && !sameStageRegression) return next;
+  const staleRetryAttempt = priorOrder > 0 && priorOrder === nextOrder &&
+    statusRank(next.status) <= 1 && Number(prior.attemptCount || 0) > 0 &&
+    Number(next.attemptCount || 0) < Number(prior.attemptCount || 0);
+  if (!regressedStage && !sameStageRegression && !staleRetryAttempt) return next;
 
   for (const field of [
     "currentStage",
@@ -97,6 +112,14 @@ function mergeMonotonicProject(previous, incoming) {
     "approvalRequired",
     "currentStageCriteriaMet",
     "completedAt",
+    "attemptCount",
+    "maxAttempts",
+    "retryCount",
+    "maxRetries",
+    "nextRetryAt",
+    "retryable",
+    "failureType",
+    "failureReason",
   ]) {
     if (prior[field] !== undefined) next[field] = prior[field];
     else delete next[field];

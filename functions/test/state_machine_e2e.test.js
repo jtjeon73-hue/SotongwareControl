@@ -125,4 +125,50 @@ describe("canonical ebook 18-stage state machine", () => {
     state.workflowReceipts.add(first.requestId);
     assert.equal(state.workflowReceipts.size, 1);
   });
+
+  it("preserves the newest retry attempt against stale same-r1 full sync", () => {
+    const retrying = {
+      stageId: "problem_validate",
+      stageNumber: 2,
+      revision: 1,
+      status: "result_validation_retrying",
+      attemptCount: 2,
+      maxAttempts: 4,
+      retryCount: 2,
+      maxRetries: 3,
+      nextRetryAt: "2026-08-20T08:02:00.000Z",
+      retryable: true,
+      failureReason: "problem_validate_problem_signals_insufficient",
+    };
+    const staleR1 = mergeMonotonicStage(retrying, {
+      stageId: "problem_validate",
+      stageNumber: 2,
+      revision: 1,
+      status: "result_validation_failed",
+      attemptCount: 1,
+      retryCount: 1,
+    });
+    assert.equal(staleR1.status, "result_validation_retrying");
+    assert.equal(staleR1.attemptCount, 2);
+    assert.equal(staleR1.retryable, true);
+
+    const retryStarted = mergeMonotonicStage(retrying, {
+      ...retrying,
+      status: "in_progress",
+      retryable: false,
+      nextRetryAt: "",
+    });
+    assert.equal(retryStarted.status, "in_progress");
+    assert.equal(retryStarted.attemptCount, 2);
+    assert.equal(retryStarted.nextRetryAt, "");
+
+    const projectRetry = mergeMonotonicProject(
+      { currentStage: 2, currentStageId: "problem_validate",
+        status: "result_validation_retrying", attemptCount: 2, retryCount: 2 },
+      { currentStage: 2, currentStageId: "problem_validate",
+        status: "in_progress", attemptCount: 1, retryCount: 1 }
+    );
+    assert.equal(projectRetry.status, "result_validation_retrying");
+    assert.equal(projectRetry.attemptCount, 2);
+  });
 });
