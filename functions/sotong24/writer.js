@@ -125,7 +125,9 @@ async function markRequestWorkflowApplied(db, receipt, appliedAt) {
       error.httpStatus = 409;
       throw error;
     }
-    if (current.status !== "approved" && current.status !== "revision_requested") {
+    const isCancel = current.requestType === "cancel";
+    if ((!isCancel && current.status !== "approved" && current.status !== "revision_requested") ||
+        (isCancel && current.status !== "pending" && current.status !== "cancelled")) {
       const error = new Error("request_decision_not_terminal");
       error.code = "failed-precondition";
       error.httpStatus = 409;
@@ -144,6 +146,7 @@ async function markRequestWorkflowApplied(db, receipt, appliedAt) {
     }
     tx.set(ref, {
       processed: true,
+      ...(isCancel ? { status: "cancelled" } : {}),
       workflowApplied: true,
       workflowAppliedAt: appliedAt,
       completedStageId: receipt.completedStageId,

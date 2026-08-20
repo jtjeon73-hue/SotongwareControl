@@ -8,6 +8,7 @@ import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import '../models/sotong24_monitoring.dart';
 import '../services/remote_agent_repository.dart';
+import '../services/remote_control_api.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
@@ -18,6 +19,13 @@ import '../widgets/sotong24_stage_widgets.dart';
 
 /// AI 제작공정 — 전송된 작업의 단계 진행·승인·보완 화면.
 /// 내부 destination key는 `productWorkshop`을 유지한다.
+typedef CancelRunAction =
+    Future<RemoteRunCancelResult> Function({
+      required String jobId,
+      required String instructionId,
+      required String projectId,
+    });
+
 class ProductWorkshopScreen extends StatefulWidget {
   const ProductWorkshopScreen({
     super.key,
@@ -28,6 +36,7 @@ class ProductWorkshopScreen extends StatefulWidget {
     this.focusStageId,
     this.onEnableNotifications,
     this.onOpenGuide,
+    this.onCancelRun,
   });
 
   final Sotong24RemoteRepository? repository;
@@ -37,6 +46,7 @@ class ProductWorkshopScreen extends StatefulWidget {
   final String? focusStageId;
   final Future<bool> Function()? onEnableNotifications;
   final void Function(String stageId)? onOpenGuide;
+  final CancelRunAction? onCancelRun;
 
   @override
   State<ProductWorkshopScreen> createState() => _ProductWorkshopScreenState();
@@ -115,6 +125,26 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
       if (job.instructionId.trim() == id) return true;
     }
     return false;
+  }
+
+  RemoteJobDoc? _jobFor(String instructionId) {
+    final id = instructionId.trim();
+    for (final job in _remoteJobs) {
+      if (job.instructionId.trim() == id) return job;
+    }
+    return null;
+  }
+
+  Future<RemoteRunCancelResult> _cancelRun({
+    required String jobId,
+    required String instructionId,
+    required String projectId,
+  }) {
+    return RemoteControlApi().cancelRun(
+      jobId: jobId,
+      instructionId: instructionId,
+      projectId: projectId,
+    );
   }
 
   @override
@@ -354,9 +384,12 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
           focusStageId: focusStageId,
           onEnableNotifications: widget.onEnableNotifications,
           onOpenGuide: widget.onOpenGuide,
+          job: _jobFor(project.projectId),
+          onCancelRun: widget.onCancelRun ?? _cancelRun,
         ),
       ),
     );
+    await _recheckFromServer();
   }
 }
 
@@ -370,6 +403,8 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
     this.focusStageId,
     this.onEnableNotifications,
     this.onOpenGuide,
+    this.job,
+    this.onCancelRun,
   });
 
   final String projectId;
@@ -379,6 +414,8 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
   final String? focusStageId;
   final Future<bool> Function()? onEnableNotifications;
   final void Function(String stageId)? onOpenGuide;
+  final RemoteJobDoc? job;
+  final CancelRunAction? onCancelRun;
 
   @override
   State<Sotong24RemoteDetailScreen> createState() =>
@@ -647,6 +684,37 @@ class _Sotong24RemoteDetailScreenState
                   def: stageDef,
                 ),
               ],
+              if (!project.isDemo &&
+                  project.userFacingStatus != Sotong24WorkStatus.completed) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: const Key('workshop_cancel_run_button'),
+                    onPressed: _busy || widget.job == null
+                        ? null
+                        : () => _onCancelRun(project),
+                    icon: const Icon(Icons.cancel_outlined, size: 19),
+                    label: const Text('작업 취소'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ControlColors.accentRose,
+                      side: const BorderSide(color: ControlColors.accentRose),
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                  ),
+                ),
+                if (widget.job == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      '취소할 원격 Job 정보를 확인하는 중입니다.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: ControlColors.textMuted,
+                      ),
+                    ),
+                  ),
+              ],
               if (project.userFacingStatus == Sotong24WorkStatus.completed) ...[
                 const SizedBox(height: 12),
                 _CompletedBanner(isTest: isTest),
@@ -830,6 +898,64 @@ class _Sotong24RemoteDetailScreenState
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(err ?? '보완 요청을 전송했습니다.')));
+  }
+
+  Future<void> _onCancelRun(Sotong24RemoteProject project) async {
+    final job = widget.job;
+    final action = widget.onCancelRun;
+    if (job == null || action == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('작업 취소'),
+        content: const Text(
+          '현재 작업을 취소하시겠습니까? 진행 중인 제작 데이터가 정리됩니다. '
+          'Agent 설정과 다른 작업은 유지됩니다.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('workshop_cancel_back'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('돌아가기'),
+          ),
+          FilledButton(
+            key: const Key('workshop_cancel_confirm'),
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: ControlColors.accentRose,
+            ),
+            child: const Text('작업 취소'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final result = await action(
+        jobId: job.jobId,
+        instructionId: job.instructionId,
+        projectId: project.projectId,
+      );
+      if (!mounted) return;
+      if (result.completed) {
+        Navigator.of(context).pop();
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Agent에 취소를 요청했습니다. 잠시 후 상태를 다시 확인해 주세요.'),
+        ),
+      );
+    } on RemoteControlApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.userMessage)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }
 

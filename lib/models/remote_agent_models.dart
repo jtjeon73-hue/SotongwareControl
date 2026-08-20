@@ -18,6 +18,7 @@ class RemoteAgentDoc {
     this.updatedAt,
     this.lastError = '',
     this.codexUsage,
+    this.cursorUsage,
   });
 
   final String agentId;
@@ -33,6 +34,7 @@ class RemoteAgentDoc {
   final DateTime? updatedAt;
   final String lastError;
   final CodexUsageTelemetry? codexUsage;
+  final CursorUsageTelemetry? cursorUsage;
 
   bool isOnline({
     DateTime? now,
@@ -125,6 +127,46 @@ class RemoteAgentDoc {
       updatedAt: _ts(map['updatedAt']),
       lastError: _lastErrorText(map['lastError']),
       codexUsage: CodexUsageTelemetry.fromAgentMap(map),
+      cursorUsage: CursorUsageTelemetry.fromAgentMap(map),
+    );
+  }
+}
+
+/// Cursor has no supported automatic quota API. Values stay unknown unless a
+/// future trusted provider (or explicit manual input) supplies them.
+class CursorUsageTelemetry {
+  const CursorUsageTelemetry({
+    this.status = 'unknown',
+    this.source = 'no_official_local_usage_api',
+    this.collectedAt,
+    this.usedPercent,
+    this.remainingPercent,
+    this.resetsAt,
+  });
+
+  final String status;
+  final String source;
+  final DateTime? collectedAt;
+  final int? usedPercent;
+  final int? remainingPercent;
+  final DateTime? resetsAt;
+
+  bool get isTrustedManual => source == 'manual';
+  bool get hasQuota =>
+      isTrustedManual && usedPercent != null && remainingPercent != null;
+
+  static CursorUsageTelemetry? fromAgentMap(Map<String, dynamic> map) {
+    final aiUsage = map['aiUsage'];
+    if (aiUsage is! Map) return null;
+    final cursor = aiUsage['cursor'];
+    if (cursor is! Map) return null;
+    return CursorUsageTelemetry(
+      status: '${cursor['status'] ?? 'unknown'}'.trim(),
+      source: '${cursor['source'] ?? 'no_official_local_usage_api'}'.trim(),
+      collectedAt: _parseIso('${cursor['collectedAt'] ?? ''}'),
+      usedPercent: _optionalPercent(cursor['usedPercent']),
+      remainingPercent: _optionalPercent(cursor['remainingPercent']),
+      resetsAt: _parseIso('${cursor['resetsAt'] ?? ''}'),
     );
   }
 }

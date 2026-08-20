@@ -113,7 +113,7 @@ class WorkInstructionWorkshopPresentation {
   }
 
   static String approvalModeLabel({required bool approvalRequired}) {
-    return approvalRequired ? '단계별 승인' : '자동 진행';
+    return approvalRequired ? '수동 승인' : '자동 승인';
   }
 
   static String qualityLevelLabel(String? raw) {

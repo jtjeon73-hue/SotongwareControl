@@ -7,6 +7,10 @@ const { createMemoryDb } = require("../remote/memory_db");
 const { sha256Hex } = require("../remote/crypto_util");
 const { COL, PROTOCOL_VERSION } = require("../remote/constants");
 const {
+  finalizeCancelledRun,
+  operationId: cancelOperationId,
+} = require("../remote/cancellation");
+const {
   evaluateStageHealth,
   evaluateActiveJobs,
   enqueueNotification,
@@ -945,5 +949,108 @@ describe("remote agent contract V1", () => {
     assert.equal(duplicate.created, false);
     assert.equal(r2.created, true);
     assert.notEqual(a.id, r2.id);
+  });
+
+  it("safe cancel is authorized, idempotent, and preserves approvalMode + Agent", async () => {
+    const iid = "wi_plan_cancel_safe";
+    const jobId = "job_cancel_safe";
+    const agentId = "agent_9830758291f9c64e";
+    db.store.set(`${COL.AGENTS}/${agentId}`, {
+      agentId, ownerUid: "user_a", state: "idle", currentJobId: "",
+      enabled: true,
+    });
+    db.store.set(`${COL.JOBS}/${jobId}`, {
+      jobId, ownerUid: "user_a", instructionId: iid,
+      assignedAgentId: agentId, status: "waiting_approval", approvalMode: "manual",
+      currentStage: "idea_clarify",
+    });
+    db.store.set(`${COL.PROJECTS}/${iid}`, {
+      projectId: iid, ownerUid: "user_a", currentStageId: "idea_clarify",
+      status: "awaiting_approval", approvalMode: "manual",
+    });
+
+    const first = await control(db, "/api/control/cancel-job", {
+      jobId, instructionId: iid, projectId: iid,
+    });
+    assert.equal(first.statusCode, 200);
+    assert.equal(first.body.state, "cancel_requested");
+    assert.equal(db.store.get(`${COL.JOBS}/${jobId}`).approvalMode, "manual");
+    assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).enabled, true);
+
+    const duplicate = await control(db, "/api/control/cancel-job", {
+      jobId, instructionId: iid, projectId: iid,
+    });
+    assert.equal(duplicate.statusCode, 200);
+    assert.equal(duplicate.body.idempotent, true);
+    assert.equal(duplicate.body.requestId, first.body.requestId);
+
+    const forbidden = await control(db, "/api/control/cancel-job", {
+      jobId, instructionId: iid, projectId: iid,
+    }, "user_b");
+    assert.equal(forbidden.statusCode, 403);
+    const mismatch = await control(db, "/api/control/cancel-job", {
+      jobId, instructionId: iid, projectId: "wi_plan_other",
+    });
+    assert.equal(mismatch.statusCode, 409);
+  });
+
+  it("cancel finalizer removes only the selected Run and clears stale pointer", async () => {
+    const iid = "wi_plan_cancel_finalize";
+    const other = "wi_plan_other_kept";
+    const jobId = "job_cancel_finalize";
+    const agentId = "agent_9830758291f9c64e";
+    const opId = cancelOperationId("user_a", jobId, iid);
+    db.store.set(`cancelOperations/${opId}`, {
+      operationId: opId, ownerUid: "user_a", jobId, instructionId: iid,
+      projectId: iid, agentId, status: "requested",
+    });
+    db.store.set(`${COL.AGENTS}/${agentId}`, {
+      agentId, ownerUid: "user_a", state: "waiting_approval",
+      currentJobId: jobId, currentStage: "idea_clarify", enabled: true,
+    });
+    db.store.set(`${COL.JOBS}/${jobId}`, {
+      jobId, ownerUid: "user_a", instructionId: iid, assignedAgentId: agentId,
+    });
+    db.store.set(`${COL.JOBS}/${jobId}/commands/cmd_1`, { commandId: "cmd_1" });
+    db.store.set(`${COL.JOBS}/${jobId}/stages/idea_clarify`, { stageId: "idea_clarify" });
+    db.store.set(`${COL.PROJECTS}/${iid}`, { projectId: iid, ownerUid: "user_a" });
+    db.store.set(`${COL.PROJECTS}/${iid}/requests/cancel_1`, { requestType: "cancel" });
+    db.store.set(`${COL.PROJECTS}/${iid}/stages/idea_clarify`, { stageId: "idea_clarify" });
+    db.store.set(`workInstructions/user_a__ebook__${iid}`, {
+      ownerUid: "user_a", instructionId: iid,
+    });
+    db.store.set(`businessPlans/user_a__plan_cancel`, {
+      ownerUid: "user_a", instructionId: iid,
+    });
+    db.store.set(`${COL.JOBS}/job_other`, {
+      jobId: "job_other", ownerUid: "user_a", instructionId: other,
+    });
+    db.store.set(`${COL.PROJECTS}/${other}`, {
+      projectId: other, ownerUid: "user_a",
+    });
+    const prefixes = [];
+    const result = await finalizeCancelledRun(db, {
+      uid: "user_a", operationId: opId, jobId, instructionId: iid,
+      projectId: iid, agentId,
+    }, {
+      deleteArtifacts: async (prefix) => { prefixes.push(prefix); return 1; },
+    });
+    assert.equal(result.state, "completed");
+    assert.equal(db.store.has(`${COL.JOBS}/${jobId}`), false);
+    assert.equal(db.store.has(`${COL.PROJECTS}/${iid}`), false);
+    assert.equal(db.store.has(`${COL.JOBS}/job_other`), true);
+    assert.equal(db.store.has(`${COL.PROJECTS}/${other}`), true);
+    assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).currentJobId, "");
+    assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).state, "idle");
+    assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).enabled, true);
+    assert.deepEqual(prefixes, [
+      `sotong24/artifacts/prod/${iid}/`,
+      `sotong24/artifacts/test/${iid}/`,
+    ]);
+    const again = await finalizeCancelledRun(db, {
+      uid: "user_a", operationId: opId, jobId, instructionId: iid,
+      projectId: iid, agentId,
+    });
+    assert.equal(again.idempotent, true);
   });
 });

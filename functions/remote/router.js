@@ -24,6 +24,7 @@ const {
   handleCreateJob,
   handleStartJob,
   handleDeliverInstruction,
+  handleCancelJob,
   validateApproveStageBody,
   validateRequestRevisionBody,
 } = require("./handlers");
@@ -143,8 +144,8 @@ async function handleApiRequest(req, res, deps) {
         throw httpError(501, "unimplemented", "resume-job later phase");
       },
       "/api/control/cancel-job": async () => {
-        await authenticateControl(req, deps);
-        throw httpError(501, "unimplemented", "cancel-job later phase");
+        const { uid } = await authenticateControl(req, deps);
+        return handleCancelJob(db, uid, body, deps);
       },
     };
 

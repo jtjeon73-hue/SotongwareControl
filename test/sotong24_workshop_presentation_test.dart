@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/models/instruction_contract.dart';
+import 'package:sotong_ware_control/models/remote_agent_models.dart';
 import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
+import 'package:sotong_ware_control/services/remote_control_api.dart';
 import 'package:sotong_ware_control/services/sotong24_workshop_presentation.dart';
 import 'package:sotong_ware_control/widgets/sotong24_stage_widgets.dart';
 
@@ -632,5 +634,82 @@ void main() {
       );
       expect(find.text('결과 준비 중'), findsOneWidget);
     });
+
+    testWidgets(
+      'safe cancel requires confirmation and sends the exact Run IDs',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        final current = project(
+          id: 'wi_plan_cancel_ui',
+          title: '취소 UI 검증',
+          status: Sotong24WorkStatus.awaitingApproval,
+          approvalStatus: ApprovalStatus.pending,
+          stageStatus: Sotong24WorkStatus.awaitingApproval,
+          stageApproval: ApprovalStatus.pending,
+        );
+        final repo = Sotong24RemoteRepository(
+          forceMemory: true,
+          memorySeed: [current],
+        );
+        addTearDown(repo.dispose);
+        const job = RemoteJobDoc(
+          jobId: 'job_cancel_ui',
+          ownerUid: 'owner',
+          title: '취소 UI 검증',
+          type: 'ebook',
+          status: 'waiting_approval',
+          assignedAgentId: 'agent_9830758291f9c64e',
+          instructionId: 'wi_plan_cancel_ui',
+        );
+        var calls = 0;
+        String captured = '';
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Sotong24RemoteDetailScreen(
+              projectId: current.projectId,
+              repository: repo,
+              initialProject: current,
+              job: job,
+              onCancelRun:
+                  ({
+                    required jobId,
+                    required instructionId,
+                    required projectId,
+                  }) async {
+                    calls += 1;
+                    captured = '$jobId|$instructionId|$projectId';
+                    return const RemoteRunCancelResult(
+                      state: 'cancel_requested',
+                      operationId: 'cancel_test',
+                    );
+                  },
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('workshop_cancel_run_button')),
+          300,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await tester.tap(find.byKey(const Key('workshop_cancel_run_button')));
+        // The manual-approval pulse is intentionally continuous while waiting.
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.textContaining('Agent 설정과 다른 작업은 유지됩니다.'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('workshop_cancel_back')));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(calls, 0);
+
+        await tester.tap(find.byKey(const Key('workshop_cancel_run_button')));
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.byKey(const Key('workshop_cancel_confirm')));
+        await tester.pump();
+        expect(calls, 1);
+        expect(captured, 'job_cancel_ui|wi_plan_cancel_ui|wi_plan_cancel_ui');
+      },
+    );
   });
 }

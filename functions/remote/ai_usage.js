@@ -9,6 +9,7 @@ const CODEX_STATUS = new Set([
   "timeout",
   "parse_error",
 ]);
+const CURSOR_STATUS = new Set(["unknown", "manual", "ok"]);
 
 const SECRET_KEY_RE =
   /(?:token|secret|apikey|api_key|password|credential|authorization|cookie|email)/i;
@@ -100,11 +101,36 @@ function pickAiUsageCodex(body) {
     if (Object.keys(weekly).length > 0) out.weekly = weekly;
   }
 
-  if (Object.keys(out).length === 0) return undefined;
-  return { codex: out };
+  const picked = {};
+  if (Object.keys(out).length > 0) picked.codex = out;
+
+  const cursor = aiUsage.cursor;
+  if (isPlainObject(cursor)) {
+    const status = String(cursor.status || "unknown").trim();
+    const source = String(cursor.source || "").trim();
+    if (CURSOR_STATUS.has(status) &&
+        (source === "no_official_local_usage_api" || source === "manual")) {
+      const c = { status, source };
+      const collectedAtCursor = parseIsoOptional(cursor.collectedAt);
+      if (collectedAtCursor !== undefined) c.collectedAt = collectedAtCursor;
+      const usedPercent = parsePercent(cursor.usedPercent);
+      const remainingPercent = parsePercent(cursor.remainingPercent);
+      const resetsAt = parseIsoOptional(cursor.resetsAt);
+      if (source === "manual") {
+        if (usedPercent !== undefined) c.usedPercent = usedPercent;
+        if (remainingPercent !== undefined) c.remainingPercent = remainingPercent;
+        if (resetsAt !== undefined) c.resetsAt = resetsAt;
+      }
+      picked.cursor = c;
+    }
+  }
+
+  if (Object.keys(picked).length === 0) return undefined;
+  return picked;
 }
 
 module.exports = {
   pickAiUsageCodex,
   CODEX_STATUS,
+  CURSOR_STATUS,
 };

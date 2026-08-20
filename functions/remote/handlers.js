@@ -30,6 +30,7 @@ const {
   mergeMonotonicProject,
 } = require("../sotong24/writer");
 const { EBOOK_STAGE_BY_ID } = require("../sotong24/canonical");
+const { handleCancelJob } = require("./cancellation");
 
 const AGENT_STATES = new Set(Object.values(AGENT_STATE));
 const WORK_STATUSES = new Set(Object.values(WORK_STATUS));
@@ -1044,6 +1045,7 @@ module.exports = {
   handleCreateJob,
   handleStartJob,
   handleDeliverInstruction,
+  handleCancelJob,
   validateApproveStageBody,
   validateRequestRevisionBody,
   isAgentOnline,

@@ -656,12 +656,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     final wiArtifact = wi.artifactType.isEmpty
         ? artifact
         : ArtifactType.normalize(wi.artifactType);
+    final expectedApproval = _resolveAiExecutionForBuild(input)?.approvalMode;
     return input.topic.trim() == wi.businessIdea.trim() &&
         input.customerProblem.trim() == wi.customerProblem.trim() &&
         input.targetCustomer.trim() == wi.targetCustomer.trim() &&
         input.desiredOutcome.trim() == wi.businessPurpose.trim() &&
         ArtifactType.normalize(artifact) == wiArtifact &&
-        input.notes.trim() == wi.notes.trim();
+        input.notes.trim() == wi.notes.trim() &&
+        (expectedApproval == null ||
+            wi.aiExecution?.approvalMode == expectedApproval);
   }
 
   /// 새 ebook + pilot 토글 ON일 때만 고정 정책. 기존 WI 자동 migration 없음.
@@ -1988,6 +1991,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             )
           else
             _buildAdvancedForm(),
+          if (_showApprovalModeChoice) ...[
+            const SizedBox(height: 12),
+            _buildApprovalModeCard(),
+          ],
           if (_instruction != null) ...[
             const SizedBox(height: 12),
             _buildSendSummaryCard(),
@@ -2439,31 +2446,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               ? null
               : (v) => setState(() => _aiProductionPilot = v),
         ),
-        if (_aiProductionPilot && isEbook) ...[
-          const SizedBox(height: 8),
-          Text('승인 방식', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 6),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'manual', label: Text('수동 승인')),
-              ButtonSegment(value: 'auto', label: Text('자동 승인')),
-            ],
-            selected: {_approvalMode},
-            onSelectionChanged: (value) {
-              setState(() => _approvalMode = value.first);
-            },
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _approvalMode == 'auto'
-                ? '검증 PASS 결과만 자동 승인해 등록 전 완성본까지 계속 진행합니다.'
-                : '각 주요 단계 결과를 확인하고 직접 승인하거나 보완을 요청합니다.',
-            style: const TextStyle(
-              fontSize: 12.5,
-              color: ControlColors.textSecondary,
-            ),
-          ),
-        ],
         const Divider(height: 16),
         _sendSummaryRow(
           '제작 방식',
@@ -2489,6 +2471,84 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           }()),
         ),
       ],
+    );
+  }
+
+  bool get _showApprovalModeChoice {
+    final artifact = ArtifactType.normalize(
+      _artifactType == ArtifactType.undecided
+          ? _currentInput.resolvedArtifactType
+          : _artifactType,
+    );
+    return _aiProductionPilot && artifact == ArtifactType.ebook;
+  }
+
+  Widget _buildApprovalModeCard() {
+    final instructionMode = _instruction?.aiExecution?.approvalMode;
+    final needsRecreate =
+        instructionMode != null && instructionMode != _approvalMode;
+    return Card(
+      key: const Key('planning_approval_mode_card'),
+      color: ControlColors.warningBg,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '승인 방식',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '작업지시를 최종 생성·전송하기 전에 반드시 확인해 주세요.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: ControlColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<String>(
+              key: const Key('planning_approval_mode_selector'),
+              segments: const [
+                ButtonSegment(value: 'manual', label: Text('수동 승인')),
+                ButtonSegment(value: 'auto', label: Text('자동 승인')),
+              ],
+              selected: {_approvalMode},
+              onSelectionChanged: (value) {
+                setState(() => _approvalMode = value.first);
+              },
+            ),
+            const SizedBox(height: 12),
+            const _ApprovalModeDescription(
+              icon: Icons.touch_app_outlined,
+              title: '수동 승인',
+              description: '각 단계 검증 PASS 후 기다립니다. 결과를 보고 승인 또는 보완 요청할 수 있습니다.',
+            ),
+            const SizedBox(height: 8),
+            const _ApprovalModeDescription(
+              icon: Icons.auto_awesome_outlined,
+              title: '자동 승인',
+              description:
+                  'validator와 단계 계약을 통과한 결과만 다음 단계로 진행합니다. 오류·지연·quota·보안 문제는 자동 승인하지 않습니다.',
+            ),
+            if (needsRecreate) ...[
+              const SizedBox(height: 10),
+              const Text(
+                '승인 방식이 바뀌었습니다. 전송 전에 작업지시를 새 버전으로 다시 생성해 값과 요약을 일치시키세요.',
+                key: Key('planning_approval_mode_recreate_notice'),
+                style: TextStyle(
+                  color: ControlColors.accentWarm,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -2626,6 +2686,49 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       onCopyGptMemo: _copyDeliveryGptMemo,
       onShowValidation: _showValidationIssues,
       onRecheckWorkshop: _recheckWorkshopStatus,
+    );
+  }
+}
+
+class _ApprovalModeDescription extends StatelessWidget {
+  const _ApprovalModeDescription({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: ControlColors.teal),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$title\n',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(
+                  text: description,
+                  style: const TextStyle(
+                    color: ControlColors.textSecondary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+            style: const TextStyle(fontSize: 12.5),
+          ),
+        ),
+      ],
     );
   }
 }

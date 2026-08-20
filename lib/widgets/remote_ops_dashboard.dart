@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import '../services/codex_usage_presentation.dart';
+import '../services/cursor_usage_presentation.dart';
 import '../services/ops_health_check.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
@@ -142,7 +143,8 @@ class RemoteOpsDashboard extends StatelessWidget {
           _WorkerLine(
             name: 'Cursor',
             status: _cursorStatus(primaryAgent),
-            usage: '수집 준비 중',
+            usage: CursorUsagePresentation.headline(primaryAgent),
+            usageLines: CursorUsagePresentation.detailLines(primaryAgent),
           ),
           const Divider(height: 24),
           const _SectionLabel('현재 진행 작업'),

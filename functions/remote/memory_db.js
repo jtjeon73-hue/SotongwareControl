@@ -50,6 +50,9 @@ function createMemoryDb() {
         if (!store.has(k)) throw new Error("not-found");
         store.set(k, { ...store.get(k), ...data });
       },
+      async delete() {
+        store.delete(k);
+      },
       collection(name) {
         return collectionRef([...path, name]);
       },

@@ -18,6 +18,20 @@ class RemoteControlApiException implements Exception {
   String toString() => userMessage;
 }
 
+class RemoteRunCancelResult {
+  const RemoteRunCancelResult({
+    required this.state,
+    required this.operationId,
+    this.idempotent = false,
+  });
+
+  final String state;
+  final String operationId;
+  final bool idempotent;
+
+  bool get completed => state == 'completed';
+}
+
 /// Control-plane HTTPS client (Firebase Auth ID Token). Never logs tokens.
 class RemoteControlApi {
   RemoteControlApi({
@@ -137,6 +151,9 @@ class RemoteControlApi {
     if (status == 404 || code == 'not_found') {
       return '요청한 대상을 찾을 수 없습니다.';
     }
+    if (code == 'run_mismatch') {
+      return '선택한 작업과 서버 작업 정보가 일치하지 않아 취소하지 않았습니다.';
+    }
     if (code == 'agent_offline' || code == 'agent_missing') {
       return '전송 실패. 연결된 노트북 Agent가 없습니다. 다시 시도가 필요합니다.';
     }
@@ -246,5 +263,31 @@ class RemoteControlApi {
       jobId: '${map['jobId'] ?? jobId}',
       idempotent: map['idempotent'] == true,
     );
+  }
+
+  Future<RemoteRunCancelResult> cancelRun({
+    required String jobId,
+    required String instructionId,
+    required String projectId,
+    String message = '사용자 작업 취소',
+  }) async {
+    RemoteRunCancelResult? latest;
+    for (var attempt = 0; attempt < 18; attempt += 1) {
+      final map = await _post('/api/control/cancel-job', {
+        'jobId': jobId,
+        'instructionId': instructionId,
+        'projectId': projectId,
+        'message': message,
+      });
+      latest = RemoteRunCancelResult(
+        state: '${map['state'] ?? 'cancel_requested'}',
+        operationId: '${map['operationId'] ?? ''}',
+        idempotent: map['idempotent'] == true,
+      );
+      if (latest.completed) return latest;
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+    return latest ??
+        const RemoteRunCancelResult(state: 'cancel_requested', operationId: '');
   }
 }

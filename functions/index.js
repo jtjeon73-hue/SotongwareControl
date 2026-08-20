@@ -9,13 +9,14 @@
 const functions = require("firebase-functions");
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { handleRelayRequest } = require("./sotong24/relay");
 const { handleApiRequest } = require("./remote/router");
 const { evaluateActiveJobs, deliverNotificationEvent } = require("./remote/monitoring");
 const { createAdminStorageDeps } = require("./sotong24/artifact");
+const { finalizeCancelRequestEvent } = require("./remote/cancellation");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -133,8 +134,29 @@ exports.api = onRequest(
     memory: "256MiB",
   },
   async (req, res) => {
+    const bucket = admin.storage().bucket();
     await handleApiRequest(req, res, {
       db: admin.firestore(),
+      async deleteArtifacts(prefix) {
+        const [files] = await bucket.getFiles({ prefix });
+        for (const file of files) await file.delete({ ignoreNotFound: true });
+        return files.length;
+      },
+    });
+  }
+);
+
+/** Agent cancel acknowledgment -> selected Run cleanup only. */
+exports.finalizeCancelledRun = onDocumentUpdated(
+  "sotong24work_projects/{projectId}/requests/{requestId}",
+  async (event) => {
+    const bucket = admin.storage().bucket();
+    await finalizeCancelRequestEvent(admin.firestore(), event, {
+      async deleteArtifacts(prefix) {
+        const [files] = await bucket.getFiles({ prefix });
+        for (const file of files) await file.delete({ ignoreNotFound: true });
+        return files.length;
+      },
     });
   }
 );
