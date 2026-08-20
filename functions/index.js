@@ -139,7 +139,7 @@ exports.api = onRequest(
   }
 );
 
-/** Observer-only monitoring. It emits idempotent events and never changes jobs/stages. */
+/** Health monitor: idempotent alerts plus bounded, command-backed stalled recovery. */
 exports.monitorStageHealth = onSchedule(
   { schedule: "every 5 minutes", timeZone: "Asia/Seoul", maxInstances: 1 },
   async () => {
