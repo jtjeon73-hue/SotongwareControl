@@ -502,7 +502,8 @@ async function handleReportStage(db, ctx, body) {
       ? WORK_STATUS.REWORKING
       : WORK_STATUS.RUNNING;
   } else if (status === WORK_STATUS.COMPLETED) {
-    jobPatch.status = EBOOK_STAGE_BY_ID.get(stageId)?.terminal
+    jobPatch.status = (EBOOK_STAGE_BY_ID.get(stageId)?.terminal ||
+      EBOOK_STAGE_BY_ID.get(stageId)?.productionBoundary)
       ? WORK_STATUS.COMPLETED
       : WORK_STATUS.RUNNING;
   } else if (status === WORK_STATUS.RESULT_VALIDATION_RETRYING) {
@@ -547,7 +548,8 @@ async function handleReportStage(db, ctx, body) {
         ? "awaiting_approval"
         : interruptionStatus.has(projectStagePatch.status)
           ? projectStagePatch.status
-        : EBOOK_STAGE_BY_ID.get(stageId)?.terminal &&
+        : (EBOOK_STAGE_BY_ID.get(stageId)?.terminal ||
+            EBOOK_STAGE_BY_ID.get(stageId)?.productionBoundary) &&
             projectStagePatch.status === "completed"
           ? "completed"
           : "in_progress";
@@ -558,6 +560,7 @@ async function handleReportStage(db, ctx, body) {
         status: projectStatus,
         lastActivityAt: ts,
         activityState: projectStagePatch.activityState || "",
+        approvalMode: job.approvalMode === "auto" ? "auto" : "manual",
         updatedAt: ts,
         ...(projectStagePatch.attemptCount != null
           ? { attemptCount: projectStagePatch.attemptCount } : {}),
@@ -781,6 +784,10 @@ async function handleCreateJob(db, uid, body) {
   const jobId = newId("job");
   const ts = nowIso();
   const totalStages = Number(body.totalStages) || 18;
+  const payload = isPlainObject(body.payload) ? body.payload : {};
+  const aiExecution = isPlainObject(payload.aiExecution) ? payload.aiExecution : {};
+  const approvalMode = String(body.approvalMode || payload.approvalMode ||
+    aiExecution.approvalMode || "manual") === "auto" ? "auto" : "manual";
   const doc = {
     jobId,
     ownerUid: uid,
@@ -797,6 +804,7 @@ async function handleCreateJob(db, uid, body) {
     updatedAt: ts,
 	  environment,
 	  isTest,
+    approvalMode,
   };
   if (instructionId) doc.instructionId = instructionId;
   await db.collection(COL.JOBS).doc(jobId).set(doc);
@@ -979,6 +987,7 @@ async function handleDeliverInstruction(db, uid, body) {
     ...body,
     assignedAgentId,
     instructionId,
+    payload,
   });
   const started = await handleStartJob(db, uid, {
     jobId: created.jobId,

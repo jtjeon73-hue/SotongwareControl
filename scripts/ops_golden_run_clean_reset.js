@@ -359,6 +359,7 @@ async function fullAudit() {
     deletePlan: [],
     preservedSystem: {
       agents: [],
+      monitoringConfig: [],
       note:
         'Catalogs/guides/wizard schema live in app bundle + SharedPreferences locally, not Firestore top-level collections.',
     },
@@ -386,6 +387,10 @@ async function fullAudit() {
 
   report.agents = await collectAgents();
   report.counts.agents = report.agents.length;
+
+  const monitoringDocs = await listCollection('monitoring_config');
+  report.counts.monitoring_config = monitoringDocs.length;
+  report.preservedSystem.monitoringConfig = monitoringDocs.map(summarizeDoc);
 
   // Build delete plan — all user work in target collections.
   for (const j of report.jobs) {

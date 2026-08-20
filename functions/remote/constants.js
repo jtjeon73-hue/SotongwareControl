@@ -88,6 +88,7 @@ const ACTIVITY_STATE = Object.freeze({
   RESULT_VALIDATING: "result_validating",
   RESULT_UPLOADING: "result_uploading",
   APPROVAL_PREPARING: "approval_preparing",
+  AUTO_APPROVAL: "auto_approval",
   PAUSED_QUOTA: "paused_quota",
   PAUSED_NETWORK: "paused_network",
   STALLED: "stalled",

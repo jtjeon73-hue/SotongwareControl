@@ -103,6 +103,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   /// 새 ebook WI에만 Codex 1단계 pilot 정책 부착. 기존 WI에는 자동 삽입하지 않음.
   bool _aiProductionPilot = true;
+  String _approvalMode = 'manual';
   DevWorkDocState? _devDocState;
   List<RemoteAgentDoc> _remoteAgents = const [];
   List<RemoteJobDoc> _remoteJobs = const [];
@@ -670,7 +671,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ? ArtifactType.ebook
         : ArtifactType.normalize(input.resolvedArtifactType);
     if (artifact != ArtifactType.ebook) return null;
-    return AiExecutionPolicy.pilotCodexStage1;
+    return AiExecutionPolicy.productionEbook(approvalMode: _approvalMode);
   }
 
   Future<void> _createOrPromptInstruction() async {
@@ -1735,6 +1736,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _activeDoc = plan;
       _lastTransferResult = null;
       _aiProductionPilot = plan.instruction?.aiExecution?.enabled == true;
+      _approvalMode = plan.instruction?.aiExecution?.approvalMode == 'auto'
+          ? 'auto'
+          : 'manual';
       if (plan.input.wizardSelections != null) {
         _wizardState = PlanningWizardState.fromJson(
           plan.input.wizardSelections!,
@@ -1767,6 +1771,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _resumeInput = null;
     _resumePlanId = null;
     _aiProductionPilot = true;
+    _approvalMode = 'manual';
     _inputModeQuick = true;
     _wizardState = PlanningWizardState(mode: 'quick');
     _designState = WorkInstructionWizardSession.emptyDesign();
@@ -2210,7 +2215,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _sendSummaryRow(
               '승인 방식',
               WorkInstructionWorkshopPresentation.approvalModeLabel(
-                approvalRequired: isEbookPilot,
+                approvalRequired: isEbookPilot && _approvalMode == 'manual',
               ),
             ),
             if (input.constraints.trim().isNotEmpty)
@@ -2426,7 +2431,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           contentPadding: EdgeInsets.zero,
           title: const Text('AI 자동 제작 (전자책)'),
           subtitle: const Text(
-            '1단계까지 자동 진행 후 승인이 필요합니다.',
+            '검증을 통과한 제작 단계를 순서대로 진행합니다. 외부 등록·출시는 실행하지 않습니다.',
             style: TextStyle(fontSize: 12.5),
           ),
           value: _aiProductionPilot && isEbook,
@@ -2434,6 +2439,31 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               ? null
               : (v) => setState(() => _aiProductionPilot = v),
         ),
+        if (_aiProductionPilot && isEbook) ...[
+          const SizedBox(height: 8),
+          Text('승인 방식', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 6),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'manual', label: Text('수동 승인')),
+              ButtonSegment(value: 'auto', label: Text('자동 승인')),
+            ],
+            selected: {_approvalMode},
+            onSelectionChanged: (value) {
+              setState(() => _approvalMode = value.first);
+            },
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _approvalMode == 'auto'
+                ? '검증 PASS 결과만 자동 승인해 등록 전 완성본까지 계속 진행합니다.'
+                : '각 주요 단계 결과를 확인하고 직접 승인하거나 보완을 요청합니다.',
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: ControlColors.textSecondary,
+            ),
+          ),
+        ],
         const Divider(height: 16),
         _sendSummaryRow(
           '제작 방식',
@@ -2445,7 +2475,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _sendSummaryRow(
           '승인 방식',
           WorkInstructionWorkshopPresentation.approvalModeLabel(
-            approvalRequired: _aiProductionPilot && isEbook,
+            approvalRequired:
+                _aiProductionPilot && isEbook && _approvalMode == 'manual',
           ),
         ),
         _sendSummaryRow('제작 언어', '한국어 (영어는 향후 locale 확장 예정)'),

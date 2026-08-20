@@ -224,6 +224,12 @@ class Sotong24StageMonitoring {
         return '결과물 업로드 중';
       case 'approval_preparing':
         return '승인 대기 준비 중';
+      case 'worker_dispatch_waiting':
+        return '작업 worker 시작 대기';
+      case 'stage_transitioning':
+        return '다음 단계 전환 중';
+      case 'auto_approval':
+        return '검증 완료 · 자동 승인 중';
       case 'paused_quota':
         return 'AI 사용량 초기화 대기';
       case 'paused_network':
@@ -239,7 +245,7 @@ class Sotong24StageMonitoring {
       case 'stage_transition_failed':
         return '단계 전환 실패';
       default:
-        return 'Agent 상태 확인 중';
+        return state.trim().isEmpty ? '작업 worker 시작 대기' : '작업 상태 동기화 중';
     }
   }
 

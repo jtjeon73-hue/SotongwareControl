@@ -26,7 +26,7 @@ const EBOOK_STAGE_CONTRACTS = [
   ["user_review", "사용자 확인", true, true, true, "review_packet", "canonical_artifact"],
   ["revise", "보완 수정", true, true, false, "revised_manuscript", "canonical_artifact"],
   ["quality", "품질 검사", true, true, false, "quality_report", "canonical_artifact"],
-  ["publish_prep", "등록 준비", true, false, true, "publishing_package", "canonical_artifact"],
+  ["publish_prep", "등록 준비", true, true, true, "publishing_package", "canonical_artifact"],
   ["deploy", "배포", false, false, true, "deployment_record", "canonical_artifact"],
   ["promo", "홍보자료 제작", true, true, false, "promotion_package", "canonical_artifact"],
   ["launch", "공개 및 공유", true, false, true, "launch_readiness_record", "canonical_artifact"],
@@ -46,6 +46,7 @@ const EBOOK_STAGE_CONTRACTS = [
     ? PROBLEM_VALIDATE_EVIDENCE_CONTRACT
     : undefined,
   terminal: index === 17,
+  productionBoundary: row[0] === "publish_prep",
 }));
 
 const EBOOK_STAGES = EBOOK_STAGE_CONTRACTS.map((stage) => [stage.id, stage.name]);

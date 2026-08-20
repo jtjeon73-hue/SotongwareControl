@@ -69,6 +69,33 @@ void main() {
     expect(result.health, Sotong24StageHealth.inactive);
   });
 
+  test('empty activity state identifies worker dispatch wait', () {
+    final s = stage(activityState: '');
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(heartbeat: '2026-08-19T00:04:50.000Z', stage: s),
+      stage: s,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T00:05:00.000Z'),
+    );
+    expect(result.activityLabel, '작업 worker 시작 대기');
+  });
+
+  test('recovery metadata survives remote model round trip', () {
+    final source = Sotong24RemoteStage(
+      stageId: 'publish_prep',
+      stageNumber: 12,
+      stageName: '등록 준비',
+      status: Sotong24WorkStatus.stalled,
+      recoveryAttempt: 2,
+      maxRecoveryAttempts: 3,
+      recoveryState: 'requested',
+    );
+    final restored = Sotong24RemoteStage.fromMap(source.toMap());
+    expect(restored.recoveryAttempt, 2);
+    expect(restored.maxRecoveryAttempts, 3);
+    expect(restored.recoveryState, 'requested');
+  });
+
   test('long work with recent activity is delayed, never an error', () {
     final s = stage(lastActivityAt: '2026-08-19T00:19:30.000Z');
     final result = Sotong24StageMonitoring.evaluate(

@@ -1,7 +1,12 @@
 "use strict";
 
 const { sha256Hex } = require("./crypto_util");
-const { COL, WORK_STATUS } = require("./constants");
+const {
+  COL,
+  WORK_STATUS,
+  COMMAND_TYPE,
+  COMMAND_STATUS,
+} = require("./constants");
 
 const DEFAULT_POLICY = Object.freeze({
   onlineWithinSeconds: 120,
@@ -141,7 +146,7 @@ function notificationContent(eventType, stageNumber, stageName, revision) {
     case "work_error":
       return { title: "AI 제작 오류", body: `${label} 작업에서 오류가 발생했습니다. 확인이 필요합니다.` };
     case "production_completed":
-      return { title: "AI 제작 완료", body: "18단계 AI 제작공정이 모두 완료되었습니다." };
+      return { title: "전자책 제작 완료", body: "등록 전 최종 완성본이 준비되었습니다. PDF와 등록 자료를 확인해 주세요." };
     default:
       return { title: "AI 제작공정 알림", body: `${label} 상태를 확인해주세요.` };
   }
@@ -214,6 +219,87 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     if (health.state === "stalled") eventType = "activity_stalled";
     if (health.state === "error") eventType = "work_error";
     if (!eventType) continue;
+    if (health.state === "inactive" || health.state === "stalled") {
+      const pendingRecoveryId = String(stage.recoveryCommandId || "");
+      if (stage.recoveryState === "requested" && pendingRecoveryId) {
+        const pending = await doc.ref.collection("commands").doc(pendingRecoveryId).get();
+        const commandStatus = pending.exists ? String((pending.data() || {}).status || "") : "";
+        if (commandStatus === COMMAND_STATUS.QUEUED ||
+            commandStatus === COMMAND_STATUS.CLAIMED) {
+          continue;
+        }
+      }
+      const maxRecoveryAttempts = Math.max(1, Number(stage.maxRecoveryAttempts) || 3);
+      const recoveryAttempt = Math.min(
+        maxRecoveryAttempts,
+        Math.max(0, Number(stage.recoveryAttempt) || 0) + 1
+      );
+      const exhausted = recoveryAttempt >= maxRecoveryAttempts;
+      const status = exhausted
+        ? WORK_STATUS.STAGE_TRANSITION_FAILED
+        : WORK_STATUS.STALLED;
+      const ts = new Date(nowMs).toISOString();
+      const recoveryPatch = {
+        status,
+        activityState: status,
+        recoveryAttempt,
+        maxRecoveryAttempts,
+        recoveryState: exhausted ? "exhausted" : "requested",
+        retryable: !exhausted,
+        failureType: exhausted ? "stalled_recovery_exhausted" : "activity_timeout",
+        failureReason: exhausted
+          ? `automatic recovery exhausted (${recoveryAttempt}/${maxRecoveryAttempts})`
+          : `automatic recovery requested (${recoveryAttempt}/${maxRecoveryAttempts})`,
+        updatedAt: ts,
+      };
+      if (!exhausted) {
+        const commands = await doc.ref.collection("commands").get();
+        const original = commands.docs
+          .map((item) => item.data() || {})
+          .find((item) => item.type === COMMAND_TYPE.START_JOB && item.payload);
+        if (original) {
+          const recoveryCommandId = `cmd_recovery_${sha256Hex(
+            `${doc.id}:${job.currentStage}:${recoveryAttempt}`
+          ).slice(0, 24)}`;
+          await doc.ref.collection("commands").doc(recoveryCommandId).set({
+            commandId: recoveryCommandId,
+            idempotencyKey: `recovery:${doc.id}:${job.currentStage}:${recoveryAttempt}`,
+            agentId: job.assignedAgentId,
+            jobId: job.jobId || doc.id,
+            type: COMMAND_TYPE.START_JOB,
+            status: COMMAND_STATUS.QUEUED,
+            attempt: 0,
+            payload: {
+              ...original.payload,
+              recovery: {
+                stageId: job.currentStage,
+                attempt: recoveryAttempt,
+                maxAttempts: maxRecoveryAttempts,
+              },
+            },
+            createdAt: ts,
+            updatedAt: ts,
+          }, { merge: true });
+          recoveryPatch.recoveryCommandId = recoveryCommandId;
+        } else {
+          recoveryPatch.recoveryState = "unavailable";
+          recoveryPatch.retryable = false;
+          recoveryPatch.failureReason = "automatic recovery unavailable: START_JOB payload missing";
+        }
+      }
+      await doc.ref.collection("stages").doc(job.currentStage)
+        .set(recoveryPatch, { merge: true });
+      await doc.ref.set({
+        ...recoveryPatch,
+        pauseReason: status,
+      }, { merge: true });
+      if (job.instructionId) {
+        const projectRef = db.collection(COL.PROJECTS).doc(job.instructionId);
+        await projectRef.collection("stages").doc(job.currentStage)
+          .set(recoveryPatch, { merge: true });
+        await projectRef.set(recoveryPatch, { merge: true });
+      }
+    }
     const out = await enqueueNotification(db, {
       ownerUid: job.ownerUid,
       instructionId: job.instructionId,

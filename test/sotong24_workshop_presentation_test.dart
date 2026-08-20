@@ -20,6 +20,7 @@ void main() {
     String stageApproval = ApprovalStatus.notRequired,
     String resultUrl = '',
     String environment = 'production',
+    String approvalMode = 'manual',
     bool isTest = false,
     List<Sotong24RemoteStage>? stages,
   }) {
@@ -33,6 +34,7 @@ void main() {
       status: status,
       approvalStatus: approvalStatus,
       environment: environment,
+      approvalMode: approvalMode,
       isTest: isTest,
       stages:
           stages ??
@@ -413,6 +415,138 @@ void main() {
   });
 
   group('ProductWorkshopScreen UX', () {
+    testWidgets('manual approval pulse starts and stops after approval', (
+      tester,
+    ) async {
+      final awaiting = project(
+        id: 'wi_plan_pulse',
+        title: 'pulse',
+        status: Sotong24WorkStatus.awaitingApproval,
+        stageStatus: Sotong24WorkStatus.awaitingApproval,
+        stageApproval: ApprovalStatus.pending,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Sotong24NowTodoPanel(
+            project: awaiting,
+            stage: awaiting.stages.first,
+            def: null,
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('approval_pulse')), findsOneWidget);
+      expect(find.text('승인 필요'), findsOneWidget);
+
+      final approved = project(
+        id: 'wi_plan_pulse',
+        title: 'pulse',
+        status: Sotong24WorkStatus.inProgress,
+        stageStatus: Sotong24WorkStatus.completed,
+        stageApproval: ApprovalStatus.approved,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Sotong24NowTodoPanel(
+            project: approved,
+            stage: approved.stages.first,
+            def: null,
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('approval_pulse')), findsNothing);
+    });
+
+    testWidgets('auto approval activity shows a short pulse state', (
+      tester,
+    ) async {
+      final autoStage = Sotong24RemoteStage(
+        stageId: 'publish_prep',
+        stageNumber: 12,
+        stageName: '등록 준비',
+        status: Sotong24WorkStatus.inProgress,
+        activityState: 'auto_approval',
+      );
+      final automatic = project(
+        id: 'wi_plan_auto_pulse',
+        title: 'auto pulse',
+        status: Sotong24WorkStatus.inProgress,
+        currentStage: 12,
+        approvalMode: 'auto',
+        stages: [autoStage],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Sotong24NowTodoPanel(
+            project: automatic,
+            stage: autoStage,
+            def: null,
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('approval_pulse')), findsOneWidget);
+      expect(find.text('검증 완료 · 자동 승인 중'), findsOneWidget);
+    });
+
+    testWidgets('completed ebook exposes final PDF and guide deep links', (
+      tester,
+    ) async {
+      final publishStage = Sotong24RemoteStage(
+        stageId: 'publish_prep',
+        stageNumber: 12,
+        stageName: '등록 준비',
+        status: Sotong24WorkStatus.completed,
+        criteriaMet: true,
+        approvalStatus: ApprovalStatus.approved,
+        resultUrl: 'https://storage.googleapis.com/example/final_ebook.pdf',
+      );
+      final completed = project(
+        id: 'wi_plan_final_result',
+        title: '완성 전자책',
+        status: Sotong24WorkStatus.completed,
+        currentStage: 12,
+        stages: [publishStage],
+      );
+      final repo = Sotong24RemoteRepository(
+        forceMemory: true,
+        memorySeed: [completed],
+      );
+      addTearDown(repo.dispose);
+      var openedStage = '';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Sotong24RemoteDetailScreen(
+            projectId: completed.projectId,
+            repository: repo,
+            initialProject: completed,
+            onOpenGuide: (stageId) => openedStage = stageId,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('final_result_panel')),
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(find.byKey(const Key('final_result_panel')), findsOneWidget);
+      expect(find.text('최종 PDF 보기/다운로드'), findsOneWidget);
+
+      await tester.ensureVisible(
+        find.byKey(const Key('registration_guide_button')),
+      );
+      await tester.tap(find.byKey(const Key('registration_guide_button')));
+      expect(openedStage, 'publish_prep');
+      final maintenance = tester.widget<OutlinedButton>(
+        find.byKey(const Key('maintenance_guide_button')),
+      );
+      maintenance.onPressed!();
+      expect(openedStage, 'maintain');
+    });
+
     testWidgets('실제/TEST 섹션 분리 + Codex 제목 + 승인 대기', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;

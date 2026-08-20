@@ -32,6 +32,16 @@ describe("canonical ebook 18-stage state machine", () => {
     );
   });
 
+  it("treats STEP 12 as AI production boundary, not external publish", () => {
+    const publishPrep = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "publish_prep");
+    const deploy = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "deploy");
+    assert.equal(publishPrep.order, 12);
+    assert.equal(publishPrep.aiDocumentStage, true);
+    assert.equal(publishPrep.productionBoundary, true);
+    assert.equal(deploy.aiDocumentStage, false);
+    assert.equal(deploy.productionBoundary, false);
+  });
+
   it("runs deterministic stage 1 through 18 with exactly-once approval", () => {
     const state = createSimulation({ approvalRequiredOverride: true });
     const transitions = [];
@@ -120,6 +130,24 @@ describe("canonical ebook 18-stage state machine", () => {
     assert.equal(stale.status, "awaiting_approval");
     assert.equal(stale.criteriaMet, true);
     assert.equal(stale.approvalStatus, "approved");
+
+    const stalled = mergeMonotonicStage(
+      {
+        stageId: "publish_prep",
+        stageNumber: 12,
+        status: "stalled",
+        revision: 1,
+        recoveryAttempt: 1,
+      },
+      {
+        stageId: "publish_prep",
+        stageNumber: 12,
+        status: "in_progress",
+        revision: 1,
+      },
+    );
+    assert.equal(stalled.status, "stalled");
+    assert.equal(stalled.recoveryAttempt, 1);
 
     const completed = mergeMonotonicStage({ ...awaiting, status: "completed" }, awaiting);
     assert.equal(completed.status, "completed");

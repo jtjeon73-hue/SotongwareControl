@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/sotong24_workflows.dart';
@@ -166,7 +168,7 @@ class Sotong24StatsRow extends StatelessWidget {
   }
 }
 
-class Sotong24NowTodoPanel extends StatelessWidget {
+class Sotong24NowTodoPanel extends StatefulWidget {
   const Sotong24NowTodoPanel({
     super.key,
     required this.project,
@@ -179,29 +181,117 @@ class Sotong24NowTodoPanel extends StatelessWidget {
   final Sotong24WorkflowStageDef? def;
 
   @override
+  State<Sotong24NowTodoPanel> createState() => _Sotong24NowTodoPanelState();
+}
+
+class _Sotong24NowTodoPanelState extends State<Sotong24NowTodoPanel> {
+  Timer? _pulseTimer;
+  bool _pulseOn = false;
+
+  bool get _awaiting =>
+      widget.project.userFacingStatus == Sotong24WorkStatus.awaitingApproval ||
+      Sotong24UserFacingStatus.normalize(widget.stage.status) ==
+          Sotong24WorkStatus.awaitingApproval;
+
+  bool get _autoApproving =>
+      widget.project.approvalMode == 'auto' &&
+      const {
+        'auto_approval',
+        'auto_approving',
+        'approval_auto_applying',
+      }.contains(widget.stage.activityState.trim().toLowerCase());
+
+  bool get _pulseActive => _awaiting || _autoApproving;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncPulseTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant Sotong24NowTodoPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPulseTimer();
+  }
+
+  void _syncPulseTimer() {
+    if (_pulseActive) {
+      _pulseTimer ??= Timer.periodic(const Duration(milliseconds: 700), (_) {
+        if (mounted) setState(() => _pulseOn = !_pulseOn);
+      });
+      return;
+    }
+    _pulseTimer?.cancel();
+    _pulseTimer = null;
+    _pulseOn = false;
+  }
+
+  @override
+  void dispose() {
+    _pulseTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final project = widget.project;
+    final stage = widget.stage;
+    final def = widget.def;
     final completed = project.userFacingStatus == Sotong24WorkStatus.completed;
     final headline = project.nowTodoHeadline(stage: stage);
     final checks = def?.userChecks ?? const <String>['결과 확인'];
-    final awaiting =
-        project.userFacingStatus == Sotong24WorkStatus.awaitingApproval;
+    final awaiting = _awaiting;
+    final autoApproving = _autoApproving;
+    final pulseActive = _pulseActive;
     final showChecks = !completed && awaiting && checks.isNotEmpty;
 
-    return Container(
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final amount = pulseActive && !reduceMotion && _pulseOn ? 1.0 : 0.0;
+    return AnimatedContainer(
+      duration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 700),
+      curve: Curves.easeInOut,
+      key: pulseActive ? const Key('approval_pulse') : null,
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: completed ? ControlColors.tealSoft : ControlColors.warningBg,
+        color: completed
+            ? ControlColors.tealSoft
+            : Color.lerp(
+                ControlColors.warningBg,
+                ControlColors.accentWarm.withValues(alpha: 0.18),
+                amount,
+              ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: completed ? ControlColors.teal : ControlColors.accentWarm,
+          width: pulseActive ? 1.5 + amount : 1,
         ),
+        boxShadow: pulseActive && amount > 0
+            ? [
+                BoxShadow(
+                  color: ControlColors.accentWarm.withValues(
+                    alpha: 0.12 * amount,
+                  ),
+                  blurRadius: 10 * amount,
+                ),
+              ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            completed ? '작업 완료' : '지금 할 일',
+            completed
+                ? '작업 완료'
+                : awaiting
+                ? '승인 필요'
+                : autoApproving
+                ? '검증 완료 · 자동 승인 중'
+                : '지금 할 일',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),

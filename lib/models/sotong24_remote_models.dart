@@ -141,6 +141,9 @@ class Sotong24RemoteStage {
     this.retryable = false,
     this.failureReason = '',
     this.failureType = '',
+    this.recoveryAttempt = 0,
+    this.maxRecoveryAttempts = 0,
+    this.recoveryState = '',
   });
 
   final String stageId;
@@ -183,6 +186,9 @@ class Sotong24RemoteStage {
   final bool retryable;
   final String failureReason;
   final String failureType;
+  final int recoveryAttempt;
+  final int maxRecoveryAttempts;
+  final String recoveryState;
 
   bool get hasOpenableResult =>
       openableResultUrl != null || openablePreviewUrl != null;
@@ -255,6 +261,9 @@ class Sotong24RemoteStage {
     'retryable': retryable,
     if (failureReason.trim().isNotEmpty) 'failureReason': failureReason,
     if (failureType.trim().isNotEmpty) 'failureType': failureType,
+    if (recoveryAttempt > 0) 'recoveryAttempt': recoveryAttempt,
+    if (maxRecoveryAttempts > 0) 'maxRecoveryAttempts': maxRecoveryAttempts,
+    if (recoveryState.trim().isNotEmpty) 'recoveryState': recoveryState,
   };
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -292,6 +301,9 @@ class Sotong24RemoteStage {
       retryable: map['retryable'] == true,
       failureReason: '${map['failureReason'] ?? ''}',
       failureType: '${map['failureType'] ?? ''}',
+      recoveryAttempt: _asInt(map['recoveryAttempt']),
+      maxRecoveryAttempts: _asInt(map['maxRecoveryAttempts']),
+      recoveryState: '${map['recoveryState'] ?? ''}',
     );
   }
 
@@ -337,6 +349,9 @@ class Sotong24RemoteStage {
       retryable: retryable,
       failureReason: failureReason,
       failureType: failureType,
+      recoveryAttempt: recoveryAttempt,
+      maxRecoveryAttempts: maxRecoveryAttempts,
+      recoveryState: recoveryState,
     );
   }
 }
@@ -433,6 +448,7 @@ class Sotong24RemoteProject {
     this.isDemo = false,
     this.environment = 'production',
     this.isTest = false,
+    this.approvalMode = 'manual',
     this.stages = const [],
   });
 
@@ -455,6 +471,7 @@ class Sotong24RemoteProject {
   final bool isDemo;
   final String environment;
   final bool isTest;
+  final String approvalMode;
   final List<Sotong24RemoteStage> stages;
 
   String get productTypeLabel {
@@ -565,6 +582,7 @@ class Sotong24RemoteProject {
     'isDemo': isDemo,
     'environment': environment,
     'isTest': isTest,
+    'approvalMode': approvalMode,
   };
 
   factory Sotong24RemoteProject.fromMap(
@@ -595,6 +613,9 @@ class Sotong24RemoteProject {
       isDemo: map['isDemo'] == true,
       environment: '${map['environment'] ?? 'production'}',
       isTest: map['isTest'] == true,
+      approvalMode: '${map['approvalMode'] ?? ''}' == 'auto'
+          ? 'auto'
+          : 'manual',
       stages: stages,
     );
   }
@@ -627,6 +648,7 @@ class Sotong24RemoteProject {
       isDemo: isDemo,
       environment: environment,
       isTest: isTest,
+      approvalMode: approvalMode,
       stages: stages ?? this.stages,
     );
   }

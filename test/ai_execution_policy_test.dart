@@ -35,6 +35,7 @@ void main() {
     expect(wi.aiExecution!.enabled, isTrue);
     expect(wi.aiExecution!.worker, 'codex');
     expect(wi.aiExecution!.maxAutoStageOrder, 1);
+    expect(wi.aiExecution!.approvalMode, 'manual');
     expect(wi.aiExecution!.approvalRequired, isTrue);
     expect(wi.aiExecution!.artifactUploadEnabled, isTrue);
     expect(wi.aiExecution!.autoAdvance, isFalse);
@@ -50,6 +51,45 @@ void main() {
     );
     expect(roundTrip.aiExecution!.worker, 'codex');
     expect(roundTrip.aiExecution!.autoAdvance, isFalse);
+    expect(roundTrip.aiExecution!.approvalMode, 'manual');
+  });
+
+  test('production ebook approvalMode manual/auto round trip', () {
+    final manual = AiExecutionPolicy.productionEbook();
+    final automatic = AiExecutionPolicy.productionEbook(approvalMode: 'auto');
+
+    expect(manual.approvalMode, 'manual');
+    expect(manual.approvalRequired, isTrue);
+    expect(manual.autoAdvance, isFalse);
+    expect(manual.maxAutoStageOrder, 12);
+    expect(manual.deploymentAllowed, isFalse);
+
+    expect(automatic.approvalMode, 'auto');
+    expect(automatic.approvalRequired, isFalse);
+    expect(automatic.autoAdvance, isTrue);
+    expect(automatic.deploymentAllowed, isFalse);
+
+    final restored = AiExecutionPolicy.fromJson(
+      Map<String, dynamic>.from(
+        jsonDecode(jsonEncode(automatic.toJson())) as Map,
+      ),
+    );
+    expect(restored.approvalMode, 'auto');
+    expect(restored.autoAdvance, isTrue);
+    expect(restored.deploymentAllowed, isFalse);
+  });
+
+  test('legacy approvalRequired keeps safe approval mode compatibility', () {
+    final manual = AiExecutionPolicy.fromJson({
+      'enabled': true,
+      'approvalRequired': true,
+    });
+    final automatic = AiExecutionPolicy.fromJson({
+      'enabled': true,
+      'approvalRequired': false,
+    });
+    expect(manual.approvalMode, 'manual');
+    expect(automatic.approvalMode, 'auto');
   });
 
   test('기본 buildInstruction은 aiExecution 없음 (legacy 보호)', () {

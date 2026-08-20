@@ -43,6 +43,10 @@ const AUTHORITATIVE_STAGE_FIELDS = Object.freeze([
   "retryable",
   "failureType",
   "failureReason",
+  "recoveryAttempt",
+  "maxRecoveryAttempts",
+  "recoveryState",
+  "recoveryCommandId",
 ]);
 
 function normalizedRevision(value) {
@@ -64,7 +68,12 @@ function mergeMonotonicStage(previous, incoming) {
   const staleRetryAttempt = incomingRevision === previousRevision &&
     statusRank(next.status) <= 1 && Number(prior.attemptCount || 0) > 0 &&
     Number(next.attemptCount || 0) < Number(prior.attemptCount || 0);
-  if (!staleRevision && !sameRevisionRegression && !staleRetryAttempt) return next;
+  const staleStallRecovery = incomingRevision === previousRevision &&
+    ["stalled", "stage_transition_failed"].includes(String(prior.status || "")) &&
+    ["ready", "in_progress", "running"].includes(String(next.status || "")) &&
+    Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0);
+  if (!staleRevision && !sameRevisionRegression && !staleRetryAttempt &&
+      !staleStallRecovery) return next;
 
   for (const field of AUTHORITATIVE_STAGE_FIELDS) {
     if (prior[field] !== undefined) next[field] = prior[field];
@@ -101,7 +110,12 @@ function mergeMonotonicProject(previous, incoming) {
   const staleRetryAttempt = priorOrder > 0 && priorOrder === nextOrder &&
     statusRank(next.status) <= 1 && Number(prior.attemptCount || 0) > 0 &&
     Number(next.attemptCount || 0) < Number(prior.attemptCount || 0);
-  if (!regressedStage && !sameStageRegression && !staleRetryAttempt) return next;
+  const staleStallRecovery = priorOrder > 0 && priorOrder === nextOrder &&
+    ["stalled", "stage_transition_failed"].includes(String(prior.status || "")) &&
+    ["ready", "in_progress", "running"].includes(String(next.status || "")) &&
+    Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0);
+  if (!regressedStage && !sameStageRegression && !staleRetryAttempt &&
+      !staleStallRecovery) return next;
 
   for (const field of [
     "currentStage",
@@ -120,6 +134,10 @@ function mergeMonotonicProject(previous, incoming) {
     "retryable",
     "failureType",
     "failureReason",
+    "recoveryAttempt",
+    "maxRecoveryAttempts",
+    "recoveryState",
+    "recoveryCommandId",
   ]) {
     if (prior[field] !== undefined) next[field] = prior[field];
     else delete next[field];

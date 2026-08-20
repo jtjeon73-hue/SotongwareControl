@@ -8,7 +8,14 @@ import '../widgets/sotong24_production_guide_panel.dart';
 
 /// 표준제작 가이드 — 참고자료 전용 (실제 제작 상태와 분리).
 class StandardProductionGuideScreen extends StatefulWidget {
-  const StandardProductionGuideScreen({super.key});
+  const StandardProductionGuideScreen({
+    super.key,
+    this.initialProductId,
+    this.focusStageId,
+  });
+
+  final String? initialProductId;
+  final String? focusStageId;
 
   @override
   State<StandardProductionGuideScreen> createState() =>
@@ -19,6 +26,12 @@ class _StandardProductionGuideScreenState
     extends State<StandardProductionGuideScreen> {
   String? _selectedProductId;
   String _contentSubtype = ContentSubtype.song;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedProductId = widget.initialProductId;
+  }
 
   static const _homeCards = <_GuideHomeCard>[
     _GuideHomeCard(
@@ -148,6 +161,7 @@ class _StandardProductionGuideScreenState
           initialProductId: productId,
           initialContentSubtype: productId == 'contents' ? _contentSubtype : '',
           embedded: true,
+          focusStageId: widget.focusStageId,
         ),
       ],
     );

@@ -8,6 +8,7 @@ const { sha256Hex } = require("../remote/crypto_util");
 const { COL, PROTOCOL_VERSION } = require("../remote/constants");
 const {
   evaluateStageHealth,
+  evaluateActiveJobs,
   enqueueNotification,
   normalizePolicy,
 } = require("../remote/monitoring");
@@ -855,6 +856,80 @@ describe("remote agent contract V1", () => {
     assert.equal(awaiting.shouldNotify, false);
     assert.equal(awaiting.elapsedSeconds, 600);
     assert.equal(awaiting.approvalWaitSeconds, 3000);
+  });
+
+  it("active monitor marks inactivity stalled and exhausts bounded recovery", async () => {
+    const env = await monitoringJob("wi_plan_monitor_recovery");
+    const started = await control(db, "/api/control/start-job", {
+      jobId: env.jobId,
+      payload: {
+        instructionId: env.instructionId,
+        environment: "production",
+        isTest: false,
+      },
+    });
+    assert.equal(started.statusCode, 200);
+    const nowMs = Date.parse("2026-08-19T01:00:00.000Z");
+    db.store.set(`${COL.MONITORING_CONFIG}/default`, {
+      offlineAfterSeconds: 600,
+      noActivityAfterSeconds: 300,
+      defaultExpectedMaxSeconds: 120,
+    });
+    db.store.set(`${COL.AGENTS}/${env.agentId}`, {
+      state: "running",
+      lastHeartbeatAt: "2026-08-19T00:59:30.000Z",
+    });
+    db.store.set(`${COL.JOBS}/${env.jobId}`, {
+      ...db.store.get(`${COL.JOBS}/${env.jobId}`),
+      jobId: env.jobId,
+      instructionId: env.instructionId,
+      assignedAgentId: env.agentId,
+      currentStage: "publish_prep",
+      status: "running",
+    });
+    db.store.set(`${COL.JOBS}/${env.jobId}/stages/publish_prep`, {
+      stageId: "publish_prep",
+      stageNumber: 12,
+      stageName: "등록 준비",
+      status: "running",
+      startedAt: "2026-08-19T00:00:00.000Z",
+      lastActivityAt: "2026-08-19T00:40:00.000Z",
+    });
+
+    await evaluateActiveJobs(db, nowMs);
+    let stage = db.store.get(`${COL.JOBS}/${env.jobId}/stages/publish_prep`);
+    assert.equal(stage.status, "stalled");
+    assert.equal(stage.recoveryAttempt, 1);
+    assert.equal(stage.maxRecoveryAttempts, 3);
+    assert.equal(stage.recoveryState, "requested");
+    assert.equal(stage.retryable, true);
+    assert.ok(stage.recoveryCommandId);
+    assert.equal(
+      db.store.get(`${COL.JOBS}/${env.jobId}/commands/${stage.recoveryCommandId}`).status,
+      "queued"
+    );
+
+    // A still queued recovery is idempotent and does not burn the retry budget.
+    await evaluateActiveJobs(db, nowMs + 500);
+    stage = db.store.get(`${COL.JOBS}/${env.jobId}/stages/publish_prep`);
+    assert.equal(stage.recoveryAttempt, 1);
+
+    db.store.get(`${COL.JOBS}/${env.jobId}/commands/${stage.recoveryCommandId}`).status =
+      "completed";
+    await evaluateActiveJobs(db, nowMs + 1000);
+    stage = db.store.get(`${COL.JOBS}/${env.jobId}/stages/publish_prep`);
+    db.store.get(`${COL.JOBS}/${env.jobId}/commands/${stage.recoveryCommandId}`).status =
+      "completed";
+    await evaluateActiveJobs(db, nowMs + 2000);
+    stage = db.store.get(`${COL.JOBS}/${env.jobId}/stages/publish_prep`);
+    assert.equal(stage.status, "stage_transition_failed");
+    assert.equal(stage.recoveryAttempt, 3);
+    assert.equal(stage.recoveryState, "exhausted");
+    assert.equal(stage.retryable, false);
+    assert.equal(
+      db.store.get(`${COL.PROJECTS}/${env.instructionId}/stages/publish_prep`).status,
+      "stage_transition_failed"
+    );
   });
 
   it("notification key separates revisions and deduplicates identical events", async () => {

@@ -87,6 +87,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   IdeaToPlanningSeed? _ideaSeed;
   String? _workshopFocusInstructionId;
   String? _workshopFocusStageId;
+  String? _guideFocusStageId;
   Sotong24NotificationService? _notificationService;
 
   @override
@@ -330,6 +331,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           onEnableNotifications: _enableNotifications,
           onStartNewWork: () =>
               _onDestinationSelected(ControlDestination.aiBusinessAnalysis),
+          onOpenGuide: (stageId) => setState(() {
+            _guideFocusStageId = stageId;
+            _selected = ControlDestination.standardProductionGuide;
+          }),
         );
       case ControlDestination.sotong24RemoteControl:
         return RemoteControlScreen(onNavigate: _onDestinationSelected);
@@ -344,7 +349,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.alertCenter:
         return AlertCenterScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.standardProductionGuide:
-        return const StandardProductionGuideScreen();
+        return StandardProductionGuideScreen(
+          initialProductId: _guideFocusStageId == null ? null : 'ebook',
+          focusStageId: _guideFocusStageId,
+        );
       case ControlDestination.ideaBank:
         return IdeaBankScreen(
           onSendToWorkInstruction: _sendIdeaToWorkInstruction,

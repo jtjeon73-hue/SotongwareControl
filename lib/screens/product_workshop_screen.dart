@@ -13,6 +13,7 @@ import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
 import '../widgets/operational_collapsible_section.dart';
+import '../widgets/result_link_button.dart';
 import '../widgets/sotong24_stage_widgets.dart';
 
 /// AI 제작공정 — 전송된 작업의 단계 진행·승인·보완 화면.
@@ -26,6 +27,7 @@ class ProductWorkshopScreen extends StatefulWidget {
     this.focusInstructionId,
     this.focusStageId,
     this.onEnableNotifications,
+    this.onOpenGuide,
   });
 
   final Sotong24RemoteRepository? repository;
@@ -34,6 +36,7 @@ class ProductWorkshopScreen extends StatefulWidget {
   final String? focusInstructionId;
   final String? focusStageId;
   final Future<bool> Function()? onEnableNotifications;
+  final void Function(String stageId)? onOpenGuide;
 
   @override
   State<ProductWorkshopScreen> createState() => _ProductWorkshopScreenState();
@@ -350,6 +353,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
           monitoringPolicy: _monitoringPolicy,
           focusStageId: focusStageId,
           onEnableNotifications: widget.onEnableNotifications,
+          onOpenGuide: widget.onOpenGuide,
         ),
       ),
     );
@@ -365,6 +369,7 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
     this.monitoringPolicy = const Sotong24MonitoringPolicy(),
     this.focusStageId,
     this.onEnableNotifications,
+    this.onOpenGuide,
   });
 
   final String projectId;
@@ -373,6 +378,7 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
   final Sotong24MonitoringPolicy monitoringPolicy;
   final String? focusStageId;
   final Future<bool> Function()? onEnableNotifications;
+  final void Function(String stageId)? onOpenGuide;
 
   @override
   State<Sotong24RemoteDetailScreen> createState() =>
@@ -499,6 +505,7 @@ class _Sotong24RemoteDetailScreenState
                 Sotong24WorkshopPresentation.currentStageLine(project),
               ),
               _Kv('상태', project.userFacingStatusLabel),
+              _Kv('승인 방식', project.approvalMode == 'auto' ? '자동 승인' : '수동 승인'),
               if (stage != null) ...[
                 const SizedBox(height: 8),
                 _StageMonitoringPanel(
@@ -542,6 +549,37 @@ class _Sotong24RemoteDetailScreenState
               ),
               const SizedBox(height: 8),
               Sotong24StatsRow(stats: stats),
+              const SizedBox(height: 4),
+              ExpansionTile(
+                key: const Key('work_timeline'),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                title: const Text(
+                  '작업 기록',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                children: [
+                  for (final item in project.stages.where(
+                    (s) =>
+                        s.startedAt.isNotEmpty ||
+                        s.completedAt.isNotEmpty ||
+                        s.lastActivityAt.isNotEmpty,
+                  ))
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Text('${item.stageNumber}'),
+                      title: Text(
+                        '${item.stageName} · ${Sotong24WorkStatus.labelKo(item.status)}',
+                      ),
+                      subtitle: Text(
+                        item.completedAt.isNotEmpty
+                            ? '${_formatTime(item.completedAt)} 완료'
+                            : '${_formatTime(item.lastActivityAt.isNotEmpty ? item.lastActivityAt : item.startedAt)} · ${Sotong24StageMonitoring.activityLabel(item.activityState)}',
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 4),
               Theme(
                 data: Theme.of(
@@ -612,6 +650,13 @@ class _Sotong24RemoteDetailScreenState
               if (project.userFacingStatus == Sotong24WorkStatus.completed) ...[
                 const SizedBox(height: 12),
                 _CompletedBanner(isTest: isTest),
+                if (!isTest) ...[
+                  const SizedBox(height: 10),
+                  _FinalResultPanel(
+                    project: project,
+                    onOpenGuide: widget.onOpenGuide,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -785,6 +830,77 @@ class _Sotong24RemoteDetailScreenState
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(err ?? '보완 요청을 전송했습니다.')));
+  }
+}
+
+class _FinalResultPanel extends StatelessWidget {
+  const _FinalResultPanel({required this.project, this.onOpenGuide});
+
+  final Sotong24RemoteProject project;
+  final void Function(String stageId)? onOpenGuide;
+
+  @override
+  Widget build(BuildContext context) {
+    Sotong24RemoteStage? publishing;
+    for (final stage in project.stages) {
+      if (stage.stageId == 'publish_prep') publishing = stage;
+    }
+    return Container(
+      key: const Key('final_result_panel'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ControlColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ControlColors.teal),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '최종 결과물 · 등록 전 완성본',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '내용·품질·등록 자료 준비가 끝났습니다. 외부 판매처 등록은 아직 실행하지 않았습니다.',
+            style: TextStyle(color: ControlColors.textSecondary, height: 1.35),
+          ),
+          const SizedBox(height: 10),
+          if (publishing?.openableResultUrl != null)
+            ResultLinkButton(
+              key: const Key('final_pdf_button'),
+              url: publishing!.openableResultUrl!,
+              label: '최종 PDF 보기/다운로드',
+              icon: Icons.picture_as_pdf_outlined,
+              style: ResultLinkStyle.tonal,
+            )
+          else
+            const Text(
+              '최종 파일 signed URL을 동기화하는 중입니다.',
+              style: TextStyle(color: ControlColors.textMuted),
+            ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            key: const Key('registration_guide_button'),
+            onPressed: onOpenGuide == null
+                ? null
+                : () => onOpenGuide!('publish_prep'),
+            icon: const Icon(Icons.menu_book_outlined),
+            label: const Text('등록 방법 보기'),
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            key: const Key('maintenance_guide_button'),
+            onPressed: onOpenGuide == null
+                ? null
+                : () => onOpenGuide!('maintain'),
+            icon: const Icon(Icons.build_outlined),
+            label: const Text('유지보수 가이드 보기'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -987,6 +1103,18 @@ class _StageMonitoringPanel extends StatelessWidget {
               '현재 작업 · ${snapshot.activityLabel} · 마지막 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
               style: const TextStyle(fontSize: 13),
             ),
+          if (snapshot.health == Sotong24StageHealth.inactive ||
+              snapshot.health == Sotong24StageHealth.stalled) ...[
+            const SizedBox(height: 4),
+            Text(
+              'PC는 온라인이어도 실제 작업 활동이 없습니다. 자동 복구 ${stage.recoveryAttempt}/${stage.maxRecoveryAttempts > 0 ? stage.maxRecoveryAttempts : 3}${stage.recoveryState == 'exhausted' ? ' 소진' : ' 시도 중'}',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.red.shade800,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           if (snapshot.health == Sotong24StageHealth.awaitingUser)
             Text(
               snapshot.activityLabel,
@@ -1054,6 +1182,14 @@ class _StageMonitoringPanel extends StatelessWidget {
           if (!compact && expected != null)
             Text(
               '최근 통계 ${Sotong24StageMonitoring.compactDuration(expected.min)}~${Sotong24StageMonitoring.compactDuration(expected.max)} · 표본 ${expected.sampleCount}건',
+              style: const TextStyle(
+                fontSize: 12,
+                color: ControlColors.textMuted,
+              ),
+            ),
+          if (expected == null)
+            Text(
+              '예상 최대 ${Sotong24StageMonitoring.compactDuration(policy.defaultExpectedMax)} · inactivity 기준 ${Sotong24StageMonitoring.compactDuration(policy.noActivityAfter)}',
               style: const TextStyle(
                 fontSize: 12,
                 color: ControlColors.textMuted,

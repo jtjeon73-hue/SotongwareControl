@@ -15,6 +15,7 @@ class Sotong24ProductionGuidePanel extends StatefulWidget {
     this.initialProductId,
     this.initialContentSubtype,
     this.embedded = false,
+    this.focusStageId,
   });
 
   /// 목록의 포커스 프로젝트 — 같은 제품이면 "현재 제작 단계" 표시(데모면 배지).
@@ -24,6 +25,7 @@ class Sotong24ProductionGuidePanel extends StatefulWidget {
 
   /// 독립 메뉴(표준제작 가이드)에 임베드될 때 제목·사업 picker 숨김.
   final bool embedded;
+  final String? focusStageId;
 
   @override
   State<Sotong24ProductionGuidePanel> createState() =>
@@ -179,8 +181,11 @@ class _Sotong24ProductionGuidePanelState
             for (final s in stages)
               _StageAccordion(
                 stage: s,
-                isCurrent: _highlightStageId == s.stageId,
+                isCurrent:
+                    _highlightStageId == s.stageId ||
+                    widget.focusStageId == s.stageId,
                 isDemoFocus: widget.focusProject?.isDemo == true,
+                initiallyExpanded: widget.focusStageId == s.stageId,
               ),
         ],
       ],
@@ -411,11 +416,13 @@ class _StageAccordion extends StatelessWidget {
     required this.stage,
     required this.isCurrent,
     required this.isDemoFocus,
+    this.initiallyExpanded = false,
   });
 
   final Sotong24StageGuide stage;
   final bool isCurrent;
   final bool isDemoFocus;
+  final bool initiallyExpanded;
 
   @override
   Widget build(BuildContext context) {
@@ -430,6 +437,7 @@ class _StageAccordion extends StatelessWidget {
         ),
       ),
       child: ExpansionTile(
+        initiallyExpanded: initiallyExpanded,
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
         childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         title: Row(

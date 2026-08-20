@@ -677,6 +677,7 @@ class AiExecutionPolicy {
     required this.artifactUploadEnabled,
     required this.autoAdvance,
     required this.deploymentAllowed,
+    this.approvalMode = 'manual',
   });
 
   /// ④ pilot 고정값 — 1단계 Codex + 승인 게이트, 자동 배포 금지.
@@ -688,7 +689,22 @@ class AiExecutionPolicy {
     artifactUploadEnabled: true,
     autoAdvance: false,
     deploymentAllowed: false,
+    approvalMode: 'manual',
   );
+
+  factory AiExecutionPolicy.productionEbook({String approvalMode = 'manual'}) {
+    final mode = approvalMode == 'auto' ? 'auto' : 'manual';
+    return AiExecutionPolicy(
+      enabled: true,
+      worker: 'codex',
+      maxAutoStageOrder: 12,
+      approvalRequired: mode == 'manual',
+      artifactUploadEnabled: true,
+      autoAdvance: mode == 'auto',
+      deploymentAllowed: false,
+      approvalMode: mode,
+    );
+  }
 
   final bool enabled;
   final String worker;
@@ -697,6 +713,7 @@ class AiExecutionPolicy {
   final bool artifactUploadEnabled;
   final bool autoAdvance;
   final bool deploymentAllowed;
+  final String approvalMode;
 
   Map<String, dynamic> toJson() => {
     'enabled': enabled,
@@ -706,6 +723,7 @@ class AiExecutionPolicy {
     'artifactUploadEnabled': artifactUploadEnabled,
     'autoAdvance': autoAdvance,
     'deploymentAllowed': deploymentAllowed,
+    'approvalMode': approvalMode,
   };
 
   factory AiExecutionPolicy.fromJson(Map<String, dynamic> json) {
@@ -723,6 +741,12 @@ class AiExecutionPolicy {
       artifactUploadEnabled: json['artifactUploadEnabled'] == true,
       autoAdvance: json['autoAdvance'] == true,
       deploymentAllowed: json['deploymentAllowed'] == true,
+      approvalMode:
+          '${json['approvalMode'] ?? ''}' == 'auto' ||
+              (!json.containsKey('approvalMode') &&
+                  json['approvalRequired'] == false)
+          ? 'auto'
+          : 'manual',
     );
   }
 
