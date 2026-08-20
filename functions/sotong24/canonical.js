@@ -4,6 +4,16 @@
  * 전자책 canonical 18단계 — Flutter BusinessPlanningService.standardWorkflowTitles 와 동일.
  * stageId / 순서 불일치 시 relay가 거부한다.
  */
+const PROBLEM_VALIDATE_EVIDENCE_CONTRACT = Object.freeze({
+  minPublicSourceUrls: 5,
+  minIndependentDomains: 3,
+  minProblemSignals: 10,
+  requiredProfiles: 2,
+  directInterviewPolicy: "declare_conducted_or_not_conducted",
+  noInterviewFallback: "public_voice_of_customer",
+  signalIdSchemes: Object.freeze(["S", "PS"]),
+});
+
 const EBOOK_STAGE_CONTRACTS = [
   ["idea_clarify", "아이디어 정리", true, true, false, "idea_summary", "idea_contract"],
   ["problem_validate", "고객 문제 검증", true, true, false, "problem_validation", "problem_contract"],
@@ -32,6 +42,9 @@ const EBOOK_STAGE_CONTRACTS = [
   approvalTypicallyRequired: row[4],
   artifactKind: row[5],
   criteriaEvaluator: row[6],
+  evidenceContract: row[0] === "problem_validate"
+    ? PROBLEM_VALIDATE_EVIDENCE_CONTRACT
+    : undefined,
   terminal: index === 17,
 }));
 
@@ -87,4 +100,5 @@ module.exports = {
   APPROVAL_STATUS,
   PC_STATUS,
   PRODUCT_TYPES,
+  PROBLEM_VALIDATE_EVIDENCE_CONTRACT,
 };

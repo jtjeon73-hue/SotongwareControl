@@ -1,4 +1,5 @@
 import '../models/business_planning.dart';
+import '../models/problem_validate_contract.dart';
 import 'instruction_contract_builder.dart';
 
 /// 로컬 규칙 기반 사업 기획 분석. 외부 AI API를 사용하지 않는다.
@@ -933,7 +934,7 @@ class BusinessPlanningService {
       case 'idea_clarify':
         return '주제·문제·고객·결과가 한 페이지로 정리됨';
       case 'problem_validate':
-        return '실제 대상 2명 이상에게 문제 공감 여부를 확인함';
+        return ProblemValidateContract.completionCriteria;
       case 'materials_prep':
         return '필요 자료 목록과 확보 상태가 체크됨';
       case 'planning':

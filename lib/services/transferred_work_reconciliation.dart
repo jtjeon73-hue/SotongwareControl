@@ -6,6 +6,7 @@ import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import 'plan_execution_index.dart';
 import 'plan_execution_status.dart';
+import 'operational_evidence_tags.dart';
 import 'work_instruction_workshop_presentation.dart';
 
 /// Remote entities that justify showing a transferred work in operational UI.
@@ -24,7 +25,8 @@ class RemoteOperationalEvidence {
   final Set<String> cloudInstructionIds;
   final bool remoteLoaded;
 
-  static const staleRemoteMissingTag = 'stale_remote_missing';
+  static const staleRemoteMissingTag =
+      OperationalEvidenceTags.staleRemoteMissing;
 
   factory RemoteOperationalEvidence.fromRemote({
     required List<RemoteJobDoc> jobs,

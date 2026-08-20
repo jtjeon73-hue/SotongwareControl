@@ -2,7 +2,10 @@
 
 const assert = require("node:assert/strict");
 const { describe, it } = require("node:test");
-const { EBOOK_STAGE_CONTRACTS } = require("../sotong24/canonical");
+const {
+  EBOOK_STAGE_CONTRACTS,
+  PROBLEM_VALIDATE_EVIDENCE_CONTRACT,
+} = require("../sotong24/canonical");
 const {
   createSimulation,
   currentStage,
@@ -13,6 +16,22 @@ const {
 } = require("../sotong24/state_machine");
 
 describe("canonical ebook 18-stage state machine", () => {
+  it("publishes the canonical STEP 2 evidence thresholds", () => {
+    assert.deepEqual(PROBLEM_VALIDATE_EVIDENCE_CONTRACT, {
+      minPublicSourceUrls: 5,
+      minIndependentDomains: 3,
+      minProblemSignals: 10,
+      requiredProfiles: 2,
+      directInterviewPolicy: "declare_conducted_or_not_conducted",
+      noInterviewFallback: "public_voice_of_customer",
+      signalIdSchemes: ["S", "PS"],
+    });
+    assert.strictEqual(
+      EBOOK_STAGE_CONTRACTS[1].evidenceContract,
+      PROBLEM_VALIDATE_EVIDENCE_CONTRACT,
+    );
+  });
+
   it("runs deterministic stage 1 through 18 with exactly-once approval", () => {
     const state = createSimulation({ approvalRequiredOverride: true });
     const transitions = [];

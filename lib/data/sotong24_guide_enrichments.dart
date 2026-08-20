@@ -43,14 +43,26 @@ class Sotong24GuideEnrichments {
     ),
     'problem_validate': Sotong24StageGuideEnrichment(
       whyNeeded: '독자가 실제로 겪는 문제인지 검증하지 않으면 팔리지 않는 전자책이 된다.',
-      mainTasks: ['문제 문장 작성', '대안(무료 자료/경쟁책) 비교', '구매 이유·지불 의사 점검'],
-      inputs: ['아이디어 요약', '검색/리뷰 단서'],
-      deliverables: ['문제 검증 메모', '가설·반증 목록'],
-      qualityCriteria: ['문제가 구체적인가', '해결 방향이 있는가', '검증 근거가 있는가'],
+      mainTasks: [
+        '직접 인터뷰 실시 여부 명시',
+        '공개 고객 목소리·공식 조사·리뷰 근거 수집',
+        '문제 신호·가설·대안·포지셔닝 비교',
+      ],
+      inputs: ['아이디어 요약', '검증 가능한 검색/리뷰/통계 원문'],
+      deliverables: ['출처 연결 문제 검증 메모', '가설·반증·포지셔닝 목록'],
+      qualityCriteria: [
+        '고유 HTTPS 출처 5개·독립 도메인 3개 이상',
+        '출처 연결 문제 신호 10건 이상',
+        '직접 인터뷰 미실시 시 공개 고객 목소리 대체 근거 명시',
+        'P01/P02·H1~H5·비교·포지셔닝 포함',
+      ],
       approvalCriteria: ['문제 문장 승인'],
       commonProblems: ['감으로만 검증', '경쟁을 무시'],
       cautions: ['통계·정책은 출처와 날짜를 남길 것'],
-      completionConditions: ['검증 메모에 문제·대안·구매이유가 기록됨'],
+      completionConditions: [
+        '직접 인터뷰 실시/미실시와 공개 근거가 조작 없이 기록됨',
+        '출처·문제 신호·가설·포지셔닝 canonical 기준 충족',
+      ],
     ),
     'materials_prep': Sotong24StageGuideEnrichment(
       whyNeeded: '집필 전에 자료·사례·출처를 모아야 저작권·사실 리스크를 줄인다.',

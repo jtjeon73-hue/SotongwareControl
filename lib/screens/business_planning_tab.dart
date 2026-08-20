@@ -1764,6 +1764,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _instruction = null;
     _activeDoc = null;
     _lastTransferResult = null;
+    _resumeInput = null;
+    _resumePlanId = null;
     _aiProductionPilot = true;
     _inputModeQuick = true;
     _wizardState = PlanningWizardState(mode: 'quick');
@@ -1785,9 +1787,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
-  void _startNewPlan({IdeaToPlanningSeed? seed}) {
+  Future<void> _startNewPlan({IdeaToPlanningSeed? seed}) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    unawaited(_parkCurrentDraftIfNeeded());
+    await _parkCurrentDraftIfNeeded();
+    if (!mounted) return;
     final s = seed ?? widget.ideaSeed;
     setState(() {
       _resetWizardToNewSession();
@@ -1874,7 +1877,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     final key = '${s.title}|${s.targetCustomer}|${s.memo}';
     if (_appliedIdeaSeedId == key) return;
     _appliedIdeaSeedId = key;
-    _startNewPlan(seed: s);
+    unawaited(_startNewPlan(seed: s));
   }
 
   void _showValidationIssues() {
@@ -2330,7 +2333,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 ),
                 OutlinedButton(
                   key: const Key('planning_new_work_button'),
-                  onPressed: () => _startNewPlan(),
+                  onPressed: () => unawaited(_startNewPlan()),
                   child: const Text('새 작업 시작'),
                 ),
               ],

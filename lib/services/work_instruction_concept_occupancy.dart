@@ -5,6 +5,7 @@ import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import 'plan_execution_index.dart';
 import 'plan_execution_status.dart';
+import 'operational_evidence_tags.dart';
 import 'sotong24_workshop_presentation.dart';
 
 enum ConceptWorkState { available, inProgress, completed }
@@ -209,6 +210,11 @@ class ConceptOccupancyIndex {
 
   static bool _planBlocksDuplicates(BusinessPlanDocument plan) {
     if (plan.isLibraryArchived || plan.isLibraryTrashed) return false;
+    // A transferred local plan is only a soft mirror. Once reconciliation has
+    // confirmed its remote operation is gone, it cannot occupy a concept.
+    if (plan.tags.contains(OperationalEvidenceTags.staleRemoteMissing)) {
+      return false;
+    }
     final status = PlanningStatus.normalize(plan.status);
     if (status == PlanningStatus.archived || status == PlanningStatus.trashed) {
       return false;

@@ -51,6 +51,7 @@ BusinessPlanDocument _transferredPlan({
   required BusinessPlanInput input,
   String status = PlanningStatus.transferred,
   String libraryState = PlanLibraryState.active,
+  List<String> tags = const [],
 }) {
   return BusinessPlanDocument(
     id: id,
@@ -64,6 +65,7 @@ BusinessPlanDocument _transferredPlan({
     lastTransferMode: 'remote',
     lastRemoteJobId: 'job_$id',
     lastRemoteCommandId: 'cmd_$id',
+    tags: tags,
     input: input,
   );
 }
@@ -181,6 +183,66 @@ void main() {
       );
       expect(view.state, ConceptWorkState.available);
       expect(view.selectable, isTrue);
+    });
+
+    test('backend entity 삭제 후 stale local transfer는 제작 중을 표시하지 않음', () {
+      final plans = [
+        _transferredPlan(
+          id: 'p1',
+          input: _draftInput(),
+          tags: const ['stale_remote_missing'],
+        ),
+      ];
+      final index = ConceptOccupancyIndex.build(plans: plans);
+      final view = index.viewFor(
+        conceptId: 'health_habit__ebook',
+        artifactType: ArtifactType.ebook,
+        title: '중장년 건강 습관 설계',
+      );
+      expect(view.state, ConceptWorkState.available);
+      expect(view.selectable, isTrue);
+      expect(view.badgeLabel, isEmpty);
+    });
+
+    test('stale local tag가 있어도 실제 active Project는 해당 카드만 제작 중', () {
+      final plan = _transferredPlan(
+        id: 'p1',
+        input: _draftInput(),
+        tags: const ['stale_remote_missing'],
+      );
+      final project = Sotong24RemoteProject(
+        projectId: 'wi_p1',
+        title: '중장년 건강 습관 설계',
+        productType: ArtifactType.ebook,
+        currentStage: 2,
+        totalStages: 18,
+        progress: 6,
+        status: Sotong24WorkStatus.inProgress,
+      );
+      final index = ConceptOccupancyIndex.build(
+        plans: [plan],
+        projects: [project],
+      );
+      expect(
+        index
+            .viewFor(
+              conceptId: 'health_habit__ebook',
+              artifactType: ArtifactType.ebook,
+              title: '중장년 건강 습관 설계',
+            )
+            .state,
+        ConceptWorkState.inProgress,
+      );
+      expect(
+        index
+            .viewFor(
+              conceptId: 'sleep_reset__ebook',
+              artifactType: ArtifactType.ebook,
+              title: '수면 리셋 가이드',
+            )
+            .state,
+        ConceptWorkState.available,
+      );
     });
 
     test('archived/trashed 는 중복 차단에서 제외', () {

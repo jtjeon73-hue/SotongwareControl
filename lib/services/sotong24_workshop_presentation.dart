@@ -231,10 +231,26 @@ class Sotong24WorkshopPresentation {
     switch (reason.trim()) {
       case 'problem_validate_interview_evidence_missing':
         return '실제 인터뷰 근거가 확인되지 않음';
+      case 'problem_validate_interview_status_missing':
+        return '직접 인터뷰 실시 여부가 명시되지 않음';
+      case 'problem_validate_interview_section_missing':
+        return 'P01/P02 검증 프로필이 누락됨';
       case 'problem_validate_public_sources_insufficient':
         return '공개 출처가 부족함';
+      case 'problem_validate_source_rows_insufficient':
+        return '출처 ID와 URL을 연결한 공개 출처 표가 부족함';
+      case 'problem_validate_source_domains_insufficient':
+        return '독립적인 공개 출처 도메인이 부족함';
+      case 'problem_validate_source_url_invalid':
+        return 'placeholder 또는 유효하지 않은 출처 URL이 포함됨';
       case 'problem_validate_problem_signals_insufficient':
         return '고객 문제 신호가 부족함';
+      case 'problem_validate_metadata_missing':
+        return '검증 메타데이터가 누락됨';
+      case 'problem_validate_problem_summary_missing':
+        return '고객 문제 요약이 누락됨';
+      case 'problem_validate_frequency_intensity_missing':
+        return '문제 빈도 또는 강도 근거가 누락됨';
       case 'problem_validate_comparison_missing':
         return '인터뷰 비교표가 누락됨';
       case 'problem_validate_hypotheses_missing':
