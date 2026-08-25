@@ -30,6 +30,45 @@ class BusinessPlanningService {
     ('maintain', '최종 패키지 검증'),
   ];
 
+  /// Sotong24Work AppStageContract와 동일한 Android/Flutter Production 18단계.
+  /// 앱 지시서는 전자책/공통 단계 ID를 재사용하면 Agent Inbox 검증에서 거부된다.
+  static const appWorkflowStages = <(String, String, String)>[
+    ('app_idea', '앱 아이디어 정리', '문제·핵심 가치·대상 사용자·한 줄 정의를 만든다.'),
+    ('app_problem_validate', '고객 문제 검증', '필요성·대체수단·경쟁 앱을 검토한다.'),
+    ('app_market_analysis', '시장·경쟁 분석', '유사 앱·차별점·수익 가능성·위험을 정리한다.'),
+    ('app_requirements', '제품 요구사항 정의', 'MVP·제외 기능·성공 기준을 고정한다.'),
+    (
+      'app_project_setup',
+      '프로젝트 셋업',
+      '독립 저장소에 실제 Android Flutter 프로젝트를 생성·검증한다.',
+    ),
+    ('app_ux_flow', 'UX 흐름 설계', '주요 화면·전환·사용자 흐름을 설계한다.'),
+    ('app_design_system', 'UI 디자인 시스템', '색상·타이포그래피·공통 컴포넌트를 정의한다.'),
+    ('app_data_state', '데이터·상태 구조 설계', '모델·상태관리·데이터·Firebase 필요성을 결정한다.'),
+    ('app_core_implementation_1', '핵심 기능 구현 1', 'MVP 핵심 기능 첫 묶음을 구현한다.'),
+    ('app_core_implementation_2', '핵심 기능 구현 2', '나머지 MVP 기능과 화면 흐름을 구현한다.'),
+    (
+      'app_integration_errors',
+      '통합 및 예외처리',
+      'loading/error/empty/offline을 포함해 통합한다.',
+    ),
+    ('app_code_quality', '코드 품질 점검', 'flutter analyze·lint·구조·보안을 점검한다.'),
+    ('app_automated_tests', '자동 테스트', 'unit/widget/integration 가능한 테스트를 실행한다.'),
+    (
+      'app_android_release',
+      'Android Release Build',
+      '설치 가능한 release APK를 빌드·검증한다.',
+    ),
+    ('app_device_review_prep', '실기기 검증 준비', 'APK·설치 안내·권한·체크리스트를 준비한다.'),
+    ('app_user_review_package', '사용자 검토 패키지', '휴대폰 다운로드·설치·확인 결과물을 준비한다.'),
+    ('app_revision_quality', '보완·최종 품질 검증', '보완 요청과 최종 regression을 처리한다.'),
+    (
+      'app_production_complete',
+      'Production Complete',
+      '최종 APK·소스·테스트·설치·출시 준비자료를 확정한다.',
+    ),
+  ];
+
   PlanningAnalysisResult analyze(BusinessPlanInput input) {
     final criteria = _scoreCriteria(input);
     final average =
@@ -430,6 +469,18 @@ class BusinessPlanningService {
     String subtype = '',
   }) {
     final primary = ArtifactType.normalize(artifact);
+    if (primary == ArtifactType.app) {
+      return [
+        for (var i = 0; i < appWorkflowStages.length; i++)
+          WorkflowStep(
+            order: i + 1,
+            id: appWorkflowStages[i].$1,
+            title: appWorkflowStages[i].$2,
+            applicable: true,
+            completionCriteria: appWorkflowStages[i].$3,
+          ),
+      ];
+    }
     return [
       for (var i = 0; i < standardWorkflowTitles.length; i++)
         WorkflowStep(

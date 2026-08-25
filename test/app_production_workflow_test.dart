@@ -1,7 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/data/sotong24_workflows.dart';
-import 'package:sotong_ware_control/models/artifact_type.dart';
+import 'package:sotong_ware_control/models/business_planning.dart';
 import 'package:sotong_ware_control/services/apk_download_service.dart';
+import 'package:sotong_ware_control/services/business_planning_service.dart';
 
 void main() {
   test('app work instruction uses canonical 18 production stages', () {
@@ -32,6 +33,39 @@ void main() {
     expect(workflow.stages.last.name, 'Production Complete');
     expect(workflow.summary, contains('출시 전 검토'));
   });
+
+  test(
+    'business planning emits the same canonical app stages sent to Agent',
+    () {
+      final service = BusinessPlanningService();
+      const input = BusinessPlanInput(
+        topic: '전기 점검 체크 앱',
+        customerProblem: '현장 점검 누락을 줄여야 한다.',
+        targetCustomer: '전기 점검 담당자',
+        desiredOutcome: 'Android 앱으로 체크 결과를 기록한다.',
+        artifactType: ArtifactType.app,
+        deliverableTypes: [ArtifactType.app],
+      );
+      final instruction = service.buildInstruction(
+        planId: 'plan_app_contract',
+        instructionId: 'wi_plan_app_contract',
+        input: input,
+        analysis: service.analyze(input),
+        now: DateTime.utc(2026, 8, 26),
+      );
+      final expected = Sotong24WorkflowCatalog.app.stages
+          .map((stage) => stage.id)
+          .toList();
+
+      expect(instruction.workflowSteps.map((step) => step.id), expected);
+      expect(
+        instruction.contract!.workflow.stages.map((stage) => stage.id),
+        expected,
+      );
+      expect(instruction.workflowSteps.first.id, 'app_idea');
+      expect(instruction.workflowSteps.last.id, 'app_production_complete');
+    },
+  );
 
   test('APK download names preserve revision and block unsafe characters', () {
     expect(buildApkDownloadFileName('Farm Log AI', 2), 'Farm_Log_AI_r2.apk');
