@@ -100,6 +100,16 @@ void main() {
     }
   });
 
+  test('앱 가이드는 APK Production과 외부 Launch를 분리한다', () {
+    final guide = Sotong24ProductionGuideCatalog.guideFor('app');
+    expect(guide.goal, contains('설치 가능한 APK'));
+    expect(guide.flowOverview, contains('Production Complete'));
+    expect(guide.keyDeliverables, contains('Release APK'));
+    expect(guide.checklist, contains('외부 공개 NOT STARTED'));
+    expect(guide.goal, isNot(contains('출시·운영')));
+    expect(guide.keyDeliverables, isNot(contains('출시 기록')));
+  });
+
   test('가이드 검색', () {
     final g = Sotong24ProductionGuideCatalog.guideFor('ebook');
     expect(g.search('저작권'), isNotEmpty);
