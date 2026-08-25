@@ -74,12 +74,31 @@ test("newer revision may re-enter rework but never launches", () => {
 
 test("mobile prelaunch UI exposes separate result, review and launch actions", () => {
   const ui = read("lib/screens/product_workshop_screen.dart");
+  const downloadUi = read("lib/widgets/pdf_download_button.dart");
+  const allUi = `${ui}\n${downloadUi}`;
   for (const label of ["PDF 보기", "PDF 다운로드", "검토용 공유", "보완 요청", "버전 확인", "출시 준비정보", "출시 승인"]) {
-    assert.match(ui, new RegExp(label));
+    assert.match(allUi, new RegExp(label));
   }
   assert.match(ui, /수동 등록 필요/);
   assert.match(ui, /연동 미구현/);
   assert.match(ui, /아직 공개되지 않음/);
+});
+
+test("PDF view and download use distinct open and attachment paths", () => {
+  const ui = read("lib/screens/product_workshop_screen.dart");
+  const download = read("lib/services/pdf_download_service.dart");
+  const web = read("lib/services/pdf_download_platform_web.dart");
+  const artifact = read("functions/sotong24/artifact.js");
+  assert.match(ui, /final_pdf_view_button[\s\S]*ResultLinkButton|ResultLinkButton[\s\S]*final_pdf_view_button/);
+  assert.match(ui, /PdfDownloadButton/);
+  assert.match(download, /application\/pdf/);
+  assert.match(download, /hasPdfSignature/);
+  assert.match(download, /hasPdfEof/);
+  assert.match(download, /googleapis\.com/);
+  assert.match(web, /openAttachmentUrl/);
+  assert.match(artifact, /responseDisposition/);
+  assert.match(artifact, /attachment; filename=/);
+  assert.doesNotMatch(web, /window\.open|launchUrl/);
 });
 
 test("Launch workflow uses separate collection and blocks external actions", () => {

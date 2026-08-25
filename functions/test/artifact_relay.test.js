@@ -8,6 +8,9 @@ const {
   sanitizeFileName,
   buildArtifactStoragePath,
   parseArtifactUploadInit,
+  parseArtifactDownloadRequest,
+  createAttachmentDownloadGrant,
+  buildAttachmentDisposition,
   UPLOAD_URL_TTL_MS,
   DOWNLOAD_URL_TTL_MS,
   ARTIFACT_MAX_BYTES,
@@ -748,5 +751,65 @@ describe("parseArtifactUploadInit", () => {
     assert.equal(p.revision, 1);
     assert.equal(p.fileName, "codex_ai_smoke.md");
     assert.equal(p.sizeBytes, 150);
+  });
+});
+
+describe("artifact attachment download", () => {
+  const body = {
+    projectId: "wi_plan_PILOT_PDF",
+    stageId: "publish_prep",
+    revision: 1,
+    fileName: "final_ebook.pdf",
+    downloadFileName: "모바일 결제 보안 기초 전자책_r1.pdf",
+  };
+
+  it("builds a deterministic PROD path and safe UTF-8 attachment name", () => {
+    const parsed = parseArtifactDownloadRequest(body);
+    assert.equal(
+      parsed.storagePath,
+      "sotong24/artifacts/prod/wi_plan_PILOT_PDF/publish_prep/r1/final_ebook.pdf"
+    );
+    const disposition = buildAttachmentDisposition(parsed.downloadFileName, 1);
+    assert.match(disposition, /^attachment; filename="AI_ebook_final_r1\.pdf"/);
+    assert.match(disposition, /filename\*=UTF-8''/);
+    assert.doesNotMatch(disposition, /[\r\n]/);
+  });
+
+  it("signs a short-lived read URL with Content-Disposition attachment", async () => {
+    const parsed = parseArtifactDownloadRequest(body);
+    const store = mockStorage({ size: 195078, contentType: "application/pdf" });
+    const grant = await createAttachmentDownloadGrant(parsed, store, {
+      now: Date.now(),
+    });
+    assert.equal(grant.contentType, "application/pdf");
+    assert.equal(grant.sizeBytes, 195078);
+    assert.ok(grant.downloadUrl.includes("download"));
+    const signed = store.signed.at(-1);
+    assert.equal(signed.action, "read");
+    assert.match(signed.responseDisposition, /^attachment;/);
+  });
+
+  it("blocks traversal, non-PDF names, wrong MIME and missing objects", async () => {
+    assert.throws(
+      () => parseArtifactDownloadRequest({ ...body, fileName: "../final_ebook.pdf" }),
+      /path_traversal/
+    );
+    assert.throws(
+      () => parseArtifactDownloadRequest({ ...body, fileName: "cover.png" }),
+      /download_file_not_allowed/
+    );
+    const parsed = parseArtifactDownloadRequest(body);
+    await assert.rejects(
+      () =>
+        createAttachmentDownloadGrant(
+          parsed,
+          mockStorage({ size: 195078, contentType: "text/html" })
+        ),
+      /contentType_mismatch_object/
+    );
+    await assert.rejects(
+      () => createAttachmentDownloadGrant(parsed, mockStorage({ exists: false })),
+      /artifact_object_missing/
+    );
   });
 });

@@ -134,9 +134,11 @@ exports.api = onRequest(
     memory: "256MiB",
   },
   async (req, res) => {
+    const storageDeps = createAdminStorageDeps(admin);
     const bucket = admin.storage().bucket();
     await handleApiRequest(req, res, {
       db: admin.firestore(),
+      ...storageDeps,
       async deleteArtifacts(prefix) {
         const [files] = await bucket.getFiles({ prefix });
         for (const file of files) await file.delete({ ignoreNotFound: true });

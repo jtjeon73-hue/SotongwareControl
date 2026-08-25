@@ -32,6 +32,20 @@ class RemoteRunCancelResult {
   bool get completed => state == 'completed';
 }
 
+class RemoteArtifactDownloadGrant {
+  const RemoteArtifactDownloadGrant({
+    required this.downloadUrl,
+    required this.fileName,
+    required this.contentType,
+    required this.sizeBytes,
+  });
+
+  final String downloadUrl;
+  final String fileName;
+  final String contentType;
+  final int sizeBytes;
+}
+
 /// Control-plane HTTPS client (Firebase Auth ID Token). Never logs tokens.
 class RemoteControlApi {
   RemoteControlApi({
@@ -164,6 +178,42 @@ class RemoteControlApi {
       return '서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.';
     }
     return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  }
+
+  Future<RemoteArtifactDownloadGrant> createArtifactDownloadGrant({
+    required String projectId,
+    required String stageId,
+    required int revision,
+    required String fileName,
+  }) async {
+    final map = await _post('/api/control/artifact-download', {
+      'projectId': projectId,
+      'stageId': stageId,
+      'revision': revision,
+      'fileName': 'final_ebook.pdf',
+      'downloadFileName': fileName,
+    });
+    final url = '${map['downloadUrl'] ?? ''}'.trim();
+    final returnedName = '${map['fileName'] ?? ''}'.trim();
+    final contentType = '${map['contentType'] ?? ''}'.trim();
+    final sizeBytes = (map['sizeBytes'] is num)
+        ? (map['sizeBytes'] as num).toInt()
+        : int.tryParse('${map['sizeBytes'] ?? ''}') ?? 0;
+    if (url.isEmpty ||
+        returnedName.isEmpty ||
+        contentType.isEmpty ||
+        sizeBytes <= 0) {
+      throw RemoteControlApiException(
+        'PDF 다운로드 응답이 올바르지 않습니다.',
+        code: 'invalid_download_grant',
+      );
+    }
+    return RemoteArtifactDownloadGrant(
+      downloadUrl: url,
+      fileName: returnedName,
+      contentType: contentType,
+      sizeBytes: sizeBytes,
+    );
   }
 
   Future<RemotePairingResult> createPairing() async {

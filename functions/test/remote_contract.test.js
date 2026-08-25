@@ -49,7 +49,12 @@ function mockReq({ path, body, headers = {}, method = "POST" }) {
   };
 }
 
-async function call(db, path, body, { token, uid, method = "POST" } = {}) {
+async function call(
+  db,
+  path,
+  body,
+  { token, uid, method = "POST", depsExtra = {} } = {}
+) {
   const res = mockRes();
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -62,6 +67,7 @@ async function call(db, path, body, { token, uid, method = "POST" } = {}) {
       if (uid) return { uid, email: "t@test.com" };
       return { uid: "user_a", email: "a@test.com" };
     },
+    ...depsExtra,
   };
   // Control uses Bearer as id token; when uid option set without token prefix
   if (uid && token && !token.startsWith("uid:")) {
@@ -190,6 +196,71 @@ describe("remote agent contract V1", () => {
       { token: agentToken }
     );
     assert.equal(res.statusCode, 403);
+  });
+
+  it("10b authenticated owner receives a PDF attachment grant", async () => {
+    const projectId = "wi_plan_1787613488643";
+    db.store.set(`${COL.PROJECTS}/${projectId}`, {
+      projectId,
+      productType: "ebook",
+      isDemo: false,
+      productionStatus: "prelaunch_review",
+      launchStatus: "not_started",
+      externalPublished: false,
+    });
+    db.store.set(`${COL.JOBS}/job_pdf_download`, {
+      instructionId: projectId,
+      ownerUid: "user_a",
+      status: "completed",
+    });
+    let signArgs = null;
+    const depsExtra = {
+      async getFileMetadata(path) {
+        assert.equal(
+          path,
+          `sotong24/artifacts/prod/${projectId}/publish_prep/r1/final_ebook.pdf`
+        );
+        return {
+          exists: true,
+          size: 195078,
+          contentType: "application/pdf",
+        };
+      },
+      async signUrl(args) {
+        signArgs = args;
+        return "https://storage.googleapis.com/bucket/final_ebook.pdf?attachment=1";
+      },
+    };
+    const ok = await call(
+      db,
+      "/api/control/artifact-download",
+      {
+        projectId,
+        stageId: "publish_prep",
+        revision: 1,
+        fileName: "final_ebook.pdf",
+        downloadFileName: "AI_전자책_최종본_r1.pdf",
+      },
+      { token: "uid:user_a", uid: "user_a", depsExtra }
+    );
+    assert.equal(ok.statusCode, 200);
+    assert.equal(ok.body.contentType, "application/pdf");
+    assert.equal(ok.body.sizeBytes, 195078);
+    assert.match(signArgs.responseDisposition, /^attachment;/);
+
+    const denied = await call(
+      db,
+      "/api/control/artifact-download",
+      {
+        projectId,
+        stageId: "publish_prep",
+        revision: 1,
+        fileName: "final_ebook.pdf",
+        downloadFileName: "ebook.pdf",
+      },
+      { token: "uid:user_b", uid: "user_b", depsExtra }
+    );
+    assert.equal(denied.statusCode, 403);
   });
 
   // C. Heartbeat

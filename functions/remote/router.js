@@ -7,6 +7,7 @@ const {
 } = require("./auth");
 const { sendError, sendOk, httpError } = require("./http");
 const { safeLog } = require("./log");
+const { handleArtifactDownload } = require("./artifact_download");
 const {
   handleEnroll,
   handleHeartbeat,
@@ -123,6 +124,10 @@ async function handleApiRequest(req, res, deps) {
       "/api/control/deliver-instruction": async () => {
         const { uid } = await authenticateControl(req, deps);
         return handleDeliverInstruction(db, uid, body);
+      },
+      "/api/control/artifact-download": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleArtifactDownload(db, uid, body, deps);
       },
       "/api/control/approve-stage": async () => {
         await authenticateControl(req, deps);

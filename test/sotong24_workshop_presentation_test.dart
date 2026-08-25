@@ -7,6 +7,8 @@ import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/services/remote_control_api.dart';
 import 'package:sotong_ware_control/services/sotong24_workshop_presentation.dart';
+import 'package:sotong_ware_control/widgets/pdf_download_button.dart';
+import 'package:sotong_ware_control/widgets/result_link_button.dart';
 import 'package:sotong_ware_control/widgets/sotong24_stage_widgets.dart';
 
 void main() {
@@ -537,6 +539,14 @@ void main() {
       expect(find.byKey(const Key('final_result_panel')), findsOneWidget);
       expect(find.text('PDF 보기'), findsOneWidget);
       expect(find.text('PDF 다운로드'), findsOneWidget);
+      expect(
+        tester.widget(find.byKey(const Key('final_pdf_view_button'))),
+        isA<ResultLinkButton>(),
+      );
+      expect(
+        tester.widget(find.byKey(const Key('final_pdf_download_button'))),
+        isA<PdfDownloadButton>(),
+      );
       expect(find.text('검토용 공유'), findsOneWidget);
       expect(find.text('보완 요청'), findsOneWidget);
       expect(find.text('출시 준비정보'), findsOneWidget);

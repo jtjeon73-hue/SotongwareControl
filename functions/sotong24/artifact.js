@@ -15,6 +15,7 @@ const PROD_INSTRUCTION_PREFIX = "wi_plan_";
 const ARTIFACT_MAX_BYTES = 1 * 1024 * 1024; // 1 MiB
 const UPLOAD_URL_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const DOWNLOAD_URL_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (phone open)
+const ATTACHMENT_URL_TTL_MS = 10 * 60 * 1000; // short-lived user download
 const MAX_URL_LEN = 2048;
 const MAX_FILENAME_LEN = 180;
 
@@ -262,6 +263,27 @@ function sanitizeFileName(raw) {
   return name;
 }
 
+function sanitizeDownloadFileName(raw, revision = 1) {
+  let name = String(raw || "").trim();
+  name = name
+    .replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, " ")
+    .replace(/\s+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[._ ]+|[._ ]+$/g, "");
+  if (!name) name = `AI_ebook_final_r${revision}.pdf`;
+  if (!name.toLowerCase().endsWith(".pdf")) name += ".pdf";
+  if (name.length > 120) {
+    name = `${name.slice(0, 110).replace(/[._ ]+$/g, "")}.pdf`;
+  }
+  return name;
+}
+
+function buildAttachmentDisposition(fileName, revision = 1) {
+  const safe = sanitizeDownloadFileName(fileName, revision);
+  const ascii = `AI_ebook_final_r${revision}.pdf`;
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
+}
+
 function assertSha256Optional(value) {
   if (value === undefined || value === null || value === "") return undefined;
   const s = String(value).trim().toLowerCase();
@@ -488,6 +510,49 @@ function parseArtifactUploadComplete(body) {
   return initLike;
 }
 
+function parseArtifactDownloadRequest(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    reject("invalid_argument", "body required");
+  }
+  const projectId = assertSafeId(body.projectId, "projectId");
+  if (!isProdInstructionId(projectId)) {
+    reject("invalid_prod_instruction", "PROD projectId must be wi_plan_*", 403);
+  }
+  const stageId = assertSafeId(body.stageId, "stageId");
+  if (!EBOOK_STAGE_BY_ID.has(stageId)) {
+    reject("invalid_argument", `unknown_ebook_stageId:${stageId}`);
+  }
+  const revision = assertInt(body.revision, "revision", {
+    min: 1,
+    max: 999,
+    required: true,
+  });
+  const fileName = sanitizeFileName(body.fileName);
+  if (fileName !== "final_ebook.pdf") {
+    reject("invalid_artifact", "download_file_not_allowed", 403);
+  }
+  const storagePath = buildArtifactStoragePath({
+    instructionId: projectId,
+    stageId,
+    revision,
+    fileName,
+    namespace: "prod",
+  });
+  return {
+    projectId,
+    instructionId: projectId,
+    stageId,
+    revision,
+    fileName,
+    downloadFileName: sanitizeDownloadFileName(
+      body.downloadFileName,
+      revision
+    ),
+    storagePath,
+    contentType: "application/pdf",
+  };
+}
+
 function maskSignedUrlForLog(url) {
   if (!url || typeof url !== "string") return null;
   try {
@@ -569,7 +634,11 @@ function logArtifactFailure(phase, parsed, err, mapped) {
       ts: new Date().toISOString(),
       tag: `[ARTIFACT] ${phase} failed`,
       operation:
-        phase === "init" ? "artifact_upload_init" : "artifact_upload_complete",
+        phase === "init"
+          ? "artifact_upload_init"
+          : phase === "download"
+            ? "artifact_download"
+            : "artifact_upload_complete",
       instructionId: parsed && parsed.instructionId,
       stageId: parsed && parsed.stageId,
       storagePath: parsed && parsed.storagePath,
@@ -676,10 +745,56 @@ async function finalizeUpload(parsed, deps, { now = Date.now() } = {}) {
   }
 }
 
+async function createAttachmentDownloadGrant(
+  parsed,
+  deps,
+  { now = Date.now() } = {}
+) {
+  try {
+    const meta = await deps.getFileMetadata(parsed.storagePath);
+    if (!meta || !meta.exists) {
+      reject("not-found", "artifact_object_missing", 404);
+    }
+    const contentType = normalizeContentType(meta.contentType);
+    if (contentType.split(";")[0].trim() !== "application/pdf") {
+      reject("invalid_artifact", "contentType_mismatch_object");
+    }
+    const sizeBytes = Number(meta.size || 0);
+    if (!Number.isInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > ARTIFACT_MAX_BYTES) {
+      reject("invalid_artifact", "sizeBytes_out_of_range");
+    }
+    const responseDisposition = buildAttachmentDisposition(
+      parsed.downloadFileName,
+      parsed.revision
+    );
+    const downloadUrl = await deps.signUrl({
+      action: "read",
+      path: parsed.storagePath,
+      expiresMs: ATTACHMENT_URL_TTL_MS,
+      responseDisposition,
+    });
+    return {
+      downloadUrl,
+      fileName: parsed.downloadFileName,
+      contentType: "application/pdf",
+      sizeBytes,
+      expiresAt: new Date(now + ATTACHMENT_URL_TTL_MS).toISOString(),
+    };
+  } catch (err) {
+    rethrowMappedArtifactError("download", parsed, err);
+  }
+}
+
 function createAdminStorageDeps(admin) {
   const bucket = admin.storage().bucket();
   return {
-    async signUrl({ action, path, contentType, expiresMs }) {
+    async signUrl({
+      action,
+      path,
+      contentType,
+      expiresMs,
+      responseDisposition,
+    }) {
       const file = bucket.file(path);
       const expires = Date.now() + (expiresMs || UPLOAD_URL_TTL_MS);
       const opts = {
@@ -689,6 +804,9 @@ function createAdminStorageDeps(admin) {
       };
       if (action === "write" && contentType) {
         opts.contentType = contentType;
+      }
+      if (action !== "write" && responseDisposition) {
+        opts.responseDisposition = responseDisposition;
       }
       const [url] = await file.getSignedUrl(opts);
       return url;
@@ -713,6 +831,7 @@ module.exports = {
   ARTIFACT_MAX_BYTES,
   UPLOAD_URL_TTL_MS,
   DOWNLOAD_URL_TTL_MS,
+  ATTACHMENT_URL_TTL_MS,
   MAX_URL_LEN,
   ALLOWED_EXTENSIONS,
   ALLOWED_CONTENT_TYPES,
@@ -721,11 +840,15 @@ module.exports = {
   resolveArtifactLane,
   sanitizeHttpsUrl,
   sanitizeFileName,
+  sanitizeDownloadFileName,
+  buildAttachmentDisposition,
   buildArtifactStoragePath,
   parseArtifactUploadInit,
   parseArtifactUploadComplete,
+  parseArtifactDownloadRequest,
   createUploadGrant,
   finalizeUpload,
+  createAttachmentDownloadGrant,
   createAdminStorageDeps,
   maskSignedUrlForLog,
   mapArtifactStorageError,

@@ -15,6 +15,7 @@ import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
 import '../widgets/operational_collapsible_section.dart';
+import '../widgets/pdf_download_button.dart';
 import '../widgets/result_link_button.dart';
 import '../widgets/sotong24_stage_widgets.dart';
 
@@ -1016,12 +1017,12 @@ class _FinalResultPanel extends StatelessWidget {
             ),
           const SizedBox(height: 6),
           if (publishing?.openableResultUrl != null)
-            ResultLinkButton(
+            PdfDownloadButton(
               key: const Key('final_pdf_download_button'),
-              url: publishing!.openableResultUrl!,
-              label: 'PDF 다운로드',
-              icon: Icons.download_outlined,
-              style: ResultLinkStyle.outlined,
+              projectId: project.projectId,
+              stageId: publishing!.stageId,
+              title: project.title,
+              revision: project.finalRevision,
             ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
