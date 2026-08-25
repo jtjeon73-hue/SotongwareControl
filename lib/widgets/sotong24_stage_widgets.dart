@@ -7,19 +7,132 @@ import '../models/instruction_contract.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
 import '../services/sotong24_workshop_presentation.dart';
+import '../services/pdf_download_service.dart';
 import '../theme/control_theme.dart';
+import 'pdf_download_button.dart';
 import 'result_link_button.dart';
+
+typedef ResultDetailOpener = Future<void> Function(BuildContext context);
 
 /// 단계 자체 resultUrl/previewUrl 열기 — currentStage에 의존하지 않음.
 class Sotong24StageResultOpenButtons extends StatelessWidget {
   const Sotong24StageResultOpenButtons({
     super.key,
     required this.stage,
+    this.project,
     this.compact = false,
+    this.detailOpener,
+    this.resultOpener,
+    this.pdfDownloader,
   });
 
   final Sotong24RemoteStage stage;
+  final Sotong24RemoteProject? project;
   final bool compact;
+  final ResultDetailOpener? detailOpener;
+  final ResultUrlOpener? resultOpener;
+  final PdfDownloader? pdfDownloader;
+
+  bool get _isFinalPdf {
+    final result = stage.openableResultUrl;
+    final uri = result == null ? null : Uri.tryParse(result);
+    return uri != null &&
+        uri.pathSegments.isNotEmpty &&
+        uri.pathSegments.last.toLowerCase() == 'final_ebook.pdf';
+  }
+
+  Future<void> _openDetail(BuildContext context) async {
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    final custom = detailOpener;
+    if (custom != null) {
+      await custom(context);
+      return;
+    }
+    final result = stage.openableResultUrl;
+    final preview = stage.openablePreviewUrl;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '결과물 상세',
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${stage.stageNumber}단계 · ${stage.stageName}'
+                '${stage.revision > 0 ? ' · r${stage.revision}' : ''}',
+                style: const TextStyle(color: ControlColors.textSecondary),
+              ),
+              if (stage.summary.trim().isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Text(stage.summary, style: const TextStyle(height: 1.4)),
+              ],
+              if (stage.resultPreview.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  stage.resultPreview,
+                  style: const TextStyle(
+                    height: 1.4,
+                    color: ControlColors.textSecondary,
+                  ),
+                ),
+              ],
+              if (result != null) ...[
+                const SizedBox(height: 16),
+                ResultLinkButton(
+                  key: Key('stage_result_view_${stage.stageId}'),
+                  url: result,
+                  label: _isFinalPdf ? 'PDF 보기' : '결과물 열기',
+                  icon: _isFinalPdf
+                      ? Icons.picture_as_pdf_outlined
+                      : Icons.open_in_new,
+                  style: ResultLinkStyle.tonal,
+                  opener: resultOpener,
+                ),
+              ],
+              if (_isFinalPdf && project != null) ...[
+                const SizedBox(height: 8),
+                PdfDownloadButton(
+                  key: Key('stage_result_download_${stage.stageId}'),
+                  projectId: project!.projectId,
+                  stageId: stage.stageId,
+                  title: project!.title,
+                  revision: stage.revision > 0
+                      ? stage.revision
+                      : project!.finalRevision,
+                  downloader:
+                      pdfDownloader ?? const ArtifactPdfDownloadService(),
+                ),
+              ],
+              if (preview != null) ...[
+                const SizedBox(height: 8),
+                ResultLinkButton(
+                  url: preview,
+                  label: '미리보기 열기',
+                  icon: Icons.open_in_new,
+                  style: ResultLinkStyle.outlined,
+                  opener: resultOpener,
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.of(sheetContext).pop(),
+                child: const Text('닫기'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +155,26 @@ class Sotong24StageResultOpenButtons extends StatelessWidget {
           const SizedBox(height: 6),
         ],
         if (result != null)
-          ResultLinkButton(
-            url: result,
-            label: '결과물 보기',
-            icon: Icons.description_outlined,
-            style: ResultLinkStyle.tonal,
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              key: Key('result_detail_${stage.stageId}'),
+              onPressed: () => _openDetail(context),
+              icon: const Icon(Icons.description_outlined, size: 18),
+              label: const Text('결과물 보기'),
+              style: FilledButton.styleFrom(
+                backgroundColor: ControlColors.tealSoft,
+                foregroundColor: ControlColors.teal,
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
           ),
         if (result != null && preview != null) const SizedBox(height: 8),
         if (preview != null)
@@ -55,6 +183,7 @@ class Sotong24StageResultOpenButtons extends StatelessWidget {
             label: '미리보기',
             icon: Icons.open_in_new,
             style: ResultLinkStyle.outlined,
+            opener: resultOpener,
           ),
       ],
     );
@@ -366,11 +495,13 @@ class Sotong24ExpandableStageTile extends StatefulWidget {
   const Sotong24ExpandableStageTile({
     super.key,
     required this.stage,
+    this.project,
     required this.isCurrent,
     required this.def,
   });
 
   final Sotong24RemoteStage stage;
+  final Sotong24RemoteProject? project;
   final bool isCurrent;
   final Sotong24WorkflowStageDef? def;
 
@@ -514,7 +645,10 @@ class _Sotong24ExpandableStageTileState
                   _line('생성 결과물', def?.outputs ?? s.resultPreview),
                   if (s.hasOpenableResult) ...[
                     const SizedBox(height: 4),
-                    Sotong24StageResultOpenButtons(stage: s),
+                    Sotong24StageResultOpenButtons(
+                      stage: s,
+                      project: widget.project,
+                    ),
                     const SizedBox(height: 8),
                   ],
                   if (def != null && def.qualityChecks.isNotEmpty)

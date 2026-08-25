@@ -28,6 +28,7 @@ class _PdfDownloadButtonState extends State<PdfDownloadButton> {
 
   Future<void> _download() async {
     if (_busy) return;
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
     setState(() => _busy = true);
     final result = await widget.downloader.downloadPdf(
       projectId: widget.projectId,

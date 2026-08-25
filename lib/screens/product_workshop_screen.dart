@@ -755,6 +755,7 @@ class _Sotong24RemoteDetailScreenState
               for (final s in project.stages)
                 Sotong24ExpandableStageTile(
                   stage: s,
+                  project: project,
                   isCurrent: s.stageNumber == project.currentStage,
                   def:
                       workflow.byId(s.stageId) ??
@@ -769,7 +770,7 @@ class _Sotong24RemoteDetailScreenState
                   ),
                 ),
                 const SizedBox(height: 6),
-                _ResultPanel(stage: stage),
+                _ResultPanel(stage: stage, project: project),
               ],
               if (showApprovalActions && stage != null) ...[
                 const SizedBox(height: 16),
@@ -1672,9 +1673,10 @@ class _ProjectCard extends StatelessWidget {
 }
 
 class _ResultPanel extends StatelessWidget {
-  const _ResultPanel({required this.stage});
+  const _ResultPanel({required this.stage, required this.project});
 
   final Sotong24RemoteStage stage;
+  final Sotong24RemoteProject project;
 
   @override
   Widget build(BuildContext context) {
@@ -1754,7 +1756,11 @@ class _ResultPanel extends StatelessWidget {
             const SizedBox(height: 10),
           ],
           if (stage.hasOpenableResult) ...[
-            Sotong24StageResultOpenButtons(stage: stage, compact: true),
+            Sotong24StageResultOpenButtons(
+              stage: stage,
+              project: project,
+              compact: true,
+            ),
           ] else ...[
             const Text(
               '결과 준비 중',

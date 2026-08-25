@@ -5,6 +5,8 @@ import '../utils/external_url.dart';
 
 enum ResultLinkStyle { primary, outlined, tonal }
 
+typedef ResultUrlOpener = Future<bool> Function(String url);
+
 class ResultLinkButton extends StatelessWidget {
   const ResultLinkButton({
     super.key,
@@ -14,6 +16,7 @@ class ResultLinkButton extends StatelessWidget {
     this.style = ResultLinkStyle.primary,
     this.fullWidth = true,
     this.onOpenFailed,
+    this.opener,
   });
 
   const ResultLinkButton.explore({
@@ -23,6 +26,7 @@ class ResultLinkButton extends StatelessWidget {
     this.style = ResultLinkStyle.primary,
     this.fullWidth = true,
     this.onOpenFailed,
+    this.opener,
   }) : icon = Icons.travel_explore_rounded;
 
   const ResultLinkButton.pages({
@@ -32,6 +36,7 @@ class ResultLinkButton extends StatelessWidget {
     this.style = ResultLinkStyle.outlined,
     this.fullWidth = true,
     this.onOpenFailed,
+    this.opener,
   }) : icon = Icons.public_rounded;
 
   final String url;
@@ -40,12 +45,14 @@ class ResultLinkButton extends StatelessWidget {
   final ResultLinkStyle style;
   final bool fullWidth;
   final VoidCallback? onOpenFailed;
+  final ResultUrlOpener? opener;
 
   bool get _hasUrl => url.trim().isNotEmpty;
 
   Future<void> _open(BuildContext context) async {
     if (!_hasUrl) return;
-    final ok = await ExternalUrl.open(url);
+    ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
+    final ok = await (opener ?? ExternalUrl.open)(url);
     if (!context.mounted) return;
     if (!ok) {
       onOpenFailed?.call();
