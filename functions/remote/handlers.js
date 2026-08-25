@@ -362,16 +362,26 @@ async function handleReportJob(db, ctx, body) {
   if (status === WORK_STATUS.RUNNING && !job.startedAt) patch.startedAt = ts;
   if (status === WORK_STATUS.COMPLETED) patch.completedAt = ts;
   await jobRef.set(patch, { merge: true });
-  if (status === WORK_STATUS.COMPLETED) {
+  const completionStageId = String(body.currentStage || job.currentStage || "");
+  const completionStage = EBOOK_STAGE_BY_ID.get(completionStageId);
+  const completionStageNumber = Number(
+    body.currentStageNumber || job.currentStageNumber || completionStage?.order
+  ) || 0;
+  const isProductionBoundary = status === WORK_STATUS.COMPLETED &&
+    (completionStage?.productionBoundary === true || completionStage?.terminal === true) &&
+    completionStageNumber === 18;
+  if (isProductionBoundary) {
     await queueNotificationSafely(db, {
       ownerUid: job.ownerUid || ctx.agent.ownerUid || "",
       instructionId: job.instructionId || "",
       jobId,
-      stageId: String(body.currentStage || job.currentStage || ""),
-      stageNumber: Number(body.currentStageNumber || job.currentStageNumber) || 18,
+      stageId: completionStageId,
+      stageNumber: completionStageNumber,
       stageName: "최종 제작",
       revision: Number(body.revision) || 1,
       eventType: "production_completed",
+      severity: "info",
+      actionRequired: false,
     });
   }
   return {};
@@ -583,7 +593,24 @@ async function handleReportStage(db, ctx, body) {
       tx.set(projectRef, safeProject, { merge: true });
     }
   });
-  if (status === WORK_STATUS.WAITING_APPROVAL) {
+  const stageDefinition = EBOOK_STAGE_BY_ID.get(stageId);
+  if (status === WORK_STATUS.COMPLETED &&
+      stageDefinition?.productionBoundary === true &&
+      stageDefinition.order === 18) {
+    await queueNotificationSafely(db, {
+      ownerUid: job.ownerUid || ctx.agent.ownerUid || "",
+      instructionId: job.instructionId || "",
+      jobId,
+      stageId,
+      stageNumber: 18,
+      stageName: String(body.stageName || previous.stageName || stageDefinition.name),
+      revision: Math.max(1, Number(body.revision || previous.revision) || 1),
+      eventType: "production_completed",
+      severity: "info",
+      actionRequired: false,
+    });
+  }
+  if (status === WORK_STATUS.WAITING_APPROVAL && job.approvalMode !== "auto") {
     const revision = Math.max(1, Number(body.revision || previous.revision) || 1);
     await queueNotificationSafely(db, {
       ownerUid: job.ownerUid || ctx.agent.ownerUid || "",
@@ -594,6 +621,8 @@ async function handleReportStage(db, ctx, body) {
       stageName: String(body.stageName || previous.stageName || stageId),
       revision,
       eventType: revision > 1 ? "revision_completed" : "approval_required",
+      severity: "warning",
+      actionRequired: true,
     });
   }
   return {};
@@ -693,6 +722,8 @@ async function handleReportError(db, ctx, body) {
         stageName: body.stageName || "AI 제작 단계",
         revision: body.revision || 1,
         eventType: "work_error",
+        severity: "critical",
+        actionRequired: true,
       });
     }
   }
@@ -739,19 +770,97 @@ async function handleCreatePairing(db, uid, body = {}) {
 async function handleRegisterNotificationToken(db, uid, body = {}) {
   const token = String(body.token || "").trim();
   const platform = String(body.platform || "web").trim().slice(0, 20);
+  const deviceId = String(body.deviceId || "").trim();
   if (token.length < 20 || token.length > 4096) {
     throw httpError(400, "invalid_payload", "token invalid");
   }
-  const tokenId = sha256Hex(token);
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(deviceId)) {
+    throw httpError(400, "invalid_payload", "deviceId invalid");
+  }
+  const tokenId = sha256Hex(`${uid}|${deviceId}`);
   const ts = nowIso();
-  await db.collection(COL.USERS).doc(uid).collection("notificationTokens").doc(tokenId).set({
+  const ref = db.collection(COL.USERS).doc(uid).collection("notificationTokens").doc(tokenId);
+  const existing = await ref.get();
+  await ref.set({
     token,
+    deviceId,
     platform,
     enabled: true,
     updatedAt: ts,
-    createdAt: ts,
+    ...(existing.exists ? {} : { createdAt: ts }),
   }, { merge: true });
-  return { tokenId };
+  return { tokenId, deviceId };
+}
+
+async function handleUnregisterNotificationToken(db, uid, body = {}) {
+  const deviceId = String(body.deviceId || "").trim();
+  if (!/^[A-Za-z0-9_-]{16,128}$/.test(deviceId)) {
+    throw httpError(400, "invalid_payload", "deviceId invalid");
+  }
+  const tokenId = sha256Hex(`${uid}|${deviceId}`);
+  await db.collection(COL.USERS).doc(uid)
+    .collection("notificationTokens").doc(tokenId).delete();
+  return { tokenId, removed: true };
+}
+
+async function handleNotificationDiagnostics(db, uid) {
+  const policy = await loadPolicy(db);
+  const [tokensSnap, eventsSnap] = await Promise.all([
+    db.collection(COL.USERS).doc(uid).collection("notificationTokens").get(),
+    db.collection(COL.NOTIFICATION_EVENTS).where("ownerUid", "==", uid).limit(100).get(),
+  ]);
+  const devices = tokensSnap.docs
+    .map((doc) => {
+      const data = doc.data() || {};
+      return {
+        tokenId: doc.id,
+        deviceId: String(data.deviceId || ""),
+        platform: String(data.platform || "unknown"),
+        enabled: data.enabled !== false && Boolean(data.token),
+        updatedAt: String(data.updatedAt || ""),
+      };
+    })
+    .filter((item) => item.enabled);
+  const history = eventsSnap.docs
+    .map((doc) => {
+      const data = doc.data() || {};
+      return {
+        notificationEventId: String(data.notificationEventId || doc.id),
+        eventType: String(data.eventType || ""),
+        title: String(data.title || ""),
+        body: String(data.body || ""),
+        status: String(data.status || ""),
+        createdAt: String(data.createdAt || ""),
+        deepLink: String(data.deepLink || ""),
+      };
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 20);
+  return {
+    deliveryMode: policy.notificationDeliveryMode,
+    environment: policy.environment,
+    registeredDeviceCount: devices.length,
+    devices,
+    recentNotifications: history,
+  };
+}
+
+async function handleSendTestNotification(db, uid) {
+  const policy = await loadPolicy(db);
+  const out = await enqueueNotification(db, {
+    ownerUid: uid,
+    eventType: "test_notification",
+    revision: 1,
+    severity: "info",
+    actionRequired: false,
+    source: "notification_diagnostics",
+    idempotencyDiscriminator: newId("test"),
+  }, policy);
+  return {
+    notificationEventId: out.id,
+    deliveryMode: policy.notificationDeliveryMode,
+    queued: out.created,
+  };
 }
 
 async function handleCreateJob(db, uid, body) {
@@ -1043,6 +1152,9 @@ module.exports = {
   handleReportError,
   handleCreatePairing,
   handleRegisterNotificationToken,
+  handleUnregisterNotificationToken,
+  handleNotificationDiagnostics,
+  handleSendTestNotification,
   handleCreateJob,
   handleStartJob,
   handleDeliverInstruction,

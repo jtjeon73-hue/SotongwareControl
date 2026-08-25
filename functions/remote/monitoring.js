@@ -119,11 +119,30 @@ function evaluateStageHealth({ job, stage, agent, policy: rawPolicy, nowMs = Dat
   return { state: "healthy", shouldNotify: false, elapsedSeconds, expectedRange: range };
 }
 
-function notificationKey({ instructionId, stageId, revision, eventType }) {
-  return [instructionId || "", stageId || "", Number(revision) || 1, eventType].join("|");
+function notificationKey(data) {
+  return [
+    data.ownerUid || "",
+    data.instructionId || "",
+    data.jobId || "",
+    data.stageId || "",
+    Number(data.revision) || 1,
+    data.eventType || "",
+    data.resourceProvider || "",
+    Number(data.thresholdPercent) || 0,
+    data.resourceWindowId || "",
+    data.idempotencyDiscriminator || "",
+  ].join("|");
 }
 
-function deepLink({ instructionId, stageId }) {
+function deepLink(data) {
+  if (String(data.eventType || "").startsWith("ai_usage_") ||
+      data.eventType === "ai_quota_exhausted") {
+    return "/?screen=remote-control";
+  }
+  if (data.eventType === "test_notification") {
+    return "/?screen=system-settings";
+  }
+  const { instructionId, stageId } = data;
   const query = new URLSearchParams({
     screen: "ai-production",
     projectId: String(instructionId || ""),
@@ -132,21 +151,33 @@ function deepLink({ instructionId, stageId }) {
   return `/?${query.toString()}`;
 }
 
-function notificationContent(eventType, stageNumber, stageName, revision) {
+function notificationContent(eventType, stageNumber, stageName, revision, data = {}) {
   const label = `${stageNumber > 0 ? `${stageNumber}단계 ` : ""}${stageName || "제작 단계"}`;
   switch (eventType) {
     case "approval_required":
       return { title: "승인이 필요합니다", body: `${label}이 완료되었습니다. 결과를 확인하고 승인 또는 보완을 선택해주세요.` };
     case "revision_completed":
-      return { title: "보완 작업 완료", body: `${label} 보완 작업 r${Math.max(2, revision || 2)}가 완료되었습니다.` };
+      return { title: "보완 작업 완료", body: `${label} 보완 작업 r${Math.max(2, revision || 2)}가 완료되었습니다. 재검토해 주세요.` };
     case "activity_stalled":
       return { title: "작업 진행 확인 필요", body: `${label} 작업이 일정 시간 동안 진행되지 않고 있습니다. 확인이 필요합니다.` };
     case "agent_offline":
       return { title: "Agent 연결 확인 필요", body: `${label} 작업 중 Agent가 오프라인 상태입니다.` };
     case "work_error":
       return { title: "AI 제작 오류", body: `${label} 작업에서 오류가 발생했습니다. 확인이 필요합니다.` };
+    case "recovery_exhausted":
+      return { title: "자동복구 실패", body: `${label} 자동복구가 모두 실패했습니다. 사용자 확인이 필요합니다.` };
+    case "ai_usage_warning":
+      return { title: `${data.resourceProvider || "AI 작업자"} 사용량 주의`, body: `확인된 사용량이 ${Number(data.usagePercent) || 0}%입니다. 남은 작업량을 확인해 주세요.` };
+    case "ai_usage_high":
+      return { title: `${data.resourceProvider || "AI 작업자"} 사용량 경고`, body: `확인된 사용량이 ${Number(data.usagePercent) || 0}%입니다. 작업자 전환을 준비해 주세요.` };
+    case "ai_usage_critical":
+      return { title: `${data.resourceProvider || "AI 작업자"} 사용량 긴급`, body: `확인된 사용량이 ${Number(data.usagePercent) || 0}%입니다. 작업 중단 가능성을 확인해 주세요.` };
+    case "ai_quota_exhausted":
+      return { title: `${data.resourceProvider || "AI 작업자"} 사용 한도 소진`, body: "AI 작업자 한도가 소진되어 작업자 전환 또는 사용자 조치가 필요합니다." };
     case "production_completed":
-      return { title: "전자책 제작 완료", body: "등록 전 최종 완성본이 준비되었습니다. PDF와 등록 자료를 확인해 주세요." };
+      return { title: "전자책 제작 완료", body: "전자책 제작이 완료되었습니다. 결과를 확인해 주세요." };
+    case "test_notification":
+      return { title: "소통총관제 테스트 알림", body: "이 기기에서 운영 알림을 정상적으로 받을 수 있습니다." };
     default:
       return { title: "AI 제작공정 알림", body: `${label} 상태를 확인해주세요.` };
   }
@@ -161,7 +192,13 @@ async function enqueueNotification(db, data, rawPolicy) {
   const policy = normalizePolicy(rawPolicy);
   const key = notificationKey(data);
   const ref = db.collection(COL.NOTIFICATION_EVENTS).doc(sha256Hex(key));
-  const content = notificationContent(data.eventType, data.stageNumber, data.stageName, data.revision);
+  const content = notificationContent(
+    data.eventType,
+    data.stageNumber,
+    data.stageName,
+    data.revision,
+    data
+  );
   let created = false;
   await db.runTransaction(async (tx) => {
     const existing = await tx.get(ref);
@@ -169,6 +206,7 @@ async function enqueueNotification(db, data, rawPolicy) {
     created = true;
     await tx.set(ref, {
       idempotencyKey: key,
+      notificationEventId: ref.id,
       ownerUid: String(data.ownerUid || ""),
       instructionId: String(data.instructionId || ""),
       jobId: String(data.jobId || ""),
@@ -177,6 +215,15 @@ async function enqueueNotification(db, data, rawPolicy) {
       stageName: String(data.stageName || "").slice(0, 120),
       revision: Number(data.revision) || 1,
       eventType: data.eventType,
+      severity: String(data.severity || "info").slice(0, 20),
+      actionRequired: data.actionRequired === true,
+      source: String(data.source || "workflow").slice(0, 40),
+      resourceProvider: String(data.resourceProvider || "").slice(0, 40),
+      resourceWindowId: String(data.resourceWindowId || "").slice(0, 80),
+      thresholdPercent: Number(data.thresholdPercent) || 0,
+      usagePercent: Number.isFinite(Number(data.usagePercent))
+        ? Number(data.usagePercent)
+        : null,
       title: content.title,
       body: content.body,
       deepLink: deepLink(data),
@@ -200,6 +247,7 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     WORK_STATUS.AI_PROCESS_FAILED,
     WORK_STATUS.RESULT_VALIDATION_FAILED,
     WORK_STATUS.STAGE_TRANSITION_FAILED,
+    WORK_STATUS.PAUSED_QUOTA,
   ]);
   const results = [];
   for (const doc of jobsSnap.docs) {
@@ -218,6 +266,7 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     if (health.state === "inactive") eventType = "activity_stalled";
     if (health.state === "stalled") eventType = "activity_stalled";
     if (health.state === "error") eventType = "work_error";
+    if (health.state === "paused_quota") eventType = "ai_quota_exhausted";
     if (!eventType) continue;
     if (health.state === "inactive" || health.state === "stalled") {
       const pendingRecoveryId = String(stage.recoveryCommandId || "");
@@ -285,8 +334,10 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
           recoveryPatch.recoveryState = "unavailable";
           recoveryPatch.retryable = false;
           recoveryPatch.failureReason = "automatic recovery unavailable: START_JOB payload missing";
+          eventType = "recovery_exhausted";
         }
       }
+      if (exhausted) eventType = "recovery_exhausted";
       await doc.ref.collection("stages").doc(job.currentStage)
         .set(recoveryPatch, { merge: true });
       await doc.ref.set({
@@ -309,6 +360,11 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
       stageName: stage.stageName,
       revision: stage.revision,
       eventType,
+      severity: eventType === "recovery_exhausted" || eventType === "work_error"
+        ? "critical"
+        : "warning",
+      actionRequired: eventType === "recovery_exhausted" ||
+        eventType === "work_error" || eventType === "ai_quota_exhausted",
       nowMs,
     }, policy);
     results.push({ jobId: doc.id, health: health.state, ...out });
@@ -316,12 +372,83 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
   return results;
 }
 
+function usageThreshold(usedPercent) {
+  const value = Number(usedPercent);
+  if (!Number.isFinite(value) || value < 0 || value > 100) return null;
+  if (value >= 100) return { eventType: "ai_quota_exhausted", thresholdPercent: 100, severity: "critical" };
+  if (value >= 95) return { eventType: "ai_usage_critical", thresholdPercent: 95, severity: "critical" };
+  if (value >= 85) return { eventType: "ai_usage_high", thresholdPercent: 85, severity: "warning" };
+  if (value >= 70) return { eventType: "ai_usage_warning", thresholdPercent: 70, severity: "warning" };
+  return null;
+}
+
+async function evaluateAiUsageNotifications(db, nowMs = Date.now()) {
+  const policy = await loadPolicy(db);
+  const agents = await db.collection(COL.AGENTS).get();
+  const results = [];
+  for (const doc of agents.docs) {
+    const agent = doc.data() || {};
+    if (!agent.ownerUid || agent.enabled === false) continue;
+    const candidates = [];
+    const codex = agent.aiUsage && agent.aiUsage.codex;
+    if (codex && codex.weekly && Number.isFinite(Number(codex.weekly.usedPercent))) {
+      candidates.push({
+        provider: "Codex",
+        usedPercent: Number(codex.weekly.usedPercent),
+        windowId: String(codex.weekly.resetsAtIso || codex.weekly.resetsAt || "unknown-window"),
+      });
+    }
+    const cursor = agent.aiUsage && agent.aiUsage.cursor;
+    if (cursor && cursor.source === "manual" && Number.isFinite(Number(cursor.usedPercent))) {
+      candidates.push({
+        provider: "Cursor",
+        usedPercent: Number(cursor.usedPercent),
+        windowId: String(cursor.resetsAt || "unknown-window"),
+      });
+    }
+    for (const candidate of candidates) {
+      const threshold = usageThreshold(candidate.usedPercent);
+      if (!threshold) continue;
+      const out = await enqueueNotification(db, {
+        ownerUid: agent.ownerUid,
+        jobId: String(agent.currentJobId || ""),
+        stageId: String(agent.currentStage || ""),
+        revision: 1,
+        eventType: threshold.eventType,
+        severity: threshold.severity,
+        actionRequired: threshold.thresholdPercent >= 95,
+        source: "ai_worker_telemetry",
+        resourceProvider: candidate.provider,
+        resourceWindowId: candidate.windowId,
+        thresholdPercent: threshold.thresholdPercent,
+        usagePercent: candidate.usedPercent,
+        idempotencyDiscriminator: doc.id,
+        nowMs,
+      }, policy);
+      results.push({ agentId: doc.id, provider: candidate.provider, ...out });
+    }
+  }
+  return results;
+}
+
 async function deliverNotificationEvent(db, messaging, eventId) {
   const ref = db.collection(COL.NOTIFICATION_EVENTS).doc(eventId);
-  const snap = await ref.get();
-  if (!snap.exists) return { delivered: 0, skipped: "missing" };
-  const event = snap.data() || {};
-  if (event.status !== "pending") return { delivered: 0, skipped: "already_processed" };
+  let event = null;
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return;
+    const current = snap.data() || {};
+    if (current.status !== "pending") return;
+    event = current;
+    tx.set(ref, {
+      status: "sending",
+      deliveryStartedAt: new Date().toISOString(),
+    }, { merge: true });
+  });
+  if (!event) {
+    const snap = await ref.get();
+    return { delivered: 0, skipped: snap.exists ? "already_processed" : "missing" };
+  }
   const policy = await loadPolicy(db);
   if (event.deliveryMode !== "fcm" || policy.notificationDeliveryMode !== "fcm") {
     await ref.set({ status: "outbox_only", processedAt: new Date().toISOString() }, { merge: true });
@@ -333,30 +460,56 @@ async function deliverNotificationEvent(db, messaging, eventId) {
   }
   const tokenSnap = await db.collection(COL.USERS).doc(event.ownerUid)
     .collection("notificationTokens").get();
-  const tokens = tokenSnap.docs
-    .map((d) => String((d.data() || {}).token || ""))
-    .filter(Boolean)
+  const targets = tokenSnap.docs
+    .map((d) => ({ ref: d.ref, id: d.id, data: d.data() || {} }))
+    .filter((item) => item.data.enabled !== false && String(item.data.token || ""))
     .slice(0, 500);
-  if (tokens.length === 0) {
+  if (targets.length === 0) {
     await ref.set({ status: "no_targets", processedAt: new Date().toISOString() }, { merge: true });
     return { delivered: 0, skipped: "no_targets" };
   }
   const link = `${policy.controlBaseUrl}${event.deepLink || "/?screen=ai-production"}`;
-  const result = await messaging.sendEachForMulticast({
-    tokens,
-    notification: { title: event.title || "AI 제작공정", body: event.body || "상태를 확인해주세요." },
-    data: {
-      deepLink: String(event.deepLink || ""),
-      instructionId: String(event.instructionId || ""),
-      stageId: String(event.stageId || ""),
-      eventType: String(event.eventType || ""),
-    },
-    webpush: { fcmOptions: { link } },
-  });
+  let result;
+  try {
+    result = await messaging.sendEachForMulticast({
+      tokens: targets.map((item) => String(item.data.token)),
+      notification: { title: event.title || "AI 제작공정", body: event.body || "상태를 확인해주세요." },
+      data: {
+        deepLink: String(event.deepLink || ""),
+        instructionId: String(event.instructionId || ""),
+        stageId: String(event.stageId || ""),
+        eventType: String(event.eventType || ""),
+        notificationEventId: String(event.notificationEventId || eventId),
+      },
+      webpush: { fcmOptions: { link } },
+    });
+  } catch (err) {
+    await ref.set({
+      status: "failed",
+      failureCode: String(err && (err.code || err.message) || "send_failed").slice(0, 160),
+      processedAt: new Date().toISOString(),
+    }, { merge: true });
+    throw err;
+  }
+  const staleCodes = new Set([
+    "messaging/registration-token-not-registered",
+    "messaging/invalid-registration-token",
+  ]);
+  const deliveries = {};
+  for (let i = 0; i < targets.length; i += 1) {
+    const response = result.responses[i] || {};
+    const code = String(response.error && response.error.code || "");
+    deliveries[targets[i].id] = response.success === true ? "delivered" : (code || "failed");
+    if (staleCodes.has(code)) await targets[i].ref.delete();
+  }
   await ref.set({
-    status: result.failureCount === result.responses.length ? "failed" : "delivered",
+    status: result.successCount === 0
+      ? "failed"
+      : result.failureCount > 0 ? "partial" : "delivered",
     deliveredCount: result.successCount,
     failedCount: result.failureCount,
+    recipientDeviceCount: targets.length,
+    deliveries,
     processedAt: new Date().toISOString(),
   }, { merge: true });
   return { delivered: result.successCount, failed: result.failureCount };
@@ -372,5 +525,7 @@ module.exports = {
   loadPolicy,
   enqueueNotification,
   evaluateActiveJobs,
+  usageThreshold,
+  evaluateAiUsageNotifications,
   deliverNotificationEvent,
 };

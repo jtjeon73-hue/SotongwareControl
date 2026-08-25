@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'data/business_departments/business_department_catalog.dart';
 import 'data/sample_business_data.dart';
@@ -98,7 +99,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       _notificationService = Sotong24NotificationService();
       unawaited(
         _notificationService!
-            .initialize(onOpen: _applyDeepLink)
+            .initialize(
+              onOpen: _applyDeepLink,
+              onForeground: _showForegroundNotification,
+            )
             .catchError((_) {}),
       );
     }
@@ -114,7 +118,16 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   }
 
   void _applyDeepLink(Uri uri) {
-    if (uri.queryParameters['screen'] != 'ai-production') return;
+    final screen = uri.queryParameters['screen'] ?? '';
+    if (screen == 'remote-control') {
+      setState(() => _selected = ControlDestination.sotong24RemoteControl);
+      return;
+    }
+    if (screen == 'system-settings') {
+      setState(() => _selected = ControlDestination.systemSettings);
+      return;
+    }
+    if (screen != 'ai-production') return;
     final projectId = uri.queryParameters['projectId']?.trim() ?? '';
     final stageId = uri.queryParameters['stageId']?.trim() ?? '';
     if (projectId.isEmpty) return;
@@ -129,6 +142,30 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
     final service = _notificationService;
     if (service == null) return false;
     return service.enable();
+  }
+
+  void _showForegroundNotification(RemoteMessage message) {
+    if (!mounted) return;
+    final title = message.notification?.title?.trim();
+    final body = message.notification?.body?.trim();
+    final deepLink = Uri.tryParse('${message.data['deepLink'] ?? ''}'.trim());
+    final text = [
+      if (title != null && title.isNotEmpty) title,
+      if (body != null && body.isNotEmpty) body,
+    ].join(' · ');
+    if (text.isEmpty) return;
+    final messengerContext = _scaffoldKey.currentContext ?? context;
+    ScaffoldMessenger.maybeOf(messengerContext)?.showSnackBar(
+      SnackBar(
+        content: Text(text),
+        action: deepLink == null
+            ? null
+            : SnackBarAction(
+                label: '열기',
+                onPressed: () => _applyDeepLink(deepLink),
+              ),
+      ),
+    );
   }
 
   /// 사업전략연구실 모바일/전체화면 읽기 시 총관제 상단 헤더 숨김.
@@ -345,7 +382,10 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
       case ControlDestination.autoFinance:
         return const AutoFinanceScreen();
       case ControlDestination.systemSettings:
-        return SystemSettingsScreen(onNavigate: _onDestinationSelected);
+        return SystemSettingsScreen(
+          onNavigate: _onDestinationSelected,
+          notificationController: _notificationService,
+        );
       case ControlDestination.alertCenter:
         return AlertCenterScreen(onNavigate: _onDestinationSelected);
       case ControlDestination.standardProductionGuide:

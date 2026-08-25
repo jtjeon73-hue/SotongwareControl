@@ -14,7 +14,11 @@ const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const { handleRelayRequest } = require("./sotong24/relay");
 const { handleApiRequest } = require("./remote/router");
-const { evaluateActiveJobs, deliverNotificationEvent } = require("./remote/monitoring");
+const {
+  evaluateActiveJobs,
+  evaluateAiUsageNotifications,
+  deliverNotificationEvent,
+} = require("./remote/monitoring");
 const { createAdminStorageDeps } = require("./sotong24/artifact");
 const { finalizeCancelRequestEvent } = require("./remote/cancellation");
 
@@ -168,6 +172,7 @@ exports.monitorStageHealth = onSchedule(
   { schedule: "every 5 minutes", timeZone: "Asia/Seoul", maxInstances: 1 },
   async () => {
     await evaluateActiveJobs(admin.firestore());
+    await evaluateAiUsageNotifications(admin.firestore());
   }
 );
 

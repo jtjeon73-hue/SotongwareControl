@@ -13,8 +13,11 @@ const {
 const {
   evaluateStageHealth,
   evaluateActiveJobs,
+  evaluateAiUsageNotifications,
+  deliverNotificationEvent,
   enqueueNotification,
   normalizePolicy,
+  usageThreshold,
 } = require("../remote/monitoring");
 
 function mockRes() {
@@ -325,6 +328,95 @@ describe("remote agent contract V1", () => {
       depsExtra,
     });
     assert.equal(denied.statusCode, 403);
+  });
+
+  it("10d notification device registration, diagnostics and disable are owner scoped", async () => {
+    db.store.set(`${COL.MONITORING_CONFIG}/default`, {
+      notificationDeliveryMode: "fcm",
+      environment: "production",
+    });
+    const deviceId = "device_0123456789abcdef0123456789abcdef";
+    const registered = await control(db, "/api/control/register-notification-token", {
+      token: "fcm-token-value-with-more-than-twenty-characters",
+      deviceId,
+      platform: "web",
+    });
+    assert.equal(registered.statusCode, 200);
+    const diagnostics = await control(db, "/api/control/notification-diagnostics", {});
+    assert.equal(diagnostics.statusCode, 200);
+    assert.equal(diagnostics.body.deliveryMode, "fcm");
+    assert.equal(diagnostics.body.registeredDeviceCount, 1);
+    assert.equal(diagnostics.body.devices[0].deviceId, deviceId);
+    assert.equal(diagnostics.body.devices[0].enabled, true);
+
+    const other = await control(db, "/api/control/notification-diagnostics", {}, "user_b");
+    assert.equal(other.body.registeredDeviceCount, 0);
+
+    const removed = await control(db, "/api/control/unregister-notification-token", {
+      deviceId,
+    });
+    assert.equal(removed.statusCode, 200);
+    const after = await control(db, "/api/control/notification-diagnostics", {});
+    assert.equal(after.body.registeredDeviceCount, 0);
+  });
+
+  it("10e test notification sends once per event and removes a stale device token", async () => {
+    db.store.set(`${COL.MONITORING_CONFIG}/default`, {
+      notificationDeliveryMode: "fcm",
+      environment: "production",
+      controlBaseUrl: "https://sotongware-control.web.app",
+    });
+    const deviceA = "device_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const deviceB = "device_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    await control(db, "/api/control/register-notification-token", {
+      token: "valid-fcm-token-value-with-more-than-twenty-characters",
+      deviceId: deviceA,
+      platform: "web",
+    });
+    await control(db, "/api/control/register-notification-token", {
+      token: "stale-fcm-token-value-with-more-than-twenty-characters",
+      deviceId: deviceB,
+      platform: "web",
+    });
+    const queued = await control(db, "/api/control/send-test-notification", {});
+    assert.equal(queued.statusCode, 200);
+    assert.equal(queued.body.queued, true);
+    const eventId = queued.body.notificationEventId;
+    let calls = 0;
+    const messaging = {
+      async sendEachForMulticast(message) {
+        calls += 1;
+        assert.equal(message.tokens.length, 2);
+        assert.equal(message.data.notificationEventId, eventId);
+        assert.match(message.webpush.fcmOptions.link, /screen=system-settings/);
+        return {
+          successCount: 1,
+          failureCount: 1,
+          responses: [
+            { success: true },
+            {
+              success: false,
+              error: { code: "messaging/registration-token-not-registered" },
+            },
+          ],
+        };
+      },
+    };
+    const delivered = await deliverNotificationEvent(db, messaging, eventId);
+    assert.equal(delivered.delivered, 1);
+    assert.equal(calls, 1);
+    assert.equal(
+      db.store.get(`${COL.NOTIFICATION_EVENTS}/${eventId}`).status,
+      "partial"
+    );
+    const tokenDocs = [...db.store.keys()].filter((key) =>
+      key.startsWith(`${COL.USERS}/user_a/notificationTokens/`)
+    );
+    assert.equal(tokenDocs.length, 1);
+
+    const duplicate = await deliverNotificationEvent(db, messaging, eventId);
+    assert.equal(duplicate.skipped, "already_processed");
+    assert.equal(calls, 1);
   });
 
   // C. Heartbeat
@@ -932,6 +1024,26 @@ describe("remote agent contract V1", () => {
     );
   });
 
+  it("auto approval mode never creates an approval-required notification", async () => {
+    const env = await monitoringJob("wi_plan_auto_approval_notification");
+    db.store.get(`${COL.JOBS}/${env.jobId}`).approvalMode = "auto";
+    const result = await call(db, "/api/agent/report-stage", {
+      jobId: env.jobId,
+      stageId: "idea_clarify",
+      stageNumber: 1,
+      stageName: "아이디어 정리",
+      revision: 1,
+      approvalRequired: true,
+      criteriaMet: true,
+      status: "waiting_approval",
+    }, { token: env.agentToken });
+    assert.equal(result.statusCode, 200);
+    const approvalEvents = [...db.store.values()].filter(
+      (item) => item.eventType === "approval_required"
+    );
+    assert.equal(approvalEvents.length, 0);
+  });
+
   it("revision r2 completion uses a distinct one-time notification", async () => {
     const env = await monitoringJob("wi_plan_monitor_r2");
     const body = {
@@ -949,6 +1061,98 @@ describe("remote agent contract V1", () => {
     const events = [...db.store.values()].filter((v) => v.eventType === "revision_completed");
     assert.equal(events.length, 1);
     assert.match(events[0].body, /r2/);
+  });
+
+  it("production completion notification is STEP 18 only and never changes Launch", async () => {
+    const env = await monitoringJob("wi_plan_production_push");
+    db.store.set(`${COL.PROJECTS}/${env.instructionId}`, {
+      projectId: env.instructionId,
+      ownerUid: "user_a",
+      productionStatus: "prelaunch_review",
+      launchStatus: "not_started",
+      externalPublished: false,
+    });
+    const beforeBoundary = await call(db, "/api/agent/report-job", {
+      jobId: env.jobId,
+      status: "completed",
+      currentStage: "regression_check",
+      currentStageNumber: 17,
+      revision: 1,
+    }, { token: env.agentToken });
+    assert.equal(beforeBoundary.statusCode, 200);
+    assert.equal(
+      [...db.store.values()].filter((v) => v.eventType === "production_completed").length,
+      0
+    );
+
+    const stageBoundary = await call(db, "/api/agent/report-stage", {
+      jobId: env.jobId,
+      stageId: "maintain",
+      stageNumber: 18,
+      stageName: "최종 패키지 검증",
+      status: "completed",
+      criteriaMet: true,
+      approvalRequired: false,
+      revision: 1,
+    }, { token: env.agentToken });
+    assert.equal(stageBoundary.statusCode, 200);
+    const boundary = await call(db, "/api/agent/report-job", {
+      jobId: env.jobId,
+      status: "completed",
+      currentStage: "maintain",
+      currentStageNumber: 18,
+      revision: 1,
+    }, { token: env.agentToken });
+    assert.equal(boundary.statusCode, 200);
+    const events = [...db.store.values()].filter(
+      (v) => v.eventType === "production_completed"
+    );
+    assert.equal(events.length, 1);
+    assert.equal(
+      events[0].body,
+      "전자책 제작이 완료되었습니다. 결과를 확인해 주세요."
+    );
+    const project = db.store.get(`${COL.PROJECTS}/${env.instructionId}`);
+    assert.equal(project.productionStatus, "prelaunch_review");
+    assert.equal(project.launchStatus, "not_started");
+    assert.equal(project.externalPublished, false);
+  });
+
+  it("AI usage notifications use only reported telemetry and threshold buckets", async () => {
+    assert.equal(usageThreshold(69), null);
+    assert.equal(usageThreshold(70).eventType, "ai_usage_warning");
+    assert.equal(usageThreshold(85).eventType, "ai_usage_high");
+    assert.equal(usageThreshold(95).eventType, "ai_usage_critical");
+    assert.equal(usageThreshold(100).eventType, "ai_quota_exhausted");
+    db.store.set(`${COL.MONITORING_CONFIG}/default`, {
+      notificationDeliveryMode: "fcm",
+      environment: "production",
+    });
+    db.store.set(`${COL.AGENTS}/agent_usage`, {
+      ownerUid: "user_a",
+      enabled: true,
+      aiUsage: {
+        codex: {
+          weekly: {
+            usedPercent: 85,
+            resetsAtIso: "2026-08-31T00:00:00.000Z",
+          },
+        },
+        cursor: {
+          status: "unknown",
+          source: "no_official_local_usage_api",
+        },
+      },
+    });
+    await evaluateAiUsageNotifications(db, Date.parse("2026-08-25T00:00:00Z"));
+    await evaluateAiUsageNotifications(db, Date.parse("2026-08-25T00:05:00Z"));
+    const events = [...db.store.values()].filter(
+      (v) => v.source === "ai_worker_telemetry"
+    );
+    assert.equal(events.length, 1);
+    assert.equal(events[0].resourceProvider, "Codex");
+    assert.equal(events[0].usagePercent, 85);
+    assert.equal(events[0].eventType, "ai_usage_high");
   });
 
   it("health detects inactivity and offline without changing a long-running job", () => {
@@ -1110,10 +1314,24 @@ describe("remote agent contract V1", () => {
     const a = await enqueueNotification(db, { ...common, revision: 1 });
     const duplicate = await enqueueNotification(db, { ...common, revision: 1 });
     const r2 = await enqueueNotification(db, { ...common, revision: 2 });
+    const otherJob = await enqueueNotification(db, {
+      ...common,
+      jobId: "job_y",
+      revision: 1,
+    });
+    const otherOwner = await enqueueNotification(db, {
+      ...common,
+      ownerUid: "user_b",
+      revision: 1,
+    });
     assert.equal(a.created, true);
     assert.equal(duplicate.created, false);
     assert.equal(r2.created, true);
+    assert.equal(otherJob.created, true);
+    assert.equal(otherOwner.created, true);
     assert.notEqual(a.id, r2.id);
+    assert.notEqual(a.id, otherJob.id);
+    assert.notEqual(a.id, otherOwner.id);
   });
 
   it("safe cancel is authorized, idempotent, and preserves approvalMode + Agent", async () => {

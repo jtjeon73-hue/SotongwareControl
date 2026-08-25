@@ -23,6 +23,9 @@ const {
   handleReportError,
   handleCreatePairing,
   handleRegisterNotificationToken,
+  handleUnregisterNotificationToken,
+  handleNotificationDiagnostics,
+  handleSendTestNotification,
   handleCreateJob,
   handleStartJob,
   handleDeliverInstruction,
@@ -134,6 +137,18 @@ async function handleApiRequest(req, res, deps) {
       "/api/control/register-notification-token": async () => {
         const { uid } = await authenticateControl(req, deps);
         return handleRegisterNotificationToken(db, uid, body);
+      },
+      "/api/control/unregister-notification-token": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleUnregisterNotificationToken(db, uid, body);
+      },
+      "/api/control/notification-diagnostics": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleNotificationDiagnostics(db, uid);
+      },
+      "/api/control/send-test-notification": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleSendTestNotification(db, uid);
       },
       "/api/control/create-job": async () => {
         const { uid } = await authenticateControl(req, deps);

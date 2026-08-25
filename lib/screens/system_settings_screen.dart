@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/constants/external_site_links.dart';
 import '../theme/control_theme.dart';
 import '../utils/external_url.dart';
+import '../services/sotong24_notification_service.dart';
+import '../widgets/notification_diagnostics_card.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'admin_data_screen.dart';
 import 'deployed_sites_screen.dart';
@@ -10,9 +12,14 @@ import 'public_services_screen.dart';
 
 /// 시스템 설정 허브 — 기존 관리 화면을 섹션으로 흡수.
 class SystemSettingsScreen extends StatelessWidget {
-  const SystemSettingsScreen({super.key, required this.onNavigate});
+  const SystemSettingsScreen({
+    super.key,
+    required this.onNavigate,
+    this.notificationController,
+  });
 
   final ValueChanged<ControlDestination> onNavigate;
+  final NotificationController? notificationController;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +60,10 @@ class SystemSettingsScreen extends StatelessWidget {
           Expanded(
             child: TabBarView(
               children: [
-                _GeneralTab(onNavigate: onNavigate),
+                _GeneralTab(
+                  onNavigate: onNavigate,
+                  notificationController: notificationController,
+                ),
                 const AdminDataScreen(),
                 const _SitesTab(),
                 _StatusTab(onNavigate: onNavigate),
@@ -68,14 +78,19 @@ class SystemSettingsScreen extends StatelessWidget {
 }
 
 class _GeneralTab extends StatelessWidget {
-  const _GeneralTab({required this.onNavigate});
+  const _GeneralTab({required this.onNavigate, this.notificationController});
   final ValueChanged<ControlDestination> onNavigate;
+  final NotificationController? notificationController;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (notificationController != null) ...[
+          NotificationDiagnosticsCard(controller: notificationController!),
+          const SizedBox(height: 12),
+        ],
         const ListTile(
           title: Text('DevWorkDoc 연결'),
           subtitle: Text('작업지시 제작소에서 폴더 권한·경로를 설정합니다.'),

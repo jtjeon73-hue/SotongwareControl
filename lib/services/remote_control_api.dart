@@ -291,13 +291,27 @@ class RemoteControlApi {
 
   Future<void> registerNotificationToken({
     required String token,
+    required String deviceId,
     String platform = 'web',
   }) async {
     await _post('/api/control/register-notification-token', {
       'token': token,
+      'deviceId': deviceId,
       'platform': platform,
     });
   }
+
+  Future<void> unregisterNotificationToken({required String deviceId}) async {
+    await _post('/api/control/unregister-notification-token', {
+      'deviceId': deviceId,
+    });
+  }
+
+  Future<Map<String, dynamic>> notificationDiagnostics() =>
+      _post('/api/control/notification-diagnostics', const {});
+
+  Future<Map<String, dynamic>> sendTestNotification() =>
+      _post('/api/control/send-test-notification', const {});
 
   Future<String> createJob({
     required String type,
