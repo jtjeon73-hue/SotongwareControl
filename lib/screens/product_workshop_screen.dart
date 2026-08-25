@@ -1533,6 +1533,10 @@ class _StageMonitoringPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final productionComplete =
+        project.isProductionComplete ||
+        Sotong24UserFacingStatus.normalize(stage.status) ==
+            Sotong24WorkStatus.completed;
     final snapshot = Sotong24StageMonitoring.evaluate(
       project: project,
       stage: stage,
@@ -1567,13 +1571,17 @@ class _StageMonitoringPanel extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
-            snapshot.health == Sotong24StageHealth.awaitingUser
+            productionComplete
+                ? '작업 완료 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
+                : snapshot.health == Sotong24StageHealth.awaitingUser
                 ? '작업 완료 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
                 : '진행 중 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} 경과',
             style: const TextStyle(fontSize: 13),
           ),
           Text(
-            snapshot.health == Sotong24StageHealth.awaitingUser
+            productionComplete
+                ? '완료 프로젝트 · 무활동 감시 제외'
+                : snapshot.health == Sotong24StageHealth.awaitingUser
                 ? '사용자 승인 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.approvalWaitAge)}'
                 : 'PC/Agent ${snapshot.agentOnline ? '온라인' : '오프라인'} · heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}',
             style: TextStyle(
@@ -1582,13 +1590,15 @@ class _StageMonitoringPanel extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          if (snapshot.health != Sotong24StageHealth.awaitingUser)
+          if (!productionComplete &&
+              snapshot.health != Sotong24StageHealth.awaitingUser)
             Text(
               '현재 작업 · ${snapshot.activityLabel} · 마지막 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
               style: const TextStyle(fontSize: 13),
             ),
-          if (snapshot.health == Sotong24StageHealth.inactive ||
-              snapshot.health == Sotong24StageHealth.stalled) ...[
+          if (!productionComplete &&
+              (snapshot.health == Sotong24StageHealth.inactive ||
+                  snapshot.health == Sotong24StageHealth.stalled)) ...[
             const SizedBox(height: 4),
             Text(
               'PC는 온라인이어도 실제 작업 활동이 없습니다. 자동 복구 ${stage.recoveryAttempt}/${stage.maxRecoveryAttempts > 0 ? stage.maxRecoveryAttempts : 3}${stage.recoveryState == 'exhausted' ? ' 소진' : ' 시도 중'}',

@@ -174,6 +174,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.textContaining('스토어·운영'), findsNothing);
+    expect(find.textContaining('APK·출시 전 검토'), findsOneWidget);
+
     await tester.tap(find.text('전자책 제작'));
     await tester.pumpAndSettle();
 

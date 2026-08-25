@@ -69,6 +69,30 @@ void main() {
     expect(result.health, Sotong24StageHealth.inactive);
   });
 
+  test('completed project is excluded from inactivity monitoring', () {
+    final completed = Sotong24RemoteStage(
+      stageId: 'maintain',
+      stageNumber: 18,
+      stageName: '운영·개선',
+      status: Sotong24WorkStatus.completed,
+      startedAt: '2026-08-19T00:00:00.000Z',
+      completedAt: '2026-08-19T00:10:00.000Z',
+      lastActivityAt: '2026-08-19T00:10:00.000Z',
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(
+        heartbeat: '2026-08-19T00:10:00.000Z',
+        stage: completed,
+        status: Sotong24WorkStatus.completed,
+      ),
+      stage: completed,
+      policy: policy,
+      now: DateTime.parse('2026-08-20T00:10:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.healthy);
+    expect(result.elapsed, const Duration(minutes: 10));
+  });
+
   test('empty activity state identifies worker dispatch wait', () {
     final s = stage(activityState: '');
     final result = Sotong24StageMonitoring.evaluate(

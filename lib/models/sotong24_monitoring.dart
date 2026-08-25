@@ -172,8 +172,12 @@ class Sotong24StageMonitoring {
     );
     final online = heartbeatAge != null && heartbeatAge <= policy.offlineAfter;
     final status = Sotong24UserFacingStatus.normalize(stage.status);
+    final productionComplete =
+        project.isProductionComplete || status == Sotong24WorkStatus.completed;
     late final Sotong24StageHealth health;
-    if (status == Sotong24WorkStatus.pausedQuota) {
+    if (productionComplete) {
+      health = Sotong24StageHealth.healthy;
+    } else if (status == Sotong24WorkStatus.pausedQuota) {
       health = Sotong24StageHealth.pausedQuota;
     } else if (status == Sotong24WorkStatus.pausedNetwork) {
       health = Sotong24StageHealth.pausedNetwork;

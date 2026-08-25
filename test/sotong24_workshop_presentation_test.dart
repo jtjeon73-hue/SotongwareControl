@@ -578,6 +578,8 @@ void main() {
         ),
       );
       await tester.pump();
+      expect(find.text('완료 프로젝트 · 무활동 감시 제외'), findsOneWidget);
+      expect(find.textContaining('실제 작업 활동이 없습니다'), findsNothing);
       await tester.scrollUntilVisible(
         find.byKey(const Key('final_result_panel')),
         300,

@@ -44,7 +44,7 @@ class _StandardProductionGuideScreenState
       'app',
       '앱 제작',
       Icons.phone_android_outlined,
-      '문제정의·설계·AI 코딩·테스트·스토어·운영',
+      '문제정의·설계·AI 코딩·테스트·APK·출시 전 검토',
     ),
     _GuideHomeCard(
       'contents',

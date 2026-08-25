@@ -1305,6 +1305,36 @@ describe("remote agent contract V1", () => {
     );
   });
 
+  it("active monitor ignores completed jobs with stale activity", async () => {
+    const env = await monitoringJob("wi_plan_monitor_completed");
+    const nowMs = Date.parse("2026-08-20T01:00:00.000Z");
+    const jobKey = `${COL.JOBS}/${env.jobId}`;
+    const stageKey = `${jobKey}/stages/idea_clarify`;
+    db.store.set(jobKey, {
+      ...db.store.get(jobKey),
+      jobId: env.jobId,
+      instructionId: env.instructionId,
+      assignedAgentId: env.agentId,
+      currentStage: "idea_clarify",
+      status: "completed",
+    });
+    db.store.set(stageKey, {
+      stageId: "idea_clarify",
+      stageNumber: 1,
+      stageName: "아이디어 정리",
+      status: "completed",
+      lastActivityAt: "2026-08-19T00:00:00.000Z",
+      recoveryAttempt: 0,
+    });
+
+    const results = await evaluateActiveJobs(db, nowMs);
+
+    assert.deepEqual(results, []);
+    assert.equal(db.store.get(jobKey).status, "completed");
+    assert.equal(db.store.get(stageKey).status, "completed");
+    assert.equal(db.store.get(stageKey).recoveryAttempt, 0);
+  });
+
   it("notification key separates revisions and deduplicates identical events", async () => {
     const common = {
       ownerUid: "user_a", instructionId: "wi_plan_keys", jobId: "job_x",
