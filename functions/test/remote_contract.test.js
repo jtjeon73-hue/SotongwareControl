@@ -920,6 +920,21 @@ describe("remote agent contract V1", () => {
       nowMs,
     });
     assert.equal(inactive.state, "inactive");
+    const workerStartWait = evaluateStageHealth({
+      job,
+      stage: {
+        ...stage,
+        status: "ready",
+        activityState: "worker_start_wait",
+        lastActivityAt: "2026-08-19T00:40:00.000Z",
+      },
+      // A live Agent heartbeat is not evidence that the stage worker started.
+      agent: { state: "idle", lastHeartbeatAt: "2026-08-19T00:59:30.000Z" },
+      policy,
+      nowMs,
+    });
+    assert.equal(workerStartWait.state, "inactive");
+    assert.equal(workerStartWait.shouldNotify, true);
     const offline = evaluateStageHealth({
       job,
       stage,
