@@ -22,6 +22,14 @@ const MAX_STR = {
 
 /** Flutter Sotong24RemoteRequest.requestType */
 const REQUEST_TYPES = new Set(["approve", "revision_request", "cancel"]);
+const PRODUCTION_STATUS = new Set([
+  "ai_production", "approval_pending", "production_complete",
+  "prelaunch_review", "revision_in_progress",
+]);
+const LAUNCH_STATUS = new Set([
+  "not_started", "awaiting_launch_approval", "launch_approved",
+  "manual_registration_required", "launching", "launched",
+]);
 
 /**
  * PC가 처리할 수 있는 request.status.
@@ -151,6 +159,11 @@ function pickProjectAllowlist(input, { serverNowIso }) {
   );
   const pcStatus = assertEnum(input.pcStatus, "pcStatus", PC_STATUS);
   const progress = assertInt(input.progress, "progress", { min: 0, max: 100 });
+  const productionStatus = assertEnum(input.productionStatus, "productionStatus", PRODUCTION_STATUS);
+  const launchStatus = assertEnum(input.launchStatus, "launchStatus", LAUNCH_STATUS);
+  const finalRevision = assertInt(input.finalRevision, "finalRevision", { min: 1, max: 9999 });
+  const productionCompletedAt = assertIsoOptional(input.productionCompletedAt, "productionCompletedAt");
+  const externalPublished = assertBool(input.externalPublished, "externalPublished");
   const totalStages = assertInt(input.totalStages, "totalStages", {
     min: 1,
     max: 99,
@@ -207,6 +220,11 @@ function pickProjectAllowlist(input, { serverNowIso }) {
   if (totalStages !== undefined) out.totalStages = totalStages;
   if (progress !== undefined) out.progress = progress;
   if (status !== undefined) out.status = status;
+  if (productionStatus !== undefined) out.productionStatus = productionStatus;
+  if (launchStatus !== undefined) out.launchStatus = launchStatus;
+  if (finalRevision !== undefined) out.finalRevision = finalRevision;
+  if (productionCompletedAt !== undefined) out.productionCompletedAt = productionCompletedAt;
+  if (externalPublished !== undefined) out.externalPublished = externalPublished;
   if (approvalStatus !== undefined) out.approvalStatus = approvalStatus;
   if (pcStatus !== undefined) out.pcStatus = pcStatus;
   if (startedAt !== undefined) out.startedAt = startedAt;

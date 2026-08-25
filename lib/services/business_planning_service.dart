@@ -24,10 +24,10 @@ class BusinessPlanningService {
     ('publish_prep', '등록 준비'),
     ('deploy', '배포'),
     ('promo', '홍보자료 제작'),
-    ('launch', '공개 및 공유'),
-    ('measure', '성과 확인'),
-    ('iterate', '재보완'),
-    ('maintain', '유지관리'),
+    ('launch', '출시자료 준비'),
+    ('measure', '출시 후 운영·측정 설계'),
+    ('iterate', '개선 백로그 점검'),
+    ('maintain', '최종 패키지 검증'),
   ];
 
   PlanningAnalysisResult analyze(BusinessPlanInput input) {

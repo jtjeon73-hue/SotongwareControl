@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const { describe, it } = require("node:test");
 const {
   EBOOK_STAGE_CONTRACTS,
+  EBOOK_STAGE_BY_ID,
   PROBLEM_VALIDATE_EVIDENCE_CONTRACT,
 } = require("../sotong24/canonical");
 const {
@@ -32,14 +33,15 @@ describe("canonical ebook 18-stage state machine", () => {
     );
   });
 
-  it("treats STEP 12 as AI production boundary, not external publish", () => {
+  it("treats STEP 18 as AI production boundary, not external publish", () => {
     const publishPrep = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "publish_prep");
     const deploy = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "deploy");
     assert.equal(publishPrep.order, 12);
     assert.equal(publishPrep.aiDocumentStage, true);
-    assert.equal(publishPrep.productionBoundary, true);
+    assert.equal(publishPrep.productionBoundary, false);
     assert.equal(deploy.aiDocumentStage, false);
     assert.equal(deploy.productionBoundary, false);
+    assert.equal(EBOOK_STAGE_BY_ID.get("maintain").productionBoundary, true);
   });
 
   it("runs deterministic stage 1 through 18 with exactly-once approval", () => {

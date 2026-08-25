@@ -29,10 +29,10 @@ const EBOOK_STAGE_CONTRACTS = [
   ["publish_prep", "등록 준비", true, true, true, "publishing_package", "canonical_artifact"],
   ["deploy", "배포", false, false, true, "deployment_record", "canonical_artifact"],
   ["promo", "홍보자료 제작", true, true, false, "promotion_package", "canonical_artifact"],
-  ["launch", "공개 및 공유", true, false, true, "launch_readiness_record", "canonical_artifact"],
-  ["measure", "성과 확인", true, false, false, "measurement_plan", "canonical_artifact"],
-  ["iterate", "재보완", true, true, false, "improvement_backlog", "canonical_artifact"],
-  ["maintain", "유지관리", true, false, false, "maintenance_plan", "canonical_artifact"],
+  ["launch", "출시자료 준비", true, true, false, "launch_preparation_package", "canonical_artifact"],
+  ["measure", "출시 후 운영·측정 설계", true, true, false, "measurement_plan", "canonical_artifact"],
+  ["iterate", "개선 백로그 점검", true, true, false, "improvement_backlog", "canonical_artifact"],
+  ["maintain", "최종 패키지 검증", true, true, false, "prelaunch_final_package", "canonical_artifact"],
 ].map((row, index) => ({
   id: row[0],
   name: row[1],
@@ -46,7 +46,7 @@ const EBOOK_STAGE_CONTRACTS = [
     ? PROBLEM_VALIDATE_EVIDENCE_CONTRACT
     : undefined,
   terminal: index === 17,
-  productionBoundary: row[0] === "publish_prep",
+  productionBoundary: row[0] === "maintain",
 }));
 
 const EBOOK_STAGES = EBOOK_STAGE_CONTRACTS.map((stage) => [stage.id, stage.name]);
@@ -63,6 +63,11 @@ const WORK_STATUS = new Set([
   "completed",
   "error",
   "revision",
+  "prelaunch_review",
+  "awaiting_launch_approval",
+  "launch_approved",
+  "launching",
+  "launched",
   "not_applicable",
   "paused_quota",
   "paused_network",

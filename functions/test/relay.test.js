@@ -282,7 +282,7 @@ describe("allowlist / validation", () => {
       {
         stageId: "launch",
         stageNumber: 15,
-        stageName: "공개 및 공유",
+        stageName: "출시자료 준비",
         status: "awaiting_approval",
         approvalStatus: "pending",
         summary: "미리보기",
@@ -591,7 +591,7 @@ describe("relay HTTP handler", () => {
       `sotong24work_projects/${sampleProject.projectId}/stages/launch`
     );
     assert.equal(sdoc.stageNumber, 15);
-    assert.equal(sdoc.stageName, "공개 및 공유");
+    assert.equal(sdoc.stageName, "출시자료 준비");
   });
 
   it("cancel tombstone rejects late heartbeat and project mirror recreation", async () => {

@@ -19,7 +19,45 @@ const STATUS_RANK = Object.freeze({
   waiting_approval: 2,
   completed: 3,
   not_applicable: 3,
+  prelaunch_review: 4,
+  awaiting_launch_approval: 5,
+  launch_approved: 6,
+  launching: 7,
+  launched: 8,
 });
+
+const PRODUCTION_RANK = Object.freeze({
+  ai_production: 0, approval_pending: 1, revision_in_progress: 2,
+  production_complete: 3, prelaunch_review: 4,
+});
+const LAUNCH_RANK = Object.freeze({
+  not_started: 0, awaiting_launch_approval: 1, launch_approved: 2,
+  manual_registration_required: 3, launching: 4, launched: 5,
+});
+
+function preserveProductionLaunch(previous, incoming) {
+  const prior = previous || {};
+  const next = { ...incoming };
+  const priorRevision = Math.max(1, Number(prior.finalRevision) || 1);
+  const nextRevision = Math.max(1, Number(next.finalRevision) || 1);
+  const productionRegressed = (PRODUCTION_RANK[prior.productionStatus] ?? 0) >
+    (PRODUCTION_RANK[next.productionStatus] ?? 0);
+  // A newer revision may deliberately re-enter revision_in_progress.
+  if (productionRegressed && nextRevision <= priorRevision) {
+    next.productionStatus = prior.productionStatus;
+    next.productionCompletedAt = prior.productionCompletedAt;
+    next.finalRevision = prior.finalRevision;
+  }
+  if ((LAUNCH_RANK[prior.launchStatus] ?? 0) > (LAUNCH_RANK[next.launchStatus] ?? 0)) {
+    next.launchStatus = prior.launchStatus;
+    next.externalPublished = prior.externalPublished === true;
+    if (["awaiting_launch_approval", "launch_approved", "launching", "launched"].includes(prior.status)) {
+      next.status = prior.status;
+    }
+  }
+  if (prior.externalPublished === true) next.externalPublished = true;
+  return next;
+}
 
 const TERMINAL_DECISIONS = new Set(["approved", "revision_requested"]);
 const AUTHORITATIVE_STAGE_FIELDS = Object.freeze([
@@ -115,7 +153,7 @@ function mergeMonotonicProject(previous, incoming) {
     ["ready", "in_progress", "running"].includes(String(next.status || "")) &&
     Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0);
   if (!regressedStage && !sameStageRegression && !staleRetryAttempt &&
-      !staleStallRecovery) return next;
+      !staleStallRecovery) return preserveProductionLaunch(prior, next);
 
   for (const field of [
     "currentStage",
@@ -142,7 +180,7 @@ function mergeMonotonicProject(previous, incoming) {
     if (prior[field] !== undefined) next[field] = prior[field];
     else delete next[field];
   }
-  return next;
+  return preserveProductionLaunch(prior, next);
 }
 
 function alignProjectWithCurrentStage(project, stages) {
@@ -158,7 +196,10 @@ function alignProjectWithCurrentStage(project, stages) {
     out.currentStageCriteriaMet = current.criteriaMet === true;
   }
   if (current.status === "completed" && EBOOK_STAGE_BY_ID.get(current.stageId)?.terminal) {
-    out.status = "completed";
+    out.status = "prelaunch_review";
+    out.productionStatus = "prelaunch_review";
+    out.launchStatus = out.launchStatus || "not_started";
+    out.externalPublished = out.externalPublished === true;
     out.approvalStatus = current.approvalStatus || "not_required";
     out.progress = 100;
   }
@@ -270,6 +311,7 @@ module.exports = {
   mergeMonotonicStage,
   preserveTerminalDecision,
   mergeMonotonicProject,
+  preserveProductionLaunch,
   alignProjectWithCurrentStage,
   createSimulation,
   currentStage,

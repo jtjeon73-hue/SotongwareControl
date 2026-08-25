@@ -272,6 +272,217 @@ class Sotong24RemoteRepository {
     );
   }
 
+  /// 제작 완료본 보완. 기존 18단계 결과를 보존하고 maintain의 새 revision을
+  /// Agent에 요청한다. Launch workflow나 외부 action은 건드리지 않는다.
+  Future<String?> requestPrelaunchRevision({
+    required String projectId,
+    required String message,
+  }) async {
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) return '보완 내용을 입력해 주세요.';
+    final project = await getProject(projectId);
+    if (project == null) return '프로젝트를 찾을 수 없습니다.';
+    if (!project.isProductionComplete) return '제작 완료본에서만 보완을 요청할 수 있습니다.';
+    Sotong24RemoteStage? stage;
+    for (final candidate in project.stages) {
+      if (candidate.stageId == 'maintain') {
+        stage = candidate;
+        break;
+      }
+    }
+    if (stage == null) return '최종 패키지 검증 단계를 찾을 수 없습니다.';
+    final now = DateTime.now().toUtc().toIso8601String();
+    final nextRevision = project.finalRevision + 1;
+    final requestId =
+        'req_maintain_${DateTime.now().toUtc().microsecondsSinceEpoch}';
+    final request = Sotong24RemoteRequest(
+      requestId: requestId,
+      projectId: projectId,
+      stageId: 'maintain',
+      requestType: 'revision_request',
+      status: ApprovalStatus.revisionRequested,
+      message: trimmed,
+      createdAt: now,
+      updatedAt: now,
+      processedAt: now,
+      revision: project.finalRevision,
+      processed: true,
+    );
+    if (usesMemory || _projects == null || project.isDemo) {
+      _memoryRequests[projectId] = [
+        ...(_memoryRequests[projectId] ?? const []),
+        request,
+      ];
+      final updated = project.copyWith(
+        status: Sotong24WorkStatus.revision,
+        approvalStatus: ApprovalStatus.revisionRequested,
+        productionStatus: 'revision_in_progress',
+        launchStatus: 'not_started',
+        finalRevision: nextRevision,
+        externalPublished: false,
+        updatedAt: now,
+      );
+      _memory = [
+        for (final p in _memory)
+          if (p.projectId == projectId) updated else p,
+      ];
+      _memoryController.add(List.unmodifiable(_memory));
+      return null;
+    }
+    try {
+      final doc = _projects!.doc(projectId);
+      final batch = (_db ?? FirebaseFirestore.instance).batch();
+      batch.set(doc.collection('requests').doc(requestId), request.toMap());
+      batch.set(doc.collection('stages').doc('maintain'), {
+        'status': Sotong24WorkStatus.revision,
+        'approvalStatus': ApprovalStatus.revisionRequested,
+        'activeRequestId': requestId,
+        'userAttention': trimmed,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      batch.set(doc, {
+        'status': Sotong24WorkStatus.revision,
+        'productionStatus': 'revision_in_progress',
+        'launchStatus': 'not_started',
+        'finalRevision': nextRevision,
+        'externalPublished': false,
+        'approvalStatus': ApprovalStatus.revisionRequested,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      await batch.commit();
+      return null;
+    } catch (e) {
+      return '보완 요청 저장 실패: $e';
+    }
+  }
+
+  static const launchWorkflowSteps = <String>[
+    '출시 대상 최종 revision 선택',
+    '최종 PDF 확인',
+    '표지 확인',
+    '상품명/소개 확인',
+    '최종 판매가격 확정',
+    '판매채널 선택',
+    '판매자 계정/필수정보 확인',
+    '환불·주의사항 확인',
+    '공개일 결정',
+    '홍보 여부 결정',
+    '사용자 최종 출시 승인',
+    '채널 등록 진행',
+    '업로드/가격/설명 검증',
+    '결제/다운로드 테스트',
+    '공개',
+    '공개 URL 저장',
+    '출시 결과 검증',
+    '출시 완료',
+  ];
+
+  /// 별도 Launch workflow 진입. 실제 외부 작업 직전의 강제 사람 승인 상태만 만든다.
+  Future<String?> enterLaunchApproval({required String projectId}) async {
+    final project = await getProject(projectId);
+    if (project == null) return '프로젝트를 찾을 수 없습니다.';
+    if (!project.isProductionComplete) return '제작 완료 후에만 출시 검토를 시작할 수 있습니다.';
+    if (project.isLaunched) return '이미 출시 완료된 프로젝트입니다.';
+    final now = DateTime.now().toUtc().toIso8601String();
+    final workflow = {
+      'schemaVersion': 1,
+      'selectedRevision': project.finalRevision,
+      'status': 'awaiting_launch_approval',
+      'externalActionState': 'blocked_until_human_approval',
+      'externalPublished': false,
+      'updatedAt': now,
+      'steps': [
+        for (var i = 0; i < launchWorkflowSteps.length; i++)
+          {
+            'order': i + 1,
+            'label': launchWorkflowSteps[i],
+            'status': i < 10
+                ? 'review_required'
+                : i == 10
+                ? 'awaiting_launch_approval'
+                : 'blocked',
+          },
+      ],
+    };
+    if (usesMemory || _projects == null || project.isDemo) {
+      final updated = project.copyWith(
+        status: Sotong24WorkStatus.awaitingLaunchApproval,
+        launchStatus: 'awaiting_launch_approval',
+        externalPublished: false,
+        updatedAt: now,
+      );
+      _memory = [
+        for (final p in _memory)
+          if (p.projectId == projectId) updated else p,
+      ];
+      _memoryController.add(List.unmodifiable(_memory));
+      return null;
+    }
+    try {
+      final doc = _projects!.doc(projectId);
+      final batch = (_db ?? FirebaseFirestore.instance).batch();
+      batch.set(doc.collection('launch_runs').doc('current'), workflow);
+      batch.set(doc, {
+        'status': Sotong24WorkStatus.awaitingLaunchApproval,
+        'launchStatus': 'awaiting_launch_approval',
+        'externalPublished': false,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      await batch.commit();
+      return null;
+    } catch (e) {
+      return '출시 승인 대기 저장 실패: $e';
+    }
+  }
+
+  /// 명시적 사람 승인 기록. 연동이 없으므로 성공/출시완료로 가장하지 않고
+  /// launch_approved + manual_registration_required에서 멈춘다.
+  Future<String?> approveLaunch({required String projectId}) async {
+    final project = await getProject(projectId);
+    if (project == null) return '프로젝트를 찾을 수 없습니다.';
+    if (project.launchStatus != 'awaiting_launch_approval') {
+      return '먼저 출시 준비정보를 확인하고 출시 승인 대기 상태로 전환해 주세요.';
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    if (usesMemory || _projects == null || project.isDemo) {
+      final updated = project.copyWith(
+        status: Sotong24WorkStatus.launchApproved,
+        launchStatus: 'launch_approved',
+        externalPublished: false,
+        updatedAt: now,
+      );
+      _memory = [
+        for (final p in _memory)
+          if (p.projectId == projectId) updated else p,
+      ];
+      _memoryController.add(List.unmodifiable(_memory));
+      return null;
+    }
+    try {
+      final doc = _projects!.doc(projectId);
+      final batch = (_db ?? FirebaseFirestore.instance).batch();
+      batch.set(doc.collection('launch_runs').doc('current'), {
+        'status': 'launch_approved',
+        'approvedAt': now,
+        'externalActionState': 'manual_registration_required',
+        'integrationStatus': 'not_implemented',
+        'externalPublished': false,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      batch.set(doc, {
+        'status': Sotong24WorkStatus.launchApproved,
+        'launchStatus': 'launch_approved',
+        'externalPublished': false,
+        'launchApprovedAt': now,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      await batch.commit();
+      return null;
+    } catch (e) {
+      return '출시 승인 저장 실패: $e';
+    }
+  }
+
   Future<String?> _submitDecision({
     required String projectId,
     required String stageId,

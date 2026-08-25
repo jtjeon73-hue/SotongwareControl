@@ -50,6 +50,11 @@ class Sotong24WorkStatus {
   static const completed = 'completed';
   static const error = 'error';
   static const revision = 'revision';
+  static const prelaunchReview = 'prelaunch_review';
+  static const awaitingLaunchApproval = 'awaiting_launch_approval';
+  static const launchApproved = 'launch_approved';
+  static const launching = 'launching';
+  static const launched = 'launched';
   static const notApplicable = 'not_applicable';
   static const pausedQuota = 'paused_quota';
   static const pausedNetwork = 'paused_network';
@@ -79,6 +84,16 @@ class Sotong24WorkStatus {
         return '승인 대기';
       case completed:
         return '완료';
+      case prelaunchReview:
+        return '제작 완료 · 출시 전 검토';
+      case awaitingLaunchApproval:
+        return '출시 승인 대기';
+      case launchApproved:
+        return '출시 승인 · 수동 등록 필요';
+      case launching:
+        return '출시 진행 중';
+      case launched:
+        return '출시 완료';
       case error:
         return '오류';
       case revision:
@@ -449,6 +464,11 @@ class Sotong24RemoteProject {
     this.environment = 'production',
     this.isTest = false,
     this.approvalMode = 'manual',
+    this.productionStatus = 'ai_production',
+    this.launchStatus = 'not_started',
+    this.finalRevision = 1,
+    this.productionCompletedAt = '',
+    this.externalPublished = false,
     this.stages = const [],
   });
 
@@ -472,6 +492,11 @@ class Sotong24RemoteProject {
   final String environment;
   final bool isTest;
   final String approvalMode;
+  final String productionStatus;
+  final String launchStatus;
+  final int finalRevision;
+  final String productionCompletedAt;
+  final bool externalPublished;
   final List<Sotong24RemoteStage> stages;
 
   String get productTypeLabel {
@@ -500,7 +525,11 @@ class Sotong24RemoteProject {
   /// 완료 단계 수 기반 전체 제작 진행률. stages가 없으면 reportedProgress로 폴백.
   /// 프로젝트 상태가 completed이면 100으로 고정한다.
   int get overallProgressPercent {
-    if (status == Sotong24WorkStatus.completed) return 100;
+    if (status == Sotong24WorkStatus.completed ||
+        status == Sotong24WorkStatus.prelaunchReview ||
+        productionStatus == 'prelaunch_review') {
+      return 100;
+    }
     final total = totalStages > 0
         ? totalStages
         : (stages.isNotEmpty ? stages.length : 0);
@@ -562,6 +591,18 @@ class Sotong24RemoteProject {
   String get userFacingStatusLabel =>
       Sotong24WorkStatus.labelKo(userFacingStatus);
 
+  bool get isProductionComplete =>
+      productionStatus == 'production_complete' ||
+      productionStatus == 'prelaunch_review' ||
+      status == Sotong24WorkStatus.completed ||
+      status == Sotong24WorkStatus.prelaunchReview ||
+      status == Sotong24WorkStatus.awaitingLaunchApproval ||
+      status == Sotong24WorkStatus.launchApproved ||
+      status == Sotong24WorkStatus.launching ||
+      status == Sotong24WorkStatus.launched;
+
+  bool get isLaunched => launchStatus == 'launched' && externalPublished;
+
   Map<String, dynamic> toMap() => {
     'projectId': projectId,
     'title': title,
@@ -583,6 +624,11 @@ class Sotong24RemoteProject {
     'environment': environment,
     'isTest': isTest,
     'approvalMode': approvalMode,
+    'productionStatus': productionStatus,
+    'launchStatus': launchStatus,
+    'finalRevision': finalRevision,
+    'productionCompletedAt': productionCompletedAt,
+    'externalPublished': externalPublished,
   };
 
   factory Sotong24RemoteProject.fromMap(
@@ -616,6 +662,14 @@ class Sotong24RemoteProject {
       approvalMode: '${map['approvalMode'] ?? ''}' == 'auto'
           ? 'auto'
           : 'manual',
+      productionStatus:
+          '${map['productionStatus'] ?? (map['status'] == 'prelaunch_review' ? 'prelaunch_review' : 'ai_production')}',
+      launchStatus: '${map['launchStatus'] ?? 'not_started'}',
+      finalRevision: _asInt(map['finalRevision']) > 0
+          ? _asInt(map['finalRevision'])
+          : 1,
+      productionCompletedAt: '${map['productionCompletedAt'] ?? ''}',
+      externalPublished: map['externalPublished'] == true,
       stages: stages,
     );
   }
@@ -627,6 +681,11 @@ class Sotong24RemoteProject {
     List<Sotong24RemoteStage>? stages,
     int? progress,
     int? currentStage,
+    String? productionStatus,
+    String? launchStatus,
+    int? finalRevision,
+    String? productionCompletedAt,
+    bool? externalPublished,
   }) {
     return Sotong24RemoteProject(
       projectId: projectId,
@@ -649,6 +708,12 @@ class Sotong24RemoteProject {
       environment: environment,
       isTest: isTest,
       approvalMode: approvalMode,
+      productionStatus: productionStatus ?? this.productionStatus,
+      launchStatus: launchStatus ?? this.launchStatus,
+      finalRevision: finalRevision ?? this.finalRevision,
+      productionCompletedAt:
+          productionCompletedAt ?? this.productionCompletedAt,
+      externalPublished: externalPublished ?? this.externalPublished,
       stages: stages ?? this.stages,
     );
   }
@@ -938,6 +1003,22 @@ class Sotong24UserFacingStatus {
     }
     if (projectStatus == Sotong24WorkStatus.notApplicable) {
       return Sotong24WorkStatus.notApplicable;
+    }
+    if (projectStatus == Sotong24WorkStatus.launched || project.isLaunched) {
+      return Sotong24WorkStatus.launched;
+    }
+    if (projectStatus == Sotong24WorkStatus.launching) {
+      return Sotong24WorkStatus.launching;
+    }
+    if (projectStatus == Sotong24WorkStatus.launchApproved) {
+      return Sotong24WorkStatus.launchApproved;
+    }
+    if (projectStatus == Sotong24WorkStatus.awaitingLaunchApproval) {
+      return Sotong24WorkStatus.awaitingLaunchApproval;
+    }
+    if (projectStatus == Sotong24WorkStatus.prelaunchReview ||
+        project.productionStatus == 'prelaunch_review') {
+      return Sotong24WorkStatus.prelaunchReview;
     }
     if (projectStatus == Sotong24WorkStatus.completed) {
       return Sotong24WorkStatus.completed;

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/sotong24_workflows.dart';
 import '../models/remote_agent_models.dart';
@@ -684,8 +685,7 @@ class _Sotong24RemoteDetailScreenState
                   def: stageDef,
                 ),
               ],
-              if (!project.isDemo &&
-                  project.userFacingStatus != Sotong24WorkStatus.completed) ...[
+              if (!project.isDemo && !project.isProductionComplete) ...[
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
@@ -715,13 +715,14 @@ class _Sotong24RemoteDetailScreenState
                     ),
                   ),
               ],
-              if (project.userFacingStatus == Sotong24WorkStatus.completed) ...[
+              if (project.isProductionComplete) ...[
                 const SizedBox(height: 12),
-                _CompletedBanner(isTest: isTest),
+                _CompletedBanner(isTest: isTest, project: project),
                 if (!isTest) ...[
                   const SizedBox(height: 10),
                   _FinalResultPanel(
                     project: project,
+                    repository: widget.repository,
                     onOpenGuide: widget.onOpenGuide,
                   ),
                 ],
@@ -960,9 +961,14 @@ class _Sotong24RemoteDetailScreenState
 }
 
 class _FinalResultPanel extends StatelessWidget {
-  const _FinalResultPanel({required this.project, this.onOpenGuide});
+  const _FinalResultPanel({
+    required this.project,
+    required this.repository,
+    this.onOpenGuide,
+  });
 
   final Sotong24RemoteProject project;
+  final Sotong24RemoteRepository repository;
   final void Function(String stageId)? onOpenGuide;
 
   @override
@@ -984,7 +990,7 @@ class _FinalResultPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            '최종 결과물 · 등록 전 완성본',
+            '제작 완료 · 출시 전 검토',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
@@ -992,12 +998,14 @@ class _FinalResultPanel extends StatelessWidget {
             '내용·품질·등록 자료 준비가 끝났습니다. 외부 판매처 등록은 아직 실행하지 않았습니다.',
             style: TextStyle(color: ControlColors.textSecondary, height: 1.35),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
+          const Text('결과물', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
           if (publishing?.openableResultUrl != null)
             ResultLinkButton(
-              key: const Key('final_pdf_button'),
+              key: const Key('final_pdf_view_button'),
               url: publishing!.openableResultUrl!,
-              label: '최종 PDF 보기/다운로드',
+              label: 'PDF 보기',
               icon: Icons.picture_as_pdf_outlined,
               style: ResultLinkStyle.tonal,
             )
@@ -1006,14 +1014,96 @@ class _FinalResultPanel extends StatelessWidget {
               '최종 파일 signed URL을 동기화하는 중입니다.',
               style: TextStyle(color: ControlColors.textMuted),
             ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
+          if (publishing?.openableResultUrl != null)
+            ResultLinkButton(
+              key: const Key('final_pdf_download_button'),
+              url: publishing!.openableResultUrl!,
+              label: 'PDF 다운로드',
+              icon: Icons.download_outlined,
+              style: ResultLinkStyle.outlined,
+            ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            key: const Key('review_share_button'),
+            onPressed: publishing?.openableResultUrl == null
+                ? null
+                : () async {
+                    await Clipboard.setData(
+                      ClipboardData(text: publishing!.openableResultUrl!),
+                    );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          '검토용 PDF 링크를 복사했습니다. 카카오톡 등 일반 공유창에 붙여넣어 전달하세요. 판매처 공개는 실행되지 않았습니다.',
+                        ),
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('검토용 공유'),
+          ),
+          const Divider(height: 24),
+          const Text('검토', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('prelaunch_revision_button'),
+            onPressed: project.launchStatus == 'launching' || project.isLaunched
+                ? null
+                : () => _requestRevision(context),
+            icon: const Icon(Icons.rate_review_outlined),
+            label: const Text('보완 요청'),
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            key: const Key('revision_history_button'),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('버전 확인'),
+                content: Text(
+                  '현재 최종 revision: r${project.finalRevision}\n\n'
+                  '보완 전 파일은 기존 revision 규칙에 따라 보존됩니다. 보완 완료 후 다시 출시 전 검토 상태로 돌아옵니다.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            ),
+            icon: const Icon(Icons.history_outlined),
+            label: Text('버전 확인 · r${project.finalRevision}'),
+          ),
+          const Divider(height: 24),
+          const Text('출시', style: TextStyle(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('launch_readiness_button'),
+            onPressed: () => _showLaunchReadiness(context, publishing),
+            icon: const Icon(Icons.fact_check_outlined),
+            label: const Text('출시 준비정보'),
+          ),
+          const SizedBox(height: 6),
+          FilledButton.icon(
+            key: const Key('launch_approval_button'),
+            onPressed:
+                project.isLaunched || project.launchStatus == 'launch_approved'
+                ? null
+                : () => _launchApproval(context),
+            icon: const Icon(Icons.verified_user_outlined),
+            label: const Text('출시 승인'),
+          ),
+          const SizedBox(height: 6),
           OutlinedButton.icon(
             key: const Key('registration_guide_button'),
             onPressed: onOpenGuide == null
                 ? null
                 : () => onOpenGuide!('publish_prep'),
             icon: const Icon(Icons.menu_book_outlined),
-            label: const Text('등록 방법 보기'),
+            label: const Text('채널별 등록 방법 보기'),
           ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
@@ -1022,9 +1112,129 @@ class _FinalResultPanel extends StatelessWidget {
                 ? null
                 : () => onOpenGuide!('maintain'),
             icon: const Icon(Icons.build_outlined),
-            label: const Text('유지보수 가이드 보기'),
+            label: const Text('출시 후 운영·측정 가이드'),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            project.isLaunched
+                ? '실제 외부 출시 완료'
+                : project.launchStatus == 'launch_approved'
+                ? '출시 승인됨 · 수동 등록 필요 · 채널 연동 미구현 · 아직 공개되지 않음'
+                : project.launchStatus == 'awaiting_launch_approval'
+                ? '사람의 최종 출시 승인 대기 · 외부 action 차단됨'
+                : 'Launch Run 미시작 · 아직 공개되지 않음',
+            style: const TextStyle(
+              color: ControlColors.textSecondary,
+              fontSize: 12,
+              height: 1.35,
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _requestRevision(BuildContext context) async {
+    final message = await showRevisionRequestDialog(context);
+    if (message == null || !context.mounted) return;
+    final error = await repository.requestPrelaunchRevision(
+      projectId: project.projectId,
+      message: message,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          error ?? '보완 요청을 전송했습니다. 상태가 보완 중으로 바뀌며 외부 출시는 실행되지 않습니다.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showLaunchReadiness(
+    BuildContext context,
+    Sotong24RemoteStage? publishing,
+  ) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('출시 준비정보'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _Kv('최종 상품명', project.title),
+              _Kv(
+                '최종 PDF',
+                publishing?.openableResultUrl == null ? '확인 필요' : '준비됨',
+              ),
+              const _Kv('표지', '최종 패키지에서 확인'),
+              const _Kv('페이지 수', '사용자 확인 필요'),
+              const _Kv('파일 크기', '다운로드 화면에서 확인'),
+              _Kv('최종 revision', 'r${project.finalRevision}'),
+              const _Kv('권장/확정 가격', '사용자 확인 필요'),
+              const _Kv('판매채널 후보', '출시자료 패키지에서 확인'),
+              const _Kv('상품 소개', '출시자료 패키지에서 확인'),
+              const _Kv('환불/주의사항', '초안 확인 필요'),
+              const _Kv('저작권/출처 검사', '최종 패키지에서 확인'),
+              const _Kv('홍보 준비 상태', '초안 준비 · 자동 게시 안 함'),
+              const _Kv('출시 체크리스트', '미확정 항목 확인 필요'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchApproval(BuildContext context) async {
+    if (project.launchStatus != 'awaiting_launch_approval') {
+      final error = await repository.enterLaunchApproval(
+        projectId: project.projectId,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error ??
+                '출시 승인 대기로 전환했습니다. 외부 action은 계속 차단됩니다. 준비정보 확인 후 출시 승인을 다시 눌러 주세요.',
+          ),
+        ),
+      );
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('최종 출시 승인'),
+        content: const Text(
+          '이 승인은 Launch workflow의 사람 승인 기록입니다. 현재 채널 자동등록 연동은 없어 외부 게시·결제·광고는 실행되지 않으며, 승인 후에도 수동 등록 필요 상태로 멈춥니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('명시적으로 승인'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final error = await repository.approveLaunch(projectId: project.projectId);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          error ?? '출시 승인을 저장했습니다. 수동 등록 필요 · 연동 미구현 상태이며 아직 공개되지 않았습니다.',
+        ),
       ),
     );
   }
@@ -1122,6 +1332,17 @@ class _CurrentWorkCard extends StatelessWidget {
           Text(
             '상태: ${project.userFacingStatusLabel}',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+          Text(
+            '최종 revision: r${project.finalRevision} · '
+            '제작 ${project.isProductionComplete ? '완료' : '진행 중'} · '
+            '출시 ${project.isLaunched ? '완료' : '아직 공개되지 않음'}',
+            style: TextStyle(
+              fontSize: 12,
+              color: project.isLaunched
+                  ? ControlColors.teal
+                  : ControlColors.textSecondary,
+            ),
           ),
           if (hasMonitoring) ...[
             const SizedBox(height: 6),
@@ -1589,9 +1810,10 @@ class _Kv extends StatelessWidget {
 }
 
 class _CompletedBanner extends StatelessWidget {
-  const _CompletedBanner({required this.isTest});
+  const _CompletedBanner({required this.isTest, required this.project});
 
   final bool isTest;
+  final Sotong24RemoteProject project;
 
   @override
   Widget build(BuildContext context) {
@@ -1607,15 +1829,17 @@ class _CompletedBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isTest ? 'TEST E2E 완료' : '작업 완료',
+            isTest ? 'TEST E2E 완료' : '제작 완료 · 출시 전 검토',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
-          const Text(
-            '모든 제작 단계가 완료되었습니다.',
-            style: TextStyle(fontSize: 14, height: 1.35),
+          Text(
+            project.isLaunched
+                ? '외부 출시 완료가 별도로 확인되었습니다.'
+                : '18단계 제작이 완료되었습니다. 아직 외부에 공개되지 않았습니다.',
+            style: const TextStyle(fontSize: 14, height: 1.35),
           ),
         ],
       ),

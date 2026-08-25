@@ -535,13 +535,23 @@ void main() {
         scrollable: find.byType(Scrollable).last,
       );
       expect(find.byKey(const Key('final_result_panel')), findsOneWidget);
-      expect(find.text('최종 PDF 보기/다운로드'), findsOneWidget);
+      expect(find.text('PDF 보기'), findsOneWidget);
+      expect(find.text('PDF 다운로드'), findsOneWidget);
+      expect(find.text('검토용 공유'), findsOneWidget);
+      expect(find.text('보완 요청'), findsOneWidget);
+      expect(find.text('출시 준비정보'), findsOneWidget);
+      expect(find.text('출시 승인'), findsOneWidget);
 
       await tester.ensureVisible(
         find.byKey(const Key('registration_guide_button')),
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('registration_guide_button')));
       expect(openedStage, 'publish_prep');
+      await tester.ensureVisible(
+        find.byKey(const Key('maintenance_guide_button')),
+      );
+      await tester.pumpAndSettle();
       final maintenance = tester.widget<OutlinedButton>(
         find.byKey(const Key('maintenance_guide_button')),
       );
