@@ -6,6 +6,7 @@ import '../data/sotong24_workflows.dart';
 import '../models/instruction_contract.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
+import '../screens/pdf_preview_screen.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../services/pdf_download_service.dart';
 import '../theme/control_theme.dart';
@@ -24,6 +25,8 @@ class Sotong24StageResultOpenButtons extends StatelessWidget {
     this.detailOpener,
     this.resultOpener,
     this.pdfDownloader,
+    this.pdfPreviewBuilder,
+    this.pdfPreviewBytesProvider,
   });
 
   final Sotong24RemoteStage stage;
@@ -32,6 +35,8 @@ class Sotong24StageResultOpenButtons extends StatelessWidget {
   final ResultDetailOpener? detailOpener;
   final ResultUrlOpener? resultOpener;
   final PdfDownloader? pdfDownloader;
+  final PdfPreviewContentBuilder? pdfPreviewBuilder;
+  final PdfPreviewBytesProvider? pdfPreviewBytesProvider;
 
   bool get _isFinalPdf {
     final result = stage.openableResultUrl;
@@ -85,15 +90,30 @@ class Sotong24StageResultOpenButtons extends StatelessWidget {
                   ),
                 ),
               ],
-              if (result != null) ...[
+              if (result != null && _isFinalPdf && project != null) ...[
+                const SizedBox(height: 16),
+                PdfPreviewButton(
+                  key: Key('stage_result_view_${stage.stageId}'),
+                  url: result,
+                  projectId: project!.projectId,
+                  stageId: stage.stageId,
+                  title: project!.title,
+                  revision: stage.revision > 0
+                      ? stage.revision
+                      : project!.finalRevision,
+                  downloader:
+                      pdfDownloader ?? const ArtifactPdfDownloadService(),
+                  previewBuilder: pdfPreviewBuilder,
+                  bytesProvider: pdfPreviewBytesProvider,
+                ),
+              ],
+              if (result != null && (!_isFinalPdf || project == null)) ...[
                 const SizedBox(height: 16),
                 ResultLinkButton(
                   key: Key('stage_result_view_${stage.stageId}'),
                   url: result,
-                  label: _isFinalPdf ? 'PDF 보기' : '결과물 열기',
-                  icon: _isFinalPdf
-                      ? Icons.picture_as_pdf_outlined
-                      : Icons.open_in_new,
+                  label: '결과물 열기',
+                  icon: Icons.open_in_new,
                   style: ResultLinkStyle.tonal,
                   opener: resultOpener,
                 ),

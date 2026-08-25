@@ -12,11 +12,11 @@ import '../services/remote_agent_repository.dart';
 import '../services/remote_control_api.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../services/sotong24_workshop_presentation.dart';
+import 'pdf_preview_screen.dart';
 import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
 import '../widgets/operational_collapsible_section.dart';
 import '../widgets/pdf_download_button.dart';
-import '../widgets/result_link_button.dart';
 import '../widgets/sotong24_stage_widgets.dart';
 
 /// AI 제작공정 — 전송된 작업의 단계 진행·승인·보완 화면.
@@ -1005,12 +1005,13 @@ class _FinalResultPanel extends StatelessWidget {
           const Text('결과물', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           if (finalPdf != null)
-            ResultLinkButton(
+            PdfPreviewButton(
               key: const Key('final_pdf_view_button'),
               url: finalPdf.viewUrl,
-              label: 'PDF 보기',
-              icon: Icons.picture_as_pdf_outlined,
-              style: ResultLinkStyle.tonal,
+              projectId: project.projectId,
+              stageId: finalPdf.stageId,
+              title: project.title,
+              revision: finalPdf.revision,
             )
           else
             const Text(

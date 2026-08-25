@@ -2,7 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:sotong_ware_control/services/pdf_download_service.dart';
+import 'package:sotong_ware_control/services/remote_control_api.dart';
 import 'package:sotong_ware_control/widgets/pdf_download_button.dart';
 
 void main() {
@@ -11,6 +14,63 @@ void main() {
     ...'test payload\n'.codeUnits,
     ...'%%EOF\n'.codeUnits,
   ]);
+
+  group('artifact PDF preview API', () {
+    test('sends Firebase auth and receives inline PDF bytes', () async {
+      final api = RemoteControlApi(
+        httpClient: MockClient((request) async {
+          expect(request.method, 'POST');
+          expect(request.url.path, '/api/control/artifact-view');
+          expect(request.headers['Authorization'], 'Bearer viewer-token');
+          expect(request.body, contains('wi_plan_123'));
+          expect(request.body, contains('maintain'));
+          return http.Response.bytes(
+            validPdf,
+            200,
+            headers: {'content-type': 'application/pdf'},
+          );
+        }),
+        baseUrl: () => 'https://sotongware-control.web.app',
+        idTokenProvider: () async => 'viewer-token',
+      );
+
+      final bytes = await api.fetchArtifactPdf(
+        projectId: 'wi_plan_123',
+        stageId: 'maintain',
+        revision: 1,
+      );
+      expect(bytes, validPdf);
+      expect(hasPdfSignature(bytes), isTrue);
+      expect(hasPdfEof(bytes), isTrue);
+    });
+
+    test('rejects unauthenticated preview response', () async {
+      final api = RemoteControlApi(
+        httpClient: MockClient(
+          (_) async => http.Response(
+            '{"ok":false,"error":"unauthorized"}',
+            401,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+        baseUrl: () => 'https://sotongware-control.web.app',
+        idTokenProvider: () async => 'expired-token',
+      );
+
+      await expectLater(
+        api.fetchArtifactPdf(
+          projectId: 'wi_plan_123',
+          stageId: 'maintain',
+          revision: 1,
+        ),
+        throwsA(
+          isA<RemoteControlApiException>()
+              .having((e) => e.statusCode, 'statusCode', 401)
+              .having((e) => e.code, 'code', 'unauthorized'),
+        ),
+      );
+    });
+  });
 
   group('ArtifactPdfDownloadService', () {
     test('opens an attachment grant with a safe readable filename', () async {

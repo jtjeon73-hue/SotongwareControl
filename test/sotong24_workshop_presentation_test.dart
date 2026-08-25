@@ -8,7 +8,7 @@ import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/services/remote_control_api.dart';
 import 'package:sotong_ware_control/services/sotong24_workshop_presentation.dart';
 import 'package:sotong_ware_control/widgets/pdf_download_button.dart';
-import 'package:sotong_ware_control/widgets/result_link_button.dart';
+import 'package:sotong_ware_control/screens/pdf_preview_screen.dart';
 import 'package:sotong_ware_control/widgets/sotong24_stage_widgets.dart';
 
 void main() {
@@ -588,13 +588,13 @@ void main() {
       expect(find.text('PDF 다운로드'), findsOneWidget);
       expect(
         tester.widget(find.byKey(const Key('final_pdf_view_button'))),
-        isA<ResultLinkButton>(),
+        isA<PdfPreviewButton>(),
       );
       expect(
         tester.widget(find.byKey(const Key('final_pdf_download_button'))),
         isA<PdfDownloadButton>(),
       );
-      final viewButton = tester.widget<ResultLinkButton>(
+      final viewButton = tester.widget<PdfPreviewButton>(
         find.byKey(const Key('final_pdf_view_button')),
       );
       final downloadButton = tester.widget<PdfDownloadButton>(

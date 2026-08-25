@@ -8,6 +8,7 @@ const {
 const { sendError, sendOk, httpError } = require("./http");
 const { safeLog } = require("./log");
 const { handleArtifactDownload } = require("./artifact_download");
+const { handleArtifactView } = require("./artifact_view");
 const {
   handleEnroll,
   handleHeartbeat,
@@ -55,6 +56,27 @@ async function handleApiRequest(req, res, deps) {
 
     const body = readJsonBody(req);
     const db = deps.db;
+
+    if (
+      path === "/api/control/artifact-view" ||
+      path === "/control/artifact-view"
+    ) {
+      const { uid } = await authenticateControl(req, deps);
+      const out = await handleArtifactView(db, uid, body, deps);
+      safeLog({
+        type: path,
+        status: "ok",
+        sizeBytes: out.sizeBytes,
+        latencyMs: Date.now() - started,
+      });
+      res.status(200);
+      res.set("Content-Type", "application/pdf");
+      res.set("Content-Disposition", 'inline; filename="preview.pdf"');
+      res.set("Cache-Control", "private, no-store");
+      res.set("X-Content-Type-Options", "nosniff");
+      res.send(out.bytes);
+      return;
+    }
 
     // --- Agent (public enroll) ---
     if (path === "/api/agent/enroll" || path === "/agent/enroll") {

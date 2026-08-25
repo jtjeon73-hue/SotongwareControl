@@ -75,7 +75,8 @@ test("newer revision may re-enter rework but never launches", () => {
 test("mobile prelaunch UI exposes separate result, review and launch actions", () => {
   const ui = read("lib/screens/product_workshop_screen.dart");
   const downloadUi = read("lib/widgets/pdf_download_button.dart");
-  const allUi = `${ui}\n${downloadUi}`;
+  const previewUi = read("lib/screens/pdf_preview_screen.dart");
+  const allUi = `${ui}\n${downloadUi}\n${previewUi}`;
   for (const label of ["PDF 보기", "PDF 다운로드", "검토용 공유", "보완 요청", "버전 확인", "출시 준비정보", "출시 승인"]) {
     assert.match(allUi, new RegExp(label));
   }
@@ -86,10 +87,19 @@ test("mobile prelaunch UI exposes separate result, review and launch actions", (
 
 test("PDF view and download use distinct open and attachment paths", () => {
   const ui = read("lib/screens/product_workshop_screen.dart");
+  const preview = read("lib/screens/pdf_preview_screen.dart");
+  const api = read("lib/services/remote_control_api.dart");
   const download = read("lib/services/pdf_download_service.dart");
   const web = read("lib/services/pdf_download_platform_web.dart");
   const artifact = read("functions/sotong24/artifact.js");
-  assert.match(ui, /final_pdf_view_button[\s\S]*ResultLinkButton|ResultLinkButton[\s\S]*final_pdf_view_button/);
+  const viewEndpoint = read("functions/remote/artifact_view.js");
+  const router = read("functions/remote/router.js");
+  assert.match(ui, /final_pdf_view_button[\s\S]*PdfPreviewButton|PdfPreviewButton[\s\S]*final_pdf_view_button/);
+  assert.match(preview, /PdfViewer\.data/);
+  assert.match(api, /\/api\/control\/artifact-view/);
+  assert.match(router, /Content-Disposition/);
+  assert.match(viewEndpoint, /application\/pdf/);
+  assert.doesNotMatch(viewEndpoint, /attachment/i);
   assert.match(ui, /PdfDownloadButton/);
   assert.match(download, /application\/pdf/);
   assert.match(download, /hasPdfSignature/);

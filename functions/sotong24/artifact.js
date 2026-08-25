@@ -822,6 +822,10 @@ function createAdminStorageDeps(admin) {
         contentType: metadata.contentType || "",
       };
     },
+    async downloadFile(path) {
+      const [bytes] = await bucket.file(path).download();
+      return bytes;
+    },
   };
 }
 

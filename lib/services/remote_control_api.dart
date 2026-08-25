@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -213,6 +214,62 @@ class RemoteControlApi {
       fileName: returnedName,
       contentType: contentType,
       sizeBytes: sizeBytes,
+    );
+  }
+
+  Future<Uint8List> fetchArtifactPdf({
+    required String projectId,
+    required String stageId,
+    required int revision,
+  }) async {
+    final token = await _token();
+    late http.Response res;
+    try {
+      res = await _http
+          .post(
+            _uri('/api/control/artifact-view'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'projectId': projectId,
+              'stageId': stageId,
+              'revision': revision,
+              'fileName': 'final_ebook.pdf',
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+    } on TimeoutException {
+      throw RemoteControlApiException(
+        'PDF 미리보기 준비가 지연되고 있습니다.',
+        code: 'timeout',
+      );
+    } catch (_) {
+      throw RemoteControlApiException('PDF 미리보기에 연결할 수 없습니다.', code: 'network');
+    }
+
+    final contentType = (res.headers['content-type'] ?? '')
+        .split(';')
+        .first
+        .trim()
+        .toLowerCase();
+    if (res.statusCode >= 200 &&
+        res.statusCode < 300 &&
+        contentType == 'application/pdf' &&
+        res.bodyBytes.isNotEmpty) {
+      return res.bodyBytes;
+    }
+
+    var code = '';
+    try {
+      final decoded = jsonDecode(res.body.isEmpty ? '{}' : res.body);
+      if (decoded is Map) code = '${decoded['error'] ?? ''}';
+    } catch (_) {}
+    throw RemoteControlApiException(
+      _userMessage(res.statusCode, code),
+      code: code.isEmpty ? 'invalid_pdf_preview' : code,
+      statusCode: res.statusCode,
     );
   }
 

@@ -21,11 +21,20 @@ function mockRes() {
   return {
     statusCode: 0,
     body: null,
+    headers: {},
     status(code) {
       this.statusCode = code;
       return this;
     },
     json(payload) {
+      this.body = payload;
+      return this;
+    },
+    set(name, value) {
+      this.headers[String(name).toLowerCase()] = value;
+      return this;
+    },
+    send(payload) {
       this.body = payload;
       return this;
     },
@@ -260,6 +269,61 @@ describe("remote agent contract V1", () => {
       },
       { token: "uid:user_b", uid: "user_b", depsExtra }
     );
+    assert.equal(denied.statusCode, 403);
+  });
+
+  it("10c authenticated owner receives inline PDF bytes without attachment", async () => {
+    const projectId = "wi_plan_1787630134398";
+    const bytes = Buffer.from("%PDF-1.7\nviewer\n%%EOF");
+    db.store.set(`${COL.PROJECTS}/${projectId}`, {
+      projectId,
+      productType: "ebook",
+      isDemo: false,
+      ownerUid: "user_a",
+      productionStatus: "prelaunch_review",
+      launchStatus: "not_started",
+      externalPublished: false,
+    });
+    const depsExtra = {
+      async getFileMetadata(path) {
+        assert.equal(
+          path,
+          `sotong24/artifacts/prod/${projectId}/maintain/r1/final_ebook.pdf`
+        );
+        return {
+          exists: true,
+          size: bytes.length,
+          contentType: "application/pdf",
+        };
+      },
+      async downloadFile() {
+        return bytes;
+      },
+    };
+    const body = {
+      projectId,
+      stageId: "maintain",
+      revision: 1,
+      fileName: "final_ebook.pdf",
+    };
+
+    const ok = await call(db, "/api/control/artifact-view", body, {
+      token: "uid:user_a",
+      uid: "user_a",
+      depsExtra,
+    });
+    assert.equal(ok.statusCode, 200);
+    assert.equal(ok.headers["content-type"], "application/pdf");
+    assert.match(ok.headers["content-disposition"], /^inline;/);
+    assert.doesNotMatch(ok.headers["content-disposition"], /attachment/i);
+    assert.equal(ok.headers["cache-control"], "private, no-store");
+    assert.deepEqual(ok.body, bytes);
+
+    const denied = await call(db, "/api/control/artifact-view", body, {
+      token: "uid:user_b",
+      uid: "user_b",
+      depsExtra,
+    });
     assert.equal(denied.statusCode, 403);
   });
 
