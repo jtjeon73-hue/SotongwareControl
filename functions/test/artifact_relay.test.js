@@ -214,6 +214,15 @@ describe("artifact path / filename", () => {
       /forbidden_pattern|extension/
     );
   });
+
+  it("allows phone-openable PDF and raster image filenames", () => {
+    assert.equal(sanitizeFileName("final_ebook.pdf"), "final_ebook.pdf");
+    assert.equal(sanitizeFileName("cover.png"), "cover.png");
+    assert.equal(sanitizeFileName("cover.jpg"), "cover.jpg");
+    assert.equal(sanitizeFileName("cover.jpeg"), "cover.jpeg");
+    assert.throws(() => sanitizeFileName("active.svg"), /extension_not_allowed/);
+    assert.throws(() => sanitizeFileName("active.html"), /extension_not_allowed/);
+  });
 });
 
 describe("artifact_upload_init", () => {
@@ -320,6 +329,40 @@ describe("artifact_upload_init", () => {
     });
     assert.equal(res.statusCode, 200);
     assert.ok(res.body.storagePath.includes("/idea_clarify/r1/"));
+  });
+
+  it("PROD final PDF returns a signed PUT with an exact content type", async () => {
+    const { res, store } = await call({
+      operation: "artifact_upload_init",
+      instructionId: "wi_plan_PILOT_PDF",
+      productType: "ebook",
+      stageId: "publish_prep",
+      stageNumber: 12,
+      revision: 1,
+      fileName: "final_ebook.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 195077,
+      source: "ai_explicit",
+      isTest: false,
+      namespace: "prod",
+      taskId: "wi_plan_PILOT_PDF__publish_prep__r1",
+      workerType: "codex",
+    });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.requiredHeaders["Content-Type"], "application/pdf");
+    assert.equal(store.signed[0].contentType, "application/pdf");
+    assert.match(res.body.storagePath, /\/publish_prep\/r1\/final_ebook\.pdf$/);
+  });
+
+  it("rejects a PDF declared as plain text", async () => {
+    const { res } = await call({
+      ...baseInit,
+      fileName: "final_ebook.pdf",
+      contentType: "text/plain",
+    });
+    assert.equal(res.statusCode, 400);
+    assert.match(String(res.body.message || ""), /contentType_mismatch_extension/);
   });
 
   it("PROD rejects stageNumber mismatch", async () => {

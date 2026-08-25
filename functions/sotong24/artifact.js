@@ -18,12 +18,24 @@ const DOWNLOAD_URL_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (phone open)
 const MAX_URL_LEN = 2048;
 const MAX_FILENAME_LEN = 180;
 
-const ALLOWED_EXTENSIONS = new Set([".md", ".txt"]);
+// Phone-openable, non-executable deliverables. Keep active-content formats
+// such as HTML/SVG outside this boundary.
+const ALLOWED_EXTENSIONS = new Set([
+  ".md",
+  ".txt",
+  ".pdf",
+  ".png",
+  ".jpg",
+  ".jpeg",
+]);
 const ALLOWED_CONTENT_TYPES = new Set([
   "text/markdown",
   "text/markdown; charset=utf-8",
   "text/plain",
   "text/plain; charset=utf-8",
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
 ]);
 const ALLOWED_WORKER_TYPES = new Set(["codex", "cursor"]);
 const ALLOWED_SOURCES = new Set(["ai_explicit"]);
@@ -381,6 +393,15 @@ function parseArtifactUploadInit(body, { requireExplicitProd = true } = {}) {
     reject("invalid_artifact", "contentType_mismatch_extension");
   }
   if (ext === ".txt" && !contentType.startsWith("text/plain")) {
+    reject("invalid_artifact", "contentType_mismatch_extension");
+  }
+  if (ext === ".pdf" && contentType !== "application/pdf") {
+    reject("invalid_artifact", "contentType_mismatch_extension");
+  }
+  if (ext === ".png" && contentType !== "image/png") {
+    reject("invalid_artifact", "contentType_mismatch_extension");
+  }
+  if ((ext === ".jpg" || ext === ".jpeg") && contentType !== "image/jpeg") {
     reject("invalid_artifact", "contentType_mismatch_extension");
   }
 
