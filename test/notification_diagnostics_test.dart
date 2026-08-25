@@ -126,6 +126,72 @@ void main() {
       expect(testButton.onPressed, isNull);
     },
   );
+
+  testWidgets(
+    'diagnostics API failure exits loading and shows explicit error',
+    (tester) async {
+      final controller = _FakeNotificationController(
+        value: const NotificationDiagnostics(
+          permission: NotificationPermissionState.notDetermined,
+          configured: true,
+          deliveryMode: 'unknown',
+          currentDeviceRegistered: false,
+          registeredDeviceCount: 0,
+          recentNotifications: [],
+          setupState: NotificationSetupState.apiError,
+          errorMessage: '인증이 만료되었습니다. 다시 로그인해 주세요.',
+          errorCode: 'auth',
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NotificationDiagnosticsCard(controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.text('API 오류'), findsNWidgets(2));
+      expect(find.textContaining('(auth)'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'unsupported in-app browser exits checking and directs to Chrome',
+    (tester) async {
+      final controller = _FakeNotificationController(
+        value: const NotificationDiagnostics(
+          permission: NotificationPermissionState.unsupported,
+          configured: true,
+          deliveryMode: 'fcm',
+          currentDeviceRegistered: false,
+          registeredDeviceCount: 0,
+          recentNotifications: [],
+          setupState: NotificationSetupState.unsupported,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: NotificationDiagnosticsCard(controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('알림 지원 안 됨'), findsOneWidget);
+      expect(
+        find.byKey(const Key('notification_unsupported_guidance')),
+        findsOneWidget,
+      );
+      final enableButton = tester.widget<FilledButton>(
+        find.byKey(const Key('notification_enable_button')),
+      );
+      expect(enableButton.onPressed, isNull);
+    },
+  );
 }
 
 class _FakeNotificationController implements NotificationController {
@@ -135,6 +201,12 @@ class _FakeNotificationController implements NotificationController {
   int enableCalls = 0;
   int disableCalls = 0;
   int testCalls = 0;
+
+  @override
+  NotificationSetupState get setupState => value.setupState;
+
+  @override
+  Stream<NotificationSetupState> get setupStates => const Stream.empty();
 
   @override
   bool get isConfigured => value.configured;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/sotong24_notification_service.dart';
@@ -17,12 +19,25 @@ class _NotificationDiagnosticsCardState
     extends State<NotificationDiagnosticsCard> {
   NotificationDiagnostics? _diagnostics;
   var _busy = false;
+  var _loadFailed = false;
   String _message = '';
+  NotificationSetupState _setupState = NotificationSetupState.checking;
+  StreamSubscription<NotificationSetupState>? _setupSubscription;
 
   @override
   void initState() {
     super.initState();
+    _setupState = widget.controller.setupState;
+    _setupSubscription = widget.controller.setupStates.listen((value) {
+      if (mounted) setState(() => _setupState = value);
+    });
     _refresh();
+  }
+
+  @override
+  void dispose() {
+    _setupSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _refresh({bool clearMessage = true}) async {
@@ -33,9 +48,26 @@ class _NotificationDiagnosticsCardState
     });
     try {
       final value = await widget.controller.diagnostics();
-      if (mounted) setState(() => _diagnostics = value);
+      if (mounted) {
+        setState(() {
+          _diagnostics = value;
+          _setupState = value.setupState;
+          _loadFailed = value.setupState == NotificationSetupState.apiError;
+          if (value.errorMessage.isNotEmpty) {
+            _message = value.errorCode.isEmpty
+                ? value.errorMessage
+                : '${value.errorMessage} (${value.errorCode})';
+          }
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _message = '알림 진단 정보를 불러오지 못했습니다.');
+      if (mounted) {
+        setState(() {
+          _loadFailed = true;
+          _setupState = NotificationSetupState.apiError;
+          _message = '알림 진단 API에 연결하지 못했습니다. (diagnostics_unexpected)';
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -53,8 +85,20 @@ class _NotificationDiagnosticsCardState
               : '알림 권한이 허용되지 않았습니다.';
         });
       }
+    } on NotificationSetupException catch (error) {
+      if (mounted) {
+        setState(() {
+          _setupState = error.state;
+          _message = '${error.userMessage} (${error.code})';
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _message = '알림 기기 등록에 실패했습니다.');
+      if (mounted) {
+        setState(() {
+          _setupState = NotificationSetupState.apiError;
+          _message = '알림 기기 등록에 실패했습니다. (registration_unexpected)';
+        });
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -107,11 +151,30 @@ class _NotificationDiagnosticsCardState
     };
   }
 
+  String _setupLabel(NotificationSetupState state) {
+    return switch (state) {
+      NotificationSetupState.checking => '진단 확인 중',
+      NotificationSetupState.unsupported => '알림 지원 안 됨',
+      NotificationSetupState.permissionNotRequested => '권한 미요청',
+      NotificationSetupState.permissionGranted => '권한 허용',
+      NotificationSetupState.permissionDenied => '권한 차단',
+      NotificationSetupState.serviceWorkerChecking => '서비스 워커 준비 중',
+      NotificationSetupState.tokenCreating => 'FCM 토큰 생성 중',
+      NotificationSetupState.deviceRegistering => '기기 등록 중',
+      NotificationSetupState.registered => '등록 완료',
+      NotificationSetupState.apiError => 'API 오류',
+      NotificationSetupState.serviceWorkerError => '서비스 워커 오류',
+      NotificationSetupState.tokenError => 'FCM 토큰 오류',
+      NotificationSetupState.deviceError => '기기 ID 오류',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final diagnostics = _diagnostics;
     final registered = diagnostics?.currentDeviceRegistered == true;
     final fcm = diagnostics?.deliveryMode == 'fcm';
+    final unsupported = _setupState == NotificationSetupState.unsupported;
     return Card(
       key: const Key('notification_diagnostics_card'),
       margin: EdgeInsets.zero,
@@ -136,17 +199,24 @@ class _NotificationDiagnosticsCardState
           _StatusRow(
             label: '브라우저 권한',
             value: diagnostics == null
-                ? '확인 중'
+                ? _loadFailed
+                      ? '확인 실패'
+                      : '확인 중'
                 : _permissionLabel(diagnostics.permission),
           ),
           _StatusRow(
             label: 'Push 전송',
             value: diagnostics == null
-                ? '확인 중'
+                ? _loadFailed
+                      ? 'API 오류'
+                      : '확인 중'
                 : fcm
                 ? 'FCM 활성'
+                : diagnostics.deliveryMode == 'unknown'
+                ? 'API 오류'
                 : 'Outbox 전용',
           ),
+          _StatusRow(label: '등록 상태', value: _setupLabel(_setupState)),
           _StatusRow(label: '현재 기기', value: registered ? '등록됨' : '등록되지 않음'),
           _StatusRow(
             label: '등록 기기 수',
@@ -159,7 +229,7 @@ class _NotificationDiagnosticsCardState
             children: [
               FilledButton.icon(
                 key: const Key('notification_enable_button'),
-                onPressed: _busy || registered ? null : _enable,
+                onPressed: _busy || registered || unsupported ? null : _enable,
                 icon: const Icon(Icons.notifications_active_outlined),
                 label: const Text('알림 켜기'),
               ),
@@ -189,6 +259,17 @@ class _NotificationDiagnosticsCardState
               _message,
               key: const Key('notification_diagnostics_message'),
               style: const TextStyle(color: ControlColors.textSecondary),
+            ),
+          ],
+          if (unsupported) ...[
+            const SizedBox(height: 8),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '현재 인앱 브라우저는 Push 알림을 지원하지 않습니다. Android Chrome에서 이 페이지를 직접 열어 주세요.',
+                key: Key('notification_unsupported_guidance'),
+                style: TextStyle(color: ControlColors.textSecondary),
+              ),
             ),
           ],
           const Divider(height: 24),
