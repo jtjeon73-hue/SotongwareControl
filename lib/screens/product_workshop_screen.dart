@@ -974,6 +974,7 @@ class _FinalResultPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final finalPdf = Sotong24WorkshopPresentation.finalPdfArtifact(project);
     Sotong24RemoteStage? publishing;
     for (final stage in project.stages) {
       if (stage.stageId == 'publish_prep') publishing = stage;
@@ -1002,10 +1003,10 @@ class _FinalResultPanel extends StatelessWidget {
           const SizedBox(height: 12),
           const Text('결과물', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          if (publishing?.openableResultUrl != null)
+          if (finalPdf != null)
             ResultLinkButton(
               key: const Key('final_pdf_view_button'),
-              url: publishing!.openableResultUrl!,
+              url: finalPdf.viewUrl,
               label: 'PDF 보기',
               icon: Icons.picture_as_pdf_outlined,
               style: ResultLinkStyle.tonal,
@@ -1016,22 +1017,22 @@ class _FinalResultPanel extends StatelessWidget {
               style: TextStyle(color: ControlColors.textMuted),
             ),
           const SizedBox(height: 6),
-          if (publishing?.openableResultUrl != null)
+          if (finalPdf != null)
             PdfDownloadButton(
               key: const Key('final_pdf_download_button'),
               projectId: project.projectId,
-              stageId: publishing!.stageId,
+              stageId: finalPdf.stageId,
               title: project.title,
-              revision: project.finalRevision,
+              revision: finalPdf.revision,
             ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
             key: const Key('review_share_button'),
-            onPressed: publishing?.openableResultUrl == null
+            onPressed: finalPdf == null
                 ? null
                 : () async {
                     await Clipboard.setData(
-                      ClipboardData(text: publishing!.openableResultUrl!),
+                      ClipboardData(text: finalPdf.viewUrl),
                     );
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(

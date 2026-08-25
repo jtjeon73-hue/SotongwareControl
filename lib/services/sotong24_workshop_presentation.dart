@@ -2,6 +2,18 @@ import '../models/artifact_type.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
 
+class Sotong24FinalPdfArtifact {
+  const Sotong24FinalPdfArtifact({
+    required this.stageId,
+    required this.revision,
+    required this.viewUrl,
+  });
+
+  final String stageId;
+  final int revision;
+  final String viewUrl;
+}
+
 /// AI 제작공정 화면 전용 표시 로직 (Firestore/API contract 변경 없음).
 class Sotong24WorkshopPresentation {
   Sotong24WorkshopPresentation._();
@@ -48,6 +60,44 @@ class Sotong24WorkshopPresentation {
 
   static bool hasOperationalWork(Iterable<Sotong24RemoteProject> projects) =>
       operationalProjects(projects).isNotEmpty;
+
+  /// Viewer와 attachment download가 동일한 최종 PDF 객체를 사용하도록
+  /// stage/revision/url을 한 번에 해석한다.
+  static Sotong24FinalPdfArtifact? finalPdfArtifact(
+    Sotong24RemoteProject project,
+  ) {
+    final candidates = <Sotong24FinalPdfArtifact>[];
+    for (final stage in project.stages) {
+      final result = _finalPdfUrl(stage.resultUrl);
+      final preview = _finalPdfUrl(stage.previewUrl);
+      final url = result ?? preview;
+      if (url == null) continue;
+      candidates.add(
+        Sotong24FinalPdfArtifact(
+          stageId: stage.stageId,
+          revision: stage.revision > 0
+              ? stage.revision
+              : (project.finalRevision > 0 ? project.finalRevision : 1),
+          viewUrl: url,
+        ),
+      );
+    }
+    if (candidates.isEmpty) return null;
+    for (final artifact in candidates.reversed) {
+      if (artifact.revision == project.finalRevision) return artifact;
+    }
+    return candidates.last;
+  }
+
+  static String? _finalPdfUrl(String raw) {
+    final value = raw.trim();
+    if (!Sotong24RemoteStage.isOpenableHttpUrl(value)) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null || uri.pathSegments.isEmpty) return null;
+    return uri.pathSegments.last.toLowerCase() == 'final_ebook.pdf'
+        ? value
+        : null;
+  }
 
   /// `sotong24work_projects/{instructionId}` 와 동일한 운영 프로젝트만.
   static Sotong24RemoteProject? projectForInstruction(

@@ -69,6 +69,41 @@ void main() {
   }
 
   group('Sotong24WorkshopPresentation', () {
+    test('viewer and attachment download share the final PDF artifact', () {
+      final completed = project(
+        id: 'wi_plan_final_pdf_locator',
+        title: '완성 전자책',
+        status: Sotong24WorkStatus.completed,
+        currentStage: 18,
+        stages: [
+          const Sotong24RemoteStage(
+            stageId: 'publish_prep',
+            stageNumber: 12,
+            stageName: '등록 준비',
+            status: Sotong24WorkStatus.completed,
+            revision: 1,
+            resultUrl:
+                'https://storage.googleapis.com/example/publish_prep/r1/12_publish_prep_result.md',
+          ),
+          const Sotong24RemoteStage(
+            stageId: 'maintain',
+            stageNumber: 18,
+            stageName: '운영·개선',
+            status: Sotong24WorkStatus.completed,
+            revision: 1,
+            resultUrl:
+                'https://storage.googleapis.com/example/maintain/r1/final_ebook.pdf?signature=redacted',
+          ),
+        ],
+      );
+
+      final artifact = Sotong24WorkshopPresentation.finalPdfArtifact(completed);
+      expect(artifact, isNotNull);
+      expect(artifact!.stageId, 'maintain');
+      expect(artifact.revision, 1);
+      expect(artifact.viewUrl, contains('/maintain/r1/final_ebook.pdf'));
+    });
+
     test('실제/TEST 분리 및 제목', () {
       final real = project(
         id: 'wi_plan_1785905165067',
@@ -504,14 +539,26 @@ void main() {
         status: Sotong24WorkStatus.completed,
         criteriaMet: true,
         approvalStatus: ApprovalStatus.approved,
-        resultUrl: 'https://storage.googleapis.com/example/final_ebook.pdf',
+        resultUrl:
+            'https://storage.googleapis.com/example/publish_prep/r1/12_publish_prep_result.md',
+      );
+      final maintainStage = Sotong24RemoteStage(
+        stageId: 'maintain',
+        stageNumber: 18,
+        stageName: '운영·개선',
+        status: Sotong24WorkStatus.completed,
+        revision: 1,
+        criteriaMet: true,
+        approvalStatus: ApprovalStatus.approved,
+        resultUrl:
+            'https://storage.googleapis.com/example/maintain/r1/final_ebook.pdf',
       );
       final completed = project(
         id: 'wi_plan_final_result',
         title: '완성 전자책',
         status: Sotong24WorkStatus.completed,
         currentStage: 12,
-        stages: [publishStage],
+        stages: [publishStage, maintainStage],
       );
       final repo = Sotong24RemoteRepository(
         forceMemory: true,
@@ -547,6 +594,16 @@ void main() {
         tester.widget(find.byKey(const Key('final_pdf_download_button'))),
         isA<PdfDownloadButton>(),
       );
+      final viewButton = tester.widget<ResultLinkButton>(
+        find.byKey(const Key('final_pdf_view_button')),
+      );
+      final downloadButton = tester.widget<PdfDownloadButton>(
+        find.byKey(const Key('final_pdf_download_button')),
+      );
+      expect(viewButton.url, contains('/maintain/r1/final_ebook.pdf'));
+      expect(downloadButton.projectId, completed.projectId);
+      expect(downloadButton.stageId, 'maintain');
+      expect(downloadButton.revision, 1);
       expect(find.text('검토용 공유'), findsOneWidget);
       expect(find.text('보완 요청'), findsOneWidget);
       expect(find.text('출시 준비정보'), findsOneWidget);
