@@ -89,12 +89,53 @@ class Sotong24WorkshopPresentation {
     return candidates.last;
   }
 
+  static Sotong24FinalPdfArtifact? finalApkArtifact(
+    Sotong24RemoteProject project,
+  ) {
+    final candidates = <Sotong24FinalPdfArtifact>[];
+    for (final stage in project.stages) {
+      if (stage.stageId != 'app_android_release' &&
+          stage.stageId != 'app_production_complete') {
+        continue;
+      }
+      final result = _finalApkUrl(stage.resultUrl);
+      final preview = _finalApkUrl(stage.previewUrl);
+      final url = result ?? preview;
+      if (url == null) continue;
+      candidates.add(
+        Sotong24FinalPdfArtifact(
+          stageId: stage.stageId,
+          revision: stage.revision > 0 ? stage.revision : project.finalRevision,
+          viewUrl: url,
+        ),
+      );
+    }
+    if (candidates.isEmpty) return null;
+    for (final artifact in candidates.reversed) {
+      if (artifact.revision == project.finalRevision) return artifact;
+    }
+    return candidates.last;
+  }
+
   static String? _finalPdfUrl(String raw) {
     final value = raw.trim();
     if (!Sotong24RemoteStage.isOpenableHttpUrl(value)) return null;
     final uri = Uri.tryParse(value);
     if (uri == null || uri.pathSegments.isEmpty) return null;
     return uri.pathSegments.last.toLowerCase() == 'final_ebook.pdf'
+        ? value
+        : null;
+  }
+
+  static String? _finalApkUrl(String raw) {
+    final value = raw.trim();
+    if (!Sotong24RemoteStage.isOpenableHttpUrl(value)) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null || uri.pathSegments.isEmpty) return null;
+    return RegExp(
+          r'^app-release_r\d+\.apk$',
+          caseSensitive: false,
+        ).hasMatch(uri.pathSegments.last)
         ? value
         : null;
   }

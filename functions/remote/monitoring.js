@@ -175,6 +175,9 @@ function notificationContent(eventType, stageNumber, stageName, revision, data =
     case "ai_quota_exhausted":
       return { title: `${data.resourceProvider || "AI 작업자"} 사용 한도 소진`, body: "AI 작업자 한도가 소진되어 작업자 전환 또는 사용자 조치가 필요합니다." };
     case "production_completed":
+      if (data.productType === "app") {
+        return { title: "앱 제작 완료", body: "앱 제작이 완료되었습니다. APK를 설치하여 확인해 주세요." };
+      }
       return { title: "전자책 제작 완료", body: "전자책 제작이 완료되었습니다. 결과를 확인해 주세요." };
     case "test_notification":
       return { title: "소통총관제 테스트 알림", body: "이 기기에서 운영 알림을 정상적으로 받을 수 있습니다." };
@@ -218,6 +221,7 @@ async function enqueueNotification(db, data, rawPolicy) {
       severity: String(data.severity || "info").slice(0, 20),
       actionRequired: data.actionRequired === true,
       source: String(data.source || "workflow").slice(0, 40),
+      productType: String(data.productType || "ebook").slice(0, 30),
       resourceProvider: String(data.resourceProvider || "").slice(0, 40),
       resourceWindowId: String(data.resourceWindowId || "").slice(0, 80),
       thresholdPercent: Number(data.thresholdPercent) || 0,

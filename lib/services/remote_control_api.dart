@@ -186,12 +186,15 @@ class RemoteControlApi {
     required String stageId,
     required int revision,
     required String fileName,
+    String productType = 'ebook',
+    String artifactFileName = 'final_ebook.pdf',
   }) async {
     final map = await _post('/api/control/artifact-download', {
       'projectId': projectId,
       'stageId': stageId,
       'revision': revision,
-      'fileName': 'final_ebook.pdf',
+      'productType': productType,
+      'fileName': artifactFileName,
       'downloadFileName': fileName,
     });
     final url = '${map['downloadUrl'] ?? ''}'.trim();
@@ -205,7 +208,7 @@ class RemoteControlApi {
         contentType.isEmpty ||
         sizeBytes <= 0) {
       throw RemoteControlApiException(
-        'PDF 다운로드 응답이 올바르지 않습니다.',
+        '결과물 다운로드 응답이 올바르지 않습니다.',
         code: 'invalid_download_grant',
       );
     }

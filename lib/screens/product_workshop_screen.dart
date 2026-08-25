@@ -17,6 +17,7 @@ import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
 import '../widgets/operational_collapsible_section.dart';
 import '../widgets/pdf_download_button.dart';
+import '../widgets/apk_download_button.dart';
 import '../widgets/sotong24_stage_widgets.dart';
 
 /// AI 제작공정 — 전송된 작업의 단계 진행·승인·보완 화면.
@@ -975,7 +976,9 @@ class _FinalResultPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isApp = project.productType == 'app';
     final finalPdf = Sotong24WorkshopPresentation.finalPdfArtifact(project);
+    final finalApk = Sotong24WorkshopPresentation.finalApkArtifact(project);
     Sotong24RemoteStage? publishing;
     for (final stage in project.stages) {
       if (stage.stageId == 'publish_prep') publishing = stage;
@@ -997,14 +1000,23 @@ class _FinalResultPanel extends StatelessWidget {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
-          const Text(
-            '내용·품질·등록 자료 준비가 끝났습니다. 외부 판매처 등록은 아직 실행하지 않았습니다.',
+          Text(
+            isApp
+                ? '앱 제작이 완료되었습니다. APK를 휴대폰에 설치하여 확인해 주세요. Google Play 등록은 아직 시작하지 않았습니다.'
+                : '내용·품질·등록 자료 준비가 끝났습니다. 외부 판매처 등록은 아직 실행하지 않았습니다.',
             style: TextStyle(color: ControlColors.textSecondary, height: 1.35),
           ),
           const SizedBox(height: 12),
           const Text('결과물', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
-          if (finalPdf != null)
+          if (isApp && finalApk != null)
+            ApkDownloadButton(
+              projectId: project.projectId,
+              stageId: finalApk.stageId,
+              title: project.title,
+              revision: finalApk.revision,
+            )
+          else if (!isApp && finalPdf != null)
             PdfPreviewButton(
               key: const Key('final_pdf_view_button'),
               url: finalPdf.viewUrl,
@@ -1015,11 +1027,11 @@ class _FinalResultPanel extends StatelessWidget {
             )
           else
             const Text(
-              '최종 파일 signed URL을 동기화하는 중입니다.',
+              '최종 결과물 signed URL을 동기화하는 중입니다.',
               style: TextStyle(color: ControlColors.textMuted),
             ),
           const SizedBox(height: 6),
-          if (finalPdf != null)
+          if (!isApp && finalPdf != null)
             PdfDownloadButton(
               key: const Key('final_pdf_download_button'),
               projectId: project.projectId,
@@ -1028,26 +1040,49 @@ class _FinalResultPanel extends StatelessWidget {
               revision: finalPdf.revision,
             ),
           const SizedBox(height: 6),
-          OutlinedButton.icon(
-            key: const Key('review_share_button'),
-            onPressed: finalPdf == null
-                ? null
-                : () async {
-                    await Clipboard.setData(
-                      ClipboardData(text: finalPdf.viewUrl),
-                    );
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          '검토용 PDF 링크를 복사했습니다. 카카오톡 등 일반 공유창에 붙여넣어 전달하세요. 판매처 공개는 실행되지 않았습니다.',
+          if (isApp) ...[
+            OutlinedButton.icon(
+              key: const Key('app_info_button'),
+              onPressed: () => _showAppInfo(context, finalApk),
+              icon: const Icon(Icons.info_outline),
+              label: const Text('앱 정보 보기'),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              key: const Key('apk_install_guide_button'),
+              onPressed: () => _showInstallGuide(context),
+              icon: const Icon(Icons.install_mobile_outlined),
+              label: const Text('설치 방법'),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              key: const Key('app_test_checklist_button'),
+              onPressed: () => _showAppTestChecklist(context),
+              icon: const Icon(Icons.checklist_outlined),
+              label: const Text('테스트 체크리스트'),
+            ),
+            const SizedBox(height: 6),
+          ] else
+            OutlinedButton.icon(
+              key: const Key('review_share_button'),
+              onPressed: finalPdf == null
+                  ? null
+                  : () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: finalPdf.viewUrl),
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            '검토용 PDF 링크를 복사했습니다. 카카오톡 등 일반 공유창에 붙여넣어 전달하세요. 판매처 공개는 실행되지 않았습니다.',
+                          ),
                         ),
-                      ),
-                    );
-                  },
-            icon: const Icon(Icons.share_outlined),
-            label: const Text('검토용 공유'),
-          ),
+                      );
+                    },
+              icon: const Icon(Icons.share_outlined),
+              label: const Text('검토용 공유'),
+            ),
           const Divider(height: 24),
           const Text('검토', style: TextStyle(fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
@@ -1086,7 +1121,8 @@ class _FinalResultPanel extends StatelessWidget {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const Key('launch_readiness_button'),
-            onPressed: () => _showLaunchReadiness(context, publishing),
+            onPressed: () =>
+                _showLaunchReadiness(context, publishing, isApp: isApp),
             icon: const Icon(Icons.fact_check_outlined),
             label: const Text('출시 준비정보'),
           ),
@@ -1105,18 +1141,21 @@ class _FinalResultPanel extends StatelessWidget {
             key: const Key('registration_guide_button'),
             onPressed: onOpenGuide == null
                 ? null
-                : () => onOpenGuide!('publish_prep'),
+                : () => onOpenGuide!(
+                    isApp ? 'app_production_complete' : 'publish_prep',
+                  ),
             icon: const Icon(Icons.menu_book_outlined),
-            label: const Text('채널별 등록 방법 보기'),
+            label: Text(isApp ? '출시 준비자료 보기' : '채널별 등록 방법 보기'),
           ),
           const SizedBox(height: 6),
           OutlinedButton.icon(
             key: const Key('maintenance_guide_button'),
             onPressed: onOpenGuide == null
                 ? null
-                : () => onOpenGuide!('maintain'),
+                : () =>
+                      onOpenGuide!(isApp ? 'app_revision_quality' : 'maintain'),
             icon: const Icon(Icons.build_outlined),
-            label: const Text('출시 후 운영·측정 가이드'),
+            label: Text(isApp ? '보완·회귀 검증 가이드' : '출시 후 운영·측정 가이드'),
           ),
           const SizedBox(height: 6),
           Text(
@@ -1138,6 +1177,76 @@ class _FinalResultPanel extends StatelessWidget {
     );
   }
 
+  Future<void> _showAppInfo(
+    BuildContext context,
+    Sotong24FinalPdfArtifact? artifact,
+  ) => showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('앱 정보'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Kv('앱명', project.title),
+          _Kv('제작 revision', 'r${artifact?.revision ?? project.finalRevision}'),
+          _Kv('APK', artifact == null ? '동기화 중' : '다운로드 가능'),
+          const _Kv('Production', '제작 완료 · 출시 전 검토'),
+          const _Kv('Launch', 'NOT STARTED'),
+          const _Kv('외부 공개', 'false'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('닫기'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _showInstallGuide(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Android APK 설치 방법'),
+      content: const Text(
+        '1. APK 다운로드를 누릅니다.\n'
+        '2. Chrome 다운로드 알림에서 파일을 엽니다.\n'
+        '3. Android가 요청하면 설정에서 “이 출처의 앱 허용”을 사용자가 직접 켭니다.\n'
+        '4. 설치 후 앱을 실행하고 테스트 체크리스트를 확인합니다.\n\n'
+        '보안 설정을 강제로 우회하지 않습니다. 검토가 끝나면 불필요한 설치 허용 권한을 다시 끌 수 있습니다.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('닫기'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _showAppTestChecklist(BuildContext context) => showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('실기기 테스트 체크리스트'),
+      content: const Text(
+        '□ APK 다운로드·설치 성공\n'
+        '□ 앱 실행 및 첫 화면 정상\n'
+        '□ 핵심 기능과 화면 이동 정상\n'
+        '□ 로딩·오류·빈 화면 처리 확인\n'
+        '□ 권한 요청 문구와 거부 동작 확인\n'
+        '□ 오프라인/재실행 동작 확인\n'
+        '□ 발견한 문제는 “보완 요청”으로 전달',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('닫기'),
+        ),
+      ],
+    ),
+  );
+
   Future<void> _requestRevision(BuildContext context) async {
     final message = await showRevisionRequestDialog(context);
     if (message == null || !context.mounted) return;
@@ -1157,8 +1266,9 @@ class _FinalResultPanel extends StatelessWidget {
 
   Future<void> _showLaunchReadiness(
     BuildContext context,
-    Sotong24RemoteStage? publishing,
-  ) {
+    Sotong24RemoteStage? publishing, {
+    bool isApp = false,
+  }) {
     return showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1167,22 +1277,45 @@ class _FinalResultPanel extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Kv('최종 상품명', project.title),
-              _Kv(
-                '최종 PDF',
-                publishing?.openableResultUrl == null ? '확인 필요' : '준비됨',
-              ),
-              const _Kv('표지', '최종 패키지에서 확인'),
-              const _Kv('페이지 수', '사용자 확인 필요'),
-              const _Kv('파일 크기', '다운로드 화면에서 확인'),
-              _Kv('최종 revision', 'r${project.finalRevision}'),
-              const _Kv('권장/확정 가격', '사용자 확인 필요'),
-              const _Kv('판매채널 후보', '출시자료 패키지에서 확인'),
-              const _Kv('상품 소개', '출시자료 패키지에서 확인'),
-              const _Kv('환불/주의사항', '초안 확인 필요'),
-              const _Kv('저작권/출처 검사', '최종 패키지에서 확인'),
-              const _Kv('홍보 준비 상태', '초안 준비 · 자동 게시 안 함'),
-              const _Kv('출시 체크리스트', '미확정 항목 확인 필요'),
+              _Kv(isApp ? '앱명' : '최종 상품명', project.title),
+              if (isApp) ...[
+                _Kv(
+                  '최종 APK',
+                  Sotong24WorkshopPresentation.finalApkArtifact(project) == null
+                      ? '확인 필요'
+                      : '준비됨',
+                ),
+                _Kv('최종 revision', 'r${project.finalRevision}'),
+                const _Kv('packageId / version', '빌드 결과에서 확인'),
+                const _Kv('privacy policy', '사용자 확인 필요'),
+                const _Kv(
+                  'icon / screenshots / feature graphic',
+                  '출시 준비자료에서 확인',
+                ),
+                const _Kv('설명 / short description', '출시 준비자료에서 확인'),
+                const _Kv(
+                  'content rating / data safety / target audience',
+                  '사용자 확인 필요',
+                ),
+                const _Kv('광고 / 가격 / 국가', '미활성 · 사용자 확인 필요'),
+                const _Kv('Play Console 상태', 'NOT STARTED · 자동 제출 금지'),
+              ] else ...[
+                _Kv(
+                  '최종 PDF',
+                  publishing?.openableResultUrl == null ? '확인 필요' : '준비됨',
+                ),
+                const _Kv('표지', '최종 패키지에서 확인'),
+                const _Kv('페이지 수', '사용자 확인 필요'),
+                const _Kv('파일 크기', '다운로드 화면에서 확인'),
+                _Kv('최종 revision', 'r${project.finalRevision}'),
+                const _Kv('권장/확정 가격', '사용자 확인 필요'),
+                const _Kv('판매채널 후보', '출시자료 패키지에서 확인'),
+                const _Kv('상품 소개', '출시자료 패키지에서 확인'),
+                const _Kv('환불/주의사항', '초안 확인 필요'),
+                const _Kv('저작권/출처 검사', '최종 패키지에서 확인'),
+                const _Kv('홍보 준비 상태', '초안 준비 · 자동 게시 안 함'),
+                const _Kv('출시 체크리스트', '미확정 항목 확인 필요'),
+              ],
             ],
           ),
         ),

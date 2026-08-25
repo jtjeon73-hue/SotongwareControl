@@ -284,21 +284,24 @@ class Sotong24RemoteRepository {
     if (project == null) return '프로젝트를 찾을 수 없습니다.';
     if (!project.isProductionComplete) return '제작 완료본에서만 보완을 요청할 수 있습니다.';
     Sotong24RemoteStage? stage;
+    final revisionStageId = project.productType == 'app'
+        ? 'app_production_complete'
+        : 'maintain';
     for (final candidate in project.stages) {
-      if (candidate.stageId == 'maintain') {
+      if (candidate.stageId == revisionStageId) {
         stage = candidate;
         break;
       }
     }
-    if (stage == null) return '최종 패키지 검증 단계를 찾을 수 없습니다.';
+    if (stage == null) return '보완·최종 품질 검증 단계를 찾을 수 없습니다.';
     final now = DateTime.now().toUtc().toIso8601String();
     final nextRevision = project.finalRevision + 1;
     final requestId =
-        'req_maintain_${DateTime.now().toUtc().microsecondsSinceEpoch}';
+        'req_${revisionStageId}_${DateTime.now().toUtc().microsecondsSinceEpoch}';
     final request = Sotong24RemoteRequest(
       requestId: requestId,
       projectId: projectId,
-      stageId: 'maintain',
+      stageId: revisionStageId,
       requestType: 'revision_request',
       status: ApprovalStatus.revisionRequested,
       message: trimmed,
@@ -333,7 +336,7 @@ class Sotong24RemoteRepository {
       final doc = _projects!.doc(projectId);
       final batch = (_db ?? FirebaseFirestore.instance).batch();
       batch.set(doc.collection('requests').doc(requestId), request.toMap());
-      batch.set(doc.collection('stages').doc('maintain'), {
+      batch.set(doc.collection('stages').doc(revisionStageId), {
         'status': Sotong24WorkStatus.revision,
         'approvalStatus': ApprovalStatus.revisionRequested,
         'activeRequestId': requestId,
@@ -377,6 +380,27 @@ class Sotong24RemoteRepository {
     '출시 완료',
   ];
 
+  static const appLaunchWorkflowSteps = <String>[
+    '출시 대상 최종 APK revision 선택',
+    '앱명·packageId·version 확인',
+    'privacy policy 확인',
+    'icon·스크린샷·feature graphic 확인',
+    '앱 설명·short description 확인',
+    'content rating 확인',
+    'data safety 확인',
+    'target audience·광고 여부 확인',
+    '가격·국가 확인',
+    'Play Console 계정 상태 확인',
+    '사용자 최종 출시 승인',
+    'Play Console 앱 생성',
+    'AAB 업로드·검증',
+    '스토어 등록정보 검증',
+    '심사 제출',
+    '공개 상태 확인',
+    '출시 결과 검증',
+    '출시 완료',
+  ];
+
   /// 별도 Launch workflow 진입. 실제 외부 작업 직전의 강제 사람 승인 상태만 만든다.
   Future<String?> enterLaunchApproval({required String projectId}) async {
     final project = await getProject(projectId);
@@ -384,6 +408,9 @@ class Sotong24RemoteRepository {
     if (!project.isProductionComplete) return '제작 완료 후에만 출시 검토를 시작할 수 있습니다.';
     if (project.isLaunched) return '이미 출시 완료된 프로젝트입니다.';
     final now = DateTime.now().toUtc().toIso8601String();
+    final steps = project.productType == 'app'
+        ? appLaunchWorkflowSteps
+        : launchWorkflowSteps;
     final workflow = {
       'schemaVersion': 1,
       'selectedRevision': project.finalRevision,
@@ -392,10 +419,10 @@ class Sotong24RemoteRepository {
       'externalPublished': false,
       'updatedAt': now,
       'steps': [
-        for (var i = 0; i < launchWorkflowSteps.length; i++)
+        for (var i = 0; i < steps.length; i++)
           {
             'order': i + 1,
-            'label': launchWorkflowSteps[i],
+            'label': steps[i],
             'status': i < 10
                 ? 'review_required'
                 : i == 10

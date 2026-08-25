@@ -29,7 +29,7 @@ const {
   mergeMonotonicStage,
   mergeMonotonicProject,
 } = require("../sotong24/writer");
-const { EBOOK_STAGE_BY_ID } = require("../sotong24/canonical");
+const { EBOOK_STAGE_BY_ID, APP_STAGE_BY_ID } = require("../sotong24/canonical");
 const { handleCancelJob } = require("./cancellation");
 
 const AGENT_STATES = new Set(Object.values(AGENT_STATE));
@@ -363,7 +363,10 @@ async function handleReportJob(db, ctx, body) {
   if (status === WORK_STATUS.COMPLETED) patch.completedAt = ts;
   await jobRef.set(patch, { merge: true });
   const completionStageId = String(body.currentStage || job.currentStage || "");
-  const completionStage = EBOOK_STAGE_BY_ID.get(completionStageId);
+  const productType = String(body.productType || job.productType || job.type || "ebook");
+  const completionStage = productType === "app"
+    ? APP_STAGE_BY_ID.get(completionStageId)
+    : EBOOK_STAGE_BY_ID.get(completionStageId);
   const completionStageNumber = Number(
     body.currentStageNumber || job.currentStageNumber || completionStage?.order
   ) || 0;
@@ -380,6 +383,7 @@ async function handleReportJob(db, ctx, body) {
       stageName: "최종 제작",
       revision: Number(body.revision) || 1,
       eventType: "production_completed",
+      productType,
       severity: "info",
       actionRequired: false,
     });
@@ -421,6 +425,10 @@ async function handleReportStage(db, ctx, body) {
   const jobSnap = await jobRef.get();
   if (!jobSnap.exists) throw httpError(404, "not_found", "job_missing");
   const job = jobSnap.data() || {};
+  const productType = String(body.productType || job.productType || job.type || "ebook");
+  const stageDefinition = productType === "app"
+    ? APP_STAGE_BY_ID.get(stageId)
+    : EBOOK_STAGE_BY_ID.get(stageId);
   if (job.assignedAgentId && job.assignedAgentId !== ctx.agentId) {
     throw httpError(403, "forbidden", "agent_mismatch");
   }
@@ -493,7 +501,7 @@ async function handleReportStage(db, ctx, body) {
   const jobPatch = {
     currentStage: stageId,
     currentStageNumber: Number(body.stageNumber || previous.stageNumber) ||
-      EBOOK_STAGE_BY_ID.get(stageId)?.order || 0,
+      stageDefinition?.order || 0,
     updatedAt: ts,
     lastActivityAt: ts,
     ...(body.criteriaMet != null ? { currentStageCriteriaMet: body.criteriaMet === true } : {}),
@@ -514,8 +522,8 @@ async function handleReportStage(db, ctx, body) {
       ? WORK_STATUS.REWORKING
       : WORK_STATUS.RUNNING;
   } else if (status === WORK_STATUS.COMPLETED) {
-    jobPatch.status = (EBOOK_STAGE_BY_ID.get(stageId)?.terminal ||
-      EBOOK_STAGE_BY_ID.get(stageId)?.productionBoundary)
+    jobPatch.status = (stageDefinition?.terminal ||
+      stageDefinition?.productionBoundary)
       ? WORK_STATUS.COMPLETED
       : WORK_STATUS.RUNNING;
   } else if (status === WORK_STATUS.RESULT_VALIDATION_RETRYING) {
@@ -560,14 +568,14 @@ async function handleReportStage(db, ctx, body) {
         ? "awaiting_approval"
         : interruptionStatus.has(projectStagePatch.status)
           ? projectStagePatch.status
-        : (EBOOK_STAGE_BY_ID.get(stageId)?.terminal ||
-            EBOOK_STAGE_BY_ID.get(stageId)?.productionBoundary) &&
+        : (stageDefinition?.terminal ||
+            stageDefinition?.productionBoundary) &&
             projectStagePatch.status === "completed"
           ? "completed"
           : "in_progress";
       const safeProject = mergeMonotonicProject(currentProject, {
         currentStage: Number(projectStagePatch.stageNumber) ||
-          EBOOK_STAGE_BY_ID.get(stageId)?.order || 0,
+          stageDefinition?.order || 0,
         currentStageId: stageId,
         status: projectStatus,
         lastActivityAt: ts,
@@ -593,7 +601,6 @@ async function handleReportStage(db, ctx, body) {
       tx.set(projectRef, safeProject, { merge: true });
     }
   });
-  const stageDefinition = EBOOK_STAGE_BY_ID.get(stageId);
   if (status === WORK_STATUS.COMPLETED &&
       stageDefinition?.productionBoundary === true &&
       stageDefinition.order === 18) {
@@ -606,6 +613,7 @@ async function handleReportStage(db, ctx, body) {
       stageName: String(body.stageName || previous.stageName || stageDefinition.name),
       revision: Math.max(1, Number(body.revision || previous.revision) || 1),
       eventType: "production_completed",
+      productType,
       severity: "info",
       actionRequired: false,
     });
@@ -903,6 +911,7 @@ async function handleCreateJob(db, uid, body) {
     jobId,
     ownerUid: uid,
     type,
+    productType: type,
     title,
     status: WORK_STATUS.QUEUED,
     assignedAgentId,

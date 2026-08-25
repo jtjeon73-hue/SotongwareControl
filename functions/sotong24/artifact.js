@@ -7,12 +7,14 @@
  */
 
 const crypto = require("crypto");
-const { EBOOK_STAGE_BY_ID, PRODUCT_TYPES } = require("./canonical");
+const { PRODUCT_TYPES, stageMapForProduct } = require("./canonical");
 const { assertSafeId, reject } = require("./validate");
 
 const TEST_INSTRUCTION_PREFIX = "wi_test_remote_e2e_";
 const PROD_INSTRUCTION_PREFIX = "wi_plan_";
-const ARTIFACT_MAX_BYTES = 1 * 1024 * 1024; // 1 MiB
+const ARTIFACT_MAX_BYTES = 1 * 1024 * 1024;
+const APK_ARTIFACT_MAX_BYTES = 200 * 1024 * 1024;
+const APK_ARTIFACT_MIN_BYTES = 64 * 1024;
 const UPLOAD_URL_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const DOWNLOAD_URL_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (phone open)
 const ATTACHMENT_URL_TTL_MS = 10 * 60 * 1000; // short-lived user download
@@ -28,6 +30,7 @@ const ALLOWED_EXTENSIONS = new Set([
   ".png",
   ".jpg",
   ".jpeg",
+  ".apk",
 ]);
 const ALLOWED_CONTENT_TYPES = new Set([
   "text/markdown",
@@ -37,6 +40,7 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "application/pdf",
   "image/png",
   "image/jpeg",
+  "application/vnd.android.package-archive",
 ]);
 const ALLOWED_WORKER_TYPES = new Set(["codex", "cursor"]);
 const ALLOWED_SOURCES = new Set(["ai_explicit"]);
@@ -263,24 +267,26 @@ function sanitizeFileName(raw) {
   return name;
 }
 
-function sanitizeDownloadFileName(raw, revision = 1) {
+function sanitizeDownloadFileName(raw, revision = 1, extension = ".pdf") {
+  const ext = extension === ".apk" ? ".apk" : ".pdf";
   let name = String(raw || "").trim();
   name = name
     .replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, " ")
     .replace(/\s+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^[._ ]+|[._ ]+$/g, "");
-  if (!name) name = `AI_ebook_final_r${revision}.pdf`;
-  if (!name.toLowerCase().endsWith(".pdf")) name += ".pdf";
+  if (!name) name = ext === ".apk" ? `SotongApp_r${revision}.apk` : `AI_ebook_final_r${revision}.pdf`;
+  if (!name.toLowerCase().endsWith(ext)) name += ext;
   if (name.length > 120) {
-    name = `${name.slice(0, 110).replace(/[._ ]+$/g, "")}.pdf`;
+    name = `${name.slice(0, 110).replace(/[._ ]+$/g, "")}${ext}`;
   }
   return name;
 }
 
 function buildAttachmentDisposition(fileName, revision = 1) {
-  const safe = sanitizeDownloadFileName(fileName, revision);
-  const ascii = `AI_ebook_final_r${revision}.pdf`;
+  const ext = String(fileName || "").toLowerCase().endsWith(".apk") ? ".apk" : ".pdf";
+  const safe = sanitizeDownloadFileName(fileName, revision, ext);
+  const ascii = ext === ".apk" ? `SotongApp_r${revision}.apk` : `AI_ebook_final_r${revision}.pdf`;
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
 }
 
@@ -374,7 +380,7 @@ function parseArtifactUploadInit(body, { requireExplicitProd = true } = {}) {
   }
 
   const stageId = assertSafeId(body.stageId, "stageId");
-  // Ebook: stageId is authoritative. Omit/0 stageNumber -> canonical order.
+  // Canonical production types: stageId is authoritative.
   let stageNumber;
   const rawStageNumber = body.stageNumber;
   if (rawStageNumber !== undefined && rawStageNumber !== null && rawStageNumber !== "") {
@@ -384,13 +390,13 @@ function parseArtifactUploadInit(body, { requireExplicitProd = true } = {}) {
       required: true,
     });
   }
-  if (productType === "ebook") {
-    const meta = EBOOK_STAGE_BY_ID.get(stageId);
-    if (!meta) reject("invalid_argument", `unknown_ebook_stageId:${stageId}`);
+  if (productType === "ebook" || productType === "app") {
+    const meta = stageMapForProduct(productType).get(stageId);
+    if (!meta) reject("invalid_argument", `unknown_${productType}_stageId:${stageId}`);
     if (stageNumber === undefined || stageNumber === 0) {
       stageNumber = meta.order;
     } else if (meta.order !== stageNumber) {
-      reject("invalid_argument", "ebook stageNumber_mismatch_stageId");
+      reject("invalid_argument", `${productType} stageNumber_mismatch_stageId`);
     }
   } else {
     stageNumber = assertInt(body.stageNumber, "stageNumber", {
@@ -426,13 +432,30 @@ function parseArtifactUploadInit(body, { requireExplicitProd = true } = {}) {
   if ((ext === ".jpg" || ext === ".jpeg") && contentType !== "image/jpeg") {
     reject("invalid_artifact", "contentType_mismatch_extension");
   }
+  if (ext === ".apk" && contentType !== "application/vnd.android.package-archive") {
+    reject("invalid_artifact", "contentType_mismatch_extension");
+  }
+  const isInitialApk = productType === "app" &&
+    stageId === "app_android_release" && revision === 1;
+  const isRevisionApk = productType === "app" &&
+    stageId === "app_production_complete" && revision >= 2;
+  if (ext === ".apk" && !isInitialApk && !isRevisionApk) {
+    reject("invalid_artifact", "apk_stage_revision_not_allowed", 403);
+  }
+  if ((isInitialApk || isRevisionApk) && ext !== ".apk") {
+    reject("invalid_artifact", "apk_required_for_release_stage");
+  }
 
   const sizeBytes = assertInt(body.sizeBytes, "sizeBytes", {
     min: 1,
-    max: 100 * 1024 * 1024,
+    max: 2 * 1024 * 1024 * 1024,
     required: true,
   });
-  if (sizeBytes > ARTIFACT_MAX_BYTES) {
+  const maxBytes = ext === ".apk" ? APK_ARTIFACT_MAX_BYTES : ARTIFACT_MAX_BYTES;
+  if (ext === ".apk" && sizeBytes < APK_ARTIFACT_MIN_BYTES) {
+    reject("invalid_artifact", "apk_size_below_minimum");
+  }
+  if (sizeBytes > maxBytes) {
     reject("artifact_too_large", "sizeBytes exceeds_limit", 413);
   }
 
@@ -481,6 +504,7 @@ function parseArtifactUploadInit(body, { requireExplicitProd = true } = {}) {
     productType,
     stageId,
     stageNumber,
+    maxBytes,
     revision,
     fileName,
     contentType,
@@ -519,8 +543,12 @@ function parseArtifactDownloadRequest(body) {
     reject("invalid_prod_instruction", "PROD projectId must be wi_plan_*", 403);
   }
   const stageId = assertSafeId(body.stageId, "stageId");
-  if (!EBOOK_STAGE_BY_ID.has(stageId)) {
-    reject("invalid_argument", `unknown_ebook_stageId:${stageId}`);
+  const productType = String(body.productType || "ebook").trim();
+  if (productType !== "ebook" && productType !== "app") {
+    reject("invalid_argument", "download productType invalid_enum");
+  }
+  if (!stageMapForProduct(productType).has(stageId)) {
+    reject("invalid_argument", `unknown_${productType}_stageId:${stageId}`);
   }
   const revision = assertInt(body.revision, "revision", {
     min: 1,
@@ -528,7 +556,15 @@ function parseArtifactDownloadRequest(body) {
     required: true,
   });
   const fileName = sanitizeFileName(body.fileName);
-  if (fileName !== "final_ebook.pdf") {
+  const expectedFile = productType === "app" ? `app-release_r${revision}.apk` : "final_ebook.pdf";
+  if (productType === "app") {
+    const validAppApkStage = (stageId === "app_android_release" && revision === 1) ||
+      (stageId === "app_production_complete" && revision >= 2);
+    if (!validAppApkStage) {
+      reject("invalid_artifact", "apk_stage_revision_not_allowed", 403);
+    }
+  }
+  if (fileName !== expectedFile) {
     reject("invalid_artifact", "download_file_not_allowed", 403);
   }
   const storagePath = buildArtifactStoragePath({
@@ -544,12 +580,16 @@ function parseArtifactDownloadRequest(body) {
     stageId,
     revision,
     fileName,
+    productType,
     downloadFileName: sanitizeDownloadFileName(
       body.downloadFileName,
-      revision
+      revision,
+      productType === "app" ? ".apk" : ".pdf"
     ),
     storagePath,
-    contentType: "application/pdf",
+    contentType: productType === "app"
+      ? "application/vnd.android.package-archive"
+      : "application/pdf",
   };
 }
 
@@ -685,7 +725,7 @@ async function createUploadGrant(parsed, deps, { now = Date.now() } = {}) {
     instructionId: parsed.instructionId,
     stageId: parsed.stageId,
     revision: parsed.revision,
-    maxBytes: ARTIFACT_MAX_BYTES,
+    maxBytes: parsed.maxBytes,
     namespace: parsed.namespace,
     isTest: parsed.isTest,
   };
@@ -756,11 +796,15 @@ async function createAttachmentDownloadGrant(
       reject("not-found", "artifact_object_missing", 404);
     }
     const contentType = normalizeContentType(meta.contentType);
-    if (contentType.split(";")[0].trim() !== "application/pdf") {
+    if (contentType.split(";")[0].trim() !== parsed.contentType) {
       reject("invalid_artifact", "contentType_mismatch_object");
     }
     const sizeBytes = Number(meta.size || 0);
-    if (!Number.isInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > ARTIFACT_MAX_BYTES) {
+    const minBytes = parsed.productType === "app" ? APK_ARTIFACT_MIN_BYTES : 1;
+    const maxBytes = parsed.productType === "app"
+      ? APK_ARTIFACT_MAX_BYTES
+      : ARTIFACT_MAX_BYTES;
+    if (!Number.isInteger(sizeBytes) || sizeBytes < minBytes || sizeBytes > maxBytes) {
       reject("invalid_artifact", "sizeBytes_out_of_range");
     }
     const responseDisposition = buildAttachmentDisposition(
@@ -776,7 +820,7 @@ async function createAttachmentDownloadGrant(
     return {
       downloadUrl,
       fileName: parsed.downloadFileName,
-      contentType: "application/pdf",
+      contentType: parsed.contentType,
       sizeBytes,
       expiresAt: new Date(now + ATTACHMENT_URL_TTL_MS).toISOString(),
     };
@@ -833,6 +877,8 @@ module.exports = {
   TEST_INSTRUCTION_PREFIX,
   PROD_INSTRUCTION_PREFIX,
   ARTIFACT_MAX_BYTES,
+  APK_ARTIFACT_MAX_BYTES,
+  APK_ARTIFACT_MIN_BYTES,
   UPLOAD_URL_TTL_MS,
   DOWNLOAD_URL_TTL_MS,
   ATTACHMENT_URL_TTL_MS,

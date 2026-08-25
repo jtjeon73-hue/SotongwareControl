@@ -56,6 +56,62 @@ const EBOOK_STAGE_BY_ID = new Map(
   EBOOK_STAGE_CONTRACTS.map((stage) => [stage.id, stage])
 );
 
+// Android-first app production. Stage 18 is an installable-APK/pre-launch
+// boundary and never means Play Store submission or external publication.
+const APP_STAGE_CONTRACTS = [
+  ["app_idea", "앱 아이디어 정리", "app_idea_summary"],
+  ["app_problem_validate", "고객 문제 검증", "app_problem_validation"],
+  ["app_market_analysis", "시장·경쟁 분석", "app_market_analysis"],
+  ["app_requirements", "제품 요구사항 정의", "app_requirements"],
+  ["app_project_setup", "프로젝트 셋업", "flutter_project"],
+  ["app_ux_flow", "UX 흐름 설계", "app_ux_flow"],
+  ["app_design_system", "UI 디자인 시스템", "app_design_system"],
+  ["app_data_state", "데이터·상태 구조 설계", "app_data_architecture"],
+  ["app_core_implementation_1", "핵심 기능 구현 1", "app_source"],
+  ["app_core_implementation_2", "핵심 기능 구현 2", "app_source"],
+  ["app_integration_errors", "통합 및 예외처리", "app_integration_report"],
+  ["app_code_quality", "코드 품질 점검", "flutter_analyze_report"],
+  ["app_automated_tests", "자동 테스트", "flutter_test_report"],
+  ["app_android_release", "Android Release Build", "android_apk"],
+  ["app_device_review_prep", "실기기 검증 준비", "device_review_package"],
+  ["app_user_review_package", "사용자 검토 패키지", "user_review_package"],
+  ["app_revision_quality", "보완·최종 품질 검증", "app_regression_report"],
+  ["app_production_complete", "Production Complete", "app_prelaunch_final_package"],
+].map((row, index) => ({
+  id: row[0],
+  name: row[1],
+  order: index + 1,
+  applicableByDefault: true,
+  aiDocumentStage: true,
+  approvalTypicallyRequired: [4, 16, 17].includes(index + 1),
+  artifactKind: row[2],
+  criteriaEvaluator: index === 4
+    ? "flutter_project_contract"
+    : index === 13
+      ? "android_apk_contract"
+      : index === 17
+        ? "app_prelaunch_contract"
+        : "canonical_artifact",
+  terminal: index === 17,
+  productionBoundary: index === 17,
+}));
+
+const APP_STAGES = APP_STAGE_CONTRACTS.map((stage) => [stage.id, stage.name]);
+const APP_STAGE_IDS = APP_STAGES.map((stage) => stage[0]);
+const APP_STAGE_BY_ID = new Map(
+  APP_STAGE_CONTRACTS.map((stage) => [stage.id, stage])
+);
+
+function stageContractsForProduct(productType) {
+  if (productType === "app") return APP_STAGE_CONTRACTS;
+  return EBOOK_STAGE_CONTRACTS;
+}
+
+function stageMapForProduct(productType) {
+  if (productType === "app") return APP_STAGE_BY_ID;
+  return EBOOK_STAGE_BY_ID;
+}
+
 const WORK_STATUS = new Set([
   "ready",
   "in_progress",
@@ -102,6 +158,12 @@ module.exports = {
   EBOOK_STAGE_CONTRACTS,
   EBOOK_STAGE_IDS,
   EBOOK_STAGE_BY_ID,
+  APP_STAGES,
+  APP_STAGE_CONTRACTS,
+  APP_STAGE_IDS,
+  APP_STAGE_BY_ID,
+  stageContractsForProduct,
+  stageMapForProduct,
   WORK_STATUS,
   APPROVAL_STATUS,
   PC_STATUS,

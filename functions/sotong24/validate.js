@@ -1,7 +1,7 @@
 "use strict";
 
 const {
-  EBOOK_STAGE_BY_ID,
+  stageMapForProduct,
   WORK_STATUS,
   APPROVAL_STATUS,
   PC_STATUS,
@@ -134,13 +134,13 @@ function resolveCurrentStageNumber(raw, productType) {
     return assertInt(raw, "currentStage", { min: 1, max: 99 });
   }
   const id = String(raw).trim();
-  if (productType === "ebook") {
-    const meta = EBOOK_STAGE_BY_ID.get(id);
-    if (!meta) reject("invalid_argument", "currentStage unknown_ebook_stageId");
+  if (productType === "ebook" || productType === "app") {
+    const meta = stageMapForProduct(productType).get(id);
+    if (!meta) reject("invalid_argument", `currentStage unknown_${productType}_stageId`);
     return meta.order;
   }
   // 비전자책은 stageId 문자열을 숫자로 강제하지 않고 거부 → stageNumber 동봉 요구
-  reject("invalid_argument", "currentStage must_be_stage_number_or_ebook_stageId");
+  reject("invalid_argument", "currentStage must_be_stage_number_or_canonical_stageId");
 }
 
 function pickProjectAllowlist(input, { serverNowIso }) {
@@ -170,14 +170,14 @@ function pickProjectAllowlist(input, { serverNowIso }) {
   });
   let currentStage = resolveCurrentStageNumber(input.currentStage, productType);
   if (
-    productType === "ebook" &&
+    (productType === "ebook" || productType === "app") &&
     totalStages !== undefined &&
     totalStages !== 18
   ) {
-    reject("invalid_argument", "ebook totalStages must_be_18");
+    reject("invalid_argument", `${productType} totalStages must_be_18`);
   }
-  if (productType === "ebook" && currentStage !== undefined && currentStage > 18) {
-    reject("invalid_argument", "ebook currentStage out_of_range");
+  if ((productType === "ebook" || productType === "app") && currentStage !== undefined && currentStage > 18) {
+    reject("invalid_argument", `${productType} currentStage out_of_range`);
   }
 
   // 선택: PC가 stageNumber를 명시하면 currentStage와 일치 검증
@@ -242,18 +242,19 @@ function pickProjectAllowlist(input, { serverNowIso }) {
   // PC sync 문서는 데모가 아님
   out.isDemo = false;
 
-  // 전자책이면 currentStageId도 보조 저장 (Flutter는 무시, MFC/디버깅용)
-  if (productType === "ebook" && currentStage !== undefined) {
-    for (const [id, meta] of EBOOK_STAGE_BY_ID.entries()) {
+  // Canonical production types keep both numeric and stable stage identity.
+  const canonicalMap = stageMapForProduct(productType);
+  if ((productType === "ebook" || productType === "app") && currentStage !== undefined) {
+    for (const [id, meta] of canonicalMap.entries()) {
       if (meta.order === currentStage) {
         out.currentStageId = id;
         break;
       }
     }
   } else if (
-    productType === "ebook" &&
+    (productType === "ebook" || productType === "app") &&
     typeof input.currentStage === "string" &&
-    EBOOK_STAGE_BY_ID.has(input.currentStage.trim())
+    canonicalMap.has(input.currentStage.trim())
   ) {
     out.currentStageId = input.currentStage.trim();
   }
@@ -292,11 +293,11 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
   });
   const revision = assertInt(input.revision, "revision", { min: 0 });
 
-  if (productType === "ebook") {
-    const meta = EBOOK_STAGE_BY_ID.get(stageId);
-    if (!meta) reject("invalid_argument", `unknown_ebook_stageId:${stageId}`);
+  if (productType === "ebook" || productType === "app") {
+    const meta = stageMapForProduct(productType).get(stageId);
+    if (!meta) reject("invalid_argument", `unknown_${productType}_stageId:${stageId}`);
     if (meta.order !== stageNumber) {
-      reject("invalid_argument", "ebook stageNumber_mismatch_stageId");
+      reject("invalid_argument", `${productType} stageNumber_mismatch_stageId`);
     }
     if (stageName && stageName !== meta.name) {
       // 이름은 서버 canonical로 교정 (손상 방지)
@@ -307,8 +308,8 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
     stageId,
     stageNumber,
   };
-  if (productType === "ebook") {
-    out.stageName = EBOOK_STAGE_BY_ID.get(stageId).name;
+  if (productType === "ebook" || productType === "app") {
+    out.stageName = stageMapForProduct(productType).get(stageId).name;
   } else if (stageName !== undefined) {
     out.stageName = stageName;
   }
@@ -402,9 +403,9 @@ function parseRequestPollInput(body) {
   const productType =
     assertEnum(body.productType, "productType", PRODUCT_TYPES) || "ebook";
 
-  if (productType === "ebook") {
-    if (!EBOOK_STAGE_BY_ID.has(currentStageId)) {
-      reject("invalid_argument", "currentStageId unknown_ebook_stageId");
+  if (productType === "ebook" || productType === "app") {
+    if (!stageMapForProduct(productType).has(currentStageId)) {
+      reject("invalid_argument", `currentStageId unknown_${productType}_stageId`);
     }
   }
 
@@ -432,12 +433,12 @@ function assertProjectStageAlignment(projectData, currentStageId, productType) {
       reject("invalid_argument", "currentStageId mismatch_project");
     }
   } else if (
-    productType === "ebook" &&
+    (productType === "ebook" || productType === "app") &&
     projectData.currentStage !== undefined &&
     projectData.currentStage !== null &&
     projectData.currentStage !== ""
   ) {
-    const meta = EBOOK_STAGE_BY_ID.get(currentStageId);
+    const meta = stageMapForProduct(productType).get(currentStageId);
     const n = Number(projectData.currentStage);
     if (meta && Number.isFinite(n) && n !== meta.order) {
       reject("invalid_argument", "currentStageId mismatch_project");

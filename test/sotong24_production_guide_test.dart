@@ -65,7 +65,7 @@ void main() {
   test('앱·산업자동화·사이트·마케팅·콘텐츠 가이드 단계 및 상세', () {
     final app = Sotong24ProductionGuideCatalog.guideFor('app');
     expect(app.totalStages, Sotong24WorkflowCatalog.app.totalStages);
-    expect(app.totalStages, 23);
+    expect(app.totalStages, 18);
 
     final ind = Sotong24ProductionGuideCatalog.guideFor('industrial');
     expect(ind.totalStages, Sotong24WorkflowCatalog.industrial.totalStages);

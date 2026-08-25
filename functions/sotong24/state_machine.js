@@ -1,6 +1,12 @@
 "use strict";
 
-const { EBOOK_STAGE_CONTRACTS, EBOOK_STAGE_BY_ID } = require("./canonical");
+const {
+  EBOOK_STAGE_CONTRACTS,
+  EBOOK_STAGE_BY_ID,
+  APP_STAGE_BY_ID,
+  stageContractsForProduct,
+  stageMapForProduct,
+} = require("./canonical");
 
 const STATUS_RANK = Object.freeze({
   ready: 0,
@@ -134,7 +140,7 @@ function currentOrder(value) {
   const direct = Number(value && (value.currentStageNumber || value.currentStage));
   if (Number.isInteger(direct) && direct > 0) return direct;
   const id = String(value && (value.currentStageId || value.currentStage) || "");
-  return EBOOK_STAGE_BY_ID.get(id)?.order || 0;
+  return EBOOK_STAGE_BY_ID.get(id)?.order || APP_STAGE_BY_ID.get(id)?.order || 0;
 }
 
 function mergeMonotonicProject(previous, incoming) {
@@ -195,7 +201,31 @@ function alignProjectWithCurrentStage(project, stages) {
     out.approvalRequired = true;
     out.currentStageCriteriaMet = current.criteriaMet === true;
   }
-  if (current.status === "completed" && EBOOK_STAGE_BY_ID.get(current.stageId)?.terminal) {
+  const canonicalStage = EBOOK_STAGE_BY_ID.get(current.stageId) || APP_STAGE_BY_ID.get(current.stageId);
+  if (current.status === "completed" && canonicalStage?.terminal) {
+    if (current.stageId === "app_production_complete") {
+      const desiredRevision = Math.max(1, Number(project.finalRevision) || 1);
+      const apkStage = stages
+        .filter((stage) => stage.stageId === "app_android_release" || (
+          stage.stageId === "app_production_complete" &&
+          Math.max(1, Number(stage.revision) || 1) >= 2
+        ))
+        .filter((stage) => Math.max(1, Number(stage.revision) || 1) === desiredRevision)
+        .pop();
+      let apkUrlValid = false;
+      try {
+        const value = String(apkStage && (apkStage.resultUrl || apkStage.previewUrl) || "");
+        const url = new URL(value);
+        apkUrlValid = url.protocol === "https:" && /\/app-release_r\d+\.apk$/i.test(url.pathname);
+      } catch (_) {}
+      if (!apkStage || apkStage.status !== "completed" || apkStage.criteriaMet !== true || !apkUrlValid) {
+        out.status = "stage_transition_failed";
+        out.productionStatus = "ai_production";
+        out.launchStatus = out.launchStatus || "not_started";
+        out.externalPublished = false;
+        return out;
+      }
+    }
     out.status = "prelaunch_review";
     out.productionStatus = "prelaunch_review";
     out.launchStatus = out.launchStatus || "not_started";
@@ -206,8 +236,9 @@ function alignProjectWithCurrentStage(project, stages) {
   return out;
 }
 
-function createSimulation({ approvalRequiredOverride } = {}) {
-  const stages = EBOOK_STAGE_CONTRACTS.map((contract) => ({
+function createSimulation({ approvalRequiredOverride, productType = "ebook" } = {}) {
+  const contracts = stageContractsForProduct(productType);
+  const stages = contracts.map((contract) => ({
     stageId: contract.id,
     stageNumber: contract.order,
     status: contract.applicableByDefault ? "ready" : "not_applicable",
@@ -225,6 +256,7 @@ function createSimulation({ approvalRequiredOverride } = {}) {
     requests: new Map(),
     workflowReceipts: new Set(),
     approvalRequiredOverride,
+    productType,
   };
 }
 
@@ -236,7 +268,8 @@ function stageNeedsApproval(state, stage) {
   if (typeof state.approvalRequiredOverride === "boolean") {
     return state.approvalRequiredOverride;
   }
-  return EBOOK_STAGE_BY_ID.get(stage.stageId)?.approvalTypicallyRequired === true;
+  return stageMapForProduct(state.productType || "ebook")
+    .get(stage.stageId)?.approvalTypicallyRequired === true;
 }
 
 function advance(state) {
