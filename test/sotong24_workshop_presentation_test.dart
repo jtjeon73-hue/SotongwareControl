@@ -200,6 +200,19 @@ void main() {
       expect(p.showApprovalActions, isTrue);
     });
 
+    test('auto 모드 awaiting → 승인 버튼 숨김 (확인 필요 없을 때)', () {
+      final p = project(
+        id: 'wi_plan_auto_1',
+        title: '자동 승인 앱',
+        status: Sotong24WorkStatus.awaitingApproval,
+        stageStatus: Sotong24WorkStatus.awaitingApproval,
+        stageApproval: ApprovalStatus.pending,
+        approvalMode: 'auto',
+      );
+      expect(p.userFacingStatus, Sotong24WorkStatus.awaitingApproval);
+      expect(p.showApprovalActions, isFalse);
+    });
+
     test('승인 제출 후 Agent 적용 전에는 승인 대기를 유지하고 버튼을 숨긴다', () {
       final p = project(
         id: 'wi_plan_approval_inflight',

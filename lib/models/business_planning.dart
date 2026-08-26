@@ -706,6 +706,21 @@ class AiExecutionPolicy {
     );
   }
 
+  /// App 18-stage production AI policy. approvalMode is the source of truth.
+  factory AiExecutionPolicy.productionApp({String approvalMode = 'manual'}) {
+    final mode = approvalMode == 'auto' ? 'auto' : 'manual';
+    return AiExecutionPolicy(
+      enabled: true,
+      worker: 'cursor',
+      maxAutoStageOrder: 18,
+      approvalRequired: mode == 'manual',
+      artifactUploadEnabled: true,
+      autoAdvance: mode == 'auto',
+      deploymentAllowed: false,
+      approvalMode: mode,
+    );
+  }
+
   final bool enabled;
   final String worker;
   final int maxAutoStageOrder;

@@ -667,14 +667,19 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             wi.aiExecution?.approvalMode == expectedApproval);
   }
 
-  /// 새 ebook + pilot 토글 ON일 때만 고정 정책. 기존 WI 자동 migration 없음.
+  /// 새 ebook/app + pilot 토글 ON일 때만 고정 정책. 기존 WI 자동 migration 없음.
   AiExecutionPolicy? _resolveAiExecutionForBuild(BusinessPlanInput input) {
     if (!_aiProductionPilot) return null;
     final artifact = input.resolvedArtifactType == ArtifactType.undecided
         ? ArtifactType.ebook
         : ArtifactType.normalize(input.resolvedArtifactType);
-    if (artifact != ArtifactType.ebook) return null;
-    return AiExecutionPolicy.productionEbook(approvalMode: _approvalMode);
+    if (artifact == ArtifactType.ebook) {
+      return AiExecutionPolicy.productionEbook(approvalMode: _approvalMode);
+    }
+    if (artifact == ArtifactType.app) {
+      return AiExecutionPolicy.productionApp(approvalMode: _approvalMode);
+    }
+    return null;
   }
 
   Future<void> _createOrPromptInstruction() async {
@@ -2167,6 +2172,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         _aiProductionPilot &&
         ArtifactType.normalize(input.resolvedArtifactType) ==
             ArtifactType.ebook;
+    final isAiProductionPilot =
+        _aiProductionPilot &&
+        (ArtifactType.normalize(input.resolvedArtifactType) ==
+                ArtifactType.ebook ||
+            ArtifactType.normalize(input.resolvedArtifactType) ==
+                ArtifactType.app);
     final validation = _contractValidation;
 
     return Card(
@@ -2222,7 +2233,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _sendSummaryRow(
               '승인 방식',
               WorkInstructionWorkshopPresentation.approvalModeLabel(
-                approvalRequired: isEbookPilot && _approvalMode == 'manual',
+                approvalRequired: isAiProductionPilot && _approvalMode == 'manual',
               ),
             ),
             if (input.constraints.trim().isNotEmpty)
@@ -2480,7 +2491,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           ? _currentInput.resolvedArtifactType
           : _artifactType,
     );
-    return _aiProductionPilot && artifact == ArtifactType.ebook;
+    return _aiProductionPilot &&
+        (artifact == ArtifactType.ebook || artifact == ArtifactType.app);
   }
 
   Widget _buildApprovalModeCard() {

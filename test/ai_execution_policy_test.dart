@@ -79,6 +79,21 @@ void main() {
     expect(restored.deploymentAllowed, isFalse);
   });
 
+  test('production app approvalMode manual/auto round trip', () {
+    final manual = AiExecutionPolicy.productionApp();
+    final automatic = AiExecutionPolicy.productionApp(approvalMode: 'auto');
+
+    expect(manual.approvalMode, 'manual');
+    expect(manual.approvalRequired, isTrue);
+    expect(manual.worker, 'cursor');
+    expect(manual.maxAutoStageOrder, 18);
+
+    expect(automatic.approvalMode, 'auto');
+    expect(automatic.approvalRequired, isFalse);
+    expect(automatic.autoAdvance, isTrue);
+    expect(automatic.worker, 'cursor');
+  });
+
   test('legacy approvalRequired keeps safe approval mode compatibility', () {
     final manual = AiExecutionPolicy.fromJson({
       'enabled': true,

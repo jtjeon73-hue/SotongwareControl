@@ -1058,6 +1058,10 @@ class Sotong24UserFacingStatus {
     if (Sotong24RemoteApprovalGuard.isTerminalDecisionStatus(stageApproval)) {
       return false;
     }
+    // auto 모드에서는 일반 승인 버튼을 숨긴다. 확인 필요(userAttention)만 수동 개입.
+    if (project.approvalMode == 'auto' && stage.userAttention.trim().isEmpty) {
+      return false;
+    }
     return status == Sotong24WorkStatus.awaitingApproval;
   }
 
