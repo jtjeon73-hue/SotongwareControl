@@ -666,6 +666,11 @@ async function handleReportActivity(db, ctx, body) {
     revision: Math.max(1, Number(body.revision || previous.revision) || 1),
     updatedAt: ts,
   };
+  if (activityState.startsWith("codex_")) {
+    stagePatch.executorKind = "codex";
+  } else if (activityState.startsWith("cursor_")) {
+    stagePatch.executorKind = "cursor";
+  }
   if (!previous.startedAt) stagePatch.startedAt = ts;
   if (body.progress != null) {
     stagePatch.activityProgress = Math.max(0, Math.min(100, Number(body.progress) || 0));
@@ -692,7 +697,14 @@ async function handleReportActivity(db, ctx, body) {
     String(body.instructionId || job.instructionId || "").trim(),
     stageId,
     stagePatch,
-    { lastActivityAt: ts, activityState, updatedAt: ts }
+    {
+      lastActivityAt: ts,
+      activityState,
+      ...(stagePatch.executorKind
+        ? { currentWorker: stagePatch.executorKind }
+        : {}),
+      updatedAt: ts,
+    }
   );
   return { lastActivityAt: ts };
 }

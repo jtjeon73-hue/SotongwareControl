@@ -91,13 +91,16 @@ class Sotong24RemoteRepository {
       if (snap.docs.isEmpty) {
         return const <Sotong24RemoteProject>[];
       }
-      final list = <Sotong24RemoteProject>[];
-      for (final doc in snap.docs) {
-        final stages = await _loadStages(doc.id);
-        list.add(
-          Sotong24RemoteProject.fromMap(doc.data(), id: doc.id, stages: stages),
-        );
-      }
+      final list = await Future.wait(
+        snap.docs.map((doc) async {
+          final stages = await _loadStages(doc.id);
+          return Sotong24RemoteProject.fromMap(
+            doc.data(),
+            id: doc.id,
+            stages: stages,
+          );
+        }),
+      );
       list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return list;
     });
@@ -110,13 +113,16 @@ class Sotong24RemoteRepository {
     }
     final snap = await _projects!.get(const GetOptions(source: Source.server));
     if (snap.docs.isEmpty) return const [];
-    final list = <Sotong24RemoteProject>[];
-    for (final doc in snap.docs) {
-      final stages = await _loadStagesFromServer(doc.id);
-      list.add(
-        Sotong24RemoteProject.fromMap(doc.data(), id: doc.id, stages: stages),
-      );
-    }
+    final list = await Future.wait(
+      snap.docs.map((doc) async {
+        final stages = await _loadStagesFromServer(doc.id);
+        return Sotong24RemoteProject.fromMap(
+          doc.data(),
+          id: doc.id,
+          stages: stages,
+        );
+      }),
+    );
     list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return list;
   }

@@ -872,6 +872,12 @@ describe("remote agent contract V1", () => {
 
   it("explicit work activity updates lastActivityAt but heartbeat does not", async () => {
     const env = await monitoringJob("wi_plan_monitor_activity");
+    db.store.set(`${COL.PROJECTS}/${env.instructionId}`, {
+      projectId: env.instructionId,
+      currentStageId: "idea_clarify",
+      currentStage: 1,
+      status: "in_progress",
+    });
     const activity = await call(db, "/api/agent/report-activity", {
       jobId: env.jobId,
       instructionId: env.instructionId,
@@ -887,6 +893,11 @@ describe("remote agent contract V1", () => {
     const key = `${COL.JOBS}/${env.jobId}/stages/idea_clarify`;
     const before = db.store.get(key).lastActivityAt;
     assert.notEqual(before, "2020-01-01T00:00:00.000Z");
+    assert.equal(db.store.get(key).executorKind, "codex");
+    assert.equal(
+      db.store.get(`${COL.PROJECTS}/${env.instructionId}`).currentWorker,
+      "codex"
+    );
     await call(db, "/api/agent/heartbeat", {
       agentId: env.agentId,
       state: "running",
@@ -1302,6 +1313,61 @@ describe("remote agent contract V1", () => {
     assert.equal(
       db.store.get(`${COL.PROJECTS}/${env.instructionId}/stages/publish_prep`).status,
       "stage_transition_failed"
+    );
+  });
+
+  it("active monitor safely redispatches a stalled app stage from cursor to available codex", async () => {
+    const env = await monitoringJob("wi_plan_monitor_app_codex");
+    await control(db, "/api/control/start-job", {
+      jobId: env.jobId,
+      payload: {
+        instructionId: env.instructionId,
+        artifactType: "app",
+        aiExecution: { worker: "cursor", executionMode: "cursor" },
+        environment: "production",
+        isTest: false,
+      },
+    });
+    const nowMs = Date.parse("2026-08-19T01:00:00.000Z");
+    db.store.set(`${COL.MONITORING_CONFIG}/default`, {
+      offlineAfterSeconds: 600,
+      noActivityAfterSeconds: 300,
+      defaultExpectedMaxSeconds: 120,
+    });
+    db.store.set(`${COL.AGENTS}/${env.agentId}`, {
+      state: "running",
+      lastHeartbeatAt: "2026-08-19T00:59:30.000Z",
+      aiUsage: { codex: { weekly: { usedPercent: 22 } } },
+    });
+    db.store.set(`${COL.JOBS}/${env.jobId}`, {
+      ...db.store.get(`${COL.JOBS}/${env.jobId}`),
+      jobId: env.jobId,
+      instructionId: env.instructionId,
+      assignedAgentId: env.agentId,
+      currentStage: "app_problem_validate",
+      status: "running",
+    });
+    db.store.set(`${COL.JOBS}/${env.jobId}/stages/app_problem_validate`, {
+      stageId: "app_problem_validate",
+      stageNumber: 2,
+      status: "running",
+      startedAt: "2026-08-19T00:00:00.000Z",
+      lastActivityAt: "2026-08-19T00:40:00.000Z",
+    });
+
+    await evaluateActiveJobs(db, nowMs);
+    const stage = db.store.get(
+      `${COL.JOBS}/${env.jobId}/stages/app_problem_validate`
+    );
+    const recovery = db.store.get(
+      `${COL.JOBS}/${env.jobId}/commands/${stage.recoveryCommandId}`
+    );
+    assert.equal(recovery.payload.aiExecution.worker, "codex");
+    assert.equal(recovery.payload.recovery.previousWorker, "cursor");
+    assert.equal(recovery.payload.recovery.selectedWorker, "codex");
+    assert.equal(
+      recovery.payload.recovery.action,
+      "stale_worker_recheck_and_executor_redispatch"
     );
   });
 

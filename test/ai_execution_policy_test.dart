@@ -85,13 +85,13 @@ void main() {
 
     expect(manual.approvalMode, 'manual');
     expect(manual.approvalRequired, isTrue);
-    expect(manual.worker, 'cursor');
+    expect(manual.worker, 'codex');
     expect(manual.maxAutoStageOrder, 18);
 
     expect(automatic.approvalMode, 'auto');
     expect(automatic.approvalRequired, isFalse);
     expect(automatic.autoAdvance, isTrue);
-    expect(automatic.worker, 'cursor');
+    expect(automatic.worker, 'codex');
   });
 
   test('legacy approvalRequired keeps safe approval mode compatibility', () {

@@ -159,6 +159,8 @@ class Sotong24RemoteStage {
     this.recoveryAttempt = 0,
     this.maxRecoveryAttempts = 0,
     this.recoveryState = '',
+    this.executorKind = '',
+    this.taskId = '',
   });
 
   final String stageId;
@@ -204,6 +206,8 @@ class Sotong24RemoteStage {
   final int recoveryAttempt;
   final int maxRecoveryAttempts;
   final String recoveryState;
+  final String executorKind;
+  final String taskId;
 
   bool get hasOpenableResult =>
       openableResultUrl != null || openablePreviewUrl != null;
@@ -279,6 +283,8 @@ class Sotong24RemoteStage {
     if (recoveryAttempt > 0) 'recoveryAttempt': recoveryAttempt,
     if (maxRecoveryAttempts > 0) 'maxRecoveryAttempts': maxRecoveryAttempts,
     if (recoveryState.trim().isNotEmpty) 'recoveryState': recoveryState,
+    if (executorKind.trim().isNotEmpty) 'executorKind': executorKind,
+    if (taskId.trim().isNotEmpty) 'taskId': taskId,
   };
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -319,6 +325,8 @@ class Sotong24RemoteStage {
       recoveryAttempt: _asInt(map['recoveryAttempt']),
       maxRecoveryAttempts: _asInt(map['maxRecoveryAttempts']),
       recoveryState: '${map['recoveryState'] ?? ''}',
+      executorKind: '${map['executorKind'] ?? map['worker'] ?? ''}',
+      taskId: '${map['taskId'] ?? ''}',
     );
   }
 
@@ -367,6 +375,8 @@ class Sotong24RemoteStage {
       recoveryAttempt: recoveryAttempt,
       maxRecoveryAttempts: maxRecoveryAttempts,
       recoveryState: recoveryState,
+      executorKind: executorKind,
+      taskId: taskId,
     );
   }
 }
@@ -469,6 +479,7 @@ class Sotong24RemoteProject {
     this.finalRevision = 1,
     this.productionCompletedAt = '',
     this.externalPublished = false,
+    this.currentWorker = '',
     this.stages = const [],
   });
 
@@ -497,6 +508,7 @@ class Sotong24RemoteProject {
   final int finalRevision;
   final String productionCompletedAt;
   final bool externalPublished;
+  final String currentWorker;
   final List<Sotong24RemoteStage> stages;
 
   String get productTypeLabel {
@@ -629,6 +641,7 @@ class Sotong24RemoteProject {
     'finalRevision': finalRevision,
     'productionCompletedAt': productionCompletedAt,
     'externalPublished': externalPublished,
+    if (currentWorker.trim().isNotEmpty) 'currentWorker': currentWorker,
   };
 
   factory Sotong24RemoteProject.fromMap(
@@ -670,6 +683,7 @@ class Sotong24RemoteProject {
           : 1,
       productionCompletedAt: '${map['productionCompletedAt'] ?? ''}',
       externalPublished: map['externalPublished'] == true,
+      currentWorker: '${map['currentWorker'] ?? map['executorKind'] ?? ''}',
       stages: stages,
     );
   }
@@ -714,6 +728,7 @@ class Sotong24RemoteProject {
       productionCompletedAt:
           productionCompletedAt ?? this.productionCompletedAt,
       externalPublished: externalPublished ?? this.externalPublished,
+      currentWorker: currentWorker,
       stages: stages ?? this.stages,
     );
   }

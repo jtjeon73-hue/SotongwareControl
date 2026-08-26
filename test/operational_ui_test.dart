@@ -40,10 +40,70 @@ class _FakeAuth implements AuthClient {
   Future<void> signOut() async {}
 }
 
+class _PendingWorkshopRepository extends Sotong24RemoteRepository {
+  _PendingWorkshopRepository() : super(forceMemory: true);
+
+  @override
+  Stream<List<Sotong24RemoteProject>> watchProjects() => const Stream.empty();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('운영 UI', () {
+    testWidgets('AI 제작공정 — 초기 로딩 중에도 빈 화면 대신 상태 문구 표시', (tester) async {
+      final repo = _PendingWorkshopRepository();
+      addTearDown(repo.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: ProductWorkshopScreen(repository: repo)),
+        ),
+      );
+
+      expect(find.byKey(const Key('workshop_loading_label')), findsOneWidget);
+      expect(find.text('AI 제작공정 불러오는 중'), findsOneWidget);
+    });
+
+    testWidgets('AI 제작공정 — 앱 단계의 Codex 작업자 표시', (tester) async {
+      final repo = Sotong24RemoteRepository(
+        forceMemory: true,
+        memorySeed: const [
+          Sotong24RemoteProject(
+            projectId: 'wi_plan_app_worker',
+            title: '전기 점검 체크 앱',
+            productType: 'app',
+            currentStage: 2,
+            totalStages: 18,
+            progress: 5,
+            status: Sotong24WorkStatus.inProgress,
+            currentWorker: 'codex',
+            stages: [
+              Sotong24RemoteStage(
+                stageId: 'app_problem_validate',
+                stageNumber: 2,
+                stageName: '고객 문제 검증',
+                status: Sotong24WorkStatus.inProgress,
+                executorKind: 'codex',
+                activityState: 'codex_running',
+              ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(repo.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(body: ProductWorkshopScreen(repository: repo)),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('현재 작업자: Codex'), findsOneWidget);
+      expect(find.textContaining('2단계'), findsWidgets);
+    });
+
     testWidgets('표준제작 가이드 홈·카테고리', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;

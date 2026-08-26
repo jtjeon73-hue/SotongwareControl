@@ -311,6 +311,21 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
           .map((item) => item.data() || {})
           .find((item) => item.type === COMMAND_TYPE.START_JOB && item.payload);
         if (original) {
+          const originalAiExecution = original.payload.aiExecution || {};
+          const originalWorker = String(originalAiExecution.worker || "").toLowerCase();
+          const artifactType = String(original.payload.artifactType || "").toLowerCase();
+          const codexWeeklyUsed = Number(
+            agent.aiUsage && agent.aiUsage.codex &&
+            agent.aiUsage.codex.weekly && agent.aiUsage.codex.weekly.usedPercent
+          );
+          const codexAvailable = Number.isFinite(codexWeeklyUsed) && codexWeeklyUsed < 100;
+          const selectedWorker = artifactType === "app" &&
+            originalWorker === "cursor" && codexAvailable
+            ? "codex"
+            : originalWorker;
+          const recoveryAction = recoveryAttempt === 1
+            ? "stale_worker_recheck_and_executor_redispatch"
+            : "ownership_reconcile_and_executor_redispatch";
           const recoveryCommandId = `cmd_recovery_${sha256Hex(
             `${doc.id}:${job.currentStage}:${recoveryAttempt}`
           ).slice(0, 24)}`;
@@ -324,10 +339,17 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
             attempt: 0,
             payload: {
               ...original.payload,
+              aiExecution: {
+                ...originalAiExecution,
+                worker: selectedWorker,
+              },
               recovery: {
                 stageId: job.currentStage,
                 attempt: recoveryAttempt,
                 maxAttempts: maxRecoveryAttempts,
+                action: recoveryAction,
+                previousWorker: originalWorker,
+                selectedWorker,
               },
             },
             createdAt: ts,

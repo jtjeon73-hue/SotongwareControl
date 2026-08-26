@@ -176,10 +176,17 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
         final projects = _serverRefreshProjects ?? snap.data;
         if (projects == null) {
           return const Center(
-            child: SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 2.5),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                SizedBox(height: 12),
+                Text('AI 제작공정 불러오는 중', key: Key('workshop_loading_label')),
+              ],
             ),
           );
         }
@@ -545,6 +552,7 @@ class _Sotong24RemoteDetailScreenState
                 Sotong24WorkshopPresentation.currentStageLine(project),
               ),
               _Kv('상태', project.userFacingStatusLabel),
+              _Kv('현재 작업자', _workerLabel(project, stage)),
               _Kv('승인 방식', project.approvalMode == 'auto' ? '자동 승인' : '수동 승인'),
               if (stage != null) ...[
                 const SizedBox(height: 8),
@@ -1467,7 +1475,8 @@ class _CurrentWorkCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '상태: ${project.userFacingStatusLabel}',
+            '상태: ${project.userFacingStatusLabel} · '
+            '현재 작업자: ${_workerLabel(project, currentStage)}',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           Text(
@@ -2236,4 +2245,17 @@ String _formatTime(String iso) {
   String two(int n) => n.toString().padLeft(2, '0');
   return '${local.year}-${two(local.month)}-${two(local.day)} '
       '${two(local.hour)}:${two(local.minute)}';
+}
+
+String _workerLabel(Sotong24RemoteProject project, Sotong24RemoteStage? stage) {
+  var raw = stage?.executorKind.trim() ?? '';
+  if (raw.isEmpty) raw = project.currentWorker.trim();
+  final activity = stage?.activityState.trim().toLowerCase() ?? '';
+  if (raw.isEmpty && activity.startsWith('codex_')) raw = 'codex';
+  if (raw.isEmpty && activity.startsWith('cursor_')) raw = 'cursor';
+  return switch (raw.toLowerCase()) {
+    'codex' => 'Codex',
+    'cursor' => 'Cursor',
+    _ => raw.isEmpty ? '-' : raw,
+  };
 }

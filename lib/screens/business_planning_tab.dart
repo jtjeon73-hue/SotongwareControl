@@ -2233,7 +2233,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _sendSummaryRow(
               '승인 방식',
               WorkInstructionWorkshopPresentation.approvalModeLabel(
-                approvalRequired: isAiProductionPilot && _approvalMode == 'manual',
+                approvalRequired:
+                    isAiProductionPilot && _approvalMode == 'manual',
               ),
             ),
             if (input.constraints.trim().isNotEmpty)

@@ -711,7 +711,7 @@ class AiExecutionPolicy {
     final mode = approvalMode == 'auto' ? 'auto' : 'manual';
     return AiExecutionPolicy(
       enabled: true,
-      worker: 'cursor',
+      worker: 'codex',
       maxAutoStageOrder: 18,
       approvalRequired: mode == 'manual',
       artifactUploadEnabled: true,
