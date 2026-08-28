@@ -405,6 +405,56 @@ function toProjectStageStatus(status) {
   return status;
 }
 
+// Reconcile an existing durable task without claiming a command or launching it.
+async function reportRecoveredStage(db, ctx, body) {
+  const { jobId, instructionId, stageId, taskId } = body;
+  const revision = body.revision;
+  if (body.status !== WORK_STATUS.PAUSED || !Number.isSafeInteger(revision) || revision < 1 ||
+      !instructionId || !stageId || taskId !== `${instructionId}__${stageId}__r${revision}`) {
+    throw httpError(400, "invalid_payload", "recovered_task_identity_invalid");
+  }
+  const jobRef = db.collection(COL.JOBS).doc(jobId);
+  const stageRef = jobRef.collection("stages").doc(stageId);
+  const projectRef = db.collection(COL.PROJECTS).doc(instructionId);
+  const projectStageRef = projectRef.collection("stages").doc(stageId);
+  const ts = nowIso();
+  await db.runTransaction(async (tx) => {
+    const refs = [jobRef, stageRef, projectRef, projectStageRef];
+    const snaps = await Promise.all(refs.map((ref) => tx.get(ref)));
+    if (snaps.some((s) => !s.exists)) throw httpError(409, "failed_precondition", "recovery_requires_existing_records");
+    const [job, stage, project, projectStage] = snaps.map((s) => s.data() || {});
+    if (job.assignedAgentId !== ctx.agentId || (job.ownerUid && job.ownerUid !== ctx.agent.ownerUid))
+      throw httpError(403, "forbidden", "agent_mismatch");
+    if (job.instructionId !== instructionId || job.currentStage !== stageId ||
+        Number(job.currentStageNumber || stage.stageNumber) !== body.stageNumber ||
+        Number(project.currentStage) !== body.stageNumber ||
+        (project.currentStageId && project.currentStageId !== stageId))
+      throw httpError(409, "failed_precondition", "recovery_current_stage_mismatch");
+    if (revision !== Math.max(Number(stage.revision) || 1, Number(projectStage.revision) || 1))
+      throw httpError(409, "failed_precondition", "recovery_revision_not_existing");
+    if ([job, stage, project, projectStage].some((s) =>
+      ["completed", "cancelled", "not_applicable", "waiting_approval", "awaiting_approval"].includes(s.status)))
+      throw httpError(409, "failed_precondition", "terminal_task_not_recoverable");
+    const common = { status: WORK_STATUS.PAUSED, recoveryState: "safe_stopped",
+      taskId, revision, recoveredTaskId: taskId, lastActivityAt: ts, updatedAt: ts,
+      activityState: "safe_stopped", failureType: "", failureReason: "", errorMessage: "",
+      pauseReason: "operator_verification", retryable: false, nextRetryAt: "" };
+    for (let i = 0; i < refs.length; i++) {
+      const prior = snaps[i].data() || {};
+      const patch = { ...common };
+      // Preserve failure/counter evidence; never reset the attempt budget.
+      if (prior.recoveredTaskId !== taskId) patch.recoveryHistory = [
+        ...(Array.isArray(prior.recoveryHistory) ? prior.recoveryHistory : []),
+        { at: ts, taskId, previousRevision: Number(prior.revision) || 1,
+          previousStatus: prior.status || "", failureType: prior.failureType || "",
+          failureReason: prior.failureReason || "", recoveryAttempt: Number(prior.recoveryAttempt) || 0 },
+      ];
+      tx.set(refs[i], patch, { merge: true });
+    }
+  });
+  return { recoveryState: "safe_stopped", taskId, revision };
+}
+
 async function handleReportStage(db, ctx, body) {
   const stageId = String(body.stageId || "").trim();
   const status = String(body.status || "").trim();
@@ -412,6 +462,7 @@ async function handleReportStage(db, ctx, body) {
   if (!stageId) throw httpError(400, "invalid_payload", "stageId required");
   if (!jobId) throw httpError(400, "invalid_payload", "jobId required");
   if (!WORK_STATUSES.has(status)) throw httpError(400, "invalid_payload", "status invalid");
+  if (body.recoveryState === "safe_stopped") return reportRecoveredStage(db, ctx, body);
   const reportsCompletion =
     status === WORK_STATUS.COMPLETED || status === WORK_STATUS.WAITING_APPROVAL;
   if (reportsCompletion && body.criteriaMet !== true) {
@@ -549,8 +600,12 @@ async function handleReportStage(db, ctx, body) {
     const currentJobStage = snapshots[1].exists
       ? snapshots[1].data() || {}
       : {};
-    const safeJobStage = mergeMonotonicStage(currentJobStage, patch);
-    const safeJob = mergeMonotonicProject(currentJob, jobPatch);
+    const resumesRecovery = activeStatus.has(status) && currentJobStage.recoveryState === "safe_stopped" &&
+      Number(body.revision) === Number(currentJobStage.revision);
+    const reportedPatch = { ...patch, ...(resumesRecovery ? { recoveryState: "resumed" } : {}) };
+    const reportedJobPatch = { ...jobPatch, ...(resumesRecovery ? { recoveryState: "resumed" } : {}) };
+    const safeJobStage = mergeMonotonicStage(currentJobStage, reportedPatch);
+    const safeJob = mergeMonotonicProject(currentJob, reportedJobPatch);
     tx.set(stageRef, safeJobStage, { merge: true });
     tx.set(jobRef, safeJob, { merge: true });
     if (projectRef && snapshots[2].exists) {
@@ -559,7 +614,7 @@ async function handleReportStage(db, ctx, body) {
         ? snapshots[3].data() || {}
         : {};
       const projectStagePatch = mergeMonotonicStage(currentProjectStage, {
-        ...patch,
+        ...reportedPatch,
         status: toProjectStageStatus(status),
         activityState: patch.activityState || String(previous.activityState || ""),
       });
@@ -582,6 +637,7 @@ async function handleReportStage(db, ctx, body) {
         activityState: projectStagePatch.activityState || "",
         approvalMode: job.approvalMode === "auto" ? "auto" : "manual",
         updatedAt: ts,
+        ...(resumesRecovery ? { recoveryState: "resumed" } : {}),
         ...(projectStagePatch.attemptCount != null
           ? { attemptCount: projectStagePatch.attemptCount } : {}),
         ...(projectStagePatch.maxAttempts != null

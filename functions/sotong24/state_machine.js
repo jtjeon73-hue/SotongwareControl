@@ -14,6 +14,7 @@ const STATUS_RANK = Object.freeze({
   running: 1,
   revision: 1,
   reworking: 1,
+  paused: 1,
   paused_quota: 1,
   paused_network: 1,
   stalled: 1,
@@ -104,6 +105,10 @@ function statusRank(status) {
 function mergeMonotonicStage(previous, incoming) {
   const prior = previous || {};
   const next = { ...incoming };
+  if (prior.recoveryState === "safe_stopped" && next.recoveryState === "resumed") {
+    for (const key of ["attemptCount", "retryCount", "recoveryAttempt"])
+      if (prior[key] != null) next[key] = Math.max(Number(prior[key]) || 0, Number(next[key]) || 0);
+  }
   const previousRevision = normalizedRevision(prior);
   const incomingRevision = normalizedRevision(next);
   const staleRevision = incomingRevision < previousRevision;
@@ -116,7 +121,9 @@ function mergeMonotonicStage(previous, incoming) {
     ["stalled", "stage_transition_failed"].includes(String(prior.status || "")) &&
     ["ready", "in_progress", "running"].includes(String(next.status || "")) &&
     Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0);
-  if (!staleRevision && !sameRevisionRegression && !staleRetryAttempt &&
+  const heldRecovery = prior.recoveryState === "safe_stopped" &&
+    incomingRevision === previousRevision && next.recoveryState !== "resumed";
+  if (!heldRecovery && !staleRevision && !sameRevisionRegression && !staleRetryAttempt &&
       !staleStallRecovery) return next;
 
   for (const field of AUTHORITATIVE_STAGE_FIELDS) {
@@ -146,6 +153,10 @@ function currentOrder(value) {
 function mergeMonotonicProject(previous, incoming) {
   const prior = previous || {};
   const next = { ...incoming };
+  if (prior.recoveryState === "safe_stopped" && next.recoveryState === "resumed") {
+    for (const key of ["attemptCount", "retryCount", "recoveryAttempt"])
+      if (prior[key] != null) next[key] = Math.max(Number(prior[key]) || 0, Number(next[key]) || 0);
+  }
   const priorOrder = currentOrder(prior);
   const nextOrder = currentOrder(next);
   const regressedStage = priorOrder > 0 && nextOrder > 0 && nextOrder < priorOrder;
@@ -158,7 +169,9 @@ function mergeMonotonicProject(previous, incoming) {
     ["stalled", "stage_transition_failed"].includes(String(prior.status || "")) &&
     ["ready", "in_progress", "running"].includes(String(next.status || "")) &&
     Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0);
-  if (!regressedStage && !sameStageRegression && !staleRetryAttempt &&
+  const heldRecovery = prior.recoveryState === "safe_stopped" &&
+    priorOrder === nextOrder && next.recoveryState !== "resumed";
+  if (!heldRecovery && !regressedStage && !sameStageRegression && !staleRetryAttempt &&
       !staleStallRecovery) return preserveProductionLaunch(prior, next);
 
   for (const field of [

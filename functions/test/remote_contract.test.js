@@ -850,6 +850,76 @@ describe("remote agent contract V1", () => {
     return { agentId, agentToken, jobId: created.body.jobId, instructionId };
   }
 
+  async function recoveryFixture() {
+    const env = await monitoringJob("wi_plan_recovery_contract");
+    const jobKey = `${COL.JOBS}/${env.jobId}`;
+    const projectKey = `${COL.PROJECTS}/${env.instructionId}`;
+    const stageId = "app_project_setup";
+    const keys = [jobKey, `${jobKey}/stages/${stageId}`, projectKey, `${projectKey}/stages/${stageId}`];
+    const failure = { status: "stage_transition_failed", recoveryState: "exhausted",
+      recoveryAttempt: 3, attemptCount: 4, revision: 1, failureType: "stalled_recovery_exhausted",
+      failureReason: "automatic recovery exhausted", stageNumber: 5 };
+    db.store.set(jobKey, { ...db.store.get(jobKey), ...failure, productType: "app",
+      currentStage: stageId, currentStageNumber: 5 });
+    db.store.set(keys[1], { ...failure, stageId });
+    db.store.set(projectKey, { ...failure, projectId: env.instructionId, currentStage: 5, currentStageId: stageId });
+    db.store.set(keys[3], { ...failure, stageId, revision: 2 });
+    const body = { jobId: env.jobId, instructionId: env.instructionId, stageId, stageNumber: 5,
+      taskId: `${env.instructionId}__${stageId}__r2`, revision: 2, status: "paused", recoveryState: "safe_stopped" };
+    return { ...env, keys, body };
+  }
+
+  it("durable r2 recovery atomically repairs existing records without commands or attempt resets", async () => {
+    const env = await recoveryFixture();
+    const count = db.store.size;
+    for (let i = 0; i < 2; i++) {
+      const res = await call(db, "/api/agent/report-stage", env.body, { token: env.agentToken });
+      assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    }
+    assert.equal(db.store.size, count);
+    for (const key of env.keys) {
+      const value = db.store.get(key);
+      assert.equal(value.revision, 2);
+      assert.equal(value.status, "paused");
+      assert.equal(value.recoveryState, "safe_stopped");
+      assert.equal(value.attemptCount, 4);
+      assert.equal(value.recoveryAttempt, 3);
+      assert.equal(value.failureType, "");
+      assert.equal(value.recoveryHistory.length, 1);
+      assert.equal(value.recoveryHistory[0].failureType, "stalled_recovery_exhausted");
+    }
+    const { mergeMonotonicStage, mergeMonotonicProject } = require("../sotong24/state_machine");
+    assert.equal(mergeMonotonicStage(db.store.get(env.keys[3]), { revision: 2, status: "in_progress" }).status, "paused");
+    assert.equal(mergeMonotonicProject(db.store.get(env.keys[2]), { currentStage: 5, status: "in_progress" }).status, "paused");
+    const resumed = await call(db, "/api/agent/report-stage", {
+      jobId: env.jobId, stageId: env.body.stageId, stageNumber: 5, revision: 2, status: "running",
+    }, { token: env.agentToken });
+    assert.equal(resumed.statusCode, 200);
+    for (const key of env.keys) {
+      assert.equal(db.store.get(key).recoveryState, "resumed", key);
+      assert.equal(db.store.get(key).attemptCount, 4, key);
+    }
+  });
+
+  it("recovery rejects stale identity, other stage/agent, missing records and terminal work", async () => {
+    const env = await recoveryFixture();
+    for (const override of [
+      { revision: 1, taskId: env.body.taskId.replace(/r2$/, "r1") },
+      { taskId: env.body.taskId.replace(/r2$/, "r3") },
+      { revision: 3, taskId: env.body.taskId.replace(/r2$/, "r3") },
+      { stageNumber: 6 }, { status: "running" },
+    ]) {
+      const res = await call(db, "/api/agent/report-stage", { ...env.body, ...override }, { token: env.agentToken });
+      assert.ok(res.statusCode >= 400);
+    }
+    const other = await pairAndEnroll();
+    assert.equal((await call(db, "/api/agent/report-stage", env.body, { token: other.agentToken })).statusCode, 403);
+    db.store.get(env.keys[1]).status = "completed";
+    assert.equal((await call(db, "/api/agent/report-stage", env.body, { token: env.agentToken })).statusCode, 409);
+    db.store.delete(env.keys[3]);
+    assert.equal((await call(db, "/api/agent/report-stage", env.body, { token: env.agentToken })).statusCode, 409);
+  });
+
   it("stage start uses server time even when a ready document already exists", async () => {
     const env = await monitoringJob("wi_plan_monitor_start");
     db.store.set(`${COL.JOBS}/${env.jobId}/stages/idea_clarify`, {
