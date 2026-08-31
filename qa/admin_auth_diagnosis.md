@@ -45,9 +45,20 @@ Firebase Authentication 비밀번호 검증이 수행되기 전에
 - 관리자 계정·비밀번호를 삭제/초기화한 흔적은 코드상 없음
 - 인증 방식: UI 아이디 `sotongware` → Firebase 이메일/비밀번호로 매핑
 
-## 실제 원인
+## 실제 원인 (2026-08-31 재발)
 
-최근 배포(`feat: AI 자동 강의 생성…`, 커밋 `75862ad`)에서
+Golden Run 2 사전 고도화 배포(`d310c8f`)에서 `flutter build web`만 실행한 뒤 Hosting을 배포했다.
+관리자 dart-define(`SOTONG_ADMIN_AUTH_EMAIL`, `SOTONG_ADMIN_UID`)이 빠진 빌드가 운영을 덮어써
+로그인 시 `AuthFailureReason.configMissing` → "관리자 인증 설정을 확인할 수 없습니다." 발생.
+
+**API 장애가 아님.** 로그인 화면은 별도 config API를 호출하지 않고, 컴파일 타임 상수를 사용한다.
+`verify_live_admin_build.py`로 live bundle에 email/uid 포함 여부를 확인할 수 있다.
+
+## 재발 방지 (2026-08-31)
+
+1. `scripts/deploy_control.ps1`만으로 운영 Hosting 배포
+2. `GET /api/control/auth-public-config` — dart-define 누락 시 런타임 fallback (비밀번호 미포함)
+3. `AuthRuntimeConfig.ensureLoaded()` — 앱 시작·로그인 전 서버 매핑 로드
 
 ```powershell
 flutter build web --release --base-href /
