@@ -8,6 +8,7 @@ import '../data/sotong24_workflows.dart';
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import '../models/sotong24_monitoring.dart';
+import '../services/apk_download_service.dart';
 import '../services/remote_agent_repository.dart';
 import '../services/remote_control_api.dart';
 import '../services/sotong24_remote_repository.dart';
@@ -37,6 +38,7 @@ class ProductWorkshopScreen extends StatefulWidget {
     this.onStartNewWork,
     this.focusInstructionId,
     this.focusStageId,
+    this.focusApk = false,
     this.onEnableNotifications,
     this.onOpenGuide,
     this.onCancelRun,
@@ -47,6 +49,7 @@ class ProductWorkshopScreen extends StatefulWidget {
   final VoidCallback? onStartNewWork;
   final String? focusInstructionId;
   final String? focusStageId;
+  final bool focusApk;
   final Future<bool> Function()? onEnableNotifications;
   final void Function(String stageId)? onOpenGuide;
   final CancelRunAction? onCancelRun;
@@ -233,7 +236,11 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
             if (!mounted) return;
             if (_openedFocusForId == focusId) return;
             _openedFocusForId = focusId;
-            _openDetailWithStage(opened, focusStageId: widget.focusStageId);
+            _openDetailWithStage(
+              opened,
+              focusStageId: widget.focusStageId,
+              focusApk: widget.focusApk,
+            );
           });
         }
         final isEmpty =
@@ -383,6 +390,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
   Future<void> _openDetailWithStage(
     Sotong24RemoteProject project, {
     String? focusStageId,
+    bool focusApk = false,
   }) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -392,6 +400,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
           repository: _repo,
           monitoringPolicy: _monitoringPolicy,
           focusStageId: focusStageId,
+          focusApk: focusApk,
           onEnableNotifications: widget.onEnableNotifications,
           onOpenGuide: widget.onOpenGuide,
           job: _jobFor(project.projectId),
@@ -411,6 +420,7 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
     this.initialProject,
     this.monitoringPolicy = const Sotong24MonitoringPolicy(),
     this.focusStageId,
+    this.focusApk = false,
     this.onEnableNotifications,
     this.onOpenGuide,
     this.job,
@@ -422,6 +432,7 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
   final Sotong24RemoteProject? initialProject;
   final Sotong24MonitoringPolicy monitoringPolicy;
   final String? focusStageId;
+  final bool focusApk;
   final Future<bool> Function()? onEnableNotifications;
   final void Function(String stageId)? onOpenGuide;
   final RemoteJobDoc? job;
@@ -437,12 +448,31 @@ class _Sotong24RemoteDetailScreenState
   var _busy = false;
   var _notificationBusy = false;
   Timer? _clockTimer;
+  final GlobalKey _apkDownloadKey = GlobalKey();
+  var _apkFocusHandled = false;
 
   @override
   void initState() {
     super.initState();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
+    });
+  }
+
+  void _scrollToApkIfNeeded(Sotong24RemoteProject project) {
+    if (!widget.focusApk || _apkFocusHandled) return;
+    final apk = Sotong24WorkshopPresentation.finalApkArtifact(project);
+    if (apk == null) return;
+    _apkFocusHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _apkDownloadKey.currentContext;
+      if (ctx == null || !mounted) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: 0.1,
+      );
     });
   }
 
@@ -493,6 +523,8 @@ class _Sotong24RemoteDetailScreenState
             project,
           );
           final showApprovalActions = project.showApprovalActions;
+          final releaseApk = Sotong24WorkshopPresentation.finalApkArtifact(project);
+          _scrollToApkIfNeeded(project);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
@@ -695,6 +727,16 @@ class _Sotong24RemoteDetailScreenState
                   def: stageDef,
                 ),
               ],
+              if (!project.isProductionComplete &&
+                  project.productType == 'app' &&
+                  releaseApk != null) ...[
+                const SizedBox(height: 12),
+                _ApkReadyDownloadPanel(
+                  key: _apkDownloadKey,
+                  project: project,
+                  artifact: releaseApk,
+                ),
+              ],
               if (!project.isDemo && !project.isProductionComplete) ...[
                 const SizedBox(height: 14),
                 SizedBox(
@@ -734,6 +776,7 @@ class _Sotong24RemoteDetailScreenState
                     project: project,
                     repository: widget.repository,
                     onOpenGuide: widget.onOpenGuide,
+                    apkFocusKey: widget.focusApk ? _apkDownloadKey : null,
                   ),
                 ],
                 const SizedBox(height: 8),
@@ -971,16 +1014,69 @@ class _Sotong24RemoteDetailScreenState
   }
 }
 
+class _ApkReadyDownloadPanel extends StatelessWidget {
+  const _ApkReadyDownloadPanel({
+    super.key,
+    required this.project,
+    required this.artifact,
+  });
+
+  final Sotong24RemoteProject project;
+  final Sotong24FinalPdfArtifact artifact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('apk_ready_download_panel'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: ControlColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ControlColors.teal),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '휴대폰 설치 테스트',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Release APK가 준비되었습니다. 아래에서 다운로드하여 실기기 설치·실행을 확인해 주세요.',
+            style: TextStyle(color: ControlColors.textSecondary, height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          ApkDownloadButton(
+            projectId: project.projectId,
+            stageId: artifact.stageId,
+            title: project.title,
+            revision: artifact.revision,
+            presentation: ApkDownloadPresentation(
+              appTitle: project.title,
+              versionName: '1.0.0',
+              sizeLabel: ApkDownloadPresentation.formatSizeLabel(49998528),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FinalResultPanel extends StatelessWidget {
   const _FinalResultPanel({
     required this.project,
     required this.repository,
     this.onOpenGuide,
+    this.apkFocusKey,
   });
 
   final Sotong24RemoteProject project;
   final Sotong24RemoteRepository repository;
   final void Function(String stageId)? onOpenGuide;
+  final GlobalKey? apkFocusKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1019,10 +1115,16 @@ class _FinalResultPanel extends StatelessWidget {
           const SizedBox(height: 8),
           if (isApp && finalApk != null)
             ApkDownloadButton(
+              key: apkFocusKey,
               projectId: project.projectId,
               stageId: finalApk.stageId,
               title: project.title,
               revision: finalApk.revision,
+              presentation: ApkDownloadPresentation(
+                appTitle: project.title,
+                versionName: '1.0.0',
+                sizeLabel: ApkDownloadPresentation.formatSizeLabel(49998528),
+              ),
             )
           else if (!isApp && finalPdf != null)
             PdfPreviewButton(

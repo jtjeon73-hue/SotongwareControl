@@ -64,11 +64,18 @@ void main() {
       );
       expect(instruction.workflowSteps.first.id, 'app_idea');
       expect(instruction.workflowSteps.last.id, 'app_production_complete');
+      expect(instruction.notes, contains('PRODUCTION'));
+      expect(instruction.notes, contains('Prototype/MVP 완료 금지'));
+      expect(instruction.qualityChecks, contains('placeholder/debug/test UI·visible TODO가 없는가'));
     },
   );
 
   test('APK download names preserve revision and block unsafe characters', () {
     expect(buildApkDownloadFileName('Farm Log AI', 2), 'Farm_Log_AI_r2.apk');
     expect(buildApkDownloadFileName('../나의:앱', 1), '나의_앱_r1.apk');
+  });
+
+  test('APK download presentation formats size label for mobile', () {
+    expect(ApkDownloadPresentation.formatSizeLabel(49998528), '약 47.7 MB');
   });
 }

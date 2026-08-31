@@ -127,6 +127,7 @@ function notificationKey(data) {
     data.stageId || "",
     Number(data.revision) || 1,
     data.eventType || "",
+    data.artifactId || "",
     data.resourceProvider || "",
     Number(data.thresholdPercent) || 0,
     data.resourceWindowId || "",
@@ -141,6 +142,15 @@ function deepLink(data) {
   }
   if (data.eventType === "test_notification") {
     return "/?screen=system-settings";
+  }
+  if (data.eventType === "apk_ready_for_device_review") {
+    const query = new URLSearchParams({
+      screen: "ai-production",
+      projectId: String(data.instructionId || ""),
+      stageId: String(data.stageId || "app_android_release"),
+      focus: "apk",
+    });
+    return `/?${query.toString()}`;
   }
   const { instructionId, stageId } = data;
   const query = new URLSearchParams({
@@ -174,6 +184,13 @@ function notificationContent(eventType, stageNumber, stageName, revision, data =
       return { title: `${data.resourceProvider || "AI 작업자"} 사용량 긴급`, body: `확인된 사용량이 ${Number(data.usagePercent) || 0}%입니다. 작업 중단 가능성을 확인해 주세요.` };
     case "ai_quota_exhausted":
       return { title: `${data.resourceProvider || "AI 작업자"} 사용 한도 소진`, body: "AI 작업자 한도가 소진되어 작업자 전환 또는 사용자 조치가 필요합니다." };
+    case "apk_ready_for_device_review": {
+      const appLabel = String(data.appName || "앱").trim() || "앱";
+      return {
+        title: "앱 설치본 준비 완료",
+        body: `${appLabel} APK가 준비되었습니다. 소통총관제에서 다운로드하여 휴대폰 설치 테스트를 진행해주세요.`,
+      };
+    }
     case "production_completed":
       if (data.productType === "app") {
         return { title: "앱 제작 완료", body: "앱 제작이 완료되었습니다. APK를 설치하여 확인해 주세요." };
@@ -222,6 +239,10 @@ async function enqueueNotification(db, data, rawPolicy) {
       actionRequired: data.actionRequired === true,
       source: String(data.source || "workflow").slice(0, 40),
       productType: String(data.productType || "ebook").slice(0, 30),
+      appName: String(data.appName || "").slice(0, 120),
+      artifactId: String(data.artifactId || "").slice(0, 64),
+      storagePath: String(data.storagePath || "").slice(0, 240),
+      sizeBytes: Number.isFinite(Number(data.sizeBytes)) ? Number(data.sizeBytes) : null,
       resourceProvider: String(data.resourceProvider || "").slice(0, 40),
       resourceWindowId: String(data.resourceWindowId || "").slice(0, 80),
       thresholdPercent: Number(data.thresholdPercent) || 0,

@@ -13,6 +13,30 @@ class ApkDownloadResult {
   final String message;
 }
 
+/// APK 다운로드 버튼에 표시할 운영 메타데이터.
+class ApkDownloadPresentation {
+  const ApkDownloadPresentation({
+    required this.appTitle,
+    this.versionName = '1.0.0',
+    this.sizeLabel = '',
+    this.reviewLabel = '출시 전 검토용',
+    this.storeLabel = 'Play Store 미등록',
+  });
+
+  final String appTitle;
+  final String versionName;
+  final String sizeLabel;
+  final String reviewLabel;
+  final String storeLabel;
+
+  static String formatSizeLabel(int bytes) {
+    if (bytes <= 0) return '';
+    final mb = bytes / (1024 * 1024);
+    if (mb >= 10) return '약 ${mb.toStringAsFixed(1)} MB';
+    return '약 ${(bytes / 1024).round()} KB';
+  }
+}
+
 abstract interface class ApkDownloader {
   Future<ApkDownloadResult> downloadApk({
     required String projectId,
@@ -64,6 +88,15 @@ class ArtifactApkDownloadService implements ApkDownloader {
       }
       await (attachmentOpener ?? platform.openAttachmentUrl)(grant.downloadUrl);
       return ApkDownloadResult(true, '${grant.fileName} 다운로드를 시작했습니다.');
+    } on RemoteControlApiException catch (e) {
+      final detail = e.userMessage.trim();
+      if (detail.isEmpty) {
+        return const ApkDownloadResult(
+          false,
+          'APK를 다운로드하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        );
+      }
+      return ApkDownloadResult(false, detail);
     } catch (_) {
       return const ApkDownloadResult(
         false,

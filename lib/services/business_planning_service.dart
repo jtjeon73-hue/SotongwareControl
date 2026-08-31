@@ -264,7 +264,9 @@ class BusinessPlanningService {
         '소통24워크 Agent 실행 전 사용자 승인',
       ],
       executionStatus: '지시서 준비',
-      notes: input.notes.trim(),
+      notes: ArtifactType.normalize(artifact) == ArtifactType.app
+          ? _appProductionInstructionNotes(input)
+          : input.notes.trim(),
       primaryTrack: primaryTrack,
       followUpTracks: followUps,
       artifactType: artifact,
@@ -275,6 +277,46 @@ class BusinessPlanningService {
       contract: contract,
       aiExecution: aiExecution,
     );
+  }
+
+  String _appProductionInstructionNotes(BusinessPlanInput input) {
+    final userMemo = input.notes.trim();
+    final sections = <String>[
+      '[앱 Production 품질 계약]',
+      '목표 등급: PRODUCTION (Prototype/MVP 완료 금지)',
+      '',
+      '## 앱 목적',
+      input.desiredOutcome.trim().isEmpty
+          ? '(사용자 확인 필요)'
+          : input.desiredOutcome.trim(),
+      '',
+      '## 목표 사용자',
+      input.targetCustomer.trim().isEmpty
+          ? '(사용자 확인 필요)'
+          : input.targetCustomer.trim(),
+      '',
+      '## 핵심 사용자 가치 / 문제',
+      input.customerProblem.trim().isEmpty
+          ? '(사용자 확인 필요)'
+          : input.customerProblem.trim(),
+      '',
+      '## 필수 포함 항목 (작업지시서 구조)',
+      '- 실제 사용 시나리오·핵심 workflow',
+      '- 필수/보조 기능·데이터 구조·navigation 구조',
+      '- 주요 화면 목록·상태별 UX(empty/loading/error)',
+      '- 디자인 방향·최신 Android/Flutter UI·접근성',
+      '- 개인정보/권한 최소화·오류 UX·실기기 검토 기준',
+      '- 출시 전 품질 기준(overflow 0, placeholder/debug UI 금지)',
+      '',
+      '## UI/UX Production 기준',
+      '- 과도하게 큰 글자·불필요한 대형 카드/공백 금지',
+      '- typography hierarchy·spacing/token consistency',
+      '- modern Material/Flutter UI·light/dark·responsive layout',
+      '- confirmation/destructive UX·실사용자 관점 화면 구성',
+      '',
+      if (userMemo.isNotEmpty) ...['## 사용자 메모', userMemo],
+    ];
+    return sections.join('\n');
   }
 
   List<String> _defaultFollowUpTracks(String artifact, {String subtype = ''}) {
@@ -347,7 +389,12 @@ class BusinessPlanningService {
       case ArtifactType.ebook:
         return [...common, '목차와 1장 초안이 존재', '출력 형식(PDF/EPUB)이 확정됨'];
       case ArtifactType.app:
-        return [...common, '핵심 기능 1개의 동작 초안이 존재', '플랫폼·로그인·데이터 범위가 확정됨'];
+        return [
+          ...common,
+          '핵심 사용자 workflow가 end-to-end로 완결됨',
+          'Production UI/UX·접근성·empty/loading/error 기준 충족',
+          'release APK·device review package·prelaunch_review 준비 완료',
+        ];
       case ArtifactType.contents:
         if (subtype == ContentSubtype.song) {
           return [...common, '데모/가이드 음원 또는 가사 초안이 존재'];
@@ -373,7 +420,17 @@ class BusinessPlanningService {
     ];
     switch (ArtifactType.normalize(artifact)) {
       case ArtifactType.app:
-        return [...common, '핵심 사용자 행동이 끊기지 않는가', '권한·알림 요청이 목적에 맞는가'];
+        return [
+          ...common,
+          'Prototype/MVP 수준으로 완료 처리하지 않았는가',
+          '핵심 사용자 행동이 끊기지 않는가',
+          '과도한 대형 카드·불필요한 공백·과대 글자가 없는가',
+          'typography hierarchy·spacing token·navigation 일관성이 있는가',
+          'light/dark·text scale·overflow 0·empty/loading/error 상태가 있는가',
+          'placeholder/debug/test UI·visible TODO가 없는가',
+          '권한·알림 요청이 목적에 맞고 최소화됐는가',
+          '앱 목적 대비 기능 밀도가 충분한가',
+        ];
       case ArtifactType.contents:
         return [
           ...common,

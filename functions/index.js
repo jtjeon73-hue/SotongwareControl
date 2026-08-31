@@ -100,8 +100,8 @@ exports.sotong24Relay = onRequest(
     secrets: [sotong24RelaySecret],
     cors: false,
     maxInstances: 20,
-    timeoutSeconds: 30,
-    memory: "256MiB",
+    timeoutSeconds: 120,
+    memory: "512MiB",
   },
   async (req, res) => {
     let storageDeps = {};
@@ -121,6 +121,7 @@ exports.sotong24Relay = onRequest(
     await handleRelayRequest(req, res, {
       getSecret: () => sotong24RelaySecret.value(),
       db: admin.firestore(),
+      messaging: admin.messaging(),
       ...storageDeps,
     });
   }

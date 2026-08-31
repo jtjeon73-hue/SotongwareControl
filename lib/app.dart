@@ -88,6 +88,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
   IdeaToPlanningSeed? _ideaSeed;
   String? _workshopFocusInstructionId;
   String? _workshopFocusStageId;
+  var _workshopFocusApk = false;
   String? _guideFocusStageId;
   Sotong24NotificationService? _notificationService;
 
@@ -131,10 +132,12 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
     final projectId = uri.queryParameters['projectId']?.trim() ?? '';
     final stageId = uri.queryParameters['stageId']?.trim() ?? '';
     if (projectId.isEmpty) return;
+    final focusApk = uri.queryParameters['focus']?.trim() == 'apk';
     setState(() {
       _selected = ControlDestination.productWorkshop;
       _workshopFocusInstructionId = projectId;
       _workshopFocusStageId = stageId.isEmpty ? null : stageId;
+      _workshopFocusApk = focusApk;
     });
   }
 
@@ -365,6 +368,7 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
           key: ValueKey(_workshopFocusInstructionId ?? 'workshop_all'),
           focusInstructionId: _workshopFocusInstructionId,
           focusStageId: _workshopFocusStageId,
+          focusApk: _workshopFocusApk,
           onEnableNotifications: _enableNotifications,
           onStartNewWork: () =>
               _onDestinationSelected(ControlDestination.aiBusinessAnalysis),

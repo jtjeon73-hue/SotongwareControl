@@ -870,6 +870,9 @@ function createAdminStorageDeps(admin) {
       const [bytes] = await bucket.file(path).download();
       return bytes;
     },
+    createReadStream(path) {
+      return bucket.file(path).createReadStream();
+    },
   };
 }
 

@@ -27,6 +27,7 @@ const {
   finalizeUpload,
   scrubErrorText,
 } = require("./artifact");
+const { maybeEnqueueApkReadyForDeviceReview } = require("./apk_ready");
 const { isRunCancellationTombstoned } = require("../remote/cancellation");
 
 const MAX_BODY_BYTES = 100 * 1024;
@@ -149,14 +150,64 @@ async function handleRelayRequest(req, res, deps) {
         reject("permission-denied", "demo_project_blocked", 403);
       }
       const done = await finalizeUpload(parsed, artifactDeps);
+      let apkReady = { skipped: "not_attempted" };
+      try {
+        apkReady = await maybeEnqueueApkReadyForDeviceReview(
+          db,
+          parsed,
+          done,
+          artifactDeps,
+          {
+            messaging: deps.messaging,
+            replayTest: body.notificationReplayTest === true,
+          }
+        );
+      } catch (apkErr) {
+        safeLog({
+          op: operation,
+          projectId: parsed.instructionId,
+          result: "apk_ready_failed",
+          safeError: scrubErrorText(apkErr && apkErr.message),
+        });
+        apkReady = { skipped: "apk_ready_error" };
+      }
       safeLog({
         op: operation,
         projectId: parsed.instructionId,
         result: "ok",
         storagePath: parsed.storagePath,
+        detail: apkReady.skipped ? `apk_ready:${apkReady.skipped}` : "apk_ready:enqueued",
       });
       res.status(200).json({
         ...done,
+        apkReadyNotification: apkReady,
+        serverReceivedAt: serverNowIso,
+        elapsedMs: Date.now() - started,
+      });
+      return;
+    }
+
+    if (operation === "artifact_apk_ready_replay_test") {
+      const artifactDeps = requireArtifactDeps(deps);
+      const parsed = parseArtifactUploadComplete({
+        ...body,
+        operation: "artifact_upload_complete",
+      });
+      const done = {
+        ok: true,
+        artifactId: body.artifactId || parsed.artifactId,
+      };
+      const apkReady = await maybeEnqueueApkReadyForDeviceReview(
+        db,
+        parsed,
+        done,
+        artifactDeps,
+        { messaging: deps.messaging, replayTest: true }
+      );
+      res.status(200).json({
+        ok: true,
+        operation,
+        apkReadyNotification: apkReady,
         serverReceivedAt: serverNowIso,
         elapsedMs: Date.now() - started,
       });

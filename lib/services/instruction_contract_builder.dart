@@ -633,6 +633,27 @@ class InstructionContractBuilder {
             label: '앱 흐름 무결성',
             description: '핵심 사용자 행동이 끊기지 않는다.',
           ),
+          const QualityCriterion(
+            id: 'appProductionUi',
+            label: 'Production UI/UX',
+            description:
+                '모바일 정보 밀도·타이포 계층·spacing token·light/dark·overflow 0·empty/loading/error 상태를 갖춘다.',
+          ),
+          const QualityCriterion(
+            id: 'appFeatureDensity',
+            label: '기능 밀도',
+            description: '앱 목적 대비 충분한 실제 workflow와 기능을 제공한다. 실행만 되는 수준은 금지.',
+          ),
+          const QualityCriterion(
+            id: 'appAccessibility',
+            label: '접근성',
+            description: 'text scale·대비·터치 영역·의미 있는 라벨을 기본 수준 이상 만족한다.',
+          ),
+          const QualityCriterion(
+            id: 'appPrivacyMinimization',
+            label: '개인정보·권한 최소화',
+            description: '목적에 필요한 권한만 요청하고 불필요한 데이터 수집을 하지 않는다.',
+          ),
         ];
       case ArtifactType.contents:
         return [
@@ -757,7 +778,13 @@ class InstructionContractBuilder {
       case ArtifactType.ebook:
         return const ['outline', 'chapter_draft', 'export_pdf_or_epub'];
       case ArtifactType.app:
-        return const ['mvp_screen_map', 'core_feature_demo'];
+        return const [
+          'mvp_screen_map',
+          'core_feature_demo',
+          'navigation_structure',
+          'ux_state_matrix',
+          'device_review_criteria',
+        ];
       case ArtifactType.contents:
         if (subtype == ContentSubtype.song) {
           return const ['lyrics_or_demo_audio'];
@@ -781,7 +808,7 @@ class InstructionContractBuilder {
       case ArtifactType.ebook:
         return '목차·사례·실행표 중심의 전자책 전문 제작';
       case ArtifactType.app:
-        return 'MVP 범위 고정 후 Flutter/Android 실사용 검증';
+        return 'PRODUCTION 등급 Flutter/Android 앱 — MVP/Prototype 완료 금지, 실사용·실기기 검증 전제';
       case ArtifactType.contents:
         return '채널 맞춤 콘텐츠 제작 (${subtype == null ? '유형 미정' : ContentSubtype.labelKo(subtype)})';
       case ArtifactType.site:
