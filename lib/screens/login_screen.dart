@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/auth_runtime_config.dart';
 import '../theme/control_theme.dart';
 import '../widgets/sotong_brand_icon.dart';
 
@@ -21,7 +24,20 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _keepSignedIn = false;
   bool _isSubmitting = false;
+  bool _isLoadingConfig = true;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_preloadAuthConfig());
+  }
+
+  Future<void> _preloadAuthConfig() async {
+    await AuthRuntimeConfig.ensureLoaded();
+    if (!mounted) return;
+    setState(() => _isLoadingConfig = false);
+  }
 
   @override
   void dispose() {
@@ -254,8 +270,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: double.infinity,
                               height: 48,
                               child: FilledButton(
-                                onPressed: _isSubmitting ? null : _submit,
-                                child: _isSubmitting
+                                onPressed: (_isSubmitting || _isLoadingConfig)
+                                    ? null
+                                    : _submit,
+                                child: (_isSubmitting || _isLoadingConfig)
                                     ? const SizedBox(
                                         width: 22,
                                         height: 22,

@@ -9,6 +9,7 @@ const { sendError, sendOk, httpError } = require("./http");
 const { safeLog } = require("./log");
 const { handleArtifactDownload } = require("./artifact_download");
 const { handleArtifactView } = require("./artifact_view");
+const { handleAuthPublicConfig } = require("./auth_public_config");
 const {
   handleEnroll,
   handleHeartbeat,
@@ -52,6 +53,20 @@ async function handleApiRequest(req, res, deps) {
   let logCtx = { type: path };
 
   try {
+    if (
+      path === "/api/control/auth-public-config" ||
+      path === "/control/auth-public-config"
+    ) {
+      handleAuthPublicConfig(req, res);
+      safeLog({
+        ...logCtx,
+        type: "auth_public_config",
+        status: res.statusCode || 200,
+        latencyMs: Date.now() - started,
+      });
+      return;
+    }
+
     if (req.method !== "POST") {
       res.status(405).json({ ok: false, error: "method_not_allowed" });
       return;

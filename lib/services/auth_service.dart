@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/auth_config.dart';
+import 'auth_runtime_config.dart';
 
 enum AuthFailureReason {
   emptyId,
@@ -52,7 +53,7 @@ class AuthService implements AuthClient {
   bool get isAuthorized {
     final user = currentUser;
     if (user == null) return false;
-    return AuthConfig.isAuthorizedUser(uid: user.uid, email: user.email);
+    return AuthRuntimeConfig.isAuthorizedUser(uid: user.uid, email: user.email);
   }
 
   @override
@@ -76,22 +77,26 @@ class AuthService implements AuthClient {
     if (pwd.isEmpty) {
       return const AuthResult.failure(AuthFailureReason.emptyPassword);
     }
-    if (id != AuthConfig.displayAdminId) {
+    await AuthRuntimeConfig.ensureLoaded();
+    if (id != AuthRuntimeConfig.displayAdminId) {
       return const AuthResult.failure(AuthFailureReason.invalidId);
     }
-    if (!AuthConfig.hasAdminEmailConfigured) {
+    if (!AuthRuntimeConfig.hasAdminEmailConfigured) {
       return const AuthResult.failure(AuthFailureReason.configMissing);
     }
 
     try {
       await setPersistence(keepSignedIn: keepSignedIn);
       final credential = await _auth.signInWithEmailAndPassword(
-        email: AuthConfig.adminAuthEmail.trim(),
+        email: AuthRuntimeConfig.adminAuthEmail,
         password: pwd,
       );
       final user = credential.user;
       if (user == null ||
-          !AuthConfig.isAuthorizedUser(uid: user.uid, email: user.email)) {
+          !AuthRuntimeConfig.isAuthorizedUser(
+            uid: user.uid,
+            email: user.email,
+          )) {
         await _auth.signOut();
         return const AuthResult.failure(AuthFailureReason.unauthorized);
       }

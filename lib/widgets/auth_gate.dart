@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../config/auth_config.dart';
+import '../services/auth_runtime_config.dart';
 import '../services/auth_service.dart';
 import '../screens/login_screen.dart';
 import '../theme/control_theme.dart';
@@ -31,7 +31,7 @@ class AuthGate extends StatelessWidget {
           return LoginScreen(authService: authService);
         }
 
-        final authorized = AuthConfig.isAuthorizedUser(
+        final authorized = AuthRuntimeConfig.isAuthorizedUser(
           uid: user.uid,
           email: user.email,
         );
