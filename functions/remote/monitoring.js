@@ -213,7 +213,7 @@ function notificationContent(eventType, stageNumber, stageName, revision, data =
     case "activity_stalled":
       return { title: "작업 진행 확인 필요", body: `${label} 작업이 일정 시간 동안 진행되지 않고 있습니다. 확인이 필요합니다.` };
     case "agent_offline":
-      return { title: "Agent 연결 확인 필요", body: `${label} 작업 중 Agent가 오프라인 상태입니다.` };
+      return { title: "Agent 연결 복구 필요", body: `${label} 작업 중 Agent heartbeat가 끊겼습니다. PC Agent 연결을 확인해 주세요.` };
     case "work_error":
       return { title: "AI 제작 오류", body: `${label} 작업에서 오류가 발생했습니다. 확인이 필요합니다.` };
     case "recovery_exhausted":
@@ -339,6 +339,10 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     if (health.state === "paused_quota") eventType = "ai_quota_exhausted";
     if (!eventType) continue;
     if (health.state === "inactive" || health.state === "stalled") {
+      const heartbeatAgeSeconds = ageSeconds(agent.lastHeartbeatAt, nowMs);
+      if (heartbeatAgeSeconds > policy.offlineAfterSeconds) {
+        continue;
+      }
       if (stage.dispatchBlocked || stage.autoRecoveryDisabled || stage.manualRecoveryUsed ||
           stage.recoveryState === "safe_stopped") {
         continue;

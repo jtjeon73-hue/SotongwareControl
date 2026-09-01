@@ -1747,7 +1747,9 @@ class _StageMonitoringPanel extends StatelessWidget {
                 ? '완료 프로젝트 · 무활동 감시 제외'
                 : snapshot.health == Sotong24StageHealth.awaitingUser
                 ? '사용자 승인 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.approvalWaitAge)}'
-                : 'PC/Agent ${snapshot.agentOnline ? '온라인' : '오프라인'} · heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}',
+                : snapshot.agentOnline
+                ? 'PC/Agent 온라인 · heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}'
+                : 'Agent 연결 복구 필요 · heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}',
             style: TextStyle(
               fontSize: 13,
               color: healthColor,

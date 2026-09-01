@@ -268,6 +268,12 @@ async function handleComplete(db, ctx, body) {
   const summary = String(body.summary || "").slice(0, 2000);
   const ts = nowIso();
   const ref = commandRef(db, jobId, commandId);
+  const DISMISS_SUMMARIES = new Set([
+    "duplicate_skipped",
+    "cancelled_preserved_blocked",
+    "job_cancelled_skipped",
+    "dismissed",
+  ]);
 
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -275,6 +281,16 @@ async function handleComplete(db, ctx, body) {
     const cmd = snap.data() || {};
     if (cmd.agentId !== ctx.agentId) throw httpError(403, "forbidden", "agent_mismatch");
     if (cmd.status === COMMAND_STATUS.COMPLETED) return;
+    if (cmd.status === COMMAND_STATUS.FAILED) return;
+    if (cmd.status === COMMAND_STATUS.QUEUED && DISMISS_SUMMARIES.has(summary)) {
+      tx.update(ref, {
+        status: COMMAND_STATUS.COMPLETED,
+        completedAt: ts,
+        updatedAt: ts,
+        summary,
+      });
+      return;
+    }
     if (cmd.status !== COMMAND_STATUS.CLAIMED) {
       throw httpError(409, "not_completable", `status=${cmd.status}`);
     }
@@ -304,6 +320,7 @@ async function handleFail(db, ctx, body) {
     const cmd = snap.data() || {};
     if (cmd.agentId !== ctx.agentId) throw httpError(403, "forbidden", "agent_mismatch");
     if (cmd.status === COMMAND_STATUS.FAILED) return;
+    if (cmd.status === COMMAND_STATUS.COMPLETED) return;
     if (
       cmd.status !== COMMAND_STATUS.QUEUED &&
       cmd.status !== COMMAND_STATUS.CLAIMED
