@@ -30,7 +30,8 @@ class RemoteRunCancelResult {
   final String operationId;
   final bool idempotent;
 
-  bool get completed => state == 'completed';
+  bool get completed => state == 'completed' || state == 'cancelled_preserved';
+  bool get preserved => state == 'completed' || state == 'cancelled_preserved';
 }
 
 class RemoteArtifactDownloadGrant {

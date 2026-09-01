@@ -790,7 +790,10 @@ void main() {
         await tester.tap(find.byKey(const Key('workshop_cancel_run_button')));
         // The manual-approval pulse is intentionally continuous while waiting.
         await tester.pump(const Duration(milliseconds: 300));
-        expect(find.textContaining('Agent 설정과 다른 작업은 유지됩니다.'), findsOneWidget);
+        expect(
+          find.textContaining('작업 기록·로그·산출물·진단정보가 자동 보존됩니다.'),
+          findsOneWidget,
+        );
         await tester.tap(find.byKey(const Key('workshop_cancel_back')));
         await tester.pump(const Duration(milliseconds: 300));
         expect(calls, 0);

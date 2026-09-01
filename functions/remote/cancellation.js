@@ -105,39 +105,50 @@ async function finalizeCancelledRun(db, spec, deps = {}) {
     }
   }
 
-  const project = await deleteProjectTree(projectRef);
-  const job = await deleteJobTree(jobRef);
-  const workInstructions = await deleteOwnedMatches(
-    db, "workInstructions", uid, instructionId
-  );
-  const businessPlans = await deleteOwnedMatches(
-    db, "businessPlans", uid, instructionId
-  );
-  let storageObjects = 0;
-  if (typeof deps.deleteArtifacts === "function") {
-    storageObjects += await deps.deleteArtifacts(
-      `sotong24/artifacts/prod/${instructionId}/`
-    );
-    storageObjects += await deps.deleteArtifacts(
-      `sotong24/artifacts/test/${instructionId}/`
-    );
+  const completedAt = nowIso();
+  const diagnostic = existing.diagnosticSummary || existing.diagnostic || null;
+  const preservedPatch = {
+    status: "cancelled_preserved",
+    activityState: "cancelled_preserved",
+    cancelCompletedAt: completedAt,
+    cancelOperationId: opId,
+    preserved: true,
+    updatedAt: completedAt,
+  };
+  if (jobSnap.exists) {
+    await jobRef.set(preservedPatch, { merge: true });
+  }
+  if (projectSnap.exists) {
+    await projectRef.set(preservedPatch, { merge: true });
+  }
+  if (diagnostic) {
+    await db.collection("cancelDiagnostics").doc(opId).set({
+      operationId: opId,
+      ownerUid: uid,
+      jobId,
+      instructionId,
+      projectId,
+      diagnostic,
+      createdAt: completedAt,
+      updatedAt: completedAt,
+    }, { merge: true });
   }
 
-  const completedAt = nowIso();
   const result = {
     state: "completed",
     idempotent: wasCompleted,
     operationId: opId,
+    preserved: true,
     deleted: {
-      jobs: jobSnap.exists ? 1 : 0,
-      jobCommands: job.commands,
-      jobStages: job.stages,
-      projects: projectSnap.exists ? 1 : 0,
-      projectStages: project.stages,
-      projectRequests: project.requests,
-      workInstructions,
-      businessPlans,
-      storageObjects,
+      jobs: 0,
+      jobCommands: 0,
+      jobStages: 0,
+      projects: 0,
+      projectStages: 0,
+      projectRequests: 0,
+      workInstructions: 0,
+      businessPlans: 0,
+      storageObjects: 0,
     },
   };
   await opRef.set({

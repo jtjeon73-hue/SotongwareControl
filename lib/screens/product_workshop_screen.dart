@@ -965,9 +965,9 @@ class _Sotong24RemoteDetailScreenState
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('작업 취소'),
-        content: const Text(
-          '현재 작업을 취소하시겠습니까? 진행 중인 제작 데이터가 정리됩니다. '
-          'Agent 설정과 다른 작업은 유지됩니다.',
+        content: Text(
+          '현재 작업(jobId: ${widget.job?.jobId ?? '-'})을 취소하시겠습니까?\n'
+          '작업 기록·로그·산출물·진단정보가 자동 보존됩니다.',
         ),
         actions: [
           TextButton(
@@ -997,6 +997,23 @@ class _Sotong24RemoteDetailScreenState
       );
       if (!mounted) return;
       if (result.completed) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('작업 취소 완료'),
+            content: const Text(
+              '작업이 안전하게 취소되었습니다.\n'
+              '작업 기록·로그·산출물·진단정보가 자동 보존되었습니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted) return;
         Navigator.of(context).pop();
         return;
       }

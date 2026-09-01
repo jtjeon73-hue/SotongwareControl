@@ -31,6 +31,7 @@ const WORK_STATUS = Object.freeze({
   COMPLETED: "completed",
   FAILED: "failed",
   CANCELLED: "cancelled",
+  CANCELLED_PRESERVED: "cancelled_preserved",
   PAUSED: "paused",
   PAUSED_QUOTA: "paused_quota",
   PAUSED_NETWORK: "paused_network",

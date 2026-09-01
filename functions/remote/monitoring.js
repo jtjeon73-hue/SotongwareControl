@@ -161,6 +161,48 @@ function deepLink(data) {
   return `/?${query.toString()}`;
 }
 
+function buildStallDiagnostic({ job, stage, agent, health, nowMs }) {
+  const elapsedSeconds = durationSeconds(stage.startedAt || job.startedAt || job.updatedAt, null, nowMs);
+  return {
+    instructionId: String(job.instructionId || ""),
+    jobId: String(job.jobId || ""),
+    stageId: String(stage.stageId || job.currentStage || ""),
+    revision: Number(stage.revision) || 1,
+    elapsedSeconds: Number.isFinite(elapsedSeconds) ? Math.round(elapsedSeconds) : null,
+    effectiveWorker: String(stage.effectiveWorker || stage.worker || "cursor"),
+    workerPid: Number(stage.processId || stage.workerPid || 0) || 0,
+    handoffSessionId: String(stage.handoffSessionId || ""),
+    lastActivityAt: String(stage.lastActivityAt || stage.updatedAt || job.updatedAt || ""),
+    recoveryAttempt: Number(stage.recoveryAttempt) || 0,
+    maxRecoveryAttempts: Number(stage.maxRecoveryAttempts) || 3,
+    recoveryState: String(stage.recoveryState || ""),
+    failureReason: String(stage.failureReason || health.reason || ""),
+    recommendedAction: String(stage.recoveryState || "") === "exhausted"
+      ? "mobile_cancel_or_manual_review"
+      : "verify_cursor_handoff_or_cancel",
+  };
+}
+
+function recoveryBackoffMs(attempt, stage = {}) {
+  if (!isRecoveryImportOnly(stage)) return 0;
+  const n = Math.max(1, Number(attempt) || 1);
+  return Math.min(300000, 30000 * (2 ** (n - 1)));
+}
+
+function isRecoveryImportOnly(stage = {}) {
+  return String(stage.lastRecoveryResult || "") === "recovery_import_only_no_progress"
+    || String(stage.recoveryFailureType || "") === "recovery_import_only_no_progress";
+}
+
+function recoverySucceeded(stage = {}) {
+  if (isRecoveryImportOnly(stage)) return false;
+  const pid = Number(stage.processId || stage.workerPid || 0);
+  const session = String(stage.handoffSessionId || "");
+  if (pid > 0 || session) return true;
+  return String(stage.lastRecoveryResult || "") === "handoff_bound"
+    || String(stage.lastRecoveryResult || "") === "output_started";
+}
+
 function notificationContent(eventType, stageNumber, stageName, revision, data = {}) {
   const label = `${stageNumber > 0 ? `${stageNumber}단계 ` : ""}${stageName || "제작 단계"}`;
   switch (eventType) {
@@ -308,6 +350,16 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
         maxRecoveryAttempts,
         Math.max(0, Number(stage.recoveryAttempt) || 0) + 1
       );
+      const lastRecoveryAt = millis(stage.lastRecoveryAt);
+      const backoffMs = recoveryBackoffMs(recoveryAttempt, stage);
+      if (Number.isFinite(lastRecoveryAt) && (nowMs - lastRecoveryAt) < backoffMs) {
+        continue;
+      }
+      if (isRecoveryImportOnly(stage)) {
+        eventType = recoveryAttempt >= maxRecoveryAttempts
+          ? "recovery_exhausted"
+          : "activity_stalled";
+      }
       const exhausted = recoveryAttempt >= maxRecoveryAttempts;
       const status = exhausted
         ? WORK_STATUS.STAGE_TRANSITION_FAILED
@@ -319,6 +371,7 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
         recoveryAttempt,
         maxRecoveryAttempts,
         recoveryState: exhausted ? "exhausted" : "requested",
+        lastRecoveryAt: ts,
         retryable: !exhausted,
         failureType: exhausted ? "stalled_recovery_exhausted" : "activity_timeout",
         failureReason: exhausted
@@ -398,6 +451,7 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
       stageName: stage.stageName,
       revision: stage.revision,
       eventType,
+      stallDiagnostic: buildStallDiagnostic({ job, stage, agent, health, nowMs }),
       severity: eventType === "recovery_exhausted" || eventType === "work_error"
         ? "critical"
         : "warning",
@@ -566,4 +620,8 @@ module.exports = {
   usageThreshold,
   evaluateAiUsageNotifications,
   deliverNotificationEvent,
+  buildStallDiagnostic,
+  recoveryBackoffMs,
+  isRecoveryImportOnly,
+  recoverySucceeded,
 };

@@ -1585,27 +1585,26 @@ describe("remote agent contract V1", () => {
       deleteArtifacts: async (prefix) => { prefixes.push(prefix); return 1; },
     });
     assert.equal(result.state, "completed");
-    assert.equal(db.store.has(`${COL.JOBS}/${jobId}`), false);
-    assert.equal(db.store.has(`${COL.PROJECTS}/${iid}`), false);
+    assert.equal(result.preserved, true);
+    assert.equal(db.store.has(`${COL.JOBS}/${jobId}`), true);
+    assert.equal(db.store.get(`${COL.JOBS}/${jobId}`).status, "cancelled_preserved");
+    assert.equal(db.store.has(`${COL.PROJECTS}/${iid}`), true);
+    assert.equal(db.store.get(`${COL.PROJECTS}/${iid}`).status, "cancelled_preserved");
     assert.equal(db.store.has(`${COL.JOBS}/job_other`), true);
     assert.equal(db.store.has(`${COL.PROJECTS}/${other}`), true);
     assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).currentJobId, "");
     assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).state, "idle");
     assert.equal(db.store.get(`${COL.AGENTS}/${agentId}`).enabled, true);
-    assert.deepEqual(prefixes, [
-      `sotong24/artifacts/prod/${iid}/`,
-      `sotong24/artifacts/test/${iid}/`,
-    ]);
-    // A sync already queued before the acknowledgment may arrive late.
+    assert.deepEqual(prefixes, []);
     db.store.set(`${COL.PROJECTS}/${iid}`, {
-      projectId: iid, ownerUid: "user_a", status: "cancelled",
+      projectId: iid, ownerUid: "user_a", status: "cancelled_preserved",
     });
     const again = await finalizeCancelledRun(db, {
       uid: "user_a", operationId: opId, jobId, instructionId: iid,
       projectId: iid, agentId,
     });
     assert.equal(again.idempotent, true);
-    assert.equal(again.deleted.projects, 1);
-    assert.equal(db.store.has(`${COL.PROJECTS}/${iid}`), false);
+    assert.equal(again.deleted.projects, 0);
+    assert.equal(db.store.has(`${COL.PROJECTS}/${iid}`), true);
   });
 });
