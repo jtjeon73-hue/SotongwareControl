@@ -2285,11 +2285,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                     isAiProductionPilot && _approvalMode == 'manual',
               ),
             ),
-            if (isAiProductionPilot)
-              _sendSummaryRow(
-                'AI 작업자',
-                'Cursor (고정)',
-              ),
+            if (isAiProductionPilot) _sendSummaryRow('AI 작업자', 'Cursor (고정)'),
             if (input.constraints.trim().isNotEmpty)
               _sendSummaryRow(
                 '주요 제작 조건',
