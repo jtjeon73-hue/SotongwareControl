@@ -64,19 +64,29 @@ class StudioProductionOptionsPanel extends StatelessWidget {
             const SizedBox(height: 14),
             const Text('AI 작업자', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 6),
-            SegmentedButton<String>(
+            Container(
               key: const Key('studio_worker_preference'),
-              segments: const [
-                ButtonSegment(value: 'auto', label: Text('자동')),
-                ButtonSegment(value: 'codex', label: Text('Codex')),
-                ButtonSegment(value: 'cursor', label: Text('Cursor')),
-              ],
-              selected: {workerPreference},
-              onSelectionChanged: (v) => onWorkerPreferenceChanged(v.first),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                border: Border.all(color: ControlColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.verified_user_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Cursor (고정)',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 4),
             const Text(
-              '자동: Codex 우선. Codex/Cursor는 Agent runtime이 지원하는 worker 값으로 전달됩니다.',
+              '제작공정 AI 작업자는 Cursor로 고정됩니다. Codex 배정·fallback은 사용하지 않습니다.',
               style: TextStyle(fontSize: 11.5, color: ControlColors.textMuted),
             ),
           ],

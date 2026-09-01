@@ -334,16 +334,7 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
         if (original) {
           const originalAiExecution = original.payload.aiExecution || {};
           const originalWorker = String(originalAiExecution.worker || "").toLowerCase();
-          const artifactType = String(original.payload.artifactType || "").toLowerCase();
-          const codexWeeklyUsed = Number(
-            agent.aiUsage && agent.aiUsage.codex &&
-            agent.aiUsage.codex.weekly && agent.aiUsage.codex.weekly.usedPercent
-          );
-          const codexAvailable = Number.isFinite(codexWeeklyUsed) && codexWeeklyUsed < 100;
-          const selectedWorker = artifactType === "app" &&
-            originalWorker === "cursor" && codexAvailable
-            ? "codex"
-            : originalWorker;
+          const selectedWorker = originalWorker === "codex" ? "cursor" : (originalWorker || "cursor");
           const recoveryAction = recoveryAttempt === 1
             ? "stale_worker_recheck_and_executor_redispatch"
             : "ownership_reconcile_and_executor_redispatch";

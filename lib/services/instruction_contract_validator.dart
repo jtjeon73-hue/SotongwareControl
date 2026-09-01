@@ -460,7 +460,8 @@ class InstructionContractValidator {
 
     final wantsContinuous = ai.approvalMode == 'auto' || ai.autoAdvance;
     final isContinuous = ai.executionMode == 'continuous';
-    final isHold = ai.executionMode == 'hold' ||
+    final isHold =
+        ai.executionMode == 'hold' ||
         ai.executionMode == 'single' ||
         ai.executionMode == 'single_step';
 
@@ -468,8 +469,7 @@ class InstructionContractValidator {
       issues.add(
         const ContractValidationIssue(
           field: 'aiExecution.executionMode',
-          reason:
-              '자동 승인/연속 실행 선택 시 executionMode=continuous 가 필요합니다.',
+          reason: '자동 승인/연속 실행 선택 시 executionMode=continuous 가 필요합니다.',
           fix: '작업지시서를 다시 생성하거나 executionMode를 continuous로 설정하세요.',
           level: ContractValidationLevel.blocked,
         ),

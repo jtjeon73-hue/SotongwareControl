@@ -401,7 +401,7 @@ void main() {
       );
       final parsed = AiExecutionPolicy.tryParse(attached)!;
       expect(parsed.enabled, isTrue);
-      expect(parsed.worker, 'codex');
+      expect(parsed.worker, 'cursor');
       expect(parsed.maxAutoStageOrder, 1);
       expect(parsed.approvalRequired, isTrue);
       expect(parsed.artifactUploadEnabled, isTrue);

@@ -33,7 +33,7 @@ void main() {
     expect(wi.workflowSteps.first.id, 'idea_clarify');
     expect(wi.aiExecution, isNotNull);
     expect(wi.aiExecution!.enabled, isTrue);
-    expect(wi.aiExecution!.worker, 'codex');
+    expect(wi.aiExecution!.worker, 'cursor');
     expect(wi.aiExecution!.maxAutoStageOrder, 1);
     expect(wi.aiExecution!.approvalMode, 'manual');
     expect(wi.aiExecution!.approvalRequired, isTrue);
@@ -50,7 +50,7 @@ void main() {
     final roundTrip = WorkInstruction.fromJson(
       Map<String, dynamic>.from(jsonDecode(jsonEncode(json)) as Map),
     );
-    expect(roundTrip.aiExecution!.worker, 'codex');
+    expect(roundTrip.aiExecution!.worker, 'cursor');
     expect(roundTrip.aiExecution!.autoAdvance, isFalse);
     expect(roundTrip.aiExecution!.approvalMode, 'manual');
     expect(roundTrip.aiExecution!.executionMode, 'hold');
@@ -90,14 +90,14 @@ void main() {
 
     expect(manual.approvalMode, 'manual');
     expect(manual.approvalRequired, isTrue);
-    expect(manual.worker, 'codex');
+    expect(manual.worker, 'cursor');
     expect(manual.maxAutoStageOrder, 18);
     expect(manual.executionMode, 'hold');
 
     expect(automatic.approvalMode, 'auto');
     expect(automatic.approvalRequired, isFalse);
     expect(automatic.autoAdvance, isTrue);
-    expect(automatic.worker, 'codex');
+    expect(automatic.worker, 'cursor');
     expect(automatic.executionMode, 'continuous');
   });
 

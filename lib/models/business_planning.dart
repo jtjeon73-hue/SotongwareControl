@@ -681,10 +681,10 @@ class AiExecutionPolicy {
     this.executionMode = 'hold',
   });
 
-  /// ④ pilot 고정값 — 1단계 Codex + 승인 게이트, 자동 배포 금지.
+  /// ④ pilot 고정값 — 1단계 Cursor + 승인 게이트, 자동 배포 금지.
   static const AiExecutionPolicy pilotCodexStage1 = AiExecutionPolicy(
     enabled: true,
-    worker: 'codex',
+    worker: 'cursor',
     maxAutoStageOrder: 1,
     approvalRequired: true,
     artifactUploadEnabled: true,
@@ -698,7 +698,7 @@ class AiExecutionPolicy {
     final mode = approvalMode == 'auto' ? 'auto' : 'manual';
     return AiExecutionPolicy(
       enabled: true,
-      worker: 'codex',
+      worker: 'cursor',
       maxAutoStageOrder: 12,
       approvalRequired: mode == 'manual',
       artifactUploadEnabled: true,
@@ -714,7 +714,7 @@ class AiExecutionPolicy {
     final mode = approvalMode == 'auto' ? 'auto' : 'manual';
     return AiExecutionPolicy(
       enabled: true,
-      worker: 'codex',
+      worker: 'cursor',
       maxAutoStageOrder: 18,
       approvalRequired: mode == 'manual',
       artifactUploadEnabled: true,
@@ -802,15 +802,9 @@ class AiExecutionPolicy {
   }
 
   AiExecutionPolicy withWorkerPreference(String preference) {
-    final resolved = switch (preference) {
-      'cursor' => 'cursor',
-      'codex' => 'codex',
-      _ => worker,
-    };
-    if (resolved == worker) return this;
     return AiExecutionPolicy(
       enabled: enabled,
-      worker: resolved,
+      worker: 'cursor',
       maxAutoStageOrder: maxAutoStageOrder,
       approvalRequired: approvalRequired,
       artifactUploadEnabled: artifactUploadEnabled,

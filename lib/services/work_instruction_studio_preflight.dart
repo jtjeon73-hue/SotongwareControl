@@ -1,6 +1,5 @@
 import '../models/business_planning.dart';
 import '../models/remote_agent_models.dart';
-import '../services/codex_usage_presentation.dart';
 import '../services/cursor_usage_presentation.dart';
 import '../services/instruction_contract_validator.dart';
 import '../services/work_instruction_delivery_presentation.dart';
@@ -187,35 +186,21 @@ class WorkInstructionStudioPreflight {
     RemoteAgentDoc? agent,
     DateTime now,
   ) {
-    final codexView = CodexUsagePresentation.viewFor(agent, now: now);
-    final codexCheck = StudioPreflightCheck(
-      id: 'worker_codex',
-      label: 'Codex',
-      status: codexView == null || codexView.unavailable
-          ? StudioPreflightStatus.warning
-          : (codexView.quotaLabel == '한도 임박'
-                ? StudioPreflightStatus.warning
-                : StudioPreflightStatus.ok),
-      detail: codexView == null || codexView.unavailable
-          ? '사용량 조회 불가 — Agent telemetry 확인 필요'
-          : codexView.displayText,
-    );
-
     final cursorHeadline = CursorUsagePresentation.headline(agent);
     final cursorLines = CursorUsagePresentation.detailLines(agent);
     final cursorUnavailable = cursorHeadline == '확인 불가';
     final cursorCheck = StudioPreflightCheck(
       id: 'worker_cursor',
-      label: 'Cursor',
+      label: 'Cursor (고정)',
       status: cursorUnavailable
           ? StudioPreflightStatus.warning
           : StudioPreflightStatus.ok,
       detail: cursorUnavailable
-          ? cursorLines.join(' · ')
-          : '$cursorHeadline · ${cursorLines.take(2).join(' · ')}',
+          ? '${cursorLines.join(' · ')} · Codex fallback 없음'
+          : '$cursorHeadline · ${cursorLines.take(2).join(' · ')} · Codex fallback 없음',
     );
 
-    return [codexCheck, cursorCheck];
+    return [cursorCheck];
   }
 
   static RemoteAgentDoc? _pickAgent(

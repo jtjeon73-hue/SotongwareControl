@@ -1432,9 +1432,9 @@ describe("remote agent contract V1", () => {
     const recovery = db.store.get(
       `${COL.JOBS}/${env.jobId}/commands/${stage.recoveryCommandId}`
     );
-    assert.equal(recovery.payload.aiExecution.worker, "codex");
+    assert.equal(recovery.payload.aiExecution.worker, "cursor");
     assert.equal(recovery.payload.recovery.previousWorker, "cursor");
-    assert.equal(recovery.payload.recovery.selectedWorker, "codex");
+    assert.equal(recovery.payload.recovery.selectedWorker, "cursor");
     assert.equal(
       recovery.payload.recovery.action,
       "stale_worker_recheck_and_executor_redispatch"

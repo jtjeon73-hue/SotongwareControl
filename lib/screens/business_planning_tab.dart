@@ -106,7 +106,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   /// 새 ebook WI에만 Codex 1단계 pilot 정책 부착. 기존 WI에는 자동 삽입하지 않음.
   bool _aiProductionPilot = true;
   String _approvalMode = 'manual';
-  String _workerPreference = 'auto';
+  String _workerPreference = 'cursor';
   DevWorkDocState? _devDocState;
   List<RemoteAgentDoc> _remoteAgents = const [];
   List<RemoteJobDoc> _remoteJobs = const [];
@@ -2288,9 +2288,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             if (isAiProductionPilot)
               _sendSummaryRow(
                 'AI 작업자',
-                _workerPreference == 'auto'
-                    ? '자동 (Codex 우선)'
-                    : _workerPreference,
+                'Cursor (고정)',
               ),
             if (input.constraints.trim().isNotEmpty)
               _sendSummaryRow(
