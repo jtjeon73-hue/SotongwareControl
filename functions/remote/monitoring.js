@@ -283,6 +283,9 @@ async function enqueueNotification(db, data, rawPolicy) {
       productType: String(data.productType || "ebook").slice(0, 30),
       appName: String(data.appName || "").slice(0, 120),
       artifactId: String(data.artifactId || "").slice(0, 64),
+      stallDiagnostic: data.stallDiagnostic && typeof data.stallDiagnostic === "object"
+        ? data.stallDiagnostic
+        : null,
       storagePath: String(data.storagePath || "").slice(0, 240),
       sizeBytes: Number.isFinite(Number(data.sizeBytes)) ? Number(data.sizeBytes) : null,
       resourceProvider: String(data.resourceProvider || "").slice(0, 40),
@@ -336,6 +339,10 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     if (health.state === "paused_quota") eventType = "ai_quota_exhausted";
     if (!eventType) continue;
     if (health.state === "inactive" || health.state === "stalled") {
+      if (stage.dispatchBlocked || stage.autoRecoveryDisabled || stage.manualRecoveryUsed ||
+          stage.recoveryState === "safe_stopped") {
+        continue;
+      }
       const pendingRecoveryId = String(stage.recoveryCommandId || "");
       if (stage.recoveryState === "requested" && pendingRecoveryId) {
         const pending = await doc.ref.collection("commands").doc(pendingRecoveryId).get();

@@ -34,6 +34,50 @@ class RemoteRunCancelResult {
   bool get preserved => state == 'completed' || state == 'cancelled_preserved';
 }
 
+class RemoteStallRecheckResult {
+  const RemoteStallRecheckResult({
+    required this.state,
+    required this.jobId,
+    required this.instructionId,
+    required this.raw,
+  });
+
+  final String state;
+  final String jobId;
+  final String instructionId;
+  final Map<String, dynamic> raw;
+
+  factory RemoteStallRecheckResult.fromMap(Map<String, dynamic> map) {
+    return RemoteStallRecheckResult(
+      state: '${map['state'] ?? ''}',
+      jobId: '${map['jobId'] ?? ''}',
+      instructionId: '${map['instructionId'] ?? ''}',
+      raw: map,
+    );
+  }
+}
+
+class RemoteStallActionResult {
+  const RemoteStallActionResult({
+    required this.state,
+    required this.operationId,
+    this.idempotent = false,
+    this.raw = const {},
+  });
+
+  final String state;
+  final String operationId;
+  final bool idempotent;
+  final Map<String, dynamic> raw;
+
+  bool get succeeded =>
+      state == 'ok' ||
+      state == 'paused' ||
+      state == 'recovery_requested' ||
+      state == 'completed' ||
+      state == 'cancelled_preserved';
+}
+
 class RemoteArtifactDownloadGrant {
   const RemoteArtifactDownloadGrant({
     required this.downloadUrl,
@@ -414,5 +458,74 @@ class RemoteControlApi {
     }
     return latest ??
         const RemoteRunCancelResult(state: 'cancel_requested', operationId: '');
+  }
+
+  Future<RemoteStallRecheckResult> recheckStallStatus({
+    required String jobId,
+    required String instructionId,
+    required String projectId,
+    String? stageId,
+  }) async {
+    final map = await _post('/api/control/recheck-status', {
+      'jobId': jobId,
+      'instructionId': instructionId,
+      'projectId': projectId,
+      if (stageId != null && stageId.isNotEmpty) 'stageId': stageId,
+    });
+    return RemoteStallRecheckResult.fromMap(map);
+  }
+
+  Future<RemoteStallActionResult> pauseJobSafely({
+    required String jobId,
+    required String instructionId,
+    required String projectId,
+    String? stageId,
+    String message = '운영자 안전 일시정지',
+  }) async {
+    final map = await _post('/api/control/pause-job', {
+      'jobId': jobId,
+      'instructionId': instructionId,
+      'projectId': projectId,
+      if (stageId != null && stageId.isNotEmpty) 'stageId': stageId,
+      'message': message,
+    });
+    return RemoteStallActionResult(
+      state: '${map['state'] ?? ''}',
+      operationId: '${map['operationId'] ?? ''}',
+      idempotent: map['idempotent'] == true,
+      raw: map,
+    );
+  }
+
+  Future<RemoteStallActionResult> recoveryOnce({
+    required String jobId,
+    required String instructionId,
+    required String stageId,
+  }) async {
+    final map = await _post('/api/control/recovery-once', {
+      'jobId': jobId,
+      'instructionId': instructionId,
+      'stageId': stageId,
+    });
+    return RemoteStallActionResult(
+      state: '${map['state'] ?? ''}',
+      operationId: '${map['operationId'] ?? ''}',
+      idempotent: map['idempotent'] == true,
+      raw: map,
+    );
+  }
+
+  Future<Map<String, dynamic>> getCancelDiagnostics({
+    String? instructionId,
+    String? operationId,
+  }) async {
+    final body = <String, dynamic>{};
+    if (operationId != null && operationId.isNotEmpty) {
+      body['operationId'] = operationId;
+    }
+    if (instructionId != null && instructionId.isNotEmpty) {
+      body['instructionId'] = instructionId;
+    }
+    return _post('/api/control/get-diagnostics', body);
   }
 }

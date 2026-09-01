@@ -159,6 +159,8 @@ class Sotong24RemoteStage {
     this.recoveryAttempt = 0,
     this.maxRecoveryAttempts = 0,
     this.recoveryState = '',
+    this.dispatchBlocked = false,
+    this.manualRecoveryUsed = false,
     this.executorKind = '',
     this.taskId = '',
   });
@@ -206,6 +208,8 @@ class Sotong24RemoteStage {
   final int recoveryAttempt;
   final int maxRecoveryAttempts;
   final String recoveryState;
+  final bool dispatchBlocked;
+  final bool manualRecoveryUsed;
   final String executorKind;
   final String taskId;
 
@@ -325,6 +329,8 @@ class Sotong24RemoteStage {
       recoveryAttempt: _asInt(map['recoveryAttempt']),
       maxRecoveryAttempts: _asInt(map['maxRecoveryAttempts']),
       recoveryState: '${map['recoveryState'] ?? ''}',
+      dispatchBlocked: map['dispatchBlocked'] == true,
+      manualRecoveryUsed: map['manualRecoveryUsed'] == true,
       executorKind: '${map['executorKind'] ?? map['worker'] ?? ''}',
       taskId: '${map['taskId'] ?? ''}',
     );
@@ -375,6 +381,8 @@ class Sotong24RemoteStage {
       recoveryAttempt: recoveryAttempt,
       maxRecoveryAttempts: maxRecoveryAttempts,
       recoveryState: recoveryState,
+      dispatchBlocked: dispatchBlocked,
+      manualRecoveryUsed: manualRecoveryUsed,
       executorKind: executorKind,
       taskId: taskId,
     );

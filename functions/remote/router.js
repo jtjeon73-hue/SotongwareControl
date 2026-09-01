@@ -34,6 +34,12 @@ const {
   validateApproveStageBody,
   validateRequestRevisionBody,
 } = require("./handlers");
+const {
+  handleRecheckStatus,
+  handlePauseJob,
+  handleRecoveryOnce,
+  handleGetDiagnostics,
+} = require("./stall_operations");
 
 function normalizePath(req) {
   let p = req.path || req.url || "/";
@@ -193,12 +199,24 @@ async function handleApiRequest(req, res, deps) {
         throw httpError(501, "unimplemented", "request-revision queued in later phase");
       },
       "/api/control/pause-job": async () => {
-        await authenticateControl(req, deps);
-        throw httpError(501, "unimplemented", "pause-job later phase");
+        const { uid } = await authenticateControl(req, deps);
+        return handlePauseJob(db, uid, body);
       },
       "/api/control/resume-job": async () => {
-        await authenticateControl(req, deps);
-        throw httpError(501, "unimplemented", "resume-job later phase");
+        const { uid } = await authenticateControl(req, deps);
+        throw httpError(501, "unimplemented", "resume-job requires explicit operator release");
+      },
+      "/api/control/recheck-status": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleRecheckStatus(db, uid, body);
+      },
+      "/api/control/recovery-once": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleRecoveryOnce(db, uid, body);
+      },
+      "/api/control/get-diagnostics": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleGetDiagnostics(db, uid, body);
       },
       "/api/control/cancel-job": async () => {
         const { uid } = await authenticateControl(req, deps);

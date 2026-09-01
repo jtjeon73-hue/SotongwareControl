@@ -20,6 +20,7 @@ import '../widgets/operational_collapsible_section.dart';
 import '../widgets/pdf_download_button.dart';
 import '../widgets/apk_download_button.dart';
 import '../widgets/sotong24_stage_widgets.dart';
+import '../widgets/stall_followup_action_bar.dart';
 
 /// AI 제작공정 — 전송된 작업의 단계 진행·승인·보완 화면.
 /// 내부 destination key는 `productWorkshop`을 유지한다.
@@ -405,6 +406,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
           onOpenGuide: widget.onOpenGuide,
           job: _jobFor(project.projectId),
           onCancelRun: widget.onCancelRun ?? _cancelRun,
+          onStartNewWork: widget.onStartNewWork,
         ),
       ),
     );
@@ -425,6 +427,7 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
     this.onOpenGuide,
     this.job,
     this.onCancelRun,
+    this.onStartNewWork,
   });
 
   final String projectId;
@@ -437,6 +440,7 @@ class Sotong24RemoteDetailScreen extends StatefulWidget {
   final void Function(String stageId)? onOpenGuide;
   final RemoteJobDoc? job;
   final CancelRunAction? onCancelRun;
+  final VoidCallback? onStartNewWork;
 
   @override
   State<Sotong24RemoteDetailScreen> createState() =>
@@ -526,6 +530,20 @@ class _Sotong24RemoteDetailScreenState
           final releaseApk = Sotong24WorkshopPresentation.finalApkArtifact(
             project,
           );
+          final monitoringSnapshot = stage == null
+              ? null
+              : Sotong24StageMonitoring.evaluate(
+                  project: project,
+                  stage: stage,
+                  policy: widget.monitoringPolicy,
+                );
+          final showStallFollowUp =
+              stage != null &&
+              widget.job != null &&
+              monitoringSnapshot != null &&
+              !project.isProductionComplete &&
+              (monitoringSnapshot.health == Sotong24StageHealth.inactive ||
+                  monitoringSnapshot.health == Sotong24StageHealth.stalled);
           _scrollToApkIfNeeded(project);
 
           return ListView(
@@ -595,6 +613,22 @@ class _Sotong24RemoteDetailScreenState
                   stage: stage,
                   policy: widget.monitoringPolicy,
                 ),
+                if (showStallFollowUp) ...[
+                  const SizedBox(height: 10),
+                  StallFollowUpActionBar(
+                    project: project,
+                    stage: stage,
+                    job: widget.job!,
+                    snapshot: monitoringSnapshot,
+                    onCancelRun: widget.onCancelRun,
+                    onStartNewWork: widget.onStartNewWork == null
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            widget.onStartNewWork!();
+                          },
+                  ),
+                ],
                 const SizedBox(height: 4),
               ],
               if (Sotong24WorkshopPresentation.revisionLine(project).isNotEmpty)
