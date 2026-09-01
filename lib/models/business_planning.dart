@@ -678,6 +678,7 @@ class AiExecutionPolicy {
     required this.autoAdvance,
     required this.deploymentAllowed,
     this.approvalMode = 'manual',
+    this.executionMode = 'hold',
   });
 
   /// ④ pilot 고정값 — 1단계 Codex + 승인 게이트, 자동 배포 금지.
@@ -690,6 +691,7 @@ class AiExecutionPolicy {
     autoAdvance: false,
     deploymentAllowed: false,
     approvalMode: 'manual',
+    executionMode: 'hold',
   );
 
   factory AiExecutionPolicy.productionEbook({String approvalMode = 'manual'}) {
@@ -703,6 +705,7 @@ class AiExecutionPolicy {
       autoAdvance: mode == 'auto',
       deploymentAllowed: false,
       approvalMode: mode,
+      executionMode: mode == 'auto' ? 'continuous' : 'hold',
     );
   }
 
@@ -718,7 +721,20 @@ class AiExecutionPolicy {
       autoAdvance: mode == 'auto',
       deploymentAllowed: false,
       approvalMode: mode,
+      executionMode: mode == 'auto' ? 'continuous' : 'hold',
     );
+  }
+
+  /// Site / promo_site — ebook 18단계 템플릿 기반 (백엔드 canonical 제한 가능).
+  factory AiExecutionPolicy.productionSite({String approvalMode = 'manual'}) {
+    return AiExecutionPolicy.productionApp(approvalMode: approvalMode);
+  }
+
+  /// Contents — ebook 18단계 템플릿 기반 (subtype별 applicable 단계).
+  factory AiExecutionPolicy.productionContents({
+    String approvalMode = 'manual',
+  }) {
+    return AiExecutionPolicy.productionApp(approvalMode: approvalMode);
   }
 
   final bool enabled;
@@ -729,6 +745,7 @@ class AiExecutionPolicy {
   final bool autoAdvance;
   final bool deploymentAllowed;
   final String approvalMode;
+  final String executionMode;
 
   Map<String, dynamic> toJson() => {
     'enabled': enabled,
@@ -739,9 +756,24 @@ class AiExecutionPolicy {
     'autoAdvance': autoAdvance,
     'deploymentAllowed': deploymentAllowed,
     'approvalMode': approvalMode,
+    'executionMode': executionMode,
   };
 
   factory AiExecutionPolicy.fromJson(Map<String, dynamic> json) {
+    final approvalMode =
+        '${json['approvalMode'] ?? ''}' == 'auto' ||
+            (!json.containsKey('approvalMode') &&
+                json['approvalRequired'] == false)
+        ? 'auto'
+        : 'manual';
+    final rawExecutionMode = '${json['executionMode'] ?? ''}'.trim();
+    final executionMode = switch (rawExecutionMode) {
+      'continuous' => 'continuous',
+      'hold' || 'single' || 'single_step' => 'hold',
+      _ when approvalMode == 'auto' && json['autoAdvance'] == true =>
+        'continuous',
+      _ => 'hold',
+    };
     return AiExecutionPolicy(
       enabled: json['enabled'] == true,
       worker: '${json['worker'] ?? 'none'}'.trim().isEmpty
@@ -756,12 +788,8 @@ class AiExecutionPolicy {
       artifactUploadEnabled: json['artifactUploadEnabled'] == true,
       autoAdvance: json['autoAdvance'] == true,
       deploymentAllowed: json['deploymentAllowed'] == true,
-      approvalMode:
-          '${json['approvalMode'] ?? ''}' == 'auto' ||
-              (!json.containsKey('approvalMode') &&
-                  json['approvalRequired'] == false)
-          ? 'auto'
-          : 'manual',
+      approvalMode: approvalMode,
+      executionMode: executionMode,
     );
   }
 
@@ -771,6 +799,26 @@ class AiExecutionPolicy {
         instructionJson['aiExecution'] ?? instructionJson['executionPolicy'];
     if (raw is! Map) return null;
     return AiExecutionPolicy.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  AiExecutionPolicy withWorkerPreference(String preference) {
+    final resolved = switch (preference) {
+      'cursor' => 'cursor',
+      'codex' => 'codex',
+      _ => worker,
+    };
+    if (resolved == worker) return this;
+    return AiExecutionPolicy(
+      enabled: enabled,
+      worker: resolved,
+      maxAutoStageOrder: maxAutoStageOrder,
+      approvalRequired: approvalRequired,
+      artifactUploadEnabled: artifactUploadEnabled,
+      autoAdvance: autoAdvance,
+      deploymentAllowed: deploymentAllowed,
+      approvalMode: approvalMode,
+      executionMode: executionMode,
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/release_info.dart';
 
 import '../data/menu_divisions.dart';
 import '../theme/control_theme.dart';
@@ -417,7 +418,7 @@ class _SidebarNavigationState extends State<SidebarNavigation> {
           Padding(
             padding: const EdgeInsets.all(14),
             child: Text(
-              'Sotong Control · AI 관제',
+              'Sotong Control · AI 관제\n${ReleaseInfo.label}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 10,
                 color: ControlColors.textMuted,

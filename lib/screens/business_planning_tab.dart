@@ -28,6 +28,7 @@ import '../services/sotong24_workshop_presentation.dart';
 import '../services/work_instruction_concept_occupancy.dart';
 import '../services/work_instruction_delivery_presentation.dart';
 import '../services/work_instruction_remote_delivery.dart';
+import '../services/work_instruction_studio_preflight.dart';
 import '../services/work_instruction_validator.dart';
 import '../services/work_instruction_wizard_session.dart';
 import '../services/work_instruction_workshop_presentation.dart';
@@ -38,6 +39,7 @@ import '../widgets/project_design/instruction_preview_panel.dart';
 import '../widgets/operational_collapsible_section.dart';
 import '../widgets/project_design/step7_delivery_panel.dart';
 import '../widgets/project_design/project_design_wizard.dart';
+import '../widgets/project_design/studio_preflight_panel.dart';
 
 /// 작업지시 제작소 본문 (로컬 규칙 기반).
 /// Production AI는 새 ebook WI에만 opt-in `aiExecution`으로 연결한다.
@@ -104,6 +106,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   /// 새 ebook WI에만 Codex 1단계 pilot 정책 부착. 기존 WI에는 자동 삽입하지 않음.
   bool _aiProductionPilot = true;
   String _approvalMode = 'manual';
+  String _workerPreference = 'auto';
   DevWorkDocState? _devDocState;
   List<RemoteAgentDoc> _remoteAgents = const [];
   List<RemoteJobDoc> _remoteJobs = const [];
@@ -673,14 +676,32 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     final artifact = input.resolvedArtifactType == ArtifactType.undecided
         ? ArtifactType.ebook
         : ArtifactType.normalize(input.resolvedArtifactType);
-    if (artifact == ArtifactType.ebook) {
-      return AiExecutionPolicy.productionEbook(approvalMode: _approvalMode);
+    AiExecutionPolicy? base;
+    switch (artifact) {
+      case ArtifactType.ebook:
+        base = AiExecutionPolicy.productionEbook(approvalMode: _approvalMode);
+      case ArtifactType.app:
+        base = AiExecutionPolicy.productionApp(approvalMode: _approvalMode);
+      case ArtifactType.site:
+      case ArtifactType.promoSite:
+        base = AiExecutionPolicy.productionSite(approvalMode: _approvalMode);
+      case ArtifactType.contents:
+        base = AiExecutionPolicy.productionContents(
+          approvalMode: _approvalMode,
+        );
+      default:
+        base = null;
     }
-    if (artifact == ArtifactType.app) {
-      return AiExecutionPolicy.productionApp(approvalMode: _approvalMode);
-    }
-    return null;
+    return base?.withWorkerPreference(_workerPreference);
   }
+
+  StudioPreflightReport get _studioPreflight =>
+      WorkInstructionStudioPreflight.evaluate(
+        input: _currentInput,
+        instruction: _instruction,
+        agents: _remoteAgents,
+        contractValidation: _contractValidation,
+      );
 
   Future<void> _createOrPromptInstruction() async {
     if (!_canCreateInstruction) {
@@ -1276,6 +1297,21 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _snack('작업지시를 보내기 전에 확인이 필요합니다.');
       return;
     }
+
+    final preflight = _studioPreflight;
+    if (!preflight.canStartProduction) {
+      _snack(
+        preflight.checks.any(
+              (c) =>
+                  c.id == 'agent_relay' &&
+                  c.status == StudioPreflightStatus.blocked,
+            )
+            ? '현재 AI 작업자가 작업 가능한 상태가 아닙니다.'
+            : '제작 시작 전 사전점검을 통과하지 못했습니다. 아래 항목을 확인하세요.',
+      );
+      return;
+    }
+
     if (validation.level == ContractValidationLevel.warning) {
       final proceed = await showDialog<bool>(
         context: context,
@@ -1993,14 +2029,26 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               instructionGenerated: _instruction != null,
               instructionStale:
                   _instruction != null && !_instructionMatchesCurrentInput,
+              approvalMode: _approvalMode,
+              workerPreference: _workerPreference,
+              aiProductionPilot: _aiProductionPilot,
+              onApprovalModeChanged: (v) => setState(() => _approvalMode = v),
+              onWorkerPreferenceChanged: (v) =>
+                  setState(() => _workerPreference = v),
             )
           else
             _buildAdvancedForm(),
-          if (_showApprovalModeChoice) ...[
+          if (_showApprovalModeChoice && !_inputModeQuick) ...[
             const SizedBox(height: 12),
             _buildApprovalModeCard(),
           ],
           if (_instruction != null) ...[
+            const SizedBox(height: 12),
+            StudioPreflightPanel(
+              report: _studioPreflight,
+              onRefresh: () => _refreshRemoteOperationalState(fromServer: true),
+              refreshing: _remoteRefreshBusy || _agentRefreshBusy,
+            ),
             const SizedBox(height: 12),
             _buildSendSummaryCard(),
             const SizedBox(height: 12),
@@ -2237,6 +2285,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                     isAiProductionPilot && _approvalMode == 'manual',
               ),
             ),
+            if (isAiProductionPilot)
+              _sendSummaryRow(
+                'AI 작업자',
+                _workerPreference == 'auto'
+                    ? '자동 (Codex 우선)'
+                    : _workerPreference,
+              ),
             if (input.constraints.trim().isNotEmpty)
               _sendSummaryRow(
                 '주요 제작 조건',
@@ -2487,13 +2542,13 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   bool get _showApprovalModeChoice {
+    if (!_aiProductionPilot) return false;
     final artifact = ArtifactType.normalize(
       _artifactType == ArtifactType.undecided
           ? _currentInput.resolvedArtifactType
           : _artifactType,
     );
-    return _aiProductionPilot &&
-        (artifact == ArtifactType.ebook || artifact == ArtifactType.app);
+    return artifact != ArtifactType.undecided;
   }
 
   Widget _buildApprovalModeCard() {

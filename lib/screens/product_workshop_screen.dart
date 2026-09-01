@@ -523,7 +523,9 @@ class _Sotong24RemoteDetailScreenState
             project,
           );
           final showApprovalActions = project.showApprovalActions;
-          final releaseApk = Sotong24WorkshopPresentation.finalApkArtifact(project);
+          final releaseApk = Sotong24WorkshopPresentation.finalApkArtifact(
+            project,
+          );
           _scrollToApkIfNeeded(project);
 
           return ListView(

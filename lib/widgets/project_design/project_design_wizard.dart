@@ -9,6 +9,9 @@ import '../../services/work_instruction_concept_occupancy.dart';
 import '../../services/work_instruction_workshop_presentation.dart';
 import '../../theme/control_theme.dart';
 import 'concept_picker_panel.dart';
+import 'studio_ai_enhance_panel.dart';
+import 'studio_production_options_panel.dart';
+import 'studio_workflow_preview_panel.dart';
 
 /// Project Design Engine Wizard (STEP 0~6).
 class ProjectDesignWizard extends StatefulWidget {
@@ -24,6 +27,11 @@ class ProjectDesignWizard extends StatefulWidget {
     this.onOccupiedConcept,
     this.instructionGenerated = false,
     this.instructionStale = false,
+    this.approvalMode = 'manual',
+    this.workerPreference = 'auto',
+    this.aiProductionPilot = true,
+    this.onApprovalModeChanged,
+    this.onWorkerPreferenceChanged,
   });
 
   final ProjectDesignState initial;
@@ -36,6 +44,11 @@ class ProjectDesignWizard extends StatefulWidget {
   final void Function(ConceptOccupancyView view)? onOccupiedConcept;
   final bool instructionGenerated;
   final bool instructionStale;
+  final String approvalMode;
+  final String workerPreference;
+  final bool aiProductionPilot;
+  final ValueChanged<String>? onApprovalModeChanged;
+  final ValueChanged<String>? onWorkerPreferenceChanged;
 
   @override
   State<ProjectDesignWizard> createState() => _ProjectDesignWizardState();
@@ -262,42 +275,86 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '만들고 싶은 사업유형을 선택하세요. 선택 전에는 다음 단계로 이동할 수 없습니다.',
+          '무엇을 만들까요? 4대 제작 유형 중 하나를 선택하세요.',
           style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
         ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 720;
-            final cards = ProjectDesignCatalog.artifactCards;
-            return Wrap(
-              spacing: 10,
-              runSpacing: 10,
+            final cards = ProjectDesignCatalog.studioMainCards;
+            final isSiteFamily =
+                _state.artifactType == ArtifactType.site ||
+                _state.artifactType == ArtifactType.promoSite;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final card in cards)
-                  SizedBox(
-                    width: wide
-                        ? (constraints.maxWidth - 20) / 3
-                        : constraints.maxWidth,
-                    child: _ArtifactSelectCard(
-                      key: ValueKey('artifact-${card.id}'),
-                      selected: _state.artifactType == card.id,
-                      selectedKey: _state.artifactType == card.id
-                          ? Key('planning_artifact_${card.id}_selected')
-                          : null,
-                      title: card.title,
-                      subtitle: card.subtitle,
-                      icon: _artifactIcon(card.iconName),
-                      onTap: () {
-                        final next = _state.copy()
-                          ..artifactType = card.id
-                          ..contentSubtype = card.id == ArtifactType.contents
-                              ? _state.contentSubtype
-                              : null;
-                        _emit(next);
-                      },
-                    ),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final card in cards)
+                      SizedBox(
+                        width: wide
+                            ? (constraints.maxWidth - 10) / 2
+                            : constraints.maxWidth,
+                        child: _ArtifactSelectCard(
+                          key: ValueKey('artifact-${card.id}'),
+                          selected: card.id == ArtifactType.site
+                              ? isSiteFamily
+                              : _state.artifactType == card.id,
+                          selectedKey:
+                              (card.id == ArtifactType.site
+                                  ? isSiteFamily
+                                  : _state.artifactType == card.id)
+                              ? Key('planning_artifact_${card.id}_selected')
+                              : null,
+                          title: card.title,
+                          subtitle: card.subtitle,
+                          icon: _artifactIcon(card.iconName),
+                          onTap: () {
+                            final next = _state.copy()
+                              ..artifactType = card.id == ArtifactType.site
+                                  ? ArtifactType.site
+                                  : card.id
+                              ..contentSubtype =
+                                  card.id == ArtifactType.contents
+                                  ? _state.contentSubtype
+                                  : null;
+                            _emit(next);
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+                if (isSiteFamily) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    '사이트 유형',
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final kind in ProjectDesignCatalog.siteKinds)
+                        FilterChip(
+                          label: Text(kind.label),
+                          selected: kind.id == ArtifactType.promoSite
+                              ? _state.artifactType == ArtifactType.promoSite
+                              : _state.artifactType == ArtifactType.site &&
+                                    kind.id == ArtifactType.site,
+                          onSelected: (_) {
+                            final artifact = kind.id == ArtifactType.promoSite
+                                ? ArtifactType.promoSite
+                                : ArtifactType.site;
+                            _emit(_state.copy()..artifactType = artifact);
+                          },
+                        ),
+                    ],
+                  ),
+                ],
               ],
             );
           },
@@ -591,6 +648,32 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             _statusBadge(_state.customerStatus),
           ],
         ),
+        const SizedBox(height: 16),
+        StudioAiEnhancePanel(
+          state: _state,
+          onApply: (result) {
+            var next = _state.copy();
+            if (next.customerProblem.trim().isEmpty) {
+              next.customerProblem = result.suggestedProblem;
+              _problemCtrl.text = result.suggestedProblem;
+            }
+            if (next.desiredOutcome.trim().isEmpty) {
+              next.desiredOutcome = result.suggestedOutcome;
+              _outcomeCtrl.text = result.suggestedOutcome;
+            }
+            final memo = result.suggestedNotes.trim();
+            if (memo.isNotEmpty) {
+              next.designMemo = next.designMemo.trim().isEmpty
+                  ? memo
+                  : '${next.designMemo.trim()}\n\n$memo';
+              _memoCtrl.text = next.designMemo;
+            }
+            next = _engine.markFieldEdited(next, field: 'problem');
+            next = _engine.markFieldEdited(next, field: 'outcome');
+            _emit(next);
+          },
+          onKeepOriginal: () {},
+        ),
       ],
     );
   }
@@ -599,52 +682,64 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     final groups = ProjectDesignCatalog.productionGroupsFor(
       _state.artifactType ?? '',
     );
-    if (groups.isEmpty) {
-      return const Text('이 결과물은 추가 제작 정보가 필수는 아닙니다. 다음으로 진행하세요.');
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '결과물에 맞는 제작 정보를 선택하세요.',
-          style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
-        ),
-        const SizedBox(height: 12),
-        for (final g in groups) ...[
-          Text(g.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final opt in g.options)
-                FilterChip(
-                  label: Text(opt.label),
-                  selected: (_state.productionSelections[g.id] ?? const [])
-                      .contains(opt.id),
-                  onSelected: (on) {
-                    final next = _state.copy();
-                    final cur = List<String>.from(
-                      next.productionSelections[g.id] ?? const [],
-                    );
-                    if (g.multi) {
-                      if (on) {
-                        if (!cur.contains(opt.id)) cur.add(opt.id);
-                      } else {
-                        cur.remove(opt.id);
-                      }
-                    } else {
-                      cur
-                        ..clear()
-                        ..addAll(on ? [opt.id] : []);
-                    }
-                    next.productionSelections[g.id] = cur;
-                    _emit(next);
-                  },
-                ),
-            ],
+        if (widget.aiProductionPilot) ...[
+          StudioProductionOptionsPanel(
+            approvalMode: widget.approvalMode,
+            workerPreference: widget.workerPreference,
+            showApprovalMode: true,
+            onApprovalModeChanged: (v) => widget.onApprovalModeChanged?.call(v),
+            onWorkerPreferenceChanged: (v) =>
+                widget.onWorkerPreferenceChanged?.call(v),
           ),
           const SizedBox(height: 12),
+        ],
+        if (groups.isEmpty)
+          const Text('이 결과물은 추가 제작 정보가 필수는 아닙니다. 다음으로 진행하세요.')
+        else ...[
+          const Text(
+            '결과물에 맞는 제작 정보를 선택하세요.',
+            style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          for (final g in groups) ...[
+            Text(g.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final opt in g.options)
+                  FilterChip(
+                    label: Text(opt.label),
+                    selected: (_state.productionSelections[g.id] ?? const [])
+                        .contains(opt.id),
+                    onSelected: (on) {
+                      final next = _state.copy();
+                      final cur = List<String>.from(
+                        next.productionSelections[g.id] ?? const [],
+                      );
+                      if (g.multi) {
+                        if (on) {
+                          if (!cur.contains(opt.id)) cur.add(opt.id);
+                        } else {
+                          cur.remove(opt.id);
+                        }
+                      } else {
+                        cur
+                          ..clear()
+                          ..addAll(on ? [opt.id] : []);
+                      }
+                      next.productionSelections[g.id] = cur;
+                      _emit(next);
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
       ],
     );
@@ -697,6 +792,11 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             _state.designMemo,
             DesignFieldStatus.userEdited,
           ),
+        const SizedBox(height: 12),
+        StudioWorkflowPreviewPanel(
+          artifactType: _state.artifactType ?? '',
+          contentSubtype: _state.contentSubtype ?? '',
+        ),
         const SizedBox(height: 12),
         FilledButton.icon(
           onPressed: () {

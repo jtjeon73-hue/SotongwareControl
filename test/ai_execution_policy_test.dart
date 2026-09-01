@@ -39,6 +39,7 @@ void main() {
     expect(wi.aiExecution!.approvalRequired, isTrue);
     expect(wi.aiExecution!.artifactUploadEnabled, isTrue);
     expect(wi.aiExecution!.autoAdvance, isFalse);
+    expect(wi.aiExecution!.executionMode, 'hold');
     expect(wi.aiExecution!.deploymentAllowed, isFalse);
 
     final json = wi.toJson();
@@ -52,6 +53,7 @@ void main() {
     expect(roundTrip.aiExecution!.worker, 'codex');
     expect(roundTrip.aiExecution!.autoAdvance, isFalse);
     expect(roundTrip.aiExecution!.approvalMode, 'manual');
+    expect(roundTrip.aiExecution!.executionMode, 'hold');
   });
 
   test('production ebook approvalMode manual/auto round trip', () {
@@ -61,12 +63,14 @@ void main() {
     expect(manual.approvalMode, 'manual');
     expect(manual.approvalRequired, isTrue);
     expect(manual.autoAdvance, isFalse);
+    expect(manual.executionMode, 'hold');
     expect(manual.maxAutoStageOrder, 12);
     expect(manual.deploymentAllowed, isFalse);
 
     expect(automatic.approvalMode, 'auto');
     expect(automatic.approvalRequired, isFalse);
     expect(automatic.autoAdvance, isTrue);
+    expect(automatic.executionMode, 'continuous');
     expect(automatic.deploymentAllowed, isFalse);
 
     final restored = AiExecutionPolicy.fromJson(
@@ -76,6 +80,7 @@ void main() {
     );
     expect(restored.approvalMode, 'auto');
     expect(restored.autoAdvance, isTrue);
+    expect(restored.executionMode, 'continuous');
     expect(restored.deploymentAllowed, isFalse);
   });
 
@@ -87,11 +92,13 @@ void main() {
     expect(manual.approvalRequired, isTrue);
     expect(manual.worker, 'codex');
     expect(manual.maxAutoStageOrder, 18);
+    expect(manual.executionMode, 'hold');
 
     expect(automatic.approvalMode, 'auto');
     expect(automatic.approvalRequired, isFalse);
     expect(automatic.autoAdvance, isTrue);
     expect(automatic.worker, 'codex');
+    expect(automatic.executionMode, 'continuous');
   });
 
   test('legacy approvalRequired keeps safe approval mode compatibility', () {
@@ -105,6 +112,17 @@ void main() {
     });
     expect(manual.approvalMode, 'manual');
     expect(automatic.approvalMode, 'auto');
+    expect(automatic.executionMode, 'hold');
+  });
+
+  test('legacy automatic production JSON infers continuous execution', () {
+    final automatic = AiExecutionPolicy.fromJson({
+      'enabled': true,
+      'approvalMode': 'auto',
+      'approvalRequired': false,
+      'autoAdvance': true,
+    });
+    expect(automatic.executionMode, 'continuous');
   });
 
   test('기본 buildInstruction은 aiExecution 없음 (legacy 보호)', () {

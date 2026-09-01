@@ -111,6 +111,42 @@ class ProjectDesignCatalog {
     ),
   ];
 
+  /// 작업지시서 제작소 4대 유형 카드 (STEP A).
+  static const studioMainCards = <ArtifactCardDef>[
+    ArtifactCardDef(
+      id: ArtifactType.ebook,
+      title: '전자책 개발',
+      subtitle: '가이드·매뉴얼·판매용 PDF/ePub',
+      iconName: 'menu_book',
+    ),
+    ArtifactCardDef(
+      id: ArtifactType.app,
+      title: '앱 개발',
+      subtitle: 'Android Flutter 상용 앱 · APK 배포',
+      iconName: 'phone_android',
+    ),
+    ArtifactCardDef(
+      id: ArtifactType.site,
+      title: '사이트 개발',
+      subtitle: '홈페이지·랜딩·지식·판매 사이트',
+      iconName: 'language',
+    ),
+    ArtifactCardDef(
+      id: ArtifactType.contents,
+      title: '콘텐츠 개발',
+      subtitle: '쇼츠·영상·음악·이미지 콘텐츠',
+      iconName: 'play_circle',
+    ),
+  ];
+
+  static const siteKinds = <DesignOption>[
+    DesignOption(id: ArtifactType.site, label: '지식·정보 사이트'),
+    DesignOption(id: ArtifactType.promoSite, label: '마케팅·랜딩'),
+    DesignOption(id: 'company_site', label: '회사·브랜드 홈페이지'),
+    DesignOption(id: 'commerce_site', label: '판매·콘텐츠 사이트'),
+    DesignOption(id: 'other_site', label: '기타'),
+  ];
+
   static const contentSubtypes = <DesignOption>[
     DesignOption(id: ContentSubtype.song, label: '노래'),
     DesignOption(id: ContentSubtype.shorts, label: '쇼츠'),

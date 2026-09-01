@@ -257,7 +257,7 @@ void main() {
 
     expect(find.text('작업지시 제작소'), findsOneWidget);
     expect(find.text('사업유형 선택'), findsOneWidget);
-    expect(find.text('전자책'), findsWidgets);
+    expect(find.text('전자책 개발'), findsWidgets);
     expect(find.text('다음'), findsOneWidget);
     expect(find.text('이전'), findsOneWidget);
     expect(find.text('취소'), findsOneWidget);

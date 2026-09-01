@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'config/release_info.dart';
 import 'data/business_departments/business_department_catalog.dart';
 import 'data/sample_business_data.dart';
 import 'models/idea_bank.dart';
@@ -514,11 +515,25 @@ class _ControlHeader extends StatelessWidget {
             if (showSiteName)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: Text(
-                  SampleBusinessData.siteTitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: ControlColors.textMuted,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      SampleBusinessData.siteTitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: ControlColors.textMuted,
+                      ),
+                    ),
+                    Text(
+                      ReleaseInfo.label,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: ControlColors.teal,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             if (showStatusBadge)
