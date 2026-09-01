@@ -338,4 +338,37 @@ void main() {
     );
     expect(result.isBlocked, isTrue);
   });
+
+  test('auto approval without executionMode continuous is BLOCKED', () {
+    final input = inputFor(
+      artifact: ArtifactType.app,
+      title: 'Continuous Contract App',
+      audiences: const ['mobile users'],
+    );
+    final analysis = service.analyze(input);
+    final instruction = service.buildInstruction(
+      planId: 'continuous_contract',
+      input: input,
+      analysis: analysis,
+      instructionId: 'wi_continuous_contract',
+      aiExecution: AiExecutionPolicy.productionApp(approvalMode: 'auto'),
+    );
+    expect(instruction.aiExecution!.executionMode, 'continuous');
+
+    final brokenJson = instruction.toJson();
+    brokenJson['aiExecution'] = {
+      ...instruction.aiExecution!.toJson(),
+      'executionMode': 'hold',
+    };
+    final broken = WorkInstruction.fromJson(brokenJson);
+    final result = contractValidator.validate(
+      input: input,
+      instruction: broken,
+    );
+    expect(result.isBlocked, isTrue);
+    expect(
+      result.blockers.any((b) => b.field == 'aiExecution.executionMode'),
+      isTrue,
+    );
+  });
 }

@@ -232,6 +232,9 @@ class InstructionContractValidator {
       );
     }
 
+    // 5.5) AI execution mode contract (continuous vs hold)
+    _validateAiExecutionMode(issues, instruction);
+
     // 6) generic 오염 휴리스틱 (warning)
     final genericHints = [
       '일반 독자',
@@ -445,6 +448,45 @@ class InstructionContractValidator {
           level: ContractValidationLevel.blocked,
         ),
       );
+    }
+  }
+
+  void _validateAiExecutionMode(
+    List<ContractValidationIssue> issues,
+    WorkInstruction instruction,
+  ) {
+    final ai = instruction.aiExecution;
+    if (ai == null || !ai.enabled) return;
+
+    final wantsContinuous = ai.approvalMode == 'auto' || ai.autoAdvance;
+    final isContinuous = ai.executionMode == 'continuous';
+    final isHold = ai.executionMode == 'hold' ||
+        ai.executionMode == 'single' ||
+        ai.executionMode == 'single_step';
+
+    if (wantsContinuous && !isContinuous) {
+      issues.add(
+        const ContractValidationIssue(
+          field: 'aiExecution.executionMode',
+          reason:
+              '자동 승인/연속 실행 선택 시 executionMode=continuous 가 필요합니다.',
+          fix: '작업지시서를 다시 생성하거나 executionMode를 continuous로 설정하세요.',
+          level: ContractValidationLevel.blocked,
+        ),
+      );
+    }
+    if (!wantsContinuous && isContinuous) {
+      issues.add(
+        const ContractValidationIssue(
+          field: 'aiExecution.executionMode',
+          reason: '수동 승인(hold) 모드에서는 continuous 실행이 허용되지 않습니다.',
+          fix: 'executionMode를 hold로 설정하세요.',
+          level: ContractValidationLevel.blocked,
+        ),
+      );
+    }
+    if (wantsContinuous && isHold && ai.executionMode != 'hold') {
+      // explicit contradictory combo already covered above
     }
   }
 }
