@@ -128,31 +128,29 @@ class ProjectDesignCatalog {
     ArtifactCardDef(
       id: ArtifactType.site,
       title: '사이트 개발',
-      subtitle: '홈페이지·랜딩·지식·판매 사이트',
+      subtitle: '홈페이지·랜딩·지식·판매 사이트 (시험 운영)',
       iconName: 'language',
     ),
     ArtifactCardDef(
       id: ArtifactType.contents,
       title: '콘텐츠 개발',
-      subtitle: '쇼츠·영상·음악·이미지 콘텐츠',
+      subtitle: '음악·쇼츠·만화 (시험 운영)',
       iconName: 'play_circle',
     ),
   ];
 
   static const siteKinds = <DesignOption>[
-    DesignOption(id: ArtifactType.site, label: '지식·정보 사이트'),
-    DesignOption(id: ArtifactType.promoSite, label: '마케팅·랜딩'),
-    DesignOption(id: 'company_site', label: '회사·브랜드 홈페이지'),
-    DesignOption(id: 'commerce_site', label: '판매·콘텐츠 사이트'),
-    DesignOption(id: 'other_site', label: '기타'),
+    DesignOption(id: 'corporate_site', label: '기업·기관 홈페이지'),
+    DesignOption(id: 'marketing_site', label: '홍보·마케팅 사이트'),
+    DesignOption(id: 'knowledge_site', label: '지식·정보 사이트'),
+    DesignOption(id: 'education_site', label: '교육·학습 사이트'),
+    DesignOption(id: 'information_portal', label: '분야별 정보 포털'),
   ];
 
   static const contentSubtypes = <DesignOption>[
-    DesignOption(id: ContentSubtype.song, label: '노래'),
+    DesignOption(id: ContentSubtype.music, label: '노래·음악'),
     DesignOption(id: ContentSubtype.shorts, label: '쇼츠'),
-    DesignOption(id: ContentSubtype.video, label: '영상'),
-    DesignOption(id: ContentSubtype.songAndShorts, label: '노래+쇼츠'),
-    DesignOption(id: ContentSubtype.other, label: '기타'),
+    DesignOption(id: ContentSubtype.comic, label: '만화'),
   ];
 
   static const topics = <DesignTopic>[

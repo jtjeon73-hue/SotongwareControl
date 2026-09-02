@@ -115,29 +115,36 @@ class ArtifactType {
       folderNames[normalize(artifact)];
 }
 
-/// 콘텐츠개발 하위 유형.
+/// 콘텐츠개발 하위 유형 (canonical: music | shorts | comic).
 class ContentSubtype {
-  static const song = 'song';
+  static const music = 'music';
   static const shorts = 'shorts';
+  static const comic = 'comic';
+
+  // Legacy read-compat tokens (not selectable for new work).
+  static const song = 'song';
   static const video = 'video';
   static const songAndShorts = 'song_and_shorts';
   static const other = 'other';
   static const undecided = 'undecided';
 
-  static const allSelectable = [song, shorts, video, songAndShorts, other];
+  static const allSelectable = [music, shorts, comic];
 
   static String labelKo(String id) {
     switch (id) {
+      case music:
       case song:
-        return '노래';
+        return '노래·음악';
       case shorts:
-        return '유튜브 쇼츠';
+        return '쇼츠';
+      case comic:
+        return '만화';
       case video:
-        return '영상';
+        return '영상 (레거시)';
       case songAndShorts:
-        return '노래와 쇼츠 연계';
+        return '노래+쇼츠 (레거시)';
       case other:
-        return '기타 콘텐츠';
+        return '기타 (레거시)';
       case undecided:
         return '아직 결정하지 못함';
       default:
@@ -145,15 +152,20 @@ class ContentSubtype {
     }
   }
 
+  /// Remote/canonical subtype for Sotong24Work. song→music, youtube_shorts→shorts.
   static String normalize(String raw) {
     switch (raw) {
+      case music:
       case song:
       case 'music_content':
       case 'content_music':
-        return song;
+        return music;
       case shorts:
       case 'youtube_shorts':
+      case 'youtube':
         return shorts;
+      case comic:
+        return comic;
       case video:
       case 'youtube_video':
         return video;
@@ -163,8 +175,17 @@ class ContentSubtype {
       case 'education_content':
       case 'content':
         return other;
+      case undecided:
+      case 'custom':
+        return undecided;
       default:
         return undecided;
     }
+  }
+
+  /// True when legacy token should not be used for new WI creation.
+  static bool blocksNewSelection(String raw) {
+    final n = normalize(raw);
+    return n == video || raw == 'marketing' || raw == 'image';
   }
 }
