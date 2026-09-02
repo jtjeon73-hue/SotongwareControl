@@ -45,10 +45,11 @@ class ProductionMenuContract {
       statusLabelKo: '사용 가능',
       supportedScopeKo: 'STEP 1~18 앱 전용 공정',
       subtypesKo: '(단일 app track)',
-      lastValidatedStepKo: 'STEP 2 (problem_validate)',
+      lastValidatedStepKo: 'STEP 5 (project_setup) / 최신 엔진 Cursor E2E',
       goldenRunComplete: false,
       expectedDeliverablesKo: 'Flutter APK, 소스, 배포 체크리스트',
-      cautionKo: 'Play Console 배포는 사용자 최종 승인 후에만',
+      cautionKo:
+          'verifiedThroughStep=5. goldenRunCompleted=false. 과거 전기점검 완주는 historicalGoldenRun만. externalDeploymentAllowed=false. Play/Firebase/원격 push 금지',
     ),
     ProductionMenuCardDef(
       trackId: 'ebook',
@@ -81,15 +82,12 @@ class ProductionMenuContract {
       titleKo: '콘텐츠',
       status: ProductionMenuStatus.pilot,
       statusLabelKo: '시험 운영',
-      supportedScopeKo:
-          'ContentStageContract STEP 1~18 (검증: shorts STEP 3까지)',
+      supportedScopeKo: 'ContentStageContract STEP 1~18 (검증: shorts STEP 3까지)',
       subtypesKo: 'music (노래·음악), shorts (쇼츠), comic (만화)',
       lastValidatedStepKo: 'STEP 3 (shorts_concept_strategy)',
       goldenRunComplete: false,
-      expectedDeliverablesKo:
-          '기획서·대본·스토리보드·메타데이터·게시 준비 패키지',
-      cautionKo:
-          '음원·영상·이미지 실제 생성 도구 미연결 단계는 tool_required. YouTube 자동 업로드 금지',
+      expectedDeliverablesKo: '기획서·대본·스토리보드·메타데이터·게시 준비 패키지',
+      cautionKo: '음원·영상·이미지 실제 생성 도구 미연결 단계는 tool_required. YouTube 자동 업로드 금지',
     ),
   ];
 
