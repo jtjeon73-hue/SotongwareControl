@@ -318,7 +318,16 @@ class InstructionContractBuilder {
     ProjectDesignState? design,
     BusinessPlanInput input,
   ) {
-    final groups = ProjectDesignCatalog.productionGroupsFor(artifact);
+    final fromDesign = design?.contentSubtype ?? '';
+    final contentSubtype = fromDesign.isNotEmpty
+        ? fromDesign
+        : (input.contentSubtype.isNotEmpty
+              ? input.contentSubtype
+              : (subtype ?? ''));
+    final groups = ProjectDesignCatalog.productionGroupsFor(
+      artifact,
+      contentSubtype: contentSubtype,
+    );
     final spec = <String, dynamic>{};
     final undecided = <String>[];
 

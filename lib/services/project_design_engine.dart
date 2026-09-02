@@ -264,6 +264,7 @@ class ProjectDesignEngine {
     final prodNotes = <String>[];
     for (final group in ProjectDesignCatalog.productionGroupsFor(
       synced.artifactType ?? '',
+      contentSubtype: synced.contentSubtype ?? '',
     )) {
       final selectedOpts = synced.productionSelections[group.id] ?? const [];
       if (selectedOpts.isEmpty) continue;

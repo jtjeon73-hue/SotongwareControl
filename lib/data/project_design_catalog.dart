@@ -265,7 +265,10 @@ class ProjectDesignCatalog {
     }).toList();
   }
 
-  static List<DesignOptionGroup> productionGroupsFor(String artifactType) {
+  static List<DesignOptionGroup> productionGroupsFor(
+    String artifactType, {
+    String contentSubtype = '',
+  }) {
     switch (ArtifactType.normalize(artifactType)) {
       case ArtifactType.ebook:
         return const [
@@ -341,19 +344,7 @@ class ProjectDesignCatalog {
           ),
         ];
       case ArtifactType.contents:
-        return const [
-          DesignOptionGroup(
-            id: 'channel',
-            title: '채널·형식',
-            options: [
-              DesignOption(id: 'song', label: '노래'),
-              DesignOption(id: 'shorts', label: '쇼츠'),
-              DesignOption(id: 'youtube', label: '유튜브'),
-              DesignOption(id: 'voice', label: '음성'),
-              DesignOption(id: 'subtitle', label: '자막'),
-            ],
-          ),
-        ];
+        return productionGroupsForContentSubtype(contentSubtype);
       case ArtifactType.site:
         return const [
           DesignOptionGroup(
@@ -377,6 +368,265 @@ class ProjectDesignCatalog {
               DesignOption(id: 'cta', label: '전환 CTA'),
               DesignOption(id: 'firebase_hosting', label: 'Firebase Hosting'),
               DesignOption(id: 'analytics', label: '유입 분석'),
+            ],
+          ),
+        ];
+      default:
+        return const [];
+    }
+  }
+
+  /// Subtype-specific production inputs for contents (music | shorts | comic).
+  static List<DesignOptionGroup> productionGroupsForContentSubtype(
+    String contentSubtype,
+  ) {
+    switch (ContentSubtype.normalize(contentSubtype)) {
+      case ContentSubtype.music:
+        return const [
+          DesignOptionGroup(
+            id: 'music_genre',
+            title: '장르',
+            options: [
+              DesignOption(id: 'pop', label: '팝'),
+              DesignOption(id: 'ballad', label: '발라드'),
+              DesignOption(id: 'lofi', label: '로파이'),
+              DesignOption(id: 'classical', label: '클래식'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'music_mood',
+            title: '분위기',
+            options: [
+              DesignOption(id: 'calm', label: '차분'),
+              DesignOption(id: 'energetic', label: '활기'),
+              DesignOption(id: 'focus', label: '집중'),
+              DesignOption(id: 'sleep', label: '수면'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'music_vocal',
+            title: '보컬',
+            multi: false,
+            options: [
+              DesignOption(id: 'instrumental', label: '연주곡'),
+              DesignOption(id: 'vocal_ko', label: '한국어 보컬'),
+              DesignOption(id: 'vocal_en', label: '영어 보컬'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'music_instrument',
+            title: '악기',
+            options: [
+              DesignOption(id: 'piano', label: '피아노'),
+              DesignOption(id: 'guitar', label: '기타'),
+              DesignOption(id: 'synth', label: '신스'),
+              DesignOption(id: 'orchestra', label: '오케스트라'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'music_language',
+            title: '언어',
+            multi: false,
+            options: [
+              DesignOption(id: 'ko', label: '한국어'),
+              DesignOption(id: 'en', label: '영어'),
+              DesignOption(id: 'instrumental_only', label: '가사 없음'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'music_track_count',
+            title: '곡 수',
+            multi: false,
+            options: [
+              DesignOption(id: 'tracks_10', label: '약 10곡'),
+              DesignOption(id: 'tracks_20', label: '약 20곡'),
+              DesignOption(id: 'tracks_custom', label: '직접 지정'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'music_video_length',
+            title: '영상 길이',
+            multi: false,
+            options: [
+              DesignOption(id: '1h', label: '1시간'),
+              DesignOption(id: '2h', label: '2시간'),
+              DesignOption(id: 'long', label: '장시간'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'music_channel',
+            title: '대상 채널',
+            options: [
+              DesignOption(id: 'sotong_music', label: '소통뮤직'),
+              DesignOption(id: 'youtube', label: 'YouTube'),
+            ],
+          ),
+        ];
+      case ContentSubtype.shorts:
+        return const [
+          DesignOptionGroup(
+            id: 'shorts_topic',
+            title: '주제',
+            multi: false,
+            options: [
+              DesignOption(id: 'howto', label: '정보·방법'),
+              DesignOption(id: 'story', label: '스토리'),
+              DesignOption(id: 'promo', label: '홍보'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_audience',
+            title: '대상 시청자',
+            multi: false,
+            options: [
+              DesignOption(id: 'general', label: '일반'),
+              DesignOption(id: 'beginner', label: '초보'),
+              DesignOption(id: 'professional', label: '전문가'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_length',
+            title: '길이',
+            multi: false,
+            options: [
+              DesignOption(id: '15s', label: '15초'),
+              DesignOption(id: '30s', label: '30초'),
+              DesignOption(id: '60s', label: '60초'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_engagement',
+            title: '재미·정보 요소',
+            options: [
+              DesignOption(id: 'hook', label: '강한 훅'),
+              DesignOption(id: 'tips', label: '핵심 팁'),
+              DesignOption(id: 'twist', label: '반전·유머'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_format',
+            title: '형식',
+            multi: false,
+            options: [
+              DesignOption(id: 'info', label: '정보형'),
+              DesignOption(id: 'promo', label: '홍보형'),
+              DesignOption(id: 'story', label: '스토리형'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_visual',
+            title: '화면 스타일',
+            options: [
+              DesignOption(id: 'live', label: '실사'),
+              DesignOption(id: 'motion', label: '모션 그래픽'),
+              DesignOption(id: 'screen', label: '화면 녹화'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_voice',
+            title: '음성',
+            multi: false,
+            options: [
+              DesignOption(id: 'narration', label: '내레이션'),
+              DesignOption(id: 'dialogue', label: '대화'),
+              DesignOption(id: 'none', label: '무음+자막'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_subtitle',
+            title: '자막',
+            multi: false,
+            options: [
+              DesignOption(id: 'on', label: '자막 포함'),
+              DesignOption(id: 'off', label: '자막 없음'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'shorts_channel',
+            title: '게시 채널',
+            options: [
+              DesignOption(id: 'youtube_shorts', label: 'YouTube Shorts'),
+              DesignOption(id: 'internal', label: '내부 검토만'),
+            ],
+          ),
+        ];
+      case ContentSubtype.comic:
+        return const [
+          DesignOptionGroup(
+            id: 'comic_genre',
+            title: '장르',
+            options: [
+              DesignOption(id: 'daily', label: '일상'),
+              DesignOption(id: 'fantasy', label: '판타지'),
+              DesignOption(id: 'edu', label: '교육'),
+              DesignOption(id: 'info', label: '정보'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'comic_age',
+            title: '독자 연령',
+            multi: false,
+            options: [
+              DesignOption(id: 'all', label: '전연령'),
+              DesignOption(id: 'teen', label: '청소년'),
+              DesignOption(id: 'adult', label: '성인'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'comic_character',
+            title: '캐릭터',
+            options: [
+              DesignOption(id: 'single', label: '단일 주인공'),
+              DesignOption(id: 'ensemble', label: '다인물'),
+              DesignOption(id: 'mascot', label: '마스코트'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'comic_art_style',
+            title: '그림 스타일',
+            multi: false,
+            options: [
+              DesignOption(id: 'simple', label: '심플'),
+              DesignOption(id: 'webtoon', label: '웹툰'),
+              DesignOption(id: 'sketch', label: '스케치'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'comic_episode_length',
+            title: '에피소드 길이',
+            multi: false,
+            options: [
+              DesignOption(id: 'short', label: '짧은 편'),
+              DesignOption(id: 'standard', label: '표준'),
+              DesignOption(id: 'long', label: '긴 편'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'comic_panel_count',
+            title: '컷 수',
+            multi: false,
+            options: [
+              DesignOption(id: 'panels_4', label: '4컷'),
+              DesignOption(id: 'panels_8', label: '8컷'),
+              DesignOption(id: 'panels_scroll', label: '스크롤형'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'comic_serial',
+            title: '연재 방식',
+            multi: false,
+            options: [
+              DesignOption(id: 'one_shot', label: '단편'),
+              DesignOption(id: 'series', label: '연재'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'comic_channel',
+            title: '게시 채널',
+            options: [
+              DesignOption(id: 'webtoon', label: '웹툰 플랫폼'),
+              DesignOption(id: 'sns', label: 'SNS'),
+              DesignOption(id: 'internal', label: '내부 검토만'),
             ],
           ),
         ];

@@ -681,6 +681,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
   Widget _buildProductionStep() {
     final groups = ProjectDesignCatalog.productionGroupsFor(
       _state.artifactType ?? '',
+      contentSubtype: _state.contentSubtype ?? '',
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
