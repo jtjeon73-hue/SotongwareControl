@@ -45,11 +45,12 @@ class ProductionMenuContract {
       statusLabelKo: '사용 가능',
       supportedScopeKo: 'STEP 1~18 앱 전용 공정',
       subtypesKo: '(단일 app track)',
-      lastValidatedStepKo: 'STEP 8 (app_data_state) / 최신 엔진 Cursor E2E',
+      lastValidatedStepKo:
+          'STEP 9 (app_core_implementation_1) / 최신 엔진 Cursor E2E',
       goldenRunComplete: false,
       expectedDeliverablesKo: 'Flutter APK, 소스, 배포 체크리스트',
       cautionKo:
-          'verifiedThroughStep=8. goldenRunCompleted=false. 과거 전기점검 완주는 historicalGoldenRun만. externalDeploymentAllowed=false. Play/Firebase/원격 push 금지',
+          'verifiedThroughStep=9. goldenRunCompleted=false. 과거 전기점검 완주는 historicalGoldenRun만. externalDeploymentAllowed=false. Play/Firebase/원격 push 금지',
     ),
     ProductionMenuCardDef(
       trackId: 'ebook',
