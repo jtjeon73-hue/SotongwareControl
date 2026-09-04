@@ -19,6 +19,7 @@ import '../widgets/revision_request_dialog.dart';
 import '../widgets/operational_collapsible_section.dart';
 import '../widgets/pdf_download_button.dart';
 import '../widgets/apk_download_button.dart';
+import '../widgets/production_review_status_card.dart';
 import '../widgets/sotong24_stage_widgets.dart';
 import '../widgets/stall_followup_action_bar.dart';
 
@@ -606,6 +607,36 @@ class _Sotong24RemoteDetailScreenState
               _Kv('상태', project.userFacingStatusLabel),
               _Kv('현재 작업자', _workerLabel(project, stage)),
               _Kv('승인 방식', project.approvalMode == 'auto' ? '자동 승인' : '수동 승인'),
+              if (project.productionReviewStatus != null) ...[
+                const SizedBox(height: 10),
+                if (Sotong24WorkshopPresentation.productionReviewBanner(
+                      project.productionReviewStatus,
+                    ) !=
+                    null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      Sotong24WorkshopPresentation.productionReviewBanner(
+                        project.productionReviewStatus,
+                      )!,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: ControlColors.accentWarm,
+                      ),
+                    ),
+                  ),
+                ProductionReviewStatusCard(
+                  envelope: project.productionReviewStatus!,
+                  compact: true,
+                  onPrepareR2Draft: () {
+                    ProductionReviewStatusCard.showR2DraftSheet(
+                      context,
+                      project.productionReviewStatus!,
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
               if (stage != null) ...[
                 const SizedBox(height: 8),
                 _StageMonitoringPanel(
@@ -1963,6 +1994,36 @@ class _ProjectCard extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (project.productionReviewStatus != null) ...[
+                const SizedBox(height: 8),
+                if (Sotong24WorkshopPresentation.productionReviewBanner(
+                      project.productionReviewStatus,
+                    ) !=
+                    null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      Sotong24WorkshopPresentation.productionReviewBanner(
+                        project.productionReviewStatus,
+                      )!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: ControlColors.accentWarm,
+                      ),
+                    ),
+                  ),
+                ProductionReviewStatusCard(
+                  envelope: project.productionReviewStatus!,
+                  compact: true,
+                  onPrepareR2Draft: () {
+                    ProductionReviewStatusCard.showR2DraftSheet(
+                      context,
+                      project.productionReviewStatus!,
+                    );
+                  },
+                ),
+              ],
               Text(
                 '마지막 동기화: ${_formatTime(project.updatedAt.isNotEmpty ? project.updatedAt : project.lastHeartbeat)}',
                 style: const TextStyle(

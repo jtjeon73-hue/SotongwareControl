@@ -43,5 +43,9 @@
     "externalPublicationAllowed": false
   },
   "updatedAt": "2026-09-04T00:00:00+09:00",
-  "createdAt": "2026-09-04T00:00:00+09:00"
+  "createdAt": "2026-09-04T00:00:00+09:00",
+  "initialSync": true,
+  "syncKind": "baseline",
+  "emittedAt": "2026-09-04T00:00:00+09:00",
+  "contentFingerprint": "51da3ed5c95bc387328e7bc761dca086b2629529c667f355002011a1c2aea4a2"
 }

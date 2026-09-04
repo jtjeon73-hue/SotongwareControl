@@ -354,6 +354,9 @@ class ProductionReviewStatusEnvelope {
     this.problem = const ProductionReviewProblem(),
     this.userLabelKo = '',
     this.nextActionKo = '',
+    this.initialSync = false,
+    this.syncKind = '',
+    this.contentFingerprint = '',
   });
 
   static const kSchemaVersion = 1;
@@ -385,6 +388,12 @@ class ProductionReviewStatusEnvelope {
   final ProductionReviewProblem problem;
   final String userLabelKo;
   final String nextActionKo;
+  /// True for first-connect / cold sync payloads (notification suppressed).
+  final bool initialSync;
+  /// '' | baseline | transition
+  final String syncKind;
+  /// Stable hash of status fields excluding volatile timestamps.
+  final String contentFingerprint;
 
   /// R1 → 1, R2 → 2, numeric fallback.
   int get revisionRank => revisionRankOf(revision);
@@ -470,6 +479,9 @@ class ProductionReviewStatusEnvelope {
     'problem': problem.toJson(),
     'userLabelKo': userLabelKo,
     'nextActionKo': nextActionKo,
+    'initialSync': initialSync,
+    'syncKind': syncKind,
+    'contentFingerprint': contentFingerprint,
   };
 
   factory ProductionReviewStatusEnvelope.fromJson(Map<String, dynamic>? json) {
@@ -481,6 +493,10 @@ class ProductionReviewStatusEnvelope {
     final exec = json['execution'];
     final ready = json['readiness'];
     final prob = json['problem'];
+    final syncKindRaw = '${json['syncKind'] ?? ''}'.trim();
+    final syncKind = (syncKindRaw == 'baseline' || syncKindRaw == 'transition')
+        ? syncKindRaw
+        : '';
     return ProductionReviewStatusEnvelope(
       schemaVersion: _asInt(json['schemaVersion'], kSchemaVersion),
       eventId: '${json['eventId'] ?? ''}',
@@ -519,6 +535,9 @@ class ProductionReviewStatusEnvelope {
       ),
       userLabelKo: '${json['userLabelKo'] ?? ''}',
       nextActionKo: '${json['nextActionKo'] ?? ''}',
+      initialSync: json['initialSync'] == true,
+      syncKind: syncKind,
+      contentFingerprint: '${json['contentFingerprint'] ?? ''}',
     );
   }
 
@@ -550,6 +569,9 @@ class ProductionReviewStatusEnvelope {
     ProductionReviewProblem? problem,
     String? userLabelKo,
     String? nextActionKo,
+    bool? initialSync,
+    String? syncKind,
+    String? contentFingerprint,
   }) {
     return ProductionReviewStatusEnvelope(
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -579,6 +601,9 @@ class ProductionReviewStatusEnvelope {
       problem: problem ?? this.problem,
       userLabelKo: userLabelKo ?? this.userLabelKo,
       nextActionKo: nextActionKo ?? this.nextActionKo,
+      initialSync: initialSync ?? this.initialSync,
+      syncKind: syncKind ?? this.syncKind,
+      contentFingerprint: contentFingerprint ?? this.contentFingerprint,
     );
   }
 }

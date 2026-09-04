@@ -138,6 +138,33 @@ void main() {
       expect(envelope.userLabelKo, contains('R2 준비 대기'));
     });
 
+    test('additive sync fields round-trip', () {
+      final e = ProductionReviewFixtures.appR1ChangesRequested().copyWith(
+        initialSync: true,
+        syncKind: 'baseline',
+        contentFingerprint: 'fp_roundtrip',
+      );
+      final json = e.toJson();
+      expect(json['initialSync'], isTrue);
+      expect(json['syncKind'], 'baseline');
+      expect(json['contentFingerprint'], 'fp_roundtrip');
+      final parsed = ProductionReviewStatusEnvelope.fromJson(json);
+      expect(parsed.initialSync, isTrue);
+      expect(parsed.syncKind, 'baseline');
+      expect(parsed.contentFingerprint, 'fp_roundtrip');
+    });
+
+    test('absent sync fields default safely', () {
+      final e = ProductionReviewStatusEnvelope.fromJson({
+        'schemaVersion': 1,
+        'eventId': 'prse_legacy',
+        'instructionId': 'wi_legacy',
+      });
+      expect(e.initialSync, isFalse);
+      expect(e.syncKind, '');
+      expect(e.contentFingerprint, '');
+    });
+
     test('revisionRank R1=1', () {
       expect(appR1.revisionRank, 1);
       expect(ProductionReviewStatusEnvelope.revisionRankOf('R2'), 2);
@@ -164,6 +191,33 @@ void main() {
         expect(r.sideEffectCount, 0);
       }
       expect(store.count, 3);
+    });
+
+    test('baseline suppresses notificationWouldEnqueue', () {
+      final store = ProductionReviewStatusStore();
+      final baseline = ProductionReviewFixtures.appR1ChangesRequested().copyWith(
+        initialSync: true,
+        syncKind: 'baseline',
+        eventId: 'prse_store_baseline',
+      );
+      final r = store.apply(baseline);
+      expect(r.applied, isTrue);
+      expect(r.sideEffectCount, 0);
+      expect(r.notificationWouldEnqueue, isFalse);
+    });
+
+    test('transition tracks notificationWouldEnqueue without side effects', () {
+      final store = ProductionReviewStatusStore();
+      final transition =
+          ProductionReviewFixtures.appR1ChangesRequested().copyWith(
+        initialSync: false,
+        syncKind: 'transition',
+        eventId: 'prse_store_transition',
+      );
+      final r = store.apply(transition);
+      expect(r.applied, isTrue);
+      expect(r.sideEffectCount, 0);
+      expect(r.notificationWouldEnqueue, isTrue);
     });
 
     test('presentation lines for app R1', () {

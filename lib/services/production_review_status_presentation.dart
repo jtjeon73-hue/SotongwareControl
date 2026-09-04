@@ -70,6 +70,18 @@ class ProductionReviewStatusPresentation {
     ];
   }
 
+  /// Read-only R2 draft summary lines (no send / create job).
+  static List<String> r2DraftDialogLines(ProductionReviewStatusEnvelope e) {
+    return [
+      '차수: ${e.revision.isNotEmpty ? e.revision : '—'}',
+      '보완 요청: ${e.ownerReview.findingCount}건',
+      '다음 허용 작업: ${e.ownerReview.nextAllowedAction.isNotEmpty ? e.ownerReview.nextAllowedAction : '—'}',
+      '16단계 차단: ${e.ownerReview.step16Blocked}',
+      '등록 가능: false',
+      '외부 공개: false',
+    ];
+  }
+
   static String _defaultUserLabel(ProductionReviewStatusEnvelope e) {
     if (e.ownerReview.decision == 'changes_requested') {
       return '기술검증 완료 · 보완요청 · ${e.revision.isNotEmpty ? e.revision : 'R1'}';

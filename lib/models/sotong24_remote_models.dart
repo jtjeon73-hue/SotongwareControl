@@ -1,5 +1,6 @@
 import '../services/business_planning_service.dart';
 import 'artifact_type.dart';
+import 'commercial/production_review_status_envelope.dart';
 import 'instruction_contract.dart';
 
 /// PC Sotong24Work ↔ 소통총관제 원격 관제 상태.
@@ -489,6 +490,7 @@ class Sotong24RemoteProject {
     this.externalPublished = false,
     this.currentWorker = '',
     this.stages = const [],
+    this.productionReviewStatus,
   });
 
   final String projectId;
@@ -518,6 +520,9 @@ class Sotong24RemoteProject {
   final bool externalPublished;
   final String currentWorker;
   final List<Sotong24RemoteStage> stages;
+
+  /// Optional live production review envelope (absent = backward compatible).
+  final ProductionReviewStatusEnvelope? productionReviewStatus;
 
   String get productTypeLabel {
     final base = ArtifactType.labelKo(productType);
@@ -650,6 +655,8 @@ class Sotong24RemoteProject {
     'productionCompletedAt': productionCompletedAt,
     'externalPublished': externalPublished,
     if (currentWorker.trim().isNotEmpty) 'currentWorker': currentWorker,
+    if (productionReviewStatus != null)
+      'productionReviewStatus': productionReviewStatus!.toJson(),
   };
 
   factory Sotong24RemoteProject.fromMap(
@@ -660,6 +667,13 @@ class Sotong24RemoteProject {
     final projectId = '${map['projectId'] ?? id ?? ''}'.trim();
     final total = _asInt(map['totalStages']);
     final current = _asInt(map['currentStage']);
+    final rawReview = map['productionReviewStatus'];
+    ProductionReviewStatusEnvelope? productionReviewStatus;
+    if (rawReview is Map) {
+      productionReviewStatus = ProductionReviewStatusEnvelope.fromJson(
+        Map<String, dynamic>.from(rawReview),
+      );
+    }
     return Sotong24RemoteProject(
       projectId: projectId,
       title: '${map['title'] ?? ''}',
@@ -693,6 +707,7 @@ class Sotong24RemoteProject {
       externalPublished: map['externalPublished'] == true,
       currentWorker: '${map['currentWorker'] ?? map['executorKind'] ?? ''}',
       stages: stages,
+      productionReviewStatus: productionReviewStatus,
     );
   }
 
@@ -708,6 +723,7 @@ class Sotong24RemoteProject {
     int? finalRevision,
     String? productionCompletedAt,
     bool? externalPublished,
+    ProductionReviewStatusEnvelope? productionReviewStatus,
   }) {
     return Sotong24RemoteProject(
       projectId: projectId,
@@ -738,6 +754,8 @@ class Sotong24RemoteProject {
       externalPublished: externalPublished ?? this.externalPublished,
       currentWorker: currentWorker,
       stages: stages ?? this.stages,
+      productionReviewStatus:
+          productionReviewStatus ?? this.productionReviewStatus,
     );
   }
 }

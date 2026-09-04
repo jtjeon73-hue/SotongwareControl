@@ -125,6 +125,61 @@ class ProductionReviewStatusCard extends StatelessWidget {
     );
   }
 
+  /// Opens a read-only R2 draft summary sheet. Does not send or create jobs.
+  static Future<void> showR2DraftSheet(
+    BuildContext context,
+    ProductionReviewStatusEnvelope envelope,
+  ) {
+    final lines = ProductionReviewStatusPresentation.r2DraftDialogLines(
+      envelope,
+    );
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'R2 보완 초안 (읽기 전용)',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '자동 전송·작업 생성은 수행하지 않습니다.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: ControlColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                for (final line in lines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(line, style: const TextStyle(fontSize: 14)),
+                  ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('닫기'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   static String _techSummary(ProductionReviewStatusEnvelope e) {
     if (e.readiness.technicalValidationCompleted ||
         e.technicalValidation.completed) {

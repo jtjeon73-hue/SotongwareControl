@@ -31,6 +31,9 @@ const {
 } = require("../sotong24/writer");
 const { EBOOK_STAGE_BY_ID, APP_STAGE_BY_ID } = require("../sotong24/canonical");
 const { handleCancelJob } = require("./cancellation");
+const {
+  applyProductionReviewStatus,
+} = require("./production_review_ingest");
 
 const AGENT_STATES = new Set(Object.values(AGENT_STATE));
 const WORK_STATUSES = new Set(Object.values(WORK_STATUS));
@@ -178,6 +181,34 @@ async function handleHeartbeat(db, ctx, body) {
   }
 
   await ctx.agentRef.set(patch, { merge: true });
+
+  // Optional production review envelope — reject must NOT fail heartbeat.
+  if (isPlainObject(body.productionReviewStatus)) {
+    try {
+      const result = await applyProductionReviewStatus(
+        db,
+        body.productionReviewStatus,
+        { agentId: ctx.agentId }
+      );
+      if (result.rejected || !result.ok) {
+        console.error(JSON.stringify({
+          type: "production_review_status_rejected",
+          agentId: ctx.agentId || "",
+          instructionId: String(
+            body.productionReviewStatus.instructionId || ""
+          ).slice(0, 128),
+          code: String(result.code || "PRSE_REJECTED").slice(0, 80),
+        }));
+      }
+    } catch (err) {
+      console.error(JSON.stringify({
+        type: "production_review_status_ingest_error",
+        agentId: ctx.agentId || "",
+        code: String((err && (err.code || err.message)) || "error").slice(0, 160),
+      }));
+    }
+  }
+
   return {};
 }
 
@@ -1257,4 +1288,5 @@ module.exports = {
   validateRequestRevisionBody,
   isAgentOnline,
   sendOk,
+  applyProductionReviewStatus,
 };

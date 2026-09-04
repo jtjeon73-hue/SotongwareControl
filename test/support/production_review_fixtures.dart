@@ -98,6 +98,9 @@ class ProductionReviewFixtures {
       },
       'userLabelKo': userLabelKo,
       'nextActionKo': nextActionKo,
+      'initialSync': false,
+      'syncKind': '',
+      'contentFingerprint': '',
     };
   }
 
@@ -178,6 +181,10 @@ class ProductionReviewFixtures {
       },
       'userLabelKo': '기술검증 완료 · 사용자 보완요청 · R2 준비 대기',
       'nextActionKo': '보완 내용을 확인하고 R2 작업지시 초안을 준비하세요 (자동 전송 없음)',
+      'initialSync': false,
+      'syncKind': 'transition',
+      'contentFingerprint':
+          'fp_wi_test_cursor_app_step15_1788441053773_R1_changes_requested',
     };
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/artifact_type.dart';
+import '../models/commercial/production_review_status_envelope.dart';
 import '../models/remote_agent_models.dart';
 import '../services/auth_service.dart';
 import '../services/remote_agent_repository.dart';
@@ -21,6 +22,7 @@ import '../widgets/remote_codex_unattended_panel.dart';
 import '../widgets/remote_ops_dashboard.dart';
 import '../widgets/operational_collapsible_section.dart';
 import '../widgets/ops_health_panel.dart';
+import '../widgets/production_review_status_card.dart';
 import '../services/ops_health_check.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../theme/control_theme.dart';
@@ -126,6 +128,38 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
       _diagnosticsOpen = true;
       _diagnosticsKey = UniqueKey();
     });
+  }
+
+  static const _preferredReviewInstructionId =
+      'wi_test_cursor_app_step15_1788441053773';
+
+  /// Prefer STEP15 app test instruction, else any with envelope
+  /// (prefer changes_requested).
+  ProductionReviewStatusEnvelope? _deriveProductionReview(
+    List<Sotong24RemoteProject> workshops,
+  ) {
+    ProductionReviewStatusEnvelope? preferred;
+    ProductionReviewStatusEnvelope? changesRequested;
+    ProductionReviewStatusEnvelope? any;
+    for (final p in workshops) {
+      final e = p.productionReviewStatus;
+      if (e == null) continue;
+      any ??= e;
+      if (p.projectId == _preferredReviewInstructionId ||
+          e.instructionId == _preferredReviewInstructionId) {
+        preferred = e;
+      }
+      if (e.ownerReview.decision == 'changes_requested') {
+        changesRequested ??= e;
+      }
+    }
+    return preferred ?? changesRequested ?? any;
+  }
+
+  void _openProductionReviewR2Draft(
+    ProductionReviewStatusEnvelope envelope,
+  ) {
+    ProductionReviewStatusCard.showR2DraftSheet(context, envelope);
   }
 
   Sotong24RemoteProject? _matchWorkshop(
@@ -238,6 +272,13 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                                   ControlDestination.productWorkshop,
                                 ),
                           onOpenDiagnostics: _openDiagnostics,
+                          productionReview: _deriveProductionReview(workshops),
+                          onPrepareR2Draft: () {
+                            final envelope =
+                                _deriveProductionReview(workshops);
+                            if (envelope == null) return;
+                            _openProductionReviewR2Draft(envelope);
+                          },
                         ),
                         const SizedBox(height: 16),
                         if (agents.isEmpty)

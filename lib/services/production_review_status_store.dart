@@ -12,6 +12,7 @@ class ProductionReviewApplyResult {
     this.message = '',
     this.envelope,
     this.sideEffectCount = 0,
+    this.notificationWouldEnqueue = false,
   });
 
   final bool ok;
@@ -22,6 +23,10 @@ class ProductionReviewApplyResult {
   final String message;
   final ProductionReviewStatusEnvelope? envelope;
   final int sideEffectCount;
+
+  /// Dry-run parity: true when a live transition would enqueue a notification.
+  /// Never actually enqueues — [sideEffectCount] stays 0.
+  final bool notificationWouldEnqueue;
 }
 
 /// In-memory only store for production review status (no Firestore).
@@ -64,6 +69,7 @@ class ProductionReviewStatusStore {
         message: validation.message,
         envelope: stored ?? envelope,
         sideEffectCount: 0,
+        notificationWouldEnqueue: false,
       );
     }
 
@@ -71,12 +77,44 @@ class ProductionReviewStatusStore {
     _seenEventIds.add(sanitized.eventId);
     _byInstruction[sanitized.instructionId] = sanitized;
 
+    final isBaseline =
+        sanitized.initialSync || sanitized.syncKind == 'baseline';
+    final identicalFingerprint =
+        stored != null &&
+        sanitized.contentFingerprint.isNotEmpty &&
+        stored.contentFingerprint == sanitized.contentFingerprint;
+    final wouldEnqueue = !isBaseline &&
+        !identicalFingerprint &&
+        sanitized.syncKind != 'baseline' &&
+        _wouldNotify(sanitized, stored);
+
     return ProductionReviewApplyResult(
       ok: true,
       applied: true,
       envelope: sanitized,
       sideEffectCount: 0,
+      notificationWouldEnqueue: wouldEnqueue,
     );
+  }
+
+  bool _wouldNotify(
+    ProductionReviewStatusEnvelope incoming,
+    ProductionReviewStatusEnvelope? stored,
+  ) {
+    if (incoming.ownerReview.decision == 'changes_requested') return true;
+    if (incoming.readiness.revisionReady &&
+        (stored == null || !stored.readiness.revisionReady)) {
+      return true;
+    }
+    if (incoming.readiness.registrationEligible &&
+        (stored == null || !stored.readiness.registrationEligible)) {
+      return true;
+    }
+    if (incoming.readiness.technicalValidationCompleted &&
+        (stored == null || !stored.readiness.technicalValidationCompleted)) {
+      return true;
+    }
+    return false;
   }
 
   void clear() {
