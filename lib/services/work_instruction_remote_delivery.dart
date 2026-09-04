@@ -1,5 +1,6 @@
 import '../models/business_planning.dart';
 import '../models/remote_agent_models.dart';
+import 'commercial_work_instruction_preflight.dart';
 import 'instruction_content_checksum.dart';
 import 'plan_progress_status.dart';
 import 'plan_user_facing_status.dart';
@@ -305,6 +306,24 @@ class WorkInstructionRemoteDeliveryService {
     final iid = instructionId.trim();
     final map = Map<String, dynamic>.from(payload);
     map['instructionId'] = iid;
+
+    // schema 1.1 commercial brief/profile gate (Work inbox parity). No fake defaults.
+    if (CommercialWorkInstructionPreflight.isSchema11(map)) {
+      final commercial = CommercialWorkInstructionPreflight.evaluate(map);
+      if (!commercial.ok) {
+        final first = commercial.errors.isNotEmpty
+            ? commercial.errors.first
+            : null;
+        return RemoteDeliveryResult.failed(
+          userMessage:
+              first?.userMessageKo ??
+              '상용 품질 계약(brief/profile)이 불완전하여 전송할 수 없습니다.',
+          errorCode: first?.code ?? 'commercial_preflight_blocked',
+          payload: map,
+        );
+      }
+    }
+
     if (WorkInstructionRemoteDelivery.isProtectedSkip(iid)) {
       final jobs = await _jobs(ownerUid);
       final existing = WorkInstructionRemoteDelivery.findJob(jobs, iid);

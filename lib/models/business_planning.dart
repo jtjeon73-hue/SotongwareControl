@@ -2,6 +2,7 @@
 library;
 
 import 'artifact_type.dart';
+import 'commercial/commercial_quality_attachment.dart';
 import 'instruction_contract.dart';
 
 export 'artifact_type.dart';
@@ -851,6 +852,7 @@ class WorkInstruction {
     this.status = '',
     this.contract,
     this.aiExecution,
+    this.commercialQuality,
   });
 
   final String schemaVersion;
@@ -891,6 +893,9 @@ class WorkInstruction {
   /// Production AI opt-in. null이면 기존과 동일(자동 Codex 없음).
   final AiExecutionPolicy? aiExecution;
 
+  /// Sotong24Work commercial brief + track profiles (optional until studio UX fills).
+  final CommercialQualityAttachment? commercialQuality;
+
   Map<String, dynamic> toJson() => {
     'schemaVersion': schemaVersion,
     'instructionId': instructionId,
@@ -926,6 +931,8 @@ class WorkInstruction {
     if (status.isNotEmpty) 'status': status,
     if (aiExecution != null) 'aiExecution': aiExecution!.toJson(),
     if (contract != null) ...contract!.toNestedJson(),
+    if (commercialQuality != null)
+      ...commercialQuality!.toInstructionJsonFields(),
   };
 
   factory WorkInstruction.fromJson(
@@ -989,6 +996,10 @@ class WorkInstruction {
     status: '${json['status'] ?? ''}',
     contract: InstructionContract.tryParse(json),
     aiExecution: AiExecutionPolicy.tryParse(json),
+    commercialQuality: () {
+      final parsed = CommercialQualityAttachment.fromInstructionJson(json);
+      return parsed.hasAnyCommercial ? parsed : null;
+    }(),
   );
 }
 

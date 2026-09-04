@@ -1,5 +1,6 @@
 import '../models/business_planning.dart';
 import '../models/remote_agent_models.dart';
+import '../services/commercial_work_instruction_preflight.dart';
 import '../services/cursor_usage_presentation.dart';
 import '../services/instruction_contract_validator.dart';
 import '../services/work_instruction_delivery_presentation.dart';
@@ -25,6 +26,7 @@ class WorkInstructionStudioPreflight {
       if (contractValidation != null) {
         checks.add(_contractCheck(contractValidation));
       }
+      checks.add(_commercialCheck(instruction));
     } else {
       checks.add(
         const StudioPreflightCheck(
@@ -156,6 +158,39 @@ class WorkInstructionStudioPreflight {
       label: 'Contract 검증',
       status: StudioPreflightStatus.ok,
       detail: 'Contract VALID',
+    );
+  }
+
+  static StudioPreflightCheck _commercialCheck(WorkInstruction wi) {
+    final json = wi.toJson();
+    if (!CommercialWorkInstructionPreflight.isSchema11(json)) {
+      return const StudioPreflightCheck(
+        id: 'commercial_quality',
+        label: '상용 품질 계약',
+        status: StudioPreflightStatus.ok,
+        detail: 'schema 1.0 legacy 경로(상용 프로필 면제). 신규는 1.1+brief+profile 필요.',
+      );
+    }
+    final result = CommercialWorkInstructionPreflight.evaluate(json);
+    if (result.ok) {
+      return StudioPreflightCheck(
+        id: 'commercial_quality',
+        label: '상용 품질 계약',
+        status: StudioPreflightStatus.ok,
+        detail:
+            'brief+${result.track} profile PASS'
+            '${result.subtype.isEmpty ? '' : ' · ${result.subtype}'}',
+      );
+    }
+    final first = result.errors.isNotEmpty ? result.errors.first : null;
+    return StudioPreflightCheck(
+      id: 'commercial_quality',
+      label: '상용 품질 계약',
+      status: StudioPreflightStatus.blocked,
+      detail: first == null
+          ? '상용 brief/profile이 불완전합니다.'
+          : '${first.code}: ${first.userMessageKo}'
+                '${result.missingFields.isEmpty ? '' : ' · 누락 ${result.missingFields.length}항'}',
     );
   }
 

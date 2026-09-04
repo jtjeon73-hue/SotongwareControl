@@ -1,4 +1,5 @@
 import '../models/business_planning.dart';
+import '../models/commercial/commercial_quality_attachment.dart';
 import '../models/problem_validate_contract.dart';
 import 'instruction_contract_builder.dart';
 
@@ -179,6 +180,7 @@ class BusinessPlanningService {
     String checksum = '',
     String sourceFileName = '',
     AiExecutionPolicy? aiExecution,
+    CommercialQualityAttachment? commercialQuality,
   }) {
     final stamp = (now ?? DateTime.now()).toUtc();
     final iso = stamp.toIso8601String();
@@ -276,6 +278,7 @@ class BusinessPlanningService {
       status: status,
       contract: contract,
       aiExecution: aiExecution,
+      commercialQuality: commercialQuality,
     );
   }
 

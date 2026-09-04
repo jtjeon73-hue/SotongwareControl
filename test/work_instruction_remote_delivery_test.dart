@@ -9,6 +9,8 @@ import 'package:sotong_ware_control/services/remote_control_api.dart';
 import 'package:sotong_ware_control/services/sotong24_workshop_presentation.dart';
 import 'package:sotong_ware_control/services/work_instruction_remote_delivery.dart';
 
+import 'support/commercial_fixtures.dart';
+
 void main() {
   final now = DateTime.now().toUtc();
 
@@ -77,6 +79,7 @@ void main() {
       executionStatus: '지시서 준비',
       artifactType: ArtifactType.ebook,
       aiExecution: ai,
+      commercialQuality: CommercialFixtures.forTrack(ArtifactType.ebook),
     );
   }
 
