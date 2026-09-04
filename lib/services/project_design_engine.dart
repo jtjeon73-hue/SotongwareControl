@@ -234,6 +234,35 @@ class ProjectDesignEngine {
     next.outcomeStatus = DesignFieldStatus.userConfirmed;
     next.customerStatus = DesignFieldStatus.userConfirmed;
     next.planningConfirmed = true;
+    next.userConfirmedAt = DateTime.now().toUtc().toIso8601String();
+    next.studioPipelinePhase = StudioPipelinePhase.contentConfirmed;
+    next.commercialLocalValidated = false;
+    if (next.displayTitle.trim().isEmpty) {
+      next.displayTitle = next.topic.trim();
+    }
+    if (next.originalUserBrief.trim().isEmpty) {
+      next.originalUserBrief = [
+        if (next.topic.trim().isNotEmpty) next.topic.trim(),
+        if (next.customerProblem.trim().isNotEmpty) next.customerProblem.trim(),
+        if (next.desiredOutcome.trim().isNotEmpty) next.desiredOutcome.trim(),
+        if (next.targetCustomer.trim().isNotEmpty)
+          '대상: ${next.targetCustomer.trim()}',
+        if (next.designMemo.trim().isNotEmpty) next.designMemo.trim(),
+      ].join('\n');
+    }
+    next.originalUserBriefConfirmed = true;
+    if (next.reasonsToPay.isEmpty && next.desiredOutcome.trim().isNotEmpty) {
+      next.reasonsToPay = [
+        '${next.desiredOutcome.trim()}을(를) 더 빠르고 확실하게 얻는 데 도움이 됩니다',
+      ];
+    }
+    if (next.uniqueValue.trim().isEmpty &&
+        next.desiredOutcome.trim().isNotEmpty) {
+      next.uniqueValue = next.desiredOutcome.trim();
+    }
+    if (next.manualOnlyMode) {
+      next.titleSource = next.titleSource.isEmpty ? 'manual' : next.titleSource;
+    }
     return next;
   }
 
@@ -243,6 +272,10 @@ class ProjectDesignEngine {
   }) {
     final next = state.copy();
     next.planningConfirmed = false;
+    next.commercialLocalValidated = false;
+    if (next.studioPipelinePhase != StudioPipelinePhase.drafting) {
+      next.studioPipelinePhase = StudioPipelinePhase.drafting;
+    }
     switch (field) {
       case 'topic':
         next.topicStatus = DesignFieldStatus.userEdited;

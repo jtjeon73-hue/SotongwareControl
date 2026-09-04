@@ -2,6 +2,7 @@
 library;
 
 import '../models/artifact_type.dart';
+import '../services/content_subtype_contract.dart';
 
 class DesignAudience {
   const DesignAudience({required this.id, required this.label});
@@ -151,6 +152,11 @@ class ProjectDesignCatalog {
     DesignOption(id: ContentSubtype.music, label: '노래·음악'),
     DesignOption(id: ContentSubtype.shorts, label: '쇼츠'),
     DesignOption(id: ContentSubtype.comic, label: '만화'),
+    DesignOption(
+      id: ContentSubtypeContract.notificationPromoVideo,
+      label: '알림·홍보 영상',
+    ),
+    DesignOption(id: ContentSubtypeContract.imageDesign, label: '이미지·디자인'),
   ];
 
   static const topics = <DesignTopic>[
@@ -627,6 +633,77 @@ class ProjectDesignCatalog {
               DesignOption(id: 'webtoon', label: '웹툰 플랫폼'),
               DesignOption(id: 'sns', label: 'SNS'),
               DesignOption(id: 'internal', label: '내부 검토만'),
+            ],
+          ),
+        ];
+      case ContentSubtype.notificationPromoVideo:
+        return const [
+          DesignOptionGroup(
+            id: 'promo_platform',
+            title: '타깃 플랫폼',
+            options: [
+              DesignOption(id: 'youtube_shorts', label: 'YouTube Shorts'),
+              DesignOption(id: 'instagram_reels', label: 'Instagram Reels'),
+              DesignOption(id: 'internal_review', label: '내부 검토만'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'promo_length',
+            title: '길이·비율',
+            multi: false,
+            options: [
+              DesignOption(id: '15s_9x16', label: '약 15초 · 세로'),
+              DesignOption(id: '30s_9x16', label: '약 30초 · 세로'),
+              DesignOption(id: '60s_9x16', label: '약 60초 · 세로'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'promo_message',
+            title: '핵심 메시지·CTA',
+            options: [
+              DesignOption(id: 'announcement', label: '안내·공지'),
+              DesignOption(id: 'promo_offer', label: '혜택·프로모션'),
+              DesignOption(id: 'cta_visit', label: '방문·문의 CTA'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'promo_rights',
+            title: '저작권·음원·이미지',
+            options: [
+              DesignOption(id: 'cleared', label: '사용권 확보'),
+              DesignOption(id: 'original', label: '자체 제작'),
+              DesignOption(id: 'review_needed', label: '검토 필요'),
+            ],
+          ),
+        ];
+      case ContentSubtype.imageDesign:
+        return const [
+          DesignOptionGroup(
+            id: 'image_format',
+            title: '결과 형식',
+            options: [
+              DesignOption(id: 'poster', label: '포스터'),
+              DesignOption(id: 'thumbnail', label: '썸네일'),
+              DesignOption(id: 'social_card', label: 'SNS 카드'),
+              DesignOption(id: 'banner', label: '배너'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'image_message',
+            title: '핵심 메시지·CTA',
+            options: [
+              DesignOption(id: 'brand', label: '브랜드 인지'),
+              DesignOption(id: 'promo', label: '혜택 안내'),
+              DesignOption(id: 'cta', label: '행동 유도'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'image_rights',
+            title: '이미지·폰트 출처',
+            options: [
+              DesignOption(id: 'original', label: '자체 제작'),
+              DesignOption(id: 'licensed', label: '라이선스 확보'),
+              DesignOption(id: 'review_needed', label: '검토 필요'),
             ],
           ),
         ];

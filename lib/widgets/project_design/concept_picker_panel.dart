@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/concept_catalog.dart';
 import '../../models/concept_candidate.dart';
 import '../../services/concept_recommendation_provider.dart';
 import '../../services/work_instruction_concept_occupancy.dart';
@@ -336,6 +337,39 @@ class _ConceptCard extends StatelessWidget {
                             color: ControlColors.textSecondary,
                           ),
                         ),
+                        if (_recommendationLine(concept).isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _recommendationLine(concept),
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: ControlColors.textMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        if (concept.deprecated) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: ControlColors.warningBg.withValues(
+                                alpha: 0.6,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: ControlColors.accentWarm),
+                            ),
+                            child: Text(
+                              _deprecatedWarning(concept),
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: ControlColors.accentWarm,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -355,19 +389,46 @@ class _ConceptCard extends StatelessWidget {
                   if (concept.isUserAdded) _chip('내 아이디어'),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                concept.whyRecommended,
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: ControlColors.textMuted,
-                ),
-              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  static String _recommendationLine(ConceptCandidate concept) {
+    final reason = concept.recommendationReason.trim();
+    if (reason.isNotEmpty) return reason;
+    return concept.whyRecommended.trim();
+  }
+
+  static String _deprecatedWarning(ConceptCandidate concept) {
+    final replacement = _replacementLabel(concept.replacementSeedId);
+    if (replacement.isNotEmpty) {
+      return '이 아이디어는 더 이상 권장되지 않습니다. '
+          '대신 「$replacement」 컨셉을 선택하거나, '
+          '기존 결과물 보완(리비전)을 우선 검토하세요.';
+    }
+    return '이 아이디어는 더 이상 권장되지 않습니다. '
+        '대체 컨셉을 선택하거나 기존 결과물 보완(리비전)을 우선 검토하세요.';
+  }
+
+  static String _replacementLabel(String? seedId) {
+    final id = (seedId ?? '').trim();
+    if (id.isEmpty) return '';
+    for (final seed in ConceptCatalog.seeds) {
+      if (seed.id != id) continue;
+      final commercial = seed.commercial;
+      if (commercial != null && commercial.shortDescription.trim().isNotEmpty) {
+        return commercial.shortDescription.trim();
+      }
+      final variant = seed.variants.values.firstOrNull;
+      if (variant != null && variant.$1.trim().isNotEmpty) {
+        return variant.$1.trim();
+      }
+      break;
+    }
+    return id.replaceAll('_', ' ');
   }
 
   Widget _chip(String label) {

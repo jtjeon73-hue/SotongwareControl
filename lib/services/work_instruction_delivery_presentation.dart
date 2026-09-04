@@ -173,6 +173,7 @@ class WorkInstructionDeliveryPresentation {
     DateTime? now,
     bool operationalProjectReady = false,
     RemoteOperationalEvidence? remoteEvidence,
+    bool localCommercialValidated = true,
   }) {
     final agentView = agentStatus(agents, now: now);
     final validationLines = validation == null
@@ -266,6 +267,25 @@ class WorkInstructionDeliveryPresentation {
           agentStatus: agentView,
         ),
         validationLines: validationLines,
+      );
+    }
+
+    if (!localCommercialValidated) {
+      return DeliveryStep7View(
+        agentStatus: agentView,
+        buttonState: DeliveryButtonState.blocked,
+        buttonLabel: '로컬 검증 후 보내기',
+        buttonEnabled: false,
+        showSuccessPanel: false,
+        failure: const DeliveryFailureView(
+          kind: DeliveryFailureKind.validation,
+          title: '로컬 검증이 필요합니다',
+          body: '작업지시서 생성 후 「로컬 검증」을 통과해야 소통24워크로 보낼 수 있습니다.',
+          guidance: '최종 확인 단계의 로컬 검증 버튼을 눌러 주세요.',
+          primaryAction: DeliveryDiagnosticAction.validationReview,
+          allowRetry: false,
+        ),
+        validationLines: const ['최종 확정 → 작업지시서 생성 → 로컬 검증 → 보내기 순서를 지켜 주세요.'],
       );
     }
 

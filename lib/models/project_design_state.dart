@@ -28,6 +28,15 @@ class ProjectDesignStep {
   static const count = 7;
 }
 
+/// 최종 확정 → 생성 → 로컬 검증 → 전송 준비 (네트워크 전송과 분리).
+class StudioPipelinePhase {
+  static const drafting = 'drafting';
+  static const contentConfirmed = 'content_confirmed';
+  static const instructionGenerated = 'instruction_generated';
+  static const locallyValidated = 'locally_validated';
+  static const readyToSend = 'ready_to_send';
+}
+
 class ProjectDesignState {
   ProjectDesignState({
     this.step = ProjectDesignStep.artifact,
@@ -51,11 +60,46 @@ class ProjectDesignState {
     this.planningConfirmed = false,
     this.combinedDirection = '',
     String? wizardSessionId,
+    this.creationMode = 'new_product',
+    this.manualOnlyMode = false,
+    this.displayTitle = '',
+    this.workingTitle = '',
+    List<String>? suggestedTitles,
+    this.titleSource = '',
+    this.originalUserBrief = '',
+    this.originalUserBriefConfirmed = false,
+    this.aiAugmentedBrief = '',
+    List<String>? aiAssumptions,
+    List<String>? unansweredQuestions,
+    List<String>? acceptedAiSuggestions,
+    List<String>? rejectedAiSuggestions,
+    List<String>? reasonsToPay,
+    this.uniqueValue = '',
+    this.sourceInstructionId = '',
+    this.sourceRevision = '',
+    this.requestedRevision = '',
+    this.ownerReviewDecisionRef = '',
+    List<String>? preservedArtifactHashes,
+    List<String>? requestedChanges,
+    this.userConfirmedAt = '',
+    this.studioPipelinePhase = StudioPipelinePhase.drafting,
+    this.commercialLocalValidated = false,
+    this.useEnvironment = '',
+    this.mainPainPoint = '',
+    this.digitalSkillLevel = '',
   }) : selectedAudiences = selectedAudiences ?? [],
        selectedTopicIds = selectedTopicIds ?? [],
        selectedConceptIds = selectedConceptIds ?? [],
        userAddedConcepts = userAddedConcepts ?? [],
        productionSelections = productionSelections ?? {},
+       suggestedTitles = suggestedTitles ?? [],
+       aiAssumptions = aiAssumptions ?? [],
+       unansweredQuestions = unansweredQuestions ?? [],
+       acceptedAiSuggestions = acceptedAiSuggestions ?? [],
+       rejectedAiSuggestions = rejectedAiSuggestions ?? [],
+       reasonsToPay = reasonsToPay ?? [],
+       preservedArtifactHashes = preservedArtifactHashes ?? [],
+       requestedChanges = requestedChanges ?? [],
        wizardSessionId =
            wizardSessionId ??
            'wiz_${DateTime.now().toUtc().millisecondsSinceEpoch}';
@@ -91,6 +135,35 @@ class ProjectDesignState {
   /// Multi-concept combined project direction (suggested until confirmed).
   String combinedDirection;
 
+  /// new_product | revise_existing
+  String creationMode;
+  bool manualOnlyMode;
+  String displayTitle;
+  String workingTitle;
+  List<String> suggestedTitles;
+  String titleSource;
+  String originalUserBrief;
+  bool originalUserBriefConfirmed;
+  String aiAugmentedBrief;
+  List<String> aiAssumptions;
+  List<String> unansweredQuestions;
+  List<String> acceptedAiSuggestions;
+  List<String> rejectedAiSuggestions;
+  List<String> reasonsToPay;
+  String uniqueValue;
+  String sourceInstructionId;
+  String sourceRevision;
+  String requestedRevision;
+  String ownerReviewDecisionRef;
+  List<String> preservedArtifactHashes;
+  List<String> requestedChanges;
+  String userConfirmedAt;
+  String studioPipelinePhase;
+  bool commercialLocalValidated;
+  String useEnvironment;
+  String mainPainPoint;
+  String digitalSkillLevel;
+
   bool get hasArtifact {
     final a = artifactType;
     return a != null &&
@@ -117,14 +190,34 @@ class ProjectDesignState {
       userAddedConcepts.isNotEmpty ||
       designMemo.trim().isNotEmpty;
 
-  bool get canCreateInstruction =>
-      hasArtifact &&
-      canProceedFromAudience &&
-      topic.trim().isNotEmpty &&
-      customerProblem.trim().isNotEmpty &&
-      targetCustomer.trim().isNotEmpty &&
-      desiredOutcome.trim().isNotEmpty &&
-      planningConfirmed;
+  bool get canCreateInstruction {
+    if (!(hasArtifact &&
+        canProceedFromAudience &&
+        topic.trim().isNotEmpty &&
+        customerProblem.trim().isNotEmpty &&
+        targetCustomer.trim().isNotEmpty &&
+        desiredOutcome.trim().isNotEmpty &&
+        planningConfirmed)) {
+      return false;
+    }
+    if (creationMode == 'revise_existing') {
+      if (sourceInstructionId.trim().isEmpty ||
+          sourceRevision.trim().isEmpty ||
+          requestedChanges.isEmpty) {
+        return false;
+      }
+    }
+    if (reasonsToPay.isEmpty && uniqueValue.trim().isEmpty) {
+      // Allow create attempt — builder/preflight will surface missing commercial
+      // fields; marketability alone must not hard-block draft save elsewhere.
+    }
+    return true;
+  }
+
+  bool get canSendAfterLocalValidate =>
+      commercialLocalValidated &&
+      (studioPipelinePhase == StudioPipelinePhase.locallyValidated ||
+          studioPipelinePhase == StudioPipelinePhase.readyToSend);
 
   bool get hasWizardProgress =>
       hasArtifact ||
@@ -164,6 +257,33 @@ class ProjectDesignState {
     customerStatus: customerStatus,
     planningConfirmed: planningConfirmed,
     combinedDirection: combinedDirection,
+    creationMode: creationMode,
+    manualOnlyMode: manualOnlyMode,
+    displayTitle: displayTitle,
+    workingTitle: workingTitle,
+    suggestedTitles: List<String>.from(suggestedTitles),
+    titleSource: titleSource,
+    originalUserBrief: originalUserBrief,
+    originalUserBriefConfirmed: originalUserBriefConfirmed,
+    aiAugmentedBrief: aiAugmentedBrief,
+    aiAssumptions: List<String>.from(aiAssumptions),
+    unansweredQuestions: List<String>.from(unansweredQuestions),
+    acceptedAiSuggestions: List<String>.from(acceptedAiSuggestions),
+    rejectedAiSuggestions: List<String>.from(rejectedAiSuggestions),
+    reasonsToPay: List<String>.from(reasonsToPay),
+    uniqueValue: uniqueValue,
+    sourceInstructionId: sourceInstructionId,
+    sourceRevision: sourceRevision,
+    requestedRevision: requestedRevision,
+    ownerReviewDecisionRef: ownerReviewDecisionRef,
+    preservedArtifactHashes: List<String>.from(preservedArtifactHashes),
+    requestedChanges: List<String>.from(requestedChanges),
+    userConfirmedAt: userConfirmedAt,
+    studioPipelinePhase: studioPipelinePhase,
+    commercialLocalValidated: commercialLocalValidated,
+    useEnvironment: useEnvironment,
+    mainPainPoint: mainPainPoint,
+    digitalSkillLevel: digitalSkillLevel,
   );
 
   /// 기존 마법사/저장 파이프라인과 호환되는 상태로 변환.
@@ -174,6 +294,22 @@ class ProjectDesignState {
       'designConcepts': List<String>.from(selectedConceptIds),
       for (final e in productionSelections.entries)
         'prod_${e.key}': List<String>.from(e.value),
+      if (reasonsToPay.isNotEmpty)
+        'reasonsToPay': List<String>.from(reasonsToPay),
+      if (acceptedAiSuggestions.isNotEmpty)
+        'acceptedAiSuggestions': List<String>.from(acceptedAiSuggestions),
+      if (rejectedAiSuggestions.isNotEmpty)
+        'rejectedAiSuggestions': List<String>.from(rejectedAiSuggestions),
+      if (aiAssumptions.isNotEmpty)
+        'aiAssumptions': List<String>.from(aiAssumptions),
+      if (unansweredQuestions.isNotEmpty)
+        'unansweredQuestions': List<String>.from(unansweredQuestions),
+      if (requestedChanges.isNotEmpty)
+        'requestedChanges': List<String>.from(requestedChanges),
+      if (preservedArtifactHashes.isNotEmpty)
+        'preservedArtifactHashes': List<String>.from(preservedArtifactHashes),
+      if (suggestedTitles.isNotEmpty)
+        'suggestedTitles': List<String>.from(suggestedTitles),
     };
     if (customAudience.trim().isNotEmpty) {
       answers['customAudience'] = [customAudience.trim()];
@@ -202,6 +338,27 @@ class ProjectDesignState {
         if (userAddedConcepts.isNotEmpty)
           'userAddedConceptsJson':
               '[${userAddedConcepts.map((c) => '"${c.id}"').join(',')}]',
+        'creationMode': creationMode,
+        'manualOnlyMode': manualOnlyMode ? 'true' : 'false',
+        'displayTitle': displayTitle,
+        'workingTitle': workingTitle,
+        'titleSource': titleSource,
+        'originalUserBrief': originalUserBrief,
+        'originalUserBriefConfirmed': originalUserBriefConfirmed
+            ? 'true'
+            : 'false',
+        'aiAugmentedBrief': aiAugmentedBrief,
+        'uniqueValue': uniqueValue,
+        'sourceInstructionId': sourceInstructionId,
+        'sourceRevision': sourceRevision,
+        'requestedRevision': requestedRevision,
+        'ownerReviewDecisionRef': ownerReviewDecisionRef,
+        'userConfirmedAt': userConfirmedAt,
+        'studioPipelinePhase': studioPipelinePhase,
+        'commercialLocalValidated': commercialLocalValidated ? 'true' : 'false',
+        'useEnvironment': useEnvironment,
+        'mainPainPoint': mainPainPoint,
+        'digitalSkillLevel': digitalSkillLevel,
       },
     );
   }
@@ -230,6 +387,19 @@ class ProjectDesignState {
             .trim();
     final memo = (w.customTexts['designMemo'] ?? w.customTexts['notes'] ?? '')
         .trim();
+
+    // Legacy: revision_requested drafts → revise_existing
+    var creationMode = w.customTexts['creationMode'] ?? '';
+    if (creationMode.isEmpty) {
+      final legacy =
+          (w.customTexts['revisionMode'] ?? w.customTexts['status'] ?? '')
+              .toLowerCase();
+      if (legacy.contains('revision') || legacy == 'revision_requested') {
+        creationMode = 'revise_existing';
+      } else {
+        creationMode = 'new_product';
+      }
+    }
 
     final restoredStep = int.tryParse(w.customTexts['designStep'] ?? '');
     return ProjectDesignState(
@@ -262,6 +432,48 @@ class ProjectDesignState {
       ),
       planningConfirmed: w.customTexts['planningConfirmed'] == 'true',
       combinedDirection: w.customTexts['combinedDirection'] ?? '',
+      creationMode: creationMode,
+      manualOnlyMode: w.customTexts['manualOnlyMode'] == 'true',
+      displayTitle: w.customTexts['displayTitle'] ?? '',
+      workingTitle: w.customTexts['workingTitle'] ?? '',
+      suggestedTitles: List<String>.from(
+        answers['suggestedTitles'] ?? const [],
+      ),
+      titleSource: w.customTexts['titleSource'] ?? '',
+      originalUserBrief: w.customTexts['originalUserBrief'] ?? '',
+      originalUserBriefConfirmed:
+          w.customTexts['originalUserBriefConfirmed'] == 'true',
+      aiAugmentedBrief: w.customTexts['aiAugmentedBrief'] ?? '',
+      aiAssumptions: List<String>.from(answers['aiAssumptions'] ?? const []),
+      unansweredQuestions: List<String>.from(
+        answers['unansweredQuestions'] ?? const [],
+      ),
+      acceptedAiSuggestions: List<String>.from(
+        answers['acceptedAiSuggestions'] ?? const [],
+      ),
+      rejectedAiSuggestions: List<String>.from(
+        answers['rejectedAiSuggestions'] ?? const [],
+      ),
+      reasonsToPay: List<String>.from(answers['reasonsToPay'] ?? const []),
+      uniqueValue: w.customTexts['uniqueValue'] ?? '',
+      sourceInstructionId: w.customTexts['sourceInstructionId'] ?? '',
+      sourceRevision: w.customTexts['sourceRevision'] ?? '',
+      requestedRevision: w.customTexts['requestedRevision'] ?? '',
+      ownerReviewDecisionRef: w.customTexts['ownerReviewDecisionRef'] ?? '',
+      preservedArtifactHashes: List<String>.from(
+        answers['preservedArtifactHashes'] ?? const [],
+      ),
+      requestedChanges: List<String>.from(
+        answers['requestedChanges'] ?? const [],
+      ),
+      userConfirmedAt: w.customTexts['userConfirmedAt'] ?? '',
+      studioPipelinePhase:
+          w.customTexts['studioPipelinePhase'] ?? StudioPipelinePhase.drafting,
+      commercialLocalValidated:
+          w.customTexts['commercialLocalValidated'] == 'true',
+      useEnvironment: w.customTexts['useEnvironment'] ?? '',
+      mainPainPoint: w.customTexts['mainPainPoint'] ?? '',
+      digitalSkillLevel: w.customTexts['digitalSkillLevel'] ?? '',
     );
   }
 
@@ -287,6 +499,33 @@ class ProjectDesignState {
     'customerStatus': customerStatus.name,
     'planningConfirmed': planningConfirmed,
     'combinedDirection': combinedDirection,
+    'creationMode': creationMode,
+    'manualOnlyMode': manualOnlyMode,
+    'displayTitle': displayTitle,
+    'workingTitle': workingTitle,
+    'suggestedTitles': suggestedTitles,
+    'titleSource': titleSource,
+    'originalUserBrief': originalUserBrief,
+    'originalUserBriefConfirmed': originalUserBriefConfirmed,
+    'aiAugmentedBrief': aiAugmentedBrief,
+    'aiAssumptions': aiAssumptions,
+    'unansweredQuestions': unansweredQuestions,
+    'acceptedAiSuggestions': acceptedAiSuggestions,
+    'rejectedAiSuggestions': rejectedAiSuggestions,
+    'reasonsToPay': reasonsToPay,
+    'uniqueValue': uniqueValue,
+    'sourceInstructionId': sourceInstructionId,
+    'sourceRevision': sourceRevision,
+    'requestedRevision': requestedRevision,
+    'ownerReviewDecisionRef': ownerReviewDecisionRef,
+    'preservedArtifactHashes': preservedArtifactHashes,
+    'requestedChanges': requestedChanges,
+    'userConfirmedAt': userConfirmedAt,
+    'studioPipelinePhase': studioPipelinePhase,
+    'commercialLocalValidated': commercialLocalValidated,
+    'useEnvironment': useEnvironment,
+    'mainPainPoint': mainPainPoint,
+    'digitalSkillLevel': digitalSkillLevel,
   };
 
   factory ProjectDesignState.fromJson(Map<String, dynamic> json) {
@@ -311,6 +550,20 @@ class ProjectDesignState {
         }
       }
     }
+    List<String> strList(String key) =>
+        (json[key] as List?)?.map((e) => '$e').toList() ?? const [];
+
+    var creationMode = '${json['creationMode'] ?? ''}';
+    if (creationMode.isEmpty) {
+      final legacy = '${json['revisionMode'] ?? json['status'] ?? ''}'
+          .toLowerCase();
+      if (legacy.contains('revision')) {
+        creationMode = 'revise_existing';
+      } else {
+        creationMode = 'new_product';
+      }
+    }
+
     return ProjectDesignState(
       step: (json['step'] as num?)?.toInt() ?? 0,
       wizardSessionId: json['wizardSessionId'] == null
@@ -347,6 +600,34 @@ class ProjectDesignState {
       ),
       planningConfirmed: json['planningConfirmed'] == true,
       combinedDirection: '${json['combinedDirection'] ?? ''}',
+      creationMode: creationMode,
+      manualOnlyMode: json['manualOnlyMode'] == true,
+      displayTitle: '${json['displayTitle'] ?? ''}',
+      workingTitle: '${json['workingTitle'] ?? ''}',
+      suggestedTitles: strList('suggestedTitles'),
+      titleSource: '${json['titleSource'] ?? ''}',
+      originalUserBrief: '${json['originalUserBrief'] ?? ''}',
+      originalUserBriefConfirmed: json['originalUserBriefConfirmed'] == true,
+      aiAugmentedBrief: '${json['aiAugmentedBrief'] ?? ''}',
+      aiAssumptions: strList('aiAssumptions'),
+      unansweredQuestions: strList('unansweredQuestions'),
+      acceptedAiSuggestions: strList('acceptedAiSuggestions'),
+      rejectedAiSuggestions: strList('rejectedAiSuggestions'),
+      reasonsToPay: strList('reasonsToPay'),
+      uniqueValue: '${json['uniqueValue'] ?? ''}',
+      sourceInstructionId: '${json['sourceInstructionId'] ?? ''}',
+      sourceRevision: '${json['sourceRevision'] ?? ''}',
+      requestedRevision: '${json['requestedRevision'] ?? ''}',
+      ownerReviewDecisionRef: '${json['ownerReviewDecisionRef'] ?? ''}',
+      preservedArtifactHashes: strList('preservedArtifactHashes'),
+      requestedChanges: strList('requestedChanges'),
+      userConfirmedAt: '${json['userConfirmedAt'] ?? ''}',
+      studioPipelinePhase:
+          '${json['studioPipelinePhase'] ?? StudioPipelinePhase.drafting}',
+      commercialLocalValidated: json['commercialLocalValidated'] == true,
+      useEnvironment: '${json['useEnvironment'] ?? ''}',
+      mainPainPoint: '${json['mainPainPoint'] ?? ''}',
+      digitalSkillLevel: '${json['digitalSkillLevel'] ?? ''}',
     );
   }
 }

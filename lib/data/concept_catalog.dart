@@ -5,6 +5,31 @@ library;
 import '../models/artifact_type.dart';
 import '../models/concept_candidate.dart';
 
+/// Commercial positioning metadata for studio UX (not market statistics).
+class ConceptCommercialMeta {
+  const ConceptCommercialMeta({
+    this.shortDescription = '',
+    required this.customerProblem,
+    required this.promisedOutcome,
+    required this.reasonsToPay,
+    required this.uniqueValue,
+    this.monetizationModels = const [],
+    this.qualityProfileTemplate = '',
+    this.recommendationReason = '',
+    this.difficulty = 'medium',
+  });
+
+  final String shortDescription;
+  final String customerProblem;
+  final String promisedOutcome;
+  final List<String> reasonsToPay;
+  final String uniqueValue;
+  final List<String> monetizationModels;
+  final String qualityProfileTemplate;
+  final String recommendationReason;
+  final String difficulty;
+}
+
 class ConceptSeed {
   const ConceptSeed({
     required this.id,
@@ -14,6 +39,12 @@ class ConceptSeed {
     required this.baseScores,
     required this.variants,
     this.subtypes = const [],
+    this.commercial,
+    this.active = true,
+    this.deprecated = false,
+    this.replacementSeedId,
+    this.catalogVersion = 1,
+    this.updatedAt = '',
   });
 
   final String id;
@@ -29,6 +60,12 @@ class ConceptSeed {
   /// artifactType -> (title, description)
   final Map<String, (String, String)> variants;
   final List<String> subtypes;
+  final ConceptCommercialMeta? commercial;
+  final bool active;
+  final bool deprecated;
+  final String? replacementSeedId;
+  final int catalogVersion;
+  final String updatedAt;
 }
 
 class ConceptCatalog {
@@ -68,6 +105,23 @@ class ConceptCatalog {
         'general': 3,
       }),
       baseScores: _scores(ai: 5, need: 4.5, business: 4, beginner: 3.5),
+      commercial: const ConceptCommercialMeta(
+        shortDescription: 'AI로 경험을 상품화하는 제2직업 실행 가이드',
+        customerProblem:
+            '은퇴·직장 전환기에 제2직업을 고민하지만 AI 활용법과 상품화 경로를 모르는 40~60대',
+        promisedOutcome:
+            'AI 도구로 경험을 정리하고 전자책·코스·앱 중 하나로 실행 가능한 제2직업 로드맵 확보',
+        reasonsToPay: [
+          '맞춤형 커리어 전환 로드맵',
+          'AI 도구별 실전 템플릿',
+          '단계별 실행 체크리스트',
+        ],
+        uniqueValue: '은퇴·전환 경험을 AI 워크플로로 상품화하는 실전형 가이드',
+        monetizationModels: ['one_time_ebook', 'online_course', 'subscription_app'],
+        qualityProfileTemplate: 'career_transition_commercial',
+        recommendationReason: '전환기 고객의 AI 활용·상품화 니즈가 높고 수익화 경로가 명확합니다.',
+        difficulty: 'medium',
+      ),
       variants: {
         ArtifactType.ebook: (
           'AI로 만드는 제2직업 설계 가이드',
@@ -91,6 +145,23 @@ class ConceptCatalog {
         'age_60_80': 3,
       }),
       baseScores: _scores(ai: 5, practical: 5, beginner: 4.5, need: 4),
+      commercial: const ConceptCommercialMeta(
+        shortDescription: '일상 업무·생활에 바로 쓰는 AI 입문 실전 가이드',
+        customerProblem:
+            'AI를 들어봤지만 검색·요약·문서 초안 등 실생활에 안전하게 쓰는 법을 모르는 초보',
+        promisedOutcome:
+            '하루 10분 루틴으로 AI를 일상·업무에 적용하고 실수·개인정보 리스크를 줄이는 습관 형성',
+        reasonsToPay: [
+          '초보 친화 프롬프트 모음',
+          '개인정보·사기 주의 체크리스트',
+          '직장·가정별 활용 시나리오',
+        ],
+        uniqueValue: '과장 없이 안전하게 시작하는 생활 밀착형 AI 입문 콘텐츠',
+        monetizationModels: ['one_time_ebook', 'freemium_app', 'short_video_series'],
+        qualityProfileTemplate: 'ai_beginner_commercial',
+        recommendationReason: '범용 니즈가 크고 초보 적합도·실용성이 높아 첫 상품으로 적합합니다.',
+        difficulty: 'low',
+      ),
       variants: {
         ArtifactType.ebook: ('일상 AI 활용 입문', '검색·요약·일정·문서 초안을 안전하게 쓰는 방법'),
         ArtifactType.app: ('생활 AI 체크 앱', '자주 쓰는 AI 프롬프트·주의사항을 모아 둔 앱'),
@@ -110,6 +181,21 @@ class ConceptCatalog {
         'age_40_60': 3,
       }),
       baseScores: _scores(ai: 5, practical: 5, business: 3.5, beginner: 4),
+      commercial: const ConceptCommercialMeta(
+        customerProblem:
+            '보고서·회의록·메일 초안 작성에 시간을 많이 쓰지만 AI를 업무에 안전하게 적용하지 못하는 직장인',
+        promisedOutcome:
+            '직무별 AI 템플릿으로 문서 작성 시간을 줄이고 품질·보안 기준을 지키는 업무 루틴 확립',
+        reasonsToPay: [
+          '직무별 프롬프트·템플릿',
+          '회사 보안·저작권 주의 가이드',
+          'Before/After 업무 시나리오',
+        ],
+        uniqueValue: '직장인 업무 흐름에 맞춘 AI 생산성 매뉴얼',
+        monetizationModels: ['one_time_ebook', 'b2b_training', 'template_app'],
+        qualityProfileTemplate: 'productivity_commercial',
+        recommendationReason: '직장인 대상 실용 니즈가 뚜렷하고 B2C·사내교육 수익 모델이 가능합니다.',
+      ),
       variants: {
         ArtifactType.ebook: ('직장인 AI 업무 가속 매뉴얼', '보고서·회의록·메일 초안을 안전하게'),
         ArtifactType.app: ('업무 AI 템플릿 앱', '직무별 프롬프트·체크리스트'),
@@ -166,6 +252,21 @@ class ConceptCatalog {
         'general': 4,
       }),
       baseScores: _scores(business: 4.5, need: 4.5, practical: 4, ai: 3.5),
+      commercial: const ConceptCommercialMeta(
+        customerProblem:
+            '온라인 부업·수익을 시작하고 싶지만 과장된 정보에 지치고 실행 순서를 모르는 예비 창업자',
+        promisedOutcome:
+            '채널·상품·루틴을 현실적으로 설계하고 첫 실험까지 실행하는 온라인 수익 로드맵',
+        reasonsToPay: [
+          '과장 없는 채널별 비교',
+          '첫 30일 실행 체크리스트',
+          '비용·시간 현실 점검표',
+        ],
+        uniqueValue: '기대관리와 실행 순서를 함께 잡는 온라인 수익 입문 가이드',
+        monetizationModels: ['one_time_ebook', 'coaching', 'membership'],
+        qualityProfileTemplate: 'income_starter_commercial',
+        recommendationReason: '부업·노후 준비 니즈가 넓고 전자책·코칭 전환율이 높은 주제입니다.',
+      ),
       variants: {
         ArtifactType.ebook: ('온라인 수익 첫걸음', '과장 없는 실행 체크리스트'),
         ArtifactType.app: ('수익 실험 트래커 앱', '채널·매출·비용을 기록'),
@@ -186,6 +287,22 @@ class ConceptCatalog {
         'rural': 3,
       }),
       baseScores: _scores(diff: 4.5, business: 4.5, need: 4.5, practical: 4),
+      commercial: const ConceptCommercialMeta(
+        customerProblem:
+            '오랜 현장 경험은 있지만 디지털 상품(전자책·코스·앱)으로 패키징하는 방법을 모르는 전문가',
+        promisedOutcome:
+            '경험을 커리큘럼·콘텐츠·판매 페이지로 구조화해 첫 디지털 상품을 출시',
+        reasonsToPay: [
+          '경험→커리큘럼 변환 프레임',
+          '가격·포지셔닝 가이드',
+          '판매 페이지 구성 템플릿',
+        ],
+        uniqueValue: '50대+ 현장 노하우를 디지털 상품으로 만드는 실전 패키징',
+        monetizationModels: ['one_time_ebook', 'online_course', 'consulting'],
+        qualityProfileTemplate: 'expert_productize_commercial',
+        recommendationReason: '고객 지불 의사가 높은 전문가형 상품화 주제로 마진이 좋습니다.',
+        difficulty: 'high',
+      ),
       variants: {
         ArtifactType.ebook: ('50대 경험을 디지털 상품으로', '커리큘럼·패키징·판매 초안'),
         ArtifactType.app: ('경험 아카이브 앱', '노하우를 카드로 정리'),
@@ -200,6 +317,21 @@ class ConceptCatalog {
       tags: const ['노후', '현금흐름', '은퇴'],
       audienceWeights: _w({'retire_prep': 5, 'age_40_60': 5, 'age_60_80': 4}),
       baseScores: _scores(need: 5, longevity: 5, business: 3.5, beginner: 3.5),
+      commercial: const ConceptCommercialMeta(
+        customerProblem:
+            '은퇴 후 현금흐름과 부수입 시나리오를 구체적으로 설계하지 못한 40~60대',
+        promisedOutcome:
+            '월별 수입·지출·부수입 시나리오를 시뮬레이션하고 실행 우선순위를 정하는 노후 재무 계획',
+        reasonsToPay: [
+          '현실적인 시나리오 템플릿',
+          '정책·연금 체크 포인트',
+          '부수입 연계 실행표',
+        ],
+        uniqueValue: '과장 없는 노후 현금흐름 설계와 실행 우선순위 가이드',
+        monetizationModels: ['one_time_ebook', 'consulting', 'subscription_app'],
+        qualityProfileTemplate: 'retirement_planning_commercial',
+        recommendationReason: '노후 준비 니즈가 지속적이고 신뢰 기반 상담·콘텐츠 수요가 큽니다.',
+      ),
       variants: {
         ArtifactType.ebook: ('노후 현금흐름 설계 노트', '수입·지출·부수입 시나리오'),
         ArtifactType.app: ('노후 현금흐름 앱', '월별 시나리오 시뮬'),
@@ -267,6 +399,22 @@ class ConceptCatalog {
         'rural': 3,
       }),
       baseScores: _scores(need: 5, longevity: 4.5, practical: 4, beginner: 3.5),
+      commercial: const ConceptCommercialMeta(
+        shortDescription: '귀농·귀촌 정착과 지원 정책을 한곳에서 안내',
+        customerProblem:
+            '귀농·귀촌을 준비하지만 지원 정책·절차·현실 비용 정보가 흩어져 있어 실수하기 쉬운 예비 귀농인',
+        promisedOutcome:
+            '지원사업·절차·정착 체크리스트를 한곳에서 확인하고 신청·준비 순서를 놓치지 않음',
+        reasonsToPay: [
+          '지원·절차 카테고리별 정리',
+          '마감·서류 체크리스트',
+          '정착 실패 포인트 사전 점검',
+        ],
+        uniqueValue: '귀농 정책 정보와 정착 실전을 통합한 신뢰형 허브',
+        monetizationModels: ['membership', 'consulting', 'premium_guide'],
+        qualityProfileTemplate: 'rural_policy_commercial',
+        recommendationReason: '귀농·귀촌 니즈가 구체적이고 정책·정착 정보 통합 가치가 큽니다.',
+      ),
       variants: {
         ArtifactType.ebook: ('귀농·귀촌 정착 실전', '준비·비용·관계·실패 포인트'),
         ArtifactType.app: ('귀촌 준비 체크 앱', '단계별 할 일'),
@@ -683,6 +831,8 @@ class ConceptCatalog {
       tags: const ['정책', '지원', '귀농'],
       audienceWeights: _w({'returning_farm': 5, 'rural': 5, 'retire_prep': 3}),
       baseScores: _scores(need: 5, practical: 4, longevity: 4, beginner: 3.5),
+      deprecated: true,
+      replacementSeedId: 'return_farm_guide',
       variants: {
         ArtifactType.ebook: ('귀농·농촌 지원 정책 읽는 법', '신청 전 체크'),
         ArtifactType.app: ('정책 메모 앱', '마감·서류'),
@@ -702,6 +852,21 @@ class ConceptCatalog {
         'age_40_60': 3,
       }),
       baseScores: _scores(need: 4.5, practical: 4, business: 4),
+      commercial: const ConceptCommercialMeta(
+        customerProblem:
+            '정부·지자체 지원사업이 많지만 내 사업에 맞는 것을 빠르게 골라내지 못하는 소상공인·창업자',
+        promisedOutcome:
+            '조건·마감·주의사항을 필터링해 적합한 지원사업 후보를 선별하고 신청 준비 시작',
+        reasonsToPay: [
+          '업종·규모별 필터 가이드',
+          '신청 전 체크리스트',
+          '자주 놓치는 탈락 사유 정리',
+        ],
+        uniqueValue: '지원사업을 빠르게 훑고 적합도를 판단하는 실무형 스캔 가이드',
+        monetizationModels: ['one_time_ebook', 'consulting', 'subscription_updates'],
+        qualityProfileTemplate: 'gov_support_commercial',
+        recommendationReason: '소상공인·귀농 대상 실질 니즈가 크고 컨설팅·구독 업데이트 모델이 가능합니다.',
+      ),
       variants: {
         ArtifactType.ebook: ('소상공인·창업 지원 훑어보기', '조건·주의'),
         ArtifactType.app: ('지원사업 체크 앱', '적합도 메모'),

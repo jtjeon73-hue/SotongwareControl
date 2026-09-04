@@ -115,11 +115,14 @@ class ArtifactType {
       folderNames[normalize(artifact)];
 }
 
-/// 콘텐츠개발 하위 유형 (canonical: music | shorts | comic).
+/// 콘텐츠개발 하위 유형 (canonical: music | shorts | comic |
+/// notification_promo_video | image_design + legacy).
 class ContentSubtype {
   static const music = 'music';
   static const shorts = 'shorts';
   static const comic = 'comic';
+  static const notificationPromoVideo = 'notification_promo_video';
+  static const imageDesign = 'image_design';
 
   // Legacy read-compat tokens (not selectable for new work).
   static const song = 'song';
@@ -128,7 +131,13 @@ class ContentSubtype {
   static const other = 'other';
   static const undecided = 'undecided';
 
-  static const allSelectable = [music, shorts, comic];
+  static const allSelectable = [
+    music,
+    shorts,
+    comic,
+    notificationPromoVideo,
+    imageDesign,
+  ];
 
   static String labelKo(String id) {
     switch (id) {
@@ -139,6 +148,13 @@ class ContentSubtype {
         return '쇼츠';
       case comic:
         return '만화';
+      case notificationPromoVideo:
+      case 'notification':
+      case 'promo_video':
+        return '알림·홍보 영상';
+      case imageDesign:
+      case 'design':
+        return '이미지·디자인';
       case video:
         return '영상 (레거시)';
       case songAndShorts:
@@ -166,6 +182,15 @@ class ContentSubtype {
         return shorts;
       case comic:
         return comic;
+      case notificationPromoVideo:
+      case 'notification':
+      case 'promo_video':
+      case 'promo':
+        return notificationPromoVideo;
+      case imageDesign:
+      case 'design':
+      case 'design_content':
+        return imageDesign;
       case video:
       case 'youtube_video':
         return video;
@@ -186,6 +211,7 @@ class ContentSubtype {
   /// True when legacy token should not be used for new WI creation.
   static bool blocksNewSelection(String raw) {
     final n = normalize(raw);
+    if (n == notificationPromoVideo || n == imageDesign) return false;
     return n == video || raw == 'marketing' || raw == 'image';
   }
 }

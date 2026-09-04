@@ -131,6 +131,17 @@ class ConceptCandidate {
     this.whyRecommended = '',
     this.sourceType = 'local_catalog',
     this.isUserAdded = false,
+    this.seedId,
+    this.customerProblem = '',
+    this.promisedOutcome = '',
+    this.reasonsToPay = const [],
+    this.uniqueValue = '',
+    this.recommendationReason = '',
+    this.deprecated = false,
+    this.replacementSeedId,
+    this.difficulty = 'medium',
+    this.catalogVersion = 1,
+    this.active = true,
   });
 
   final String id;
@@ -152,6 +163,17 @@ class ConceptCandidate {
   final String whyRecommended;
   final String sourceType;
   final bool isUserAdded;
+  final String? seedId;
+  final String customerProblem;
+  final String promisedOutcome;
+  final List<String> reasonsToPay;
+  final String uniqueValue;
+  final String recommendationReason;
+  final bool deprecated;
+  final String? replacementSeedId;
+  final String difficulty;
+  final int catalogVersion;
+  final bool active;
 
   ConceptScoreBand get fitBand => bandFromScore(customerNeedScore);
   ConceptScoreBand get aiBand => bandFromScore(aiRelevanceScore);
@@ -170,6 +192,17 @@ class ConceptCandidate {
     String? whyRecommended,
     bool? isUserAdded,
     List<String>? tags,
+    String? seedId,
+    String? customerProblem,
+    String? promisedOutcome,
+    List<String>? reasonsToPay,
+    String? uniqueValue,
+    String? recommendationReason,
+    bool? deprecated,
+    String? replacementSeedId,
+    String? difficulty,
+    int? catalogVersion,
+    bool? active,
   }) {
     return ConceptCandidate(
       id: id ?? this.id,
@@ -191,6 +224,17 @@ class ConceptCandidate {
       whyRecommended: whyRecommended ?? this.whyRecommended,
       sourceType: sourceType,
       isUserAdded: isUserAdded ?? this.isUserAdded,
+      seedId: seedId ?? this.seedId,
+      customerProblem: customerProblem ?? this.customerProblem,
+      promisedOutcome: promisedOutcome ?? this.promisedOutcome,
+      reasonsToPay: reasonsToPay ?? this.reasonsToPay,
+      uniqueValue: uniqueValue ?? this.uniqueValue,
+      recommendationReason: recommendationReason ?? this.recommendationReason,
+      deprecated: deprecated ?? this.deprecated,
+      replacementSeedId: replacementSeedId ?? this.replacementSeedId,
+      difficulty: difficulty ?? this.difficulty,
+      catalogVersion: catalogVersion ?? this.catalogVersion,
+      active: active ?? this.active,
     );
   }
 
@@ -214,6 +258,17 @@ class ConceptCandidate {
     'whyRecommended': whyRecommended,
     'sourceType': sourceType,
     'isUserAdded': isUserAdded,
+    'seedId': seedId,
+    'customerProblem': customerProblem,
+    'promisedOutcome': promisedOutcome,
+    'reasonsToPay': reasonsToPay,
+    'uniqueValue': uniqueValue,
+    'recommendationReason': recommendationReason,
+    'deprecated': deprecated,
+    'replacementSeedId': replacementSeedId,
+    'difficulty': difficulty,
+    'catalogVersion': catalogVersion,
+    'active': active,
   };
 
   factory ConceptCandidate.fromJson(Map<String, dynamic> json) {
@@ -245,6 +300,21 @@ class ConceptCandidate {
       whyRecommended: '${json['whyRecommended'] ?? ''}',
       sourceType: '${json['sourceType'] ?? 'local_catalog'}',
       isUserAdded: json['isUserAdded'] == true,
+      seedId: json['seedId'] as String?,
+      customerProblem: '${json['customerProblem'] ?? ''}',
+      promisedOutcome: '${json['promisedOutcome'] ?? ''}',
+      reasonsToPay:
+          (json['reasonsToPay'] as List?)?.map((e) => '$e').toList() ??
+          const [],
+      uniqueValue: '${json['uniqueValue'] ?? ''}',
+      recommendationReason: '${json['recommendationReason'] ?? ''}',
+      deprecated: json['deprecated'] == true,
+      replacementSeedId: json['replacementSeedId'] as String?,
+      difficulty: '${json['difficulty'] ?? 'medium'}',
+      catalogVersion: (json['catalogVersion'] is num)
+          ? (json['catalogVersion'] as num).toInt()
+          : 1,
+      active: json['active'] != false,
     );
   }
 

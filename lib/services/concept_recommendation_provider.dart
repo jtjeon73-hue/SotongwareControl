@@ -75,6 +75,7 @@ class LocalConceptRecommendationProvider
     final scored = <ConceptCandidate>[];
 
     for (final seed in ConceptCatalog.seeds) {
+      if (!seed.active) continue;
       final variant = seed.variants[artifact];
       if (variant == null) continue;
       if (seed.subtypes.isNotEmpty &&
@@ -209,18 +210,27 @@ class LocalConceptRecommendationProvider
             longevity * 0.10) *
         (0.85 + audienceFactor * 0.3);
 
-    final why = _why(
+    final commercial = seed.commercial;
+    final shortDesc = (commercial?.shortDescription ?? '').trim().isNotEmpty
+        ? commercial!.shortDescription
+        : description;
+
+    var why = _why(
       audiences: audiences,
       category: seed.category,
       need: need,
       ai: ai,
       practical: practical,
     );
+    final recReason = (commercial?.recommendationReason ?? '').trim();
+    if (recReason.isNotEmpty) {
+      why = why.trim().isEmpty ? recReason : '$recReason · $why';
+    }
 
     return ConceptCandidate(
       id: '${seed.id}__$artifact',
       title: title,
-      shortDescription: description,
+      shortDescription: shortDesc,
       category: seed.category,
       targetCustomers: audiences,
       compatibleArtifacts: [artifact],
@@ -236,6 +246,17 @@ class LocalConceptRecommendationProvider
       tags: seed.tags,
       whyRecommended: why,
       sourceType: 'local_catalog',
+      seedId: seed.id,
+      customerProblem: commercial?.customerProblem ?? '',
+      promisedOutcome: commercial?.promisedOutcome ?? '',
+      reasonsToPay: commercial?.reasonsToPay ?? const [],
+      uniqueValue: commercial?.uniqueValue ?? '',
+      recommendationReason: recReason,
+      deprecated: seed.deprecated,
+      replacementSeedId: seed.replacementSeedId,
+      difficulty: commercial?.difficulty ?? 'medium',
+      catalogVersion: seed.catalogVersion,
+      active: seed.active,
     );
   }
 

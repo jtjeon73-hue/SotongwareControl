@@ -32,6 +32,8 @@ class ProjectDesignWizard extends StatefulWidget {
     this.aiProductionPilot = true,
     this.onApprovalModeChanged,
     this.onWorkerPreferenceChanged,
+    this.onRequestLocalValidate,
+    this.onRequestTransfer,
   });
 
   final ProjectDesignState initial;
@@ -49,6 +51,8 @@ class ProjectDesignWizard extends StatefulWidget {
   final bool aiProductionPilot;
   final ValueChanged<String>? onApprovalModeChanged;
   final ValueChanged<String>? onWorkerPreferenceChanged;
+  final VoidCallback? onRequestLocalValidate;
+  final VoidCallback? onRequestTransfer;
 
   @override
   State<ProjectDesignWizard> createState() => _ProjectDesignWizardState();
@@ -62,6 +66,13 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
   final _topicCtrl = TextEditingController();
   final _problemCtrl = TextEditingController();
   final _outcomeCtrl = TextEditingController();
+  final _uniqueValueCtrl = TextEditingController();
+  final _reasonsToPayCtrl = TextEditingController();
+  final _sourceInstructionIdCtrl = TextEditingController();
+  final _sourceRevisionCtrl = TextEditingController();
+  final _requestedRevisionCtrl = TextEditingController();
+  final _requestedChangesCtrl = TextEditingController();
+  final _preservedHashesCtrl = TextEditingController();
   DesignReviewReport? _review;
 
   @override
@@ -87,6 +98,13 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     _topicCtrl.text = _state.topic;
     _problemCtrl.text = _state.customerProblem;
     _outcomeCtrl.text = _state.desiredOutcome;
+    _uniqueValueCtrl.text = _state.uniqueValue;
+    _reasonsToPayCtrl.text = _state.reasonsToPay.join('\n');
+    _sourceInstructionIdCtrl.text = _state.sourceInstructionId;
+    _sourceRevisionCtrl.text = _state.sourceRevision;
+    _requestedRevisionCtrl.text = _state.requestedRevision;
+    _requestedChangesCtrl.text = _state.requestedChanges.join('\n');
+    _preservedHashesCtrl.text = _state.preservedArtifactHashes.join('\n');
   }
 
   @override
@@ -96,12 +114,100 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     _topicCtrl.dispose();
     _problemCtrl.dispose();
     _outcomeCtrl.dispose();
+    _uniqueValueCtrl.dispose();
+    _reasonsToPayCtrl.dispose();
+    _sourceInstructionIdCtrl.dispose();
+    _sourceRevisionCtrl.dispose();
+    _requestedRevisionCtrl.dispose();
+    _requestedChangesCtrl.dispose();
+    _preservedHashesCtrl.dispose();
     super.dispose();
   }
 
   void _emit(ProjectDesignState next) {
     setState(() => _state = next);
     widget.onChanged(next);
+  }
+
+  String _creationModeSummary() {
+    final parts = <String>[
+      _state.creationMode == 'revise_existing' ? '기존 결과물 보완' : '새 결과물',
+    ];
+    if (_state.manualOnlyMode) parts.add('상세 직접입력');
+    return parts.join(' · ');
+  }
+
+  String _pipelinePhaseLabel(String phase) {
+    switch (phase) {
+      case StudioPipelinePhase.drafting:
+        return '초안 작성 중';
+      case StudioPipelinePhase.contentConfirmed:
+        return '기획 확정됨';
+      case StudioPipelinePhase.instructionGenerated:
+        return '작업지시서 생성됨';
+      case StudioPipelinePhase.locallyValidated:
+        return '로컬 검증 완료';
+      case StudioPipelinePhase.readyToSend:
+        return '전송 준비 완료';
+      default:
+        return phase;
+    }
+  }
+
+  String _composeUserBrief() {
+    return [
+      if (_topicCtrl.text.trim().isNotEmpty) _topicCtrl.text.trim(),
+      if (_problemCtrl.text.trim().isNotEmpty) _problemCtrl.text.trim(),
+      if (_outcomeCtrl.text.trim().isNotEmpty) _outcomeCtrl.text.trim(),
+    ].join('\n');
+  }
+
+  List<String> _parseMultilineList(String raw) {
+    final lines = raw
+        .split(RegExp(r'[\n,]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    return lines;
+  }
+
+  String _truncate(String text, {int max = 120}) {
+    final t = text.trim();
+    if (t.length <= max) return t;
+    return '${t.substring(0, max)}…';
+  }
+
+  void _prefillCommercialFromConcepts(ProjectDesignState state) {
+    if (state.selectedConceptIds.isEmpty) return;
+    final selected = _engine.resolveSelectedConcepts(state);
+    if (selected.isEmpty) return;
+    final first = selected.first;
+    var next = state.copy();
+    var changed = false;
+    if (next.uniqueValue.trim().isEmpty && first.uniqueValue.trim().isNotEmpty) {
+      next.uniqueValue = first.uniqueValue.trim();
+      _uniqueValueCtrl.text = next.uniqueValue;
+      changed = true;
+    }
+    if (next.reasonsToPay.isEmpty && first.reasonsToPay.isNotEmpty) {
+      next.reasonsToPay = List<String>.from(first.reasonsToPay);
+      _reasonsToPayCtrl.text = next.reasonsToPay.join('\n');
+      changed = true;
+    }
+    if (changed) _emit(next);
+  }
+
+  void _clearReviseFields(ProjectDesignState next) {
+    next.sourceInstructionId = '';
+    next.sourceRevision = '';
+    next.requestedRevision = '';
+    next.requestedChanges = [];
+    next.preservedArtifactHashes = [];
+    _sourceInstructionIdCtrl.clear();
+    _sourceRevisionCtrl.clear();
+    _requestedRevisionCtrl.clear();
+    _requestedChangesCtrl.clear();
+    _preservedHashesCtrl.clear();
   }
 
   bool _canGoNext() {
@@ -274,6 +380,105 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Text(
+          '어떤 방식으로 진행할까요?',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _CreationModeCard(
+              title: '새 결과물 만들기',
+              subtitle: '처음부터 새 프로젝트를 기획합니다',
+              selected: _state.creationMode == 'new_product',
+              onTap: () {
+                final next = _state.copy()..creationMode = 'new_product';
+                _clearReviseFields(next);
+                _emit(next);
+              },
+            ),
+            _CreationModeCard(
+              title: '기존 결과물 보완하기',
+              subtitle: '이전 작업지시서·리비전을 기준으로 수정',
+              selected: _state.creationMode == 'revise_existing',
+              onTap: () {
+                _emit(_state.copy()..creationMode = 'revise_existing');
+              },
+            ),
+            _CreationModeCard(
+              title: '상세 직접입력',
+              subtitle: 'AI 보완 없이 사용자 입력만 사용',
+              selected: _state.manualOnlyMode,
+              onTap: () {
+                _emit(_state.copy()..manualOnlyMode = !_state.manualOnlyMode);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '현재: ${_creationModeSummary()}',
+          style: const TextStyle(
+            fontSize: 12,
+            color: ControlColors.textMuted,
+          ),
+        ),
+        if (_state.creationMode == 'revise_existing') ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _sourceInstructionIdCtrl,
+            decoration: const InputDecoration(
+              labelText: '원본 작업지시 ID',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => _state.sourceInstructionId = v,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _sourceRevisionCtrl,
+            decoration: const InputDecoration(
+              labelText: '원본 리비전',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => _state.sourceRevision = v,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _requestedRevisionCtrl,
+            decoration: const InputDecoration(
+              labelText: '요청 리비전 (선택)',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) => _state.requestedRevision = v,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _requestedChangesCtrl,
+            minLines: 2,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: '요청 변경 사항 (줄 또는 쉼표로 구분)',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) =>
+                _state.requestedChanges = _parseMultilineList(v),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _preservedHashesCtrl,
+            minLines: 1,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: '보존할 산출물 해시 (선택, 줄 구분)',
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (v) =>
+                _state.preservedArtifactHashes = _parseMultilineList(v),
+          ),
+        ],
+        const SizedBox(height: 16),
         const Text(
           '무엇을 만들까요? 4대 제작 유형 중 하나를 선택하세요.',
           style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
@@ -461,6 +666,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             _topicCtrl.text = next.topic;
             _problemCtrl.text = next.customerProblem;
             _outcomeCtrl.text = next.desiredOutcome;
+            _prefillCommercialFromConcepts(next);
             _emit(next);
           },
           onAddUserConcept: (title, memo) {
@@ -488,6 +694,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             _topicCtrl.text = next.topic;
             _problemCtrl.text = next.customerProblem;
             _outcomeCtrl.text = next.desiredOutcome;
+            _prefillCommercialFromConcepts(next);
             _emit(next);
           },
         ),
@@ -649,30 +856,107 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           ],
         ),
         const SizedBox(height: 16),
+        const Text(
+          '차별 가치',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _uniqueValueCtrl,
+          minLines: 2,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: '이 결과물만의 차별점·독특한 가치',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (v) {
+            _emit(_state.copy()..uniqueValue = v);
+          },
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          '구매·이용 이유',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: _reasonsToPayCtrl,
+          minLines: 3,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            hintText: '한 줄에 하나씩 입력 (고객이 돈·시간을 쓸 이유)',
+            border: OutlineInputBorder(),
+          ),
+          onChanged: (v) {
+            _emit(
+              _state.copy()..reasonsToPay = _parseMultilineList(v),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
         StudioAiEnhancePanel(
           state: _state,
           onApply: (result) {
             var next = _state.copy();
+            if (next.originalUserBrief.trim().isEmpty &&
+                !next.originalUserBriefConfirmed) {
+              next.originalUserBrief = _composeUserBrief();
+            }
+            final notes = result.suggestedNotes.trim();
+            if (notes.isNotEmpty) {
+              next.aiAugmentedBrief = notes;
+            }
+            for (final section in result.sections) {
+              for (final bullet in section.bullets) {
+                final b = bullet.trim();
+                if (b.isEmpty) continue;
+                if (!next.acceptedAiSuggestions.contains(b)) {
+                  next.acceptedAiSuggestions = [
+                    ...next.acceptedAiSuggestions,
+                    b,
+                  ];
+                }
+              }
+            }
             if (next.customerProblem.trim().isEmpty) {
               next.customerProblem = result.suggestedProblem;
               _problemCtrl.text = result.suggestedProblem;
+              next = _engine.markFieldEdited(next, field: 'problem');
             }
             if (next.desiredOutcome.trim().isEmpty) {
               next.desiredOutcome = result.suggestedOutcome;
               _outcomeCtrl.text = result.suggestedOutcome;
+              next = _engine.markFieldEdited(next, field: 'outcome');
             }
-            final memo = result.suggestedNotes.trim();
-            if (memo.isNotEmpty) {
+            if (notes.isNotEmpty) {
               next.designMemo = next.designMemo.trim().isEmpty
-                  ? memo
-                  : '${next.designMemo.trim()}\n\n$memo';
+                  ? notes
+                  : '${next.designMemo.trim()}\n\n$notes';
               _memoCtrl.text = next.designMemo;
             }
-            next = _engine.markFieldEdited(next, field: 'problem');
-            next = _engine.markFieldEdited(next, field: 'outcome');
+            next.manualOnlyMode = false;
             _emit(next);
           },
-          onKeepOriginal: () {},
+          onKeepOriginal: (result) {
+            var next = _state.copy();
+            if (result != null) {
+              for (final section in result.sections) {
+                for (final bullet in section.bullets) {
+                  final b = bullet.trim();
+                  if (b.isEmpty) continue;
+                  if (!next.rejectedAiSuggestions.contains(b)) {
+                    next.rejectedAiSuggestions = [
+                      ...next.rejectedAiSuggestions,
+                      b,
+                    ];
+                  }
+                }
+              }
+            }
+            next.aiAugmentedBrief = '';
+            next.manualOnlyMode = true;
+            _emit(next);
+          },
         ),
       ],
     );
@@ -695,6 +979,17 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             onWorkerPreferenceChanged: (v) =>
                 widget.onWorkerPreferenceChanged?.call(v),
           ),
+          if (widget.approvalMode == 'auto') ...[
+            const SizedBox(height: 8),
+            const Text(
+              '자동 승인이 켜져 있어도 다음 단계에서는 반드시 멈춥니다: '
+              '사용자 품질 검토, owner review, 외부 공개, 앱스토어·사업부 등록',
+              style: TextStyle(
+                fontSize: 11.5,
+                color: ControlColors.accentWarm,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
         ],
         if (groups.isEmpty)
@@ -781,6 +1076,64 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         _confirmRow('핵심 문제', _state.customerProblem, _state.problemStatus),
         _confirmRow('프로젝트 목적', _state.desiredOutcome, _state.outcomeStatus),
         _confirmRow('주제', _state.topic, _state.topicStatus),
+        _confirmRow(
+          '표시 제목',
+          _state.displayTitle.trim().isEmpty
+              ? (_state.topic.trim().isEmpty ? '(미정)' : _state.topic)
+              : _state.displayTitle,
+          _state.planningConfirmed
+              ? DesignFieldStatus.userConfirmed
+              : DesignFieldStatus.suggested,
+        ),
+        _confirmRow(
+          '제작 방식',
+          _creationModeSummary(),
+          DesignFieldStatus.userSelected,
+        ),
+        if (_state.originalUserBrief.trim().isNotEmpty)
+          _confirmRow(
+            '원본 요약',
+            _truncate(_state.originalUserBrief),
+            _state.originalUserBriefConfirmed
+                ? DesignFieldStatus.userConfirmed
+                : DesignFieldStatus.userEdited,
+          ),
+        _confirmRow(
+          'AI 제안 수락',
+          '${_state.acceptedAiSuggestions.length}건',
+          _state.acceptedAiSuggestions.isEmpty
+              ? DesignFieldStatus.undecided
+              : DesignFieldStatus.userSelected,
+        ),
+        _confirmRow(
+          'AI 제안 거절',
+          '${_state.rejectedAiSuggestions.length}건',
+          _state.rejectedAiSuggestions.isEmpty
+              ? DesignFieldStatus.undecided
+              : DesignFieldStatus.userSelected,
+        ),
+        if (_state.uniqueValue.trim().isNotEmpty)
+          _confirmRow(
+            '차별 가치',
+            _state.uniqueValue,
+            DesignFieldStatus.userEdited,
+          ),
+        if (_state.reasonsToPay.isNotEmpty)
+          _confirmRow(
+            '구매·이용 이유',
+            _state.reasonsToPay.join('\n'),
+            DesignFieldStatus.userEdited,
+          ),
+        _confirmRow(
+          '외부 공개',
+          '금지',
+          DesignFieldStatus.userConfirmed,
+        ),
+        _confirmRow(
+          '품질 검토',
+          '사용자 품질 검토 · owner review 필수',
+          DesignFieldStatus.userConfirmed,
+        ),
         if (_state.combinedDirection.isNotEmpty)
           _confirmRow(
             '차별화·결합 방향',
@@ -894,6 +1247,14 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         _kv('핵심 문제', synced.customerProblem),
         _kv('기대 결과', synced.desiredOutcome),
         _kv('확정', synced.planningConfirmed ? '사용자 확정' : '미확정 (생성 불가)'),
+        _kv(
+          '파이프라인',
+          _pipelinePhaseLabel(synced.studioPipelinePhase),
+        ),
+        _kv(
+          '로컬 검증',
+          synced.commercialLocalValidated ? '완료' : '미완료',
+        ),
         if (synced.designMemo.trim().isNotEmpty)
           _kv('추가 메모', synced.designMemo),
         const SizedBox(height: 12),
@@ -903,6 +1264,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
               generated: widget.instructionGenerated,
               stale: widget.instructionStale,
             );
+            final canValidate =
+                widget.instructionGenerated && synced.planningConfirmed;
             return Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -933,6 +1296,29 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                   ),
                   label: Text(InstructionCreateUx.label(kind)),
                 ),
+                OutlinedButton.icon(
+                  key: const Key('planning_local_validate'),
+                  onPressed: canValidate && widget.onRequestLocalValidate != null
+                      ? () {
+                          _emit(synced);
+                          widget.onRequestLocalValidate?.call();
+                        }
+                      : null,
+                  icon: const Icon(Icons.fact_check_outlined, size: 18),
+                  label: const Text('로컬 상용 검증'),
+                ),
+                if (widget.onRequestTransfer != null &&
+                    synced.commercialLocalValidated)
+                  OutlinedButton.icon(
+                    onPressed: synced.canSendAfterLocalValidate
+                        ? () {
+                            _emit(synced);
+                            widget.onRequestTransfer?.call();
+                          }
+                        : null,
+                    icon: const Icon(Icons.send_outlined, size: 18),
+                    label: const Text('전송 준비'),
+                  ),
                 OutlinedButton.icon(
                   onPressed: () {
                     _emit(synced);
@@ -999,6 +1385,62 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             child: const Text('다음'),
           ),
       ],
+    );
+  }
+}
+
+class _CreationModeCard extends StatelessWidget {
+  const _CreationModeCard({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? ControlColors.tealSoft.withValues(alpha: 0.35)
+          : ControlColors.surface,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: 200,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? ControlColors.teal : ControlColors.border,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: ControlColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

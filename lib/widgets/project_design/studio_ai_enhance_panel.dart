@@ -15,7 +15,7 @@ class StudioAiEnhancePanel extends StatefulWidget {
 
   final ProjectDesignState state;
   final void Function(RequirementEnhancementResult result) onApply;
-  final VoidCallback onKeepOriginal;
+  final void Function(RequirementEnhancementResult? lastResult) onKeepOriginal;
 
   @override
   State<StudioAiEnhancePanel> createState() => _StudioAiEnhancePanelState();
@@ -152,8 +152,9 @@ class _StudioAiEnhancePanelState extends State<StudioAiEnhancePanel> {
                   TextButton(
                     key: const Key('studio_ai_enhance_keep'),
                     onPressed: () {
+                      final last = _result;
                       setState(() => _result = null);
-                      widget.onKeepOriginal();
+                      widget.onKeepOriginal(last);
                     },
                     child: const Text('원래 내용 유지'),
                   ),

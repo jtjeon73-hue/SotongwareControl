@@ -13,6 +13,8 @@ import '../models/project_design_state.dart';
 import '../models/remote_agent_models.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
+import '../services/commercial_studio_builder.dart';
+import '../services/commercial_work_instruction_preflight.dart';
 import '../services/dev_work_doc_paths.dart';
 import '../services/dev_work_doc_service.dart';
 import '../services/instruction_contract_validator.dart';
@@ -388,6 +390,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       lastResult: _effectiveLastTransferResult,
       operationalProjectReady: _operationalProjectReady,
       remoteEvidence: _remoteEvidence,
+      localCommercialValidated: _designState.commercialLocalValidated,
     );
   }
 
@@ -1083,6 +1086,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       }
     } else {
       final aiExecution = _resolveAiExecutionForBuild(input);
+      final commercial = const CommercialStudioBuilder().tryBuild(
+        state: _designState,
+        input: input,
+        instructionId: iid,
+        projectId: id,
+      );
       var built = _service.buildInstruction(
         planId: id,
         input: input,
@@ -1094,6 +1103,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         updatedAt: preserveUpdatedAt,
         status: PlanningStatus.instructionReady,
         aiExecution: aiExecution,
+        commercialQuality: commercial,
       );
       final sourceFileName =
           'WI_${DevWorkDocPaths.sanitizeInstructionId(iid)}.json';
@@ -1115,6 +1125,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         sourceFileName: sourceFileName,
         status: PlanningStatus.instructionReady,
         aiExecution: aiExecution,
+        commercialQuality: commercial,
       );
       jsonText = const JsonEncoder.withIndent(
         '  ',
@@ -1235,6 +1246,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       _instruction = instruction;
       _activeDoc = doc;
       _lastDevWorkDocResult = saveResult;
+      _designState = _designState.copy()
+        ..studioPipelinePhase = StudioPipelinePhase.instructionGenerated
+        ..commercialLocalValidated = false;
     });
 
     if (isDownloadComplete) {
@@ -1263,11 +1277,124 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
   }
 
+  Future<void> _runCommercialLocalValidate() async {
+    if (_instruction == null) {
+      _snack('먼저 작업지시서를 생성하세요.');
+      return;
+    }
+    final result = CommercialWorkInstructionPreflight.evaluate(
+      _instruction!.toJson(),
+    );
+    final blocking = result.errors;
+    if (result.ok && blocking.isEmpty) {
+      setState(() {
+        _designState = _designState.copy()
+          ..commercialLocalValidated = true
+          ..studioPipelinePhase = StudioPipelinePhase.locallyValidated;
+      });
+      await _persistDraft();
+      _snack('로컬 검증을 통과했습니다. 이제 소통24워크로 보내기를 준비할 수 있습니다.');
+      return;
+    }
+
+    setState(() {
+      _designState = _designState.copy()
+        ..commercialLocalValidated = false
+        ..studioPipelinePhase = StudioPipelinePhase.instructionGenerated;
+    });
+    await _persistDraft();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('로컬 검증 — 수정이 필요합니다'),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '계약 필수 항목이 비어 있거나 심각한 품질 문제가 있습니다. '
+                  '시장성 조언과 달리 이 항목은 보내기 전에 반드시 고쳐야 합니다.',
+                ),
+                const SizedBox(height: 12),
+                for (final issue in blocking.take(12)) ...[
+                  Text(
+                    issue.severity == CommercialIssueSeverity.error
+                        ? '차단 · ${issue.userMessageKo}'
+                        : issue.userMessageKo,
+                    style: TextStyle(
+                      fontWeight:
+                          issue.severity == CommercialIssueSeverity.error
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      color: issue.severity == CommercialIssueSeverity.error
+                          ? ControlColors.accentWarm
+                          : null,
+                    ),
+                  ),
+                  if (issue.studioStepHint.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8, top: 2),
+                      child: Text(
+                        '→ ${issue.studioStepHint}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: ControlColors.textSecondary,
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // Prefer STEP 4 (details / customer value) when commercial fields missing.
+              setState(() {
+                _designState = _designState.copy()
+                  ..step = ProjectDesignStep.details
+                  ..planningConfirmed = false
+                  ..studioPipelinePhase = StudioPipelinePhase.drafting;
+              });
+            },
+            child: const Text('수정하기'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _transferToWork() async {
     if (_transferBusy || _agentRefreshBusy) return;
     if (_activeDoc?.wasTransferred == true) return;
     if (_instruction == null) {
       _snack('먼저 작업지시서를 생성하세요.');
+      return;
+    }
+    if (!_designState.commercialLocalValidated) {
+      _snack('로컬 검증을 먼저 통과해야 보낼 수 있습니다.');
+      await _runCommercialLocalValidate();
+      if (!_designState.commercialLocalValidated) return;
+    }
+
+    final commercial = CommercialWorkInstructionPreflight.evaluate(
+      _instruction!.toJson(),
+    );
+    if (!commercial.ok || commercial.errors.isNotEmpty) {
+      _snack('상용 계약 검증에 실패했습니다. 보내기를 차단합니다.');
+      await _runCommercialLocalValidate();
       return;
     }
 
@@ -1313,6 +1440,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     }
 
     if (validation.level == ContractValidationLevel.warning) {
+      if (!mounted) return;
       final proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -2026,6 +2154,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               onRequestRecreateInstruction: _recreateInstructionFromChanges,
               onRequestNewWork: _startNewPlan,
               onOccupiedConcept: _onOccupiedConcept,
+              onRequestLocalValidate: _runCommercialLocalValidate,
               instructionGenerated: _instruction != null,
               instructionStale:
                   _instruction != null && !_instructionMatchesCurrentInput,
