@@ -170,7 +170,7 @@ class RemoteOpsDashboard extends StatelessWidget {
             for (final envelope
                 in (reviewAwaiting.isNotEmpty
                     ? reviewAwaiting
-                    : [if (productionReview != null) productionReview!])) ...[
+                    : [?productionReview])) ...[
               ProductionReviewStatusCard(
                 envelope: envelope,
                 compact: true,
