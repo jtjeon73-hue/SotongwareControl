@@ -2,6 +2,7 @@
 library;
 
 import '../data/concept_catalog.dart';
+import '../data/concept_commercial_catalog.dart';
 import '../data/project_design_catalog.dart';
 import '../models/artifact_type.dart';
 import '../models/concept_candidate.dart';
@@ -75,7 +76,7 @@ class LocalConceptRecommendationProvider
     final scored = <ConceptCandidate>[];
 
     for (final seed in ConceptCatalog.seeds) {
-      if (!seed.active) continue;
+      if (!seed.active || seed.deprecated) continue;
       final variant = seed.variants[artifact];
       if (variant == null) continue;
       if (seed.subtypes.isNotEmpty &&
@@ -210,9 +211,9 @@ class LocalConceptRecommendationProvider
             longevity * 0.10) *
         (0.85 + audienceFactor * 0.3);
 
-    final commercial = seed.commercial;
-    final shortDesc = (commercial?.shortDescription ?? '').trim().isNotEmpty
-        ? commercial!.shortDescription
+    final commercial = ConceptCommercialCatalog.resolve(seed);
+    final shortDesc = commercial.shortDescription.trim().isNotEmpty
+        ? commercial.shortDescription
         : description;
 
     var why = _why(
@@ -222,7 +223,7 @@ class LocalConceptRecommendationProvider
       ai: ai,
       practical: practical,
     );
-    final recReason = (commercial?.recommendationReason ?? '').trim();
+    final recReason = commercial.recommendationReason.trim();
     if (recReason.isNotEmpty) {
       why = why.trim().isEmpty ? recReason : '$recReason · $why';
     }
@@ -247,14 +248,14 @@ class LocalConceptRecommendationProvider
       whyRecommended: why,
       sourceType: 'local_catalog',
       seedId: seed.id,
-      customerProblem: commercial?.customerProblem ?? '',
-      promisedOutcome: commercial?.promisedOutcome ?? '',
-      reasonsToPay: commercial?.reasonsToPay ?? const [],
-      uniqueValue: commercial?.uniqueValue ?? '',
+      customerProblem: commercial.customerProblem,
+      promisedOutcome: commercial.promisedOutcome,
+      reasonsToPay: commercial.reasonsToPay,
+      uniqueValue: commercial.uniqueValue,
       recommendationReason: recReason,
       deprecated: seed.deprecated,
       replacementSeedId: seed.replacementSeedId,
-      difficulty: commercial?.difficulty ?? 'medium',
+      difficulty: commercial.difficulty,
       catalogVersion: seed.catalogVersion,
       active: seed.active,
     );

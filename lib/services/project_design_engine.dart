@@ -2,6 +2,7 @@
 library;
 
 import '../data/concept_catalog.dart';
+import '../data/concept_commercial_catalog.dart';
 import '../data/project_design_catalog.dart';
 import '../models/business_planning.dart';
 import '../models/concept_candidate.dart';
@@ -113,9 +114,18 @@ class ProjectDesignEngine {
     final selected = <ConceptCandidate>[];
     for (final id in state.selectedConceptIds) {
       final c = byId[id];
-      if (c != null) selected.add(c);
+      if (c != null) {
+        selected.add(c);
+        continue;
+      }
+      // Draft/compat: deprecated or previously selected ids not in active pool.
+      final restored = _candidateFromSeedId(
+        id,
+        artifactType: state.artifactType ?? '',
+        audiences: state.selectedAudiences,
+      );
+      if (restored != null) selected.add(restored);
     }
-    // Also include user-added that are selected
     for (final c in state.userAddedConcepts) {
       if (state.selectedConceptIds.contains(c.id) &&
           !selected.any((e) => e.id == c.id)) {
@@ -123,6 +133,64 @@ class ProjectDesignEngine {
       }
     }
     return selected;
+  }
+
+  ConceptCandidate? _candidateFromSeedId(
+    String candidateOrSeedId, {
+    required String artifactType,
+    required List<String> audiences,
+  }) {
+    final seedId = ConceptCommercialCatalog.seedIdFromCandidateId(
+      candidateOrSeedId,
+    );
+    ConceptSeed? seed;
+    for (final s in ConceptCatalog.seeds) {
+      if (s.id == seedId) {
+        seed = s;
+        break;
+      }
+    }
+    if (seed == null) return null;
+    final artifact = artifactType.trim().isEmpty
+        ? seed.variants.keys.first
+        : artifactType;
+    final variant = seed.variants[artifact] ?? seed.variants.values.first;
+    final meta = ConceptCommercialCatalog.resolve(seed);
+    return ConceptCandidate(
+      id: candidateOrSeedId.contains('__')
+          ? candidateOrSeedId
+          : '${seed.id}__$artifact',
+      title: variant.$1,
+      shortDescription: meta.shortDescription.isNotEmpty
+          ? meta.shortDescription
+          : variant.$2,
+      category: seed.category,
+      targetCustomers: audiences,
+      compatibleArtifacts: [artifact],
+      compatibleSubtypes: seed.subtypes,
+      aiRelevanceScore: 3,
+      customerNeedScore: 3,
+      businessPotentialScore: 3,
+      differentiationScore: 3,
+      practicalValueScore: 3,
+      beginnerFitScore: 3,
+      longevityScore: 3,
+      totalScore: 3,
+      tags: seed.tags,
+      whyRecommended: meta.recommendationReason,
+      sourceType: 'local_catalog',
+      seedId: seed.id,
+      customerProblem: meta.customerProblem,
+      promisedOutcome: meta.promisedOutcome,
+      reasonsToPay: meta.reasonsToPay,
+      uniqueValue: meta.uniqueValue,
+      recommendationReason: meta.recommendationReason,
+      deprecated: seed.deprecated,
+      replacementSeedId: seed.replacementSeedId,
+      difficulty: meta.difficulty,
+      catalogVersion: seed.catalogVersion,
+      active: seed.active,
+    );
   }
 
   String buildCombinedDirection(List<ConceptCandidate> selected) {
@@ -251,14 +319,23 @@ class ProjectDesignEngine {
       ].join('\n');
     }
     next.originalUserBriefConfirmed = true;
-    if (next.reasonsToPay.isEmpty && next.desiredOutcome.trim().isNotEmpty) {
-      next.reasonsToPay = [
-        '${next.desiredOutcome.trim()}을(를) 더 빠르고 확실하게 얻는 데 도움이 됩니다',
-      ];
+    if (next.reasonsToPay.isEmpty) {
+      final selected = resolveSelectedConcepts(next);
+      if (selected.isNotEmpty && selected.first.reasonsToPay.isNotEmpty) {
+        next.reasonsToPay = List<String>.from(selected.first.reasonsToPay);
+      } else if (next.desiredOutcome.trim().isNotEmpty) {
+        next.reasonsToPay = [
+          '${next.desiredOutcome.trim()}을(를) 더 빠르고 확실하게 얻는 데 도움이 됩니다',
+        ];
+      }
     }
-    if (next.uniqueValue.trim().isEmpty &&
-        next.desiredOutcome.trim().isNotEmpty) {
-      next.uniqueValue = next.desiredOutcome.trim();
+    if (next.uniqueValue.trim().isEmpty) {
+      final selected = resolveSelectedConcepts(next);
+      if (selected.isNotEmpty && selected.first.uniqueValue.trim().isNotEmpty) {
+        next.uniqueValue = selected.first.uniqueValue.trim();
+      } else if (next.desiredOutcome.trim().isNotEmpty) {
+        next.uniqueValue = next.desiredOutcome.trim();
+      }
     }
     if (next.manualOnlyMode) {
       next.titleSource = next.titleSource.isEmpty ? 'manual' : next.titleSource;

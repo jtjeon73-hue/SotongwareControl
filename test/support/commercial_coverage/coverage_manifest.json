@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-09-04T12:30:00+09:00",
+  "seedCount": 61,
+  "variantCount": 305,
+  "activeNonDeprecated": 60,
+  "deprecated": 1,
+  "commercialCompleteSeeds": 61,
+  "inlineCommercialSeedsLegacyMeaning": 8,
+  "perArtifactRecommendAtLeast50": {
+    "app": 50,
+    "ebook": 50,
+    "site": 50,
+    "contents": 50,
+    "promo_site": 50
+  },
+  "remoteDeliveryCallsInThisSuite": 0
+}

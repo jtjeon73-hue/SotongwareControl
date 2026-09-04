@@ -9,6 +9,7 @@ import '../models/commercial/commercial_track_profiles.dart';
 import '../models/commercial/work_instruction_brief.dart';
 import '../models/project_design_state.dart';
 import '../data/concept_catalog.dart';
+import '../data/concept_commercial_catalog.dart';
 import 'content_subtype_contract.dart';
 
 class CommercialStudioBuilder {
@@ -257,7 +258,8 @@ class CommercialStudioBuilder {
           ),
         );
       case 'content':
-        final rawSubtype = (state.contentSubtype ?? input.contentSubtype).trim();
+        final rawSubtype = (state.contentSubtype ?? input.contentSubtype)
+            .trim();
         final subtype = ContentSubtypeContract.requireWorkCommercialEnum(
           rawSubtype,
         );
@@ -399,8 +401,11 @@ class CommercialStudioBuilder {
 
   ConceptCommercialMeta? _selectedSeedMeta(ProjectDesignState state) {
     for (final id in state.selectedConceptIds) {
-      for (final seed in ConceptCatalog.seeds) {
-        if (seed.id == id && seed.commercial != null) return seed.commercial;
+      final seedId = ConceptCommercialCatalog.seedIdFromCandidateId(id);
+      try {
+        return ConceptCommercialCatalog.requireForSeedId(seedId);
+      } catch (_) {
+        continue;
       }
     }
     return null;
