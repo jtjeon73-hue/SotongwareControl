@@ -372,11 +372,12 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
+      await tester.dragUntilVisible(
         find.text('작업 내역 자세히'),
-        400,
-        scrollable: find.byType(Scrollable).first,
+        find.byType(ListView).first,
+        const Offset(0, -120),
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('작업 내역 자세히'));
       await tester.pumpAndSettle();
       expect(find.textContaining('50대'), findsWidgets);

@@ -22,6 +22,7 @@ class RemoteOpsDashboard extends StatelessWidget {
     this.onOpenWorkshop,
     this.onOpenDiagnostics,
     this.productionReview,
+    this.reviewAwaiting = const [],
     this.onPrepareR2Draft,
   });
 
@@ -33,6 +34,7 @@ class RemoteOpsDashboard extends StatelessWidget {
   final VoidCallback? onOpenWorkshop;
   final VoidCallback? onOpenDiagnostics;
   final ProductionReviewStatusEnvelope? productionReview;
+  final List<ProductionReviewStatusEnvelope> reviewAwaiting;
   final VoidCallback? onPrepareR2Draft;
 
   List<Sotong24RemoteProject> get _operationalWorkshops =>
@@ -92,6 +94,7 @@ class RemoteOpsDashboard extends StatelessWidget {
         border: Border.all(color: ControlColors.border),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
@@ -153,16 +156,34 @@ class RemoteOpsDashboard extends StatelessWidget {
             usageLines: CursorUsagePresentation.detailLines(primaryAgent),
           ),
           const Divider(height: 24),
+          const _SectionLabel('지금 확인할 결과물'),
+          const SizedBox(height: 8),
+          if (reviewAwaiting.isEmpty && productionReview == null)
+            const Text(
+              '확인할 제작·검토 상태가 없습니다. (과거 동기화는 새 알림이 아닙니다)',
+              style: TextStyle(
+                fontSize: 13,
+                color: ControlColors.textSecondary,
+              ),
+            )
+          else ...[
+            for (final envelope
+                in (reviewAwaiting.isNotEmpty
+                    ? reviewAwaiting
+                    : [if (productionReview != null) productionReview!])) ...[
+              ProductionReviewStatusCard(
+                envelope: envelope,
+                compact: true,
+                onPrepareR2Draft: envelope.readiness.revisionRequired
+                    ? onPrepareR2Draft
+                    : null,
+              ),
+              const SizedBox(height: 10),
+            ],
+          ],
+          const Divider(height: 24),
           const _SectionLabel('현재 진행 작업'),
           const SizedBox(height: 8),
-          if (productionReview != null) ...[
-            ProductionReviewStatusCard(
-              envelope: productionReview!,
-              compact: true,
-              onPrepareR2Draft: onPrepareR2Draft,
-            ),
-            const SizedBox(height: 10),
-          ],
           _currentWorkBlock(currentWork, primaryAgent),
           const SizedBox(height: 12),
           _LabeledBlock(

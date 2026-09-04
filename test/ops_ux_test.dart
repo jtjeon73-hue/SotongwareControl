@@ -152,6 +152,12 @@ void main() {
 
     expect(find.text('50대 AI 활용 입문'), findsOneWidget);
     expect(find.text('AI 제작공정에서 계속 보기'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('AI 제작공정에서 계속 보기'),
+      find.byType(ListView).first,
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('AI 제작공정에서 계속 보기'));
     expect(dest, ControlDestination.productWorkshop);
   });

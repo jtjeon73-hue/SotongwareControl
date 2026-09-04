@@ -142,15 +142,18 @@ class Sotong24WorkshopPresentation {
         : null;
   }
 
-  /// `sotong24work_projects/{instructionId}` 와 동일한 운영 프로젝트만.
+  /// instructionId로 프로젝트 조회 (TEST·envelope-only 포함, 데모 제외).
   static Sotong24RemoteProject? projectForInstruction(
     Iterable<Sotong24RemoteProject> projects,
     String instructionId,
   ) {
     final id = instructionId.trim();
     if (id.isEmpty) return null;
-    for (final p in operationalProjects(projects)) {
+    for (final p in projects) {
+      if (p.isDemo) continue;
       if (p.projectId.trim() == id) return p;
+      final envId = p.productionReviewStatus?.instructionId.trim() ?? '';
+      if (envId == id) return p;
     }
     return null;
   }

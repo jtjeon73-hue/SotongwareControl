@@ -22,6 +22,7 @@ class ProductionReviewStatusCard extends StatelessWidget {
     final lines = compact
         ? ProductionReviewStatusPresentation.workshopCardLines(envelope)
         : ProductionReviewStatusPresentation.dashboardSummary(envelope);
+    final facts = ProductionReviewStatusPresentation.statusFacts(envelope);
     final r2Hints = ProductionReviewStatusPresentation.r2DraftHints(envelope);
     final showR2Button =
         envelope.readiness.revisionRequired && onPrepareR2Draft != null;
@@ -33,7 +34,9 @@ class ProductionReviewStatusCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: ControlColors.warningBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ControlColors.accentWarm.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: ControlColors.accentWarm.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,10 +73,40 @@ class ProductionReviewStatusCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final fact in facts)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ControlColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: ControlColors.border.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  child: Text(
+                    fact,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: ControlColors.textSecondary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
           _ReviewSection(
             title: '기술검증',
             value: _techSummary(envelope),
-            ok: envelope.readiness.technicalValidationCompleted ||
+            ok:
+                envelope.readiness.technicalValidationCompleted ||
                 envelope.technicalValidation.completed,
           ),
           const SizedBox(height: 6),
@@ -86,16 +119,17 @@ class ProductionReviewStatusCard extends StatelessWidget {
           if (!compact && lines.length > 1) ...[
             const SizedBox(height: 8),
             for (final line in lines.skip(1))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  line,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: ControlColors.textSecondary,
+              if (!facts.contains(line))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    line,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: ControlColors.textSecondary,
+                    ),
                   ),
                 ),
-              ),
           ],
           if (r2Hints.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -199,9 +233,7 @@ class ProductionReviewStatusCard extends StatelessWidget {
       case 'pending':
         return '대기';
       default:
-        return e.ownerReview.decision.isNotEmpty
-            ? e.ownerReview.decision
-            : '—';
+        return e.ownerReview.decision.isNotEmpty ? e.ownerReview.decision : '—';
     }
   }
 }

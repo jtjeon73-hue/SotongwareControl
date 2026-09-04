@@ -13,6 +13,8 @@ import '../services/remote_agent_repository.dart';
 import '../services/remote_control_api.dart';
 import '../services/sotong24_remote_repository.dart';
 import '../services/sotong24_workshop_presentation.dart';
+import '../services/production_review_status_repository.dart';
+import '../services/production_review_workshop_merge.dart';
 import 'pdf_preview_screen.dart';
 import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
@@ -36,6 +38,7 @@ class ProductWorkshopScreen extends StatefulWidget {
   const ProductWorkshopScreen({
     super.key,
     this.repository,
+    this.productionReviewRepository,
     this.agentRepository,
     this.onStartNewWork,
     this.focusInstructionId,
@@ -47,6 +50,7 @@ class ProductWorkshopScreen extends StatefulWidget {
   });
 
   final Sotong24RemoteRepository? repository;
+  final ProductionReviewStatusRepository? productionReviewRepository;
   final RemoteAgentRepository? agentRepository;
   final VoidCallback? onStartNewWork;
   final String? focusInstructionId;
@@ -62,8 +66,10 @@ class ProductWorkshopScreen extends StatefulWidget {
 
 class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
   late final Sotong24RemoteRepository _repo;
+  late final ProductionReviewStatusRepository _productionReview;
   late final RemoteAgentRepository _agentRepo;
   var _ownsRepo = false;
+  var _ownsProductionReview = false;
   var _filter = Sotong24ProjectFilter.all;
   String? _openedFocusForId;
   List<Sotong24RemoteProject>? _serverRefreshProjects;
@@ -80,6 +86,12 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
     } else {
       _repo = Sotong24RemoteRepository();
       _ownsRepo = true;
+    }
+    if (widget.productionReviewRepository != null) {
+      _productionReview = widget.productionReviewRepository!;
+    } else {
+      _productionReview = ProductionReviewStatusRepository();
+      _ownsProductionReview = true;
     }
     if (widget.agentRepository != null) {
       _agentRepo = widget.agentRepository!;
@@ -167,6 +179,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
   void dispose() {
     _clockTimer?.cancel();
     if (_ownsRepo) _repo.dispose();
+    if (_ownsProductionReview) _productionReview.dispose();
     super.dispose();
   }
 
@@ -178,208 +191,231 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
         if (snap.hasError) {
           return _ErrorBody(message: '${snap.error}');
         }
-        final projects = _serverRefreshProjects ?? snap.data;
-        if (projects == null) {
-          return const Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
+        return StreamBuilder<ProductionReviewStatusQueryResult>(
+          stream: _productionReview.watchRecent(),
+          builder: (context, reviewSnap) {
+            final rawProjects = _serverRefreshProjects ?? snap.data;
+            if (rawProjects == null &&
+                (reviewSnap.connectionState == ConnectionState.waiting ||
+                    reviewSnap.data?.loading == true)) {
+              return const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                    SizedBox(height: 12),
+                    Text('AI 제작공정 불러오는 중', key: Key('workshop_loading_label')),
+                  ],
                 ),
-                SizedBox(height: 12),
-                Text('AI 제작공정 불러오는 중', key: Key('workshop_loading_label')),
-              ],
-            ),
-          );
-        }
-
-        final filtered = projects.where(_filter.matches).toList();
-        final primary = filtered
-            .where((p) => !p.isDemo && !p.isIncompleteListing)
-            .toList();
-        final incomplete = filtered
-            .where((p) => p.isIncompleteListing && !p.isDemo)
-            .toList();
-        final realWork = Sotong24WorkshopPresentation.operationalProjects(
-          primary,
-        );
-        final testWork = primary
-            .where(Sotong24WorkshopPresentation.isTestProject)
-            .toList();
-        final awaiting = realWork
-            .where(
-              (p) => p.userFacingStatus == Sotong24WorkStatus.awaitingApproval,
-            )
-            .toList();
-        final inProgress = realWork
-            .where(
-              (p) =>
-                  p.userFacingStatus != Sotong24WorkStatus.awaitingApproval &&
-                  p.userFacingStatus != Sotong24WorkStatus.completed,
-            )
-            .toList();
-        final completed = realWork
-            .where((p) => p.userFacingStatus == Sotong24WorkStatus.completed)
-            .toList();
-        final focusId = widget.focusInstructionId?.trim() ?? '';
-        final focusing = focusId.isNotEmpty;
+              );
+            }
+            final envelopes = reviewSnap.data?.envelopes ?? const [];
+            final projects = ProductionReviewWorkshopMerge.merge(
+              projects: rawProjects ?? const [],
+              envelopes: envelopes,
+            );
+            final filtered = projects.where(_filter.matches).toList();
+            final primary = filtered
+                .where((p) => !p.isDemo && !p.isIncompleteListing)
+                .toList();
+            final incomplete = filtered
+                .where((p) => p.isIncompleteListing && !p.isDemo)
+                .toList();
+            final realWork = Sotong24WorkshopPresentation.operationalProjects(
+              primary,
+            );
+            final testWork = primary
+                .where(Sotong24WorkshopPresentation.isTestProject)
+                .toList();
+            final awaiting = realWork
+                .where(
+                  (p) =>
+                      p.userFacingStatus == Sotong24WorkStatus.awaitingApproval,
+                )
+                .toList();
+            final inProgress = realWork
+                .where(
+                  (p) =>
+                      p.userFacingStatus !=
+                          Sotong24WorkStatus.awaitingApproval &&
+                      p.userFacingStatus != Sotong24WorkStatus.completed,
+                )
+                .toList();
+            final completed = realWork
+                .where(
+                  (p) => p.userFacingStatus == Sotong24WorkStatus.completed,
+                )
+                .toList();
+            final focusId = widget.focusInstructionId?.trim() ?? '';
+            final focusing = focusId.isNotEmpty;
         final resolution = Sotong24WorkshopPresentation.resolveFocus(
           projects: projects,
           focusInstructionId: widget.focusInstructionId,
         );
         final focus = resolution.project;
+        // Exact focus id가 아직 project/envelope에 없으면 준비 중 카드 유지
+        // (handoff 직후 project 생성 대기). 전체 화면 무한 loading은 사용하지 않음.
         final waiting = resolution.waitingForExactProject;
-        if (focusing && focus != null && _openedFocusForId != focusId) {
-          final opened = focus;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            if (_openedFocusForId == focusId) return;
-            _openedFocusForId = focusId;
-            _openDetailWithStage(
-              opened,
-              focusStageId: widget.focusStageId,
-              focusApk: widget.focusApk,
-            );
-          });
-        }
-        final isEmpty =
-            realWork.isEmpty && testWork.isEmpty && incomplete.isEmpty;
+            if (focusing && focus != null && _openedFocusForId != focusId) {
+              final opened = focus;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                if (_openedFocusForId == focusId) return;
+                _openedFocusForId = focusId;
+                _openDetailWithStage(
+                  opened,
+                  focusStageId: widget.focusStageId,
+                  focusApk: widget.focusApk,
+                );
+              });
+            }
+            final isEmpty =
+                realWork.isEmpty && testWork.isEmpty && incomplete.isEmpty;
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          children: [
-            Text(
-              'AI 제작공정',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '전송된 작업의 진행 상태를 확인하고 승인·보완을 관리합니다.',
-              style: TextStyle(
-                color: ControlColors.textSecondary,
-                fontSize: 14,
-                height: 1.35,
-              ),
-            ),
-            const SizedBox(height: 14),
-            if (waiting)
-              _PreparingWorkshopCard(
-                onRecheck: _recheckFromServer,
-                recheckBusy: _recheckBusy,
-                agentDeliveryConfirmed:
-                    focusId.isEmpty || _hasRemoteJobFor(focusId),
-              )
-            else if (focus != null)
-              _CurrentWorkCard(project: focus, policy: _monitoringPolicy)
-            else if (isEmpty)
-              _EmptyWorkshopCard(onStartNewWork: widget.onStartNewWork)
-            else
-              const _InfoBanner(text: '진행 중인 제작 프로젝트가 없습니다.'),
-            if (!focusing && !isEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                '작업 목록',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final f in Sotong24ProjectFilter.values)
-                    ChoiceChip(
-                      label: Text(
-                        f.labelKo,
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      selected: _filter == f,
-                      onSelected: (_) => setState(() => _filter = f),
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                Text(
+                  'AI 제작공정',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  '전송된 작업의 진행 상태를 확인하고 승인·보완을 관리합니다.',
+                  style: TextStyle(
+                    color: ControlColors.textSecondary,
+                    fontSize: 14,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (waiting)
+                  _PreparingWorkshopCard(
+                    onRecheck: _recheckFromServer,
+                    recheckBusy: _recheckBusy,
+                    agentDeliveryConfirmed:
+                        focusId.isEmpty || _hasRemoteJobFor(focusId),
+                  )
+                else if (focus != null)
+                  _CurrentWorkCard(project: focus, policy: _monitoringPolicy)
+                else if (isEmpty)
+                  _EmptyWorkshopCard(onStartNewWork: widget.onStartNewWork)
+                else
+                  const _InfoBanner(text: '진행 중인 제작 프로젝트가 없습니다.'),
+                if (!focusing && !isEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    '작업 목록',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                ],
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (!focusing &&
-                !(realWork.isEmpty &&
-                    testWork.isEmpty &&
-                    incomplete.isEmpty)) ...[
-              if (awaiting.isNotEmpty) ...[
-                const _SectionHeader(
-                  title: '승인 필요한 작업',
-                  subtitle: '결과를 확인하고 승인 또는 보완 요청을 진행하세요.',
-                ),
-                const SizedBox(height: 8),
-                for (final p in awaiting) ...[
-                  _ProjectCard(project: p, onOpen: () => _openDetail(p)),
-                  const SizedBox(height: 10),
-                ],
-              ],
-              if (inProgress.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const _SectionHeader(
-                  title: '진행 중',
-                  subtitle: 'AI가 작업 중이거나 보완·오류 상태입니다.',
-                ),
-                const SizedBox(height: 8),
-                for (final p in inProgress) ...[
-                  _ProjectCard(project: p, onOpen: () => _openDetail(p)),
-                  const SizedBox(height: 10),
-                ],
-              ],
-              if (completed.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                const _SectionHeader(title: '완료', subtitle: '제작이 끝난 작업입니다.'),
-                const SizedBox(height: 8),
-                for (final p in completed) ...[
-                  _ProjectCard(project: p, onOpen: () => _openDetail(p)),
-                  const SizedBox(height: 10),
-                ],
-              ],
-              if (testWork.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                OperationalCollapsibleSection(
-                  title: '개발/테스트 작업 보기',
-                  subtitle: 'E2E·Agent 검증용 — 데이터는 보존됩니다',
-                  sectionKey: const Key('workshop_test_projects'),
-                  child: Column(
-                    children: [
-                      for (final p in testWork) ...[
-                        _ProjectCard(project: p, onOpen: () => _openDetail(p)),
-                        const SizedBox(height: 10),
-                      ],
-                    ],
                   ),
-                ),
-              ],
-              if (incomplete.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                OperationalCollapsibleSection(
-                  title: '진단/불완전 데이터',
-                  subtitle: '삭제하지 않은 이전 TEST 항목',
-                  sectionKey: const Key('workshop_incomplete_projects'),
-                  child: Column(
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      for (final p in incomplete) ...[
-                        _ProjectCard(
-                          project: p,
-                          onOpen: () => _openDetail(p),
-                          incomplete: true,
+                      for (final f in Sotong24ProjectFilter.values)
+                        ChoiceChip(
+                          label: Text(
+                            f.labelKo,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          selected: _filter == f,
+                          onSelected: (_) => setState(() => _filter = f),
                         ),
-                        const SizedBox(height: 8),
-                      ],
                     ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+                ],
+                if (!focusing &&
+                    !(realWork.isEmpty &&
+                        testWork.isEmpty &&
+                        incomplete.isEmpty)) ...[
+                  if (awaiting.isNotEmpty) ...[
+                    const _SectionHeader(
+                      title: '승인 필요한 작업',
+                      subtitle: '결과를 확인하고 승인 또는 보완 요청을 진행하세요.',
+                    ),
+                    const SizedBox(height: 8),
+                    for (final p in awaiting) ...[
+                      _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                  if (inProgress.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    const _SectionHeader(
+                      title: '진행 중',
+                      subtitle: 'AI가 작업 중이거나 보완·오류 상태입니다.',
+                    ),
+                    const SizedBox(height: 8),
+                    for (final p in inProgress) ...[
+                      _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                  if (completed.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    const _SectionHeader(
+                      title: '완료',
+                      subtitle: '제작이 끝난 작업입니다.',
+                    ),
+                    const SizedBox(height: 8),
+                    for (final p in completed) ...[
+                      _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                  if (testWork.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    OperationalCollapsibleSection(
+                      title: '개발/테스트 작업 보기',
+                      subtitle: 'E2E·Agent 검증용 — 데이터는 보존됩니다',
+                      sectionKey: const Key('workshop_test_projects'),
+                      child: Column(
+                        children: [
+                          for (final p in testWork) ...[
+                            _ProjectCard(
+                              project: p,
+                              onOpen: () => _openDetail(p),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (incomplete.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    OperationalCollapsibleSection(
+                      title: '진단/불완전 데이터',
+                      subtitle: '삭제하지 않은 이전 TEST 항목',
+                      sectionKey: const Key('workshop_incomplete_projects'),
+                      child: Column(
+                        children: [
+                          for (final p in incomplete) ...[
+                            _ProjectCard(
+                              project: p,
+                              onOpen: () => _openDetail(p),
+                              incomplete: true,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ],
-            ],
-          ],
+            );
+          },
         );
       },
     );
@@ -499,9 +535,16 @@ class _Sotong24RemoteDetailScreenState
           if (snap.hasError) {
             return _ErrorBody(message: '${snap.error}');
           }
-          final project = snap.data;
+          final project = snap.data ?? widget.initialProject;
           if (project == null) {
-            return const Center(child: CircularProgressIndicator());
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return const _ErrorBody(
+              message:
+                  '제작 프로젝트를 찾을 수 없습니다. 검토 상태만 있는 경우에도 '
+                  '목록에서 다시 열어 주세요.',
+            );
           }
           Sotong24RemoteStage? stage = project.currentStageDoc;
           final focusStageId = widget.focusStageId?.trim() ?? '';

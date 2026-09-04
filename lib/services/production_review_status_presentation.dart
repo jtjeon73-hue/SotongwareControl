@@ -15,6 +15,7 @@ class ProductionReviewStatusPresentation {
     }
     lines.add(_techLine(e));
     lines.add(_ownerLine(e));
+    lines.addAll(statusFacts(e));
     return lines.where((l) => l.trim().isNotEmpty).toList();
   }
 
@@ -23,9 +24,57 @@ class ProductionReviewStatusPresentation {
       e.userLabelKo.isNotEmpty ? e.userLabelKo : _defaultUserLabel(e),
       _techLine(e),
       _ownerLine(e),
+      ...statusFacts(e),
       if (e.readiness.revisionRequired) '보완 차수(R2) 준비가 필요합니다.',
       if (e.nextActionKo.isNotEmpty) e.nextActionKo,
     ].where((l) => l.trim().isNotEmpty).toList();
+  }
+
+  /// Compact fact chips for remote ops / workshop cards.
+  static List<String> statusFacts(ProductionReviewStatusEnvelope e) {
+    final facts = <String>[];
+    final artifact = _artifactLabelKo(e.artifactType);
+    if (artifact.isNotEmpty) facts.add(artifact);
+    if (e.revision.isNotEmpty) facts.add(e.revision);
+    if (e.verifiedThroughStep > 0) {
+      facts.add('STEP${e.verifiedThroughStep}');
+    }
+    if (e.readiness.technicalValidationCompleted ||
+        e.technicalValidation.completed) {
+      facts.add('기술검증 완료');
+    }
+    if (e.ownerReview.decision == 'changes_requested') {
+      facts.add('사용자 보완요청');
+    }
+    if (e.readiness.revisionRequired) {
+      facts.add('R2 준비 대기');
+    }
+    if (e.ownerReview.step16Blocked || !e.readiness.registrationEligible) {
+      facts.add('STEP16 미시작');
+    }
+    facts.add(e.readiness.registrationEligible ? '등록 가능' : '등록 불가');
+    facts.add(e.readiness.externalPublicationAllowed ? '외부 공개 가능' : '외부 공개 불가');
+    final synced = e.updatedAt.isNotEmpty ? e.updatedAt : e.emittedAt;
+    if (synced.isNotEmpty) {
+      facts.add('마지막 동기화: $synced');
+    }
+    return facts;
+  }
+
+  static String _artifactLabelKo(String artifactType) {
+    switch (artifactType.trim().toLowerCase()) {
+      case 'app':
+        return '앱';
+      case 'ebook':
+        return '전자책';
+      case 'site':
+      case 'website':
+        return '사이트';
+      case 'content':
+        return '콘텐츠';
+      default:
+        return artifactType.trim();
+    }
   }
 
   static List<String> recommendedActions(ProductionReviewStatusEnvelope e) {
@@ -40,10 +89,7 @@ class ProductionReviewStatusPresentation {
           '16단계 등록은 보완 완료 후 진행하세요.',
         ];
       case 'pending':
-        return const [
-          '기술검증 결과를 확인하세요.',
-          '소유자 검토를 진행하세요.',
-        ];
+        return const ['기술검증 결과를 확인하세요.', '소유자 검토를 진행하세요.'];
       case 'approved':
         if (e.readiness.registrationEligible) {
           return const ['등록(16단계)을 진행할 수 있습니다.'];

@@ -16,6 +16,8 @@ import '../services/remote_e2e_sample_service.dart';
 import '../services/remote_cursor_autostart_test_service.dart';
 import '../services/remote_codex_unattended_test_service.dart';
 import '../services/sotong24_remote_repository.dart';
+import '../services/production_review_status_repository.dart';
+import '../services/production_review_workshop_merge.dart';
 import '../widgets/remote_e2e_sample_panel.dart';
 import '../widgets/remote_cursor_autostart_panel.dart';
 import '../widgets/remote_codex_unattended_panel.dart';
@@ -40,6 +42,7 @@ class RemoteControlScreen extends StatefulWidget {
     this.cursorAutostartService,
     this.codexUnattendedService,
     this.workshopRepository,
+    this.productionReviewRepository,
     this.onNavigate,
   });
 
@@ -51,6 +54,7 @@ class RemoteControlScreen extends StatefulWidget {
   final RemoteCursorAutostartTestService? cursorAutostartService;
   final RemoteCodexUnattendedTestService? codexUnattendedService;
   final Sotong24RemoteRepository? workshopRepository;
+  final ProductionReviewStatusRepository? productionReviewRepository;
   final ValueChanged<ControlDestination>? onNavigate;
 
   @override
@@ -69,7 +73,10 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
       widget.codexUnattendedService ?? RemoteCodexUnattendedTestService();
   late final Sotong24RemoteRepository _workshop =
       widget.workshopRepository ?? Sotong24RemoteRepository();
+  late final ProductionReviewStatusRepository _productionReview =
+      widget.productionReviewRepository ?? ProductionReviewStatusRepository();
   var _ownsWorkshop = false;
+  var _ownsProductionReview = false;
 
   String _jobFilter = 'all';
   bool _e2eBusy = false;
@@ -86,6 +93,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   void initState() {
     super.initState();
     _ownsWorkshop = widget.workshopRepository == null;
+    _ownsProductionReview = widget.productionReviewRepository == null;
     widget.instructionSource;
     _refreshE2eSession();
     _refreshCursorSession();
@@ -95,6 +103,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
   @override
   void dispose() {
     if (_ownsWorkshop) _workshop.dispose();
+    if (_ownsProductionReview) _productionReview.dispose();
     super.dispose();
   }
 
@@ -156,9 +165,7 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
     return preferred ?? changesRequested ?? any;
   }
 
-  void _openProductionReviewR2Draft(
-    ProductionReviewStatusEnvelope envelope,
-  ) {
+  void _openProductionReviewR2Draft(ProductionReviewStatusEnvelope envelope) {
     ProductionReviewStatusCard.showR2DraftSheet(context, envelope);
   }
 
@@ -198,250 +205,299 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
             return StreamBuilder<List<Sotong24RemoteProject>>(
               stream: _workshop.watchProjects(),
               builder: (context, workshopSnap) {
-                final workshops =
+                final rawWorkshops =
                     workshopSnap.data ?? const <Sotong24RemoteProject>[];
-                final matched = _matchWorkshop(
-                  workshops,
-                  _e2eSession.instructionId,
-                );
-                final codexMatched = _matchWorkshop(
-                  workshops,
-                  _codexSession.instructionId,
-                );
-                final e2eView = _e2e.buildView(
-                  session: _e2eSession,
-                  agents: agents,
-                  jobs: jobs,
-                  workshopStatus: matched?.status,
-                  workshopProgressPercent: matched?.overallProgressPercent,
-                  workshopCurrentStage: matched?.currentStage,
-                  workshopTotalStages: matched?.totalStages,
-                );
-                final cursorView = _cursor.buildView(
-                  session: _cursorSession,
-                  agents: agents,
-                  jobs: jobs,
-                );
-                final codexView = _codex.buildView(
-                  session: _codexSession,
-                  agents: agents,
-                  jobs: jobs,
-                  workshopStatus: codexMatched?.status,
-                  workshopProgressPercent: codexMatched?.overallProgressPercent,
-                  workshopCurrentStage: codexMatched?.currentStage,
-                  workshopTotalStages: codexMatched?.totalStages,
-                );
-                final healthReport = OpsHealthCheck.evaluate(
-                  agents: agents,
-                  jobs: jobs,
-                  workshops: workshops,
-                );
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    final narrow = constraints.maxWidth < 900;
-                    return ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        narrow ? 16 : 24,
-                        16,
-                        narrow ? 16 : 24,
-                        32,
-                      ),
-                      children: [
-                        Text(
-                          '노트북 원격관제',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '노트북·Agent·AI 작업자의 운영 상태를 확인합니다. '
-                          '작업지시 최초 전송은 작업지시 제작소에서 진행하세요.',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: ControlColors.textSecondary),
-                        ),
-                        const SizedBox(height: 16),
-                        RemoteOpsDashboard(
-                          agents: agents,
-                          workshops: workshops,
-                          jobs: jobs,
-                          refreshing: _dashboardRefreshing,
-                          onRefresh: _refreshDashboard,
-                          onOpenWorkshop: widget.onNavigate == null
-                              ? null
-                              : () => widget.onNavigate!(
-                                  ControlDestination.productWorkshop,
-                                ),
-                          onOpenDiagnostics: _openDiagnostics,
-                          productionReview: _deriveProductionReview(workshops),
-                          onPrepareR2Draft: () {
-                            final envelope =
-                                _deriveProductionReview(workshops);
-                            if (envelope == null) return;
-                            _openProductionReviewR2Draft(envelope);
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        if (agents.isEmpty)
-                          _EmptyAgentsCard(onPair: () => _openPairing(context))
-                        else
-                          OperationalCollapsibleSection(
-                            title: 'Agent 상태 자세히',
-                            subtitle: '연결·heartbeat·현재 작업',
-                            sectionKey: const Key('remote_agent_details'),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton.icon(
-                                    onPressed: () => _openPairing(context),
-                                    icon: const Icon(Icons.add_link, size: 18),
-                                    label: const Text('새 연결'),
-                                  ),
-                                ),
-                                for (final a in agents)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: _AgentCard(
-                                      agent: a,
-                                      onDetail: () =>
-                                          _openAgentDetail(context, a),
-                                      onOpenPlanning: widget.onNavigate == null
-                                          ? null
-                                          : () => widget.onNavigate!(
-                                              ControlDestination
-                                                  .aiBusinessAnalysis,
-                                            ),
-                                    ),
-                                  ),
-                              ],
+                return StreamBuilder<ProductionReviewStatusQueryResult>(
+                  stream: _productionReview.watchRecent(),
+                  builder: (context, reviewSnap) {
+                    final reviewResult =
+                        reviewSnap.data ??
+                        const ProductionReviewStatusQueryResult(loading: true);
+                    final envelopes = reviewResult.envelopes;
+                    final workshops = ProductionReviewWorkshopMerge.merge(
+                      projects: rawWorkshops,
+                      envelopes: envelopes,
+                    );
+                    final primaryReview =
+                        ProductionReviewWorkshopMerge.pickPrimary(
+                          envelopes: envelopes,
+                          preferredInstructionId: _preferredReviewInstructionId,
+                        ) ??
+                        _deriveProductionReview(workshops);
+                    final awaiting =
+                        ProductionReviewWorkshopMerge.awaitingOwnerReview(
+                          envelopes,
+                        );
+                    final matched = _matchWorkshop(
+                      workshops,
+                      _e2eSession.instructionId,
+                    );
+                    final codexMatched = _matchWorkshop(
+                      workshops,
+                      _codexSession.instructionId,
+                    );
+                    final e2eView = _e2e.buildView(
+                      session: _e2eSession,
+                      agents: agents,
+                      jobs: jobs,
+                      workshopStatus: matched?.status,
+                      workshopProgressPercent: matched?.overallProgressPercent,
+                      workshopCurrentStage: matched?.currentStage,
+                      workshopTotalStages: matched?.totalStages,
+                    );
+                    final cursorView = _cursor.buildView(
+                      session: _cursorSession,
+                      agents: agents,
+                      jobs: jobs,
+                    );
+                    final codexView = _codex.buildView(
+                      session: _codexSession,
+                      agents: agents,
+                      jobs: jobs,
+                      workshopStatus: codexMatched?.status,
+                      workshopProgressPercent:
+                          codexMatched?.overallProgressPercent,
+                      workshopCurrentStage: codexMatched?.currentStage,
+                      workshopTotalStages: codexMatched?.totalStages,
+                    );
+                    final healthReport = OpsHealthCheck.evaluate(
+                      agents: agents,
+                      jobs: jobs,
+                      workshops: workshops,
+                    );
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        final narrow = constraints.maxWidth < 900;
+                        return ListView(
+                          padding: EdgeInsets.fromLTRB(
+                            narrow ? 16 : 24,
+                            16,
+                            narrow ? 16 : 24,
+                            32,
+                          ),
+                          children: [
+                            Text(
+                              '노트북 원격관제',
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
-                          ),
-                        const SizedBox(height: 12),
-                        OperationalCollapsibleSection(
-                          title: '작업 내역 자세히',
-                          subtitle: '원격 Job 목록·필터',
-                          sectionKey: const Key('remote_job_history'),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _JobFilterChips(
-                                value: _jobFilter,
-                                onChanged: (v) =>
-                                    setState(() => _jobFilter = v),
-                              ),
-                              const SizedBox(height: 8),
-                              ..._filteredJobs(jobs).map(
-                                (j) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _JobCard(
-                                    job: j,
-                                    onOpen: () => _openJobDetail(context, j),
+                            const SizedBox(height: 6),
+                            Text(
+                              '노트북·Agent·AI 작업자의 운영 상태를 확인합니다. '
+                              '작업지시 최초 전송은 작업지시 제작소에서 진행하세요.',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: ControlColors.textSecondary,
                                   ),
+                            ),
+                            const SizedBox(height: 16),
+                            RemoteOpsDashboard(
+                              agents: agents,
+                              workshops: workshops,
+                              jobs: jobs,
+                              refreshing: _dashboardRefreshing,
+                              onRefresh: _refreshDashboard,
+                              onOpenWorkshop: widget.onNavigate == null
+                                  ? null
+                                  : () => widget.onNavigate!(
+                                      ControlDestination.productWorkshop,
+                                    ),
+                              onOpenDiagnostics: _openDiagnostics,
+                              productionReview: primaryReview,
+                              reviewAwaiting: awaiting,
+                              onPrepareR2Draft: () {
+                                final envelope = primaryReview;
+                                if (envelope == null) return;
+                                _openProductionReviewR2Draft(envelope);
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            if (agents.isEmpty)
+                              _EmptyAgentsCard(
+                                onPair: () => _openPairing(context),
+                              )
+                            else
+                              OperationalCollapsibleSection(
+                                title: 'Agent 상태 자세히',
+                                subtitle: '연결·heartbeat·현재 작업',
+                                sectionKey: const Key('remote_agent_details'),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton.icon(
+                                        onPressed: () => _openPairing(context),
+                                        icon: const Icon(
+                                          Icons.add_link,
+                                          size: 18,
+                                        ),
+                                        label: const Text('새 연결'),
+                                      ),
+                                    ),
+                                    for (final a in agents)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 12,
+                                        ),
+                                        child: _AgentCard(
+                                          agent: a,
+                                          onDetail: () =>
+                                              _openAgentDetail(context, a),
+                                          onOpenPlanning:
+                                              widget.onNavigate == null
+                                              ? null
+                                              : () => widget.onNavigate!(
+                                                  ControlDestination
+                                                      .aiBusinessAnalysis,
+                                                ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
-                              if (_filteredJobs(jobs).isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
+                            const SizedBox(height: 12),
+                            OperationalCollapsibleSection(
+                              title: '작업 내역 자세히',
+                              subtitle: '원격 Job 목록·필터',
+                              sectionKey: const Key('remote_job_history'),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _JobFilterChips(
+                                    value: _jobFilter,
+                                    onChanged: (v) =>
+                                        setState(() => _jobFilter = v),
                                   ),
-                                  child: Text(
-                                    '표시할 작업이 없습니다.',
+                                  const SizedBox(height: 8),
+                                  ..._filteredJobs(jobs).map(
+                                    (j) => Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 10,
+                                      ),
+                                      child: _JobCard(
+                                        job: j,
+                                        onOpen: () =>
+                                            _openJobDetail(context, j),
+                                      ),
+                                    ),
+                                  ),
+                                  if (_filteredJobs(jobs).isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      child: Text(
+                                        '표시할 작업이 없습니다.',
+                                        style: TextStyle(
+                                          color: ControlColors.textMuted,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            OperationalCollapsibleSection(
+                              title: '개발/진단 도구',
+                              subtitle: '버튼으로 점검 · 운영 작업은 만들지 않습니다',
+                              initiallyExpanded: _diagnosticsOpen,
+                              sectionKey: _diagnosticsKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  OpsHealthPanel(
+                                    report: healthReport,
+                                    onRunAll: () {
+                                      setState(() {});
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            healthReport.overallLabelKo,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    '개발자 TEST 전송',
                                     style: TextStyle(
-                                      color: ControlColors.textMuted,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        OperationalCollapsibleSection(
-                          title: '개발/진단 도구',
-                          subtitle: '버튼으로 점검 · 운영 작업은 만들지 않습니다',
-                          initiallyExpanded: _diagnosticsOpen,
-                          sectionKey: _diagnosticsKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              OpsHealthPanel(
-                                report: healthReport,
-                                onRunAll: () {
-                                  setState(() {});
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        healthReport.overallLabelKo,
-                                      ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '샘플 작업 생성 — 운영에 사용하지 마세요',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: ControlColors.textSecondary,
                                     ),
-                                  );
-                                },
+                                  ),
+                                  const SizedBox(height: 12),
+                                  RemoteE2eSamplePanel(
+                                    view: e2eView,
+                                    busy: _e2eBusy,
+                                    onCreateSample: _e2eCreateSample,
+                                    onViewContent: () =>
+                                        showRemoteE2eJsonDialog(
+                                          context,
+                                          _e2eSession.jsonText,
+                                        ),
+                                    onSendToAgent: () => _e2eSend(e2eView),
+                                    onViewStatus: () => _e2eViewStatus(e2eView),
+                                    onReset: _e2eReset,
+                                    onOpenProductWorkshop:
+                                        widget.onNavigate == null
+                                        ? null
+                                        : () => widget.onNavigate!(
+                                            ControlDestination.productWorkshop,
+                                          ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  RemoteCursorAutostartPanel(
+                                    view: cursorView,
+                                    busy: _cursorBusy,
+                                    onCreate: _cursorCreate,
+                                    onViewContent: () =>
+                                        showRemoteE2eJsonDialog(
+                                          context,
+                                          _cursorSession.jsonText,
+                                        ),
+                                    onSendToAgent: () =>
+                                        _cursorSend(cursorView),
+                                    onReset: _cursorReset,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  RemoteCodexUnattendedPanel(
+                                    view: codexView,
+                                    busy: _codexBusy,
+                                    onCreate: _codexCreate,
+                                    onViewContent: () =>
+                                        showRemoteE2eJsonDialog(
+                                          context,
+                                          _codexSession.jsonText,
+                                        ),
+                                    onSendToAgent: () => _codexSend(codexView),
+                                    onViewStatus: () =>
+                                        _codexViewStatus(codexView),
+                                    onReset: _codexReset,
+                                    onOpenProductWorkshop:
+                                        widget.onNavigate == null
+                                        ? null
+                                        : () => widget.onNavigate!(
+                                            ControlDestination.productWorkshop,
+                                          ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                '개발자 TEST 전송',
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                '샘플 작업 생성 — 운영에 사용하지 마세요',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: ControlColors.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              RemoteE2eSamplePanel(
-                                view: e2eView,
-                                busy: _e2eBusy,
-                                onCreateSample: _e2eCreateSample,
-                                onViewContent: () => showRemoteE2eJsonDialog(
-                                  context,
-                                  _e2eSession.jsonText,
-                                ),
-                                onSendToAgent: () => _e2eSend(e2eView),
-                                onViewStatus: () => _e2eViewStatus(e2eView),
-                                onReset: _e2eReset,
-                                onOpenProductWorkshop: widget.onNavigate == null
-                                    ? null
-                                    : () => widget.onNavigate!(
-                                        ControlDestination.productWorkshop,
-                                      ),
-                              ),
-                              const SizedBox(height: 16),
-                              RemoteCursorAutostartPanel(
-                                view: cursorView,
-                                busy: _cursorBusy,
-                                onCreate: _cursorCreate,
-                                onViewContent: () => showRemoteE2eJsonDialog(
-                                  context,
-                                  _cursorSession.jsonText,
-                                ),
-                                onSendToAgent: () => _cursorSend(cursorView),
-                                onReset: _cursorReset,
-                              ),
-                              const SizedBox(height: 16),
-                              RemoteCodexUnattendedPanel(
-                                view: codexView,
-                                busy: _codexBusy,
-                                onCreate: _codexCreate,
-                                onViewContent: () => showRemoteE2eJsonDialog(
-                                  context,
-                                  _codexSession.jsonText,
-                                ),
-                                onSendToAgent: () => _codexSend(codexView),
-                                onViewStatus: () => _codexViewStatus(codexView),
-                                onReset: _codexReset,
-                                onOpenProductWorkshop: widget.onNavigate == null
-                                    ? null
-                                    : () => widget.onNavigate!(
-                                        ControlDestination.productWorkshop,
-                                      ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                            ),
+                          ],
+                        );
+                      },
                     );
                   },
                 );

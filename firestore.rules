@@ -209,6 +209,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // --- Production review status (Agent→Functions write; client read-only) ---
+    match /production_review_status/{instructionId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // --- 레거시/기타 컬렉션 (기존 동작 유지) ---
     match /{collection}/{document=**} {
       allow read, write: if isAdmin()
@@ -218,7 +224,8 @@ service cloud.firestore {
         && collection != 'jobs'
         && collection != 'users'
         && collection != 'workInstructions'
-        && collection != 'businessPlans';
+        && collection != 'businessPlans'
+        && collection != 'production_review_status';
     }
   }
 }
