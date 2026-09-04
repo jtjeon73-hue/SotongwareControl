@@ -30,7 +30,7 @@ class ProductionReviewStatusQueryResult {
 /// Client never writes. Functions/Admin SDK remain the write path.
 class ProductionReviewStatusRepository {
   ProductionReviewStatusRepository({
-    FirebaseFirestore? this._db,
+    this._db,
     List<ProductionReviewStatusEnvelope>? memorySeed,
     bool? forceMemory,
   }) : _forceMemory = forceMemory ?? false,
