@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "eventId": "prse_wi_test_cursor_app_step15_1788441053773_R1_app_device_review_prep",
+  "instructionId": "wi_test_cursor_app_step15_1788441053773",
+  "projectId": "farm_safety_check",
+  "displayTitle": "농작업 안전 점검",
+  "artifactType": "app",
+  "revision": "R1",
+  "stageId": "app_device_review_prep",
+  "stageOrder": 15,
+  "verifiedThroughStep": 15,
+  "lastVerifiedStage": "app_device_review_prep",
+  "productionStatus": "technical_validation_completed_owner_changes_requested",
+  "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+  "technicalValidation": {
+    "completed": true,
+    "status": "completed",
+    "artifactKind": "apk",
+    "artifactSha256": "6c151c739ca1fd9eb9ff7ac631396db677083004af48d67344c9785fa120c481"
+  },
+  "ownerReview": {
+    "present": true,
+    "decision": "changes_requested",
+    "step16Blocked": true,
+    "nextAllowedAction": "revise_to_R2_under_commercial_quality_profile",
+    "findingCount": 11,
+    "blockerCount": 0,
+    "highCount": 5
+  },
+  "execution": {
+    "paused": true,
+    "recoveryState": "test_completed_preserved",
+    "currentJobId": "",
+    "permitState": null,
+    "terminalBlockCount": 3
+  },
+  "readiness": {
+    "technicalValidationCompleted": true,
+    "ownerReviewRequired": false,
+    "revisionRequired": true,
+    "revisionReady": true,
+    "registrationEligible": false,
+    "externalPublicationAllowed": false
+  },
+  "updatedAt": "2026-09-04T00:00:00+09:00",
+  "createdAt": "2026-09-04T00:00:00+09:00"
+}

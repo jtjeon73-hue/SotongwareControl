@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/commercial/production_review_status_envelope.dart';
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import '../services/codex_usage_presentation.dart';
@@ -7,6 +8,7 @@ import '../services/cursor_usage_presentation.dart';
 import '../services/ops_health_check.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../theme/control_theme.dart';
+import 'production_review_status_card.dart';
 
 /// 노트북 원격관제 — 운영자용 한눈에 보기 대시보드.
 class RemoteOpsDashboard extends StatelessWidget {
@@ -19,6 +21,8 @@ class RemoteOpsDashboard extends StatelessWidget {
     this.refreshing = false,
     this.onOpenWorkshop,
     this.onOpenDiagnostics,
+    this.productionReview,
+    this.onPrepareR2Draft,
   });
 
   final List<RemoteAgentDoc> agents;
@@ -28,6 +32,8 @@ class RemoteOpsDashboard extends StatelessWidget {
   final bool refreshing;
   final VoidCallback? onOpenWorkshop;
   final VoidCallback? onOpenDiagnostics;
+  final ProductionReviewStatusEnvelope? productionReview;
+  final VoidCallback? onPrepareR2Draft;
 
   List<Sotong24RemoteProject> get _operationalWorkshops =>
       Sotong24WorkshopPresentation.operationalProjects(workshops);
@@ -149,6 +155,14 @@ class RemoteOpsDashboard extends StatelessWidget {
           const Divider(height: 24),
           const _SectionLabel('현재 진행 작업'),
           const SizedBox(height: 8),
+          if (productionReview != null) ...[
+            ProductionReviewStatusCard(
+              envelope: productionReview!,
+              compact: true,
+              onPrepareR2Draft: onPrepareR2Draft,
+            ),
+            const SizedBox(height: 10),
+          ],
           _currentWorkBlock(currentWork, primaryAgent),
           const SizedBox(height: 12),
           _LabeledBlock(

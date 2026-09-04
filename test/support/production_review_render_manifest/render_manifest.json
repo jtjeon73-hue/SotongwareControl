@@ -1,0 +1,259 @@
+{
+  "generatedAt": "2026-09-04T04:19:49.765750Z",
+  "cases": [
+    {
+      "screenId": "production_review_full_desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "textScale": 1.0,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "8a5463c"
+    },
+    {
+      "screenId": "production_review_compact_desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "textScale": 1.0,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "2bb1879a"
+    },
+    {
+      "screenId": "production_review_full_desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "textScale": 1.3,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "3021c8e1"
+    },
+    {
+      "screenId": "production_review_compact_desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "textScale": 1.3,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "26a051ba"
+    },
+    {
+      "screenId": "production_review_full_desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "textScale": 1.5,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "2892773b"
+    },
+    {
+      "screenId": "production_review_compact_desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "textScale": 1.5,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "323e572"
+    },
+    {
+      "screenId": "production_review_full_tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "textScale": 1.0,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "21b0b208"
+    },
+    {
+      "screenId": "production_review_compact_tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "textScale": 1.0,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "1c956df1"
+    },
+    {
+      "screenId": "production_review_full_tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "textScale": 1.3,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "153b8e0c"
+    },
+    {
+      "screenId": "production_review_compact_tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "textScale": 1.3,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "3987ad59"
+    },
+    {
+      "screenId": "production_review_full_tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "textScale": 1.5,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "156ad59c"
+    },
+    {
+      "screenId": "production_review_compact_tablet",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "textScale": 1.5,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "32da5372"
+    },
+    {
+      "screenId": "production_review_full_mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "textScale": 1.0,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "3cd692ab"
+    },
+    {
+      "screenId": "production_review_compact_mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "textScale": 1.0,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "16362b8d"
+    },
+    {
+      "screenId": "production_review_full_mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "textScale": 1.3,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "195b02fe"
+    },
+    {
+      "screenId": "production_review_compact_mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "textScale": 1.3,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "4a5f63c"
+    },
+    {
+      "screenId": "production_review_full_mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "textScale": 1.5,
+      "compact": false,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "2c0f4725"
+    },
+    {
+      "screenId": "production_review_compact_mobile",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "textScale": 1.5,
+      "compact": true,
+      "instructionId": "wi_test_cursor_app_step15_1788441053773",
+      "userLabelKo": "기술검증 완료 · 사용자 보완요청 · R2 준비 대기",
+      "overflow": 0,
+      "exception": null,
+      "fixtureHash": "7ddf42a"
+    }
+  ],
+  "totalCases": 18,
+  "r2PrepareTaps": 1
+}

@@ -150,14 +150,20 @@ function deepLink(data) {
       stageId: String(data.stageId || "app_android_release"),
       focus: "apk",
     });
+    const rev = String(data.revision || "").trim();
+    if (rev) query.set("revision", rev.startsWith("R") ? rev : `R${rev}`);
     return `/?${query.toString()}`;
   }
-  const { instructionId, stageId } = data;
+  const { instructionId, stageId, revision } = data;
   const query = new URLSearchParams({
     screen: "ai-production",
     projectId: String(instructionId || ""),
     stageId: String(stageId || ""),
   });
+  const rev = String(revision || "").trim();
+  if (rev) {
+    query.set("revision", rev.startsWith("R") ? rev : `R${rev}`);
+  }
   return `/?${query.toString()}`;
 }
 
@@ -210,6 +216,22 @@ function notificationContent(eventType, stageNumber, stageName, revision, data =
       return { title: "승인이 필요합니다", body: `${label}이 완료되었습니다. 결과를 확인하고 승인 또는 보완을 선택해주세요.` };
     case "revision_completed":
       return { title: "보완 작업 완료", body: `${label} 보완 작업 r${Math.max(2, revision || 2)}가 완료되었습니다. 재검토해 주세요.` };
+    case "technical_validation_completed":
+      return { title: "기술검증 완료", body: `${label} 기술검증이 완료되었습니다. 소유자 검토를 진행해 주세요.` };
+    case "owner_review_required":
+      return { title: "소유자 검토 필요", body: `${label} 결과를 확인하고 승인 또는 보완을 선택해 주세요.` };
+    case "owner_review_changes_requested":
+      return { title: "보완 요청", body: `${label} 소유자 보완 요청이 등록되었습니다. R2 초안을 준비해 주세요.` };
+    case "r2_revision_ready":
+      return { title: "R2 보완 준비 완료", body: `${label} R2 보완 초안이 준비되었습니다. 검토 후 진행해 주세요.` };
+    case "revision_started":
+      return { title: "보완 작업 시작", body: `${label} 보완 작업 r${Math.max(2, revision || 2)}이 시작되었습니다.` };
+    case "registration_ready":
+      return { title: "등록 준비 완료", body: `${label} 등록(16단계)을 진행할 수 있습니다.` };
+    case "production_failed":
+      return { title: "제작 실패", body: `${label} 제작 과정에서 오류가 발생했습니다. 확인이 필요합니다.` };
+    case "recovery_action_required":
+      return { title: "복구 조치 필요", body: `${label} 자동 복구에 실패했습니다. 사용자 조치가 필요합니다.` };
     case "activity_stalled":
       return { title: "작업 진행 확인 필요", body: `${label} 작업이 일정 시간 동안 진행되지 않고 있습니다. 확인이 필요합니다.` };
     case "agent_offline":

@@ -1,6 +1,8 @@
 import '../models/artifact_type.dart';
+import '../models/commercial/production_review_status_envelope.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
+import 'production_review_status_presentation.dart';
 
 class Sotong24FinalPdfArtifact {
   const Sotong24FinalPdfArtifact({
@@ -428,6 +430,14 @@ class Sotong24WorkshopPresentation {
 
   static String nowTodoHeadline(Sotong24RemoteProject project) =>
       project.nowTodoHeadline();
+
+  /// Optional banner line when a production review envelope is attached (no Firestore).
+  static String? productionReviewBanner(ProductionReviewStatusEnvelope? e) {
+    if (e == null) return null;
+    final lines = ProductionReviewStatusPresentation.workshopCardLines(e);
+    if (lines.isEmpty) return null;
+    return lines.first;
+  }
 
   static bool _isVagueTestTitle(String title) {
     final t = title.trim().toLowerCase();
