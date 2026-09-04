@@ -123,7 +123,7 @@ void main() {
       final result = ProductionReviewStatusValidator.validate(
         incoming: envelope,
       );
-      expect(result.ok, isTrue, reason: '${result.code}');
+      expect(result.ok, isTrue, reason: result.code);
       expect(envelope.instructionId, ProductionReviewFixtures.appR1InstructionId);
       expect(envelope.ownerReview.decision, 'changes_requested');
       expect(envelope.ownerReview.step16Blocked, isTrue);
