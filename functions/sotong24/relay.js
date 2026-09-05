@@ -27,6 +27,12 @@ const {
   finalizeUpload,
   scrubErrorText,
 } = require("./artifact");
+const {
+  parseReviewArtifactUploadInit,
+  parseReviewArtifactUploadComplete,
+  writeReviewArtifactMetadata,
+  verifyStoredSha256,
+} = require("./review_artifact");
 const { maybeEnqueueApkReadyForDeviceReview } = require("./apk_ready");
 const { isRunCancellationTombstoned } = require("../remote/cancellation");
 
@@ -136,6 +142,59 @@ async function handleRelayRequest(req, res, deps) {
       });
       res.status(200).json({
         ...grant,
+        serverReceivedAt: serverNowIso,
+        elapsedMs: Date.now() - started,
+      });
+      return;
+    }
+
+    if (operation === "review_artifact_upload_init") {
+      const artifactDeps = requireArtifactDeps(deps);
+      const parsed = parseReviewArtifactUploadInit(body);
+      const grant = await createUploadGrant(parsed, artifactDeps);
+      safeLog({
+        op: operation,
+        projectId: parsed.instructionId,
+        result: "ok",
+        storagePath: parsed.storagePath,
+        revision: parsed.revision,
+        fileName: parsed.fileName,
+      });
+      res.status(200).json({
+        ...grant,
+        reviewOnly: true,
+        revision: parsed.revision,
+        revisionLabel: parsed.revisionLabel,
+        sha256: parsed.sha256,
+        serverReceivedAt: serverNowIso,
+        elapsedMs: Date.now() - started,
+      });
+      return;
+    }
+
+    if (operation === "review_artifact_upload_complete") {
+      const artifactDeps = requireArtifactDeps(deps);
+      const parsed = parseReviewArtifactUploadComplete(body);
+      const done = await finalizeUpload(parsed, artifactDeps);
+      await verifyStoredSha256(parsed.storagePath, parsed.sha256, artifactDeps);
+      const meta = await writeReviewArtifactMetadata(db, parsed, {
+        nowIso: serverNowIso,
+      });
+      safeLog({
+        op: operation,
+        projectId: parsed.instructionId,
+        result: "ok",
+        storagePath: parsed.storagePath,
+        revision: parsed.revision,
+        fileName: parsed.fileName,
+      });
+      res.status(200).json({
+        ...done,
+        reviewOnly: true,
+        revision: parsed.revision,
+        revisionLabel: parsed.revisionLabel,
+        sha256: parsed.sha256,
+        metadataDocId: meta.docId,
         serverReceivedAt: serverNowIso,
         elapsedMs: Date.now() - started,
       });

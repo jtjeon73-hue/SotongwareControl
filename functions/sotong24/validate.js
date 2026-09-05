@@ -359,6 +359,8 @@ function assertOperations(op) {
     "artifact_upload_init",
     "artifact_upload_complete",
     "artifact_apk_ready_replay_test",
+    "review_artifact_upload_init",
+    "review_artifact_upload_complete",
   ]);
   if (!allowed.has(op)) reject("invalid_argument", "operation invalid");
   return op;

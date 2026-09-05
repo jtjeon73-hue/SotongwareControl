@@ -128,6 +128,22 @@ class ProductionReviewStatusPresentation {
     ];
   }
 
+  /// Show review-only APK download when owner device review is waiting.
+  /// Independent of registrationEligible / externalPublicationAllowed.
+  static bool showReviewApkDownload(ProductionReviewStatusEnvelope e) {
+    final sha = e.technicalValidation.artifactSha256.trim();
+    if (sha.length != 64) return false;
+    if (e.revisionRank < 1) return false;
+    final techDone =
+        e.technicalValidation.completed ||
+        e.readiness.technicalValidationCompleted;
+    if (!techDone) return false;
+    final decision = e.ownerReview.decision.trim();
+    return decision == 'pending' ||
+        decision == 'changes_requested' ||
+        e.readiness.ownerReviewRequired;
+  }
+
   static String _defaultUserLabel(ProductionReviewStatusEnvelope e) {
     if (e.ownerReview.decision == 'changes_requested') {
       return '기술검증 완료 · 보완요청 · ${e.revision.isNotEmpty ? e.revision : 'R1'}';

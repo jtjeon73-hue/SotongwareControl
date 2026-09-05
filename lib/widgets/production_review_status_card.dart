@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/commercial/production_review_status_envelope.dart';
 import '../services/production_review_status_presentation.dart';
 import '../theme/control_theme.dart';
+import 'review_apk_download_button.dart';
 
 /// Compact production review status card for dashboard / workshop.
 class ProductionReviewStatusCard extends StatelessWidget {
@@ -154,6 +155,7 @@ class ProductionReviewStatusCard extends StatelessWidget {
               label: const Text('R2 보완 초안 준비'),
             ),
           ],
+          if (!compact) ReviewApkDownloadButton(envelope: envelope),
         ],
       ),
     );

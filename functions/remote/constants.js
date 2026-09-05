@@ -81,6 +81,7 @@ const COL = Object.freeze({
   PROJECTS: "sotong24work_projects",
   MONITORING_CONFIG: "monitoring_config",
   NOTIFICATION_EVENTS: "notificationEvents",
+  REVIEW_ARTIFACTS: "sotong24_review_artifacts",
 });
 
 const ACTIVITY_STATE = Object.freeze({

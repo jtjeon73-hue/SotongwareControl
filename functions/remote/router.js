@@ -8,6 +8,7 @@ const {
 const { sendError, sendOk, httpError } = require("./http");
 const { safeLog } = require("./log");
 const { handleArtifactDownload } = require("./artifact_download");
+const { handleReviewArtifactDownload } = require("./review_artifact_download");
 const { handleArtifactView } = require("./artifact_view");
 const { handleAuthPublicConfig } = require("./auth_public_config");
 const {
@@ -186,6 +187,10 @@ async function handleApiRequest(req, res, deps) {
       "/api/control/artifact-download": async () => {
         const { uid } = await authenticateControl(req, deps);
         return handleArtifactDownload(db, uid, body, deps);
+      },
+      "/api/control/review-artifact-download": async () => {
+        const { uid } = await authenticateControl(req, deps);
+        return handleReviewArtifactDownload(db, uid, body, deps);
       },
       "/api/control/approve-stage": async () => {
         await authenticateControl(req, deps);

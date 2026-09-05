@@ -265,6 +265,44 @@ class RemoteControlApi {
     );
   }
 
+  /// Review-only APK grant (production_review_status bound; not Golden prod path).
+  Future<RemoteArtifactDownloadGrant> createReviewArtifactDownloadGrant({
+    required String instructionId,
+    required int revision,
+    required String artifactSha256,
+    required String downloadFileName,
+    String? artifactFileName,
+  }) async {
+    final map = await _post('/api/control/review-artifact-download', {
+      'instructionId': instructionId,
+      'revision': revision,
+      'artifactSha256': artifactSha256,
+      'fileName': artifactFileName ?? 'app-release_r$revision.apk',
+      'downloadFileName': downloadFileName,
+    });
+    final url = '${map['downloadUrl'] ?? ''}'.trim();
+    final returnedName = '${map['fileName'] ?? ''}'.trim();
+    final contentType = '${map['contentType'] ?? ''}'.trim();
+    final sizeBytes = (map['sizeBytes'] is num)
+        ? (map['sizeBytes'] as num).toInt()
+        : int.tryParse('${map['sizeBytes'] ?? ''}') ?? 0;
+    if (url.isEmpty ||
+        returnedName.isEmpty ||
+        contentType.isEmpty ||
+        sizeBytes <= 0) {
+      throw RemoteControlApiException(
+        '검토용 APK 다운로드 응답이 올바르지 않습니다.',
+        code: 'invalid_review_download_grant',
+      );
+    }
+    return RemoteArtifactDownloadGrant(
+      downloadUrl: url,
+      fileName: returnedName,
+      contentType: contentType,
+      sizeBytes: sizeBytes,
+    );
+  }
+
   Future<Uint8List> fetchArtifactPdf({
     required String projectId,
     required String stageId,

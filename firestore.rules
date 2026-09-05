@@ -215,6 +215,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // --- Review-only APK/PDF metadata (Functions write; admin client read) ---
+    match /sotong24_review_artifacts/{docId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false;
+    }
+
     // --- 레거시/기타 컬렉션 (기존 동작 유지) ---
     match /{collection}/{document=**} {
       allow read, write: if isAdmin()
@@ -225,7 +232,8 @@ service cloud.firestore {
         && collection != 'users'
         && collection != 'workInstructions'
         && collection != 'businessPlans'
-        && collection != 'production_review_status';
+        && collection != 'production_review_status'
+        && collection != 'sotong24_review_artifacts';
     }
   }
 }

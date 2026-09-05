@@ -176,6 +176,37 @@ void main() {
       expect(older.isStaleVs(newer), isTrue);
       expect(newer.isStaleVs(older), isFalse);
     });
+
+    test('showReviewApkDownload for pending owner review with SHA', () {
+      final pending = appR1.copyWith(
+        revision: 'R2',
+        technicalValidation: appR1.technicalValidation.copyWith(
+          completed: true,
+          artifactSha256:
+              '3c5d16c7d74bbce525ffe053a1037264f346173299c3f0c769618d0e3ca3ac5c',
+        ),
+        ownerReview: appR1.ownerReview.copyWith(decision: 'pending'),
+        readiness: appR1.readiness.copyWith(
+          technicalValidationCompleted: true,
+          ownerReviewRequired: true,
+          registrationEligible: false,
+          externalPublicationAllowed: false,
+        ),
+      );
+      expect(
+        ProductionReviewStatusPresentation.showReviewApkDownload(pending),
+        isTrue,
+      );
+      final noSha = appR1.copyWith(
+        technicalValidation: appR1.technicalValidation.copyWith(
+          artifactSha256: '',
+        ),
+      );
+      expect(
+        ProductionReviewStatusPresentation.showReviewApkDownload(noSha),
+        isFalse,
+      );
+    });
   });
 
   group('tracks dry-run store', () {
