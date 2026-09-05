@@ -155,7 +155,9 @@ class ProductionReviewStatusCard extends StatelessWidget {
               label: const Text('R2 보완 초안 준비'),
             ),
           ],
-          if (!compact) ReviewApkDownloadButton(envelope: envelope),
+          // Always show when eligible — workshop/dashboard use compact:true on
+          // the live mobile path, so gating on !compact hid the download panel.
+          ReviewApkDownloadButton(envelope: envelope),
         ],
       ),
     );

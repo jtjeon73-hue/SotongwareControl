@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/widgets/production_review_status_card.dart';
+import 'package:sotong_ware_control/widgets/review_apk_download_button.dart';
 
 import 'support/production_review_fixtures.dart';
 
@@ -67,6 +68,8 @@ void main() {
     expect(exception, isNull, reason: c.screenId);
     expect(find.textContaining('OVERFLOWED'), findsNothing);
     expect(find.byKey(const Key('production_review_status_card')), findsOneWidget);
+    // Live mobile/dashboard always use compact:true; review download must stay mounted.
+    expect(find.byType(ReviewApkDownloadButton), findsOneWidget);
 
     final hashInput =
         '${c.screenId}|${c.viewport.width.toInt()}x${c.viewport.height.toInt()}|${c.textScale}|${c.compact}|${envelope.instructionId}';

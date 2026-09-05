@@ -14,6 +14,7 @@ import 'package:sotong_ware_control/services/production_review_workshop_merge.da
 import 'package:sotong_ware_control/services/remote_agent_repository.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/widgets/remote_ops_dashboard.dart';
+import 'package:sotong_ware_control/widgets/review_apk_download_button.dart';
 
 import 'support/production_review_fixtures.dart';
 
@@ -189,6 +190,8 @@ void main() {
             find.byKey(const Key('production_review_status_card')),
             findsWidgets,
           );
+          // Dashboard uses compact:true; review download widget must still mount.
+          expect(find.byType(ReviewApkDownloadButton), findsWidgets);
           expect(tester.takeException(), isNull);
           expect(find.textContaining('OVERFLOWED'), findsNothing);
         }
