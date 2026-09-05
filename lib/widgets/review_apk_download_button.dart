@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../models/commercial/production_review_status_envelope.dart';
@@ -28,6 +29,12 @@ class _ReviewApkDownloadButtonState extends State<ReviewApkDownloadButton> {
 
   ProductionReviewStatusEnvelope get e => widget.envelope;
 
+  FirebaseFirestore? get _db {
+    if (widget.firestore != null) return widget.firestore;
+    if (Firebase.apps.isEmpty) return null;
+    return FirebaseFirestore.instance;
+  }
+
   Future<void> _download(int sizeBytes) async {
     if (_busy) return;
     final rev = e.revisionRank;
@@ -56,9 +63,10 @@ class _ReviewApkDownloadButtonState extends State<ReviewApkDownloadButton> {
     if (!ProductionReviewStatusPresentation.showReviewApkDownload(e)) {
       return const SizedBox.shrink();
     }
+    final db = _db;
+    if (db == null) return const SizedBox.shrink();
     final rev = e.revisionRank;
     final docId = '${e.instructionId}__r$rev';
-    final db = widget.firestore ?? FirebaseFirestore.instance;
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: db.collection('sotong24_review_artifacts').doc(docId).snapshots(),
       builder: (context, snap) {
@@ -68,7 +76,9 @@ class _ReviewApkDownloadButtonState extends State<ReviewApkDownloadButton> {
         final data = snap.data!.data() ?? const <String, dynamic>{};
         if (data['reviewOnly'] != true) return const SizedBox.shrink();
         final metaSha = '${data['sha256'] ?? ''}'.trim().toLowerCase();
-        final expected = e.technicalValidation.artifactSha256.trim().toLowerCase();
+        final expected = e.technicalValidation.artifactSha256
+            .trim()
+            .toLowerCase();
         if (metaSha.isEmpty || metaSha != expected) {
           return const SizedBox.shrink();
         }
@@ -94,7 +104,10 @@ class _ReviewApkDownloadButtonState extends State<ReviewApkDownloadButton> {
             children: [
               Text(
                 e.displayTitle.isNotEmpty ? e.displayTitle : e.instructionId,
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -145,7 +158,9 @@ class _ReviewApkDownloadButtonState extends State<ReviewApkDownloadButton> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(
                                 Icons.android_outlined,
@@ -176,10 +191,7 @@ class _ReviewApkDownloadButtonState extends State<ReviewApkDownloadButton> {
               const SizedBox(height: 6),
               const Text(
                 '검토용 · Play Store 미등록 · 외부 공개 아님',
-                style: TextStyle(
-                  color: ControlColors.textMuted,
-                  fontSize: 11,
-                ),
+                style: TextStyle(color: ControlColors.textMuted, fontSize: 11),
               ),
             ],
           ),
