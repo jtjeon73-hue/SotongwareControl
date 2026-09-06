@@ -4,6 +4,7 @@ library;
 import '../models/artifact_type.dart';
 import '../models/concept_candidate.dart';
 import '../models/planning_wizard_state.dart';
+import '../services/site_subtype_contract.dart';
 
 /// Wizard STEP 0~6
 class ProjectDesignStep {
@@ -42,6 +43,7 @@ class ProjectDesignState {
     this.step = ProjectDesignStep.artifact,
     this.artifactType,
     this.contentSubtype,
+    this.siteSubtype,
     List<String>? selectedAudiences,
     this.customAudience = '',
     List<String>? selectedTopicIds,
@@ -110,6 +112,9 @@ class ProjectDesignState {
   String wizardSessionId;
   String? artifactType;
   String? contentSubtype;
+
+  /// Site track subtype (corporate_site | marketing_site | …). Single-select.
+  String? siteSubtype;
   List<String> selectedAudiences;
   String customAudience;
 
@@ -173,10 +178,14 @@ class ProjectDesignState {
 
   bool get canProceedFromArtifact {
     if (!hasArtifact) return false;
-    if (ArtifactType.normalize(artifactType!) == ArtifactType.contents) {
+    final artifact = ArtifactType.normalize(artifactType!);
+    if (artifact == ArtifactType.contents) {
       return contentSubtype != null &&
           contentSubtype!.isNotEmpty &&
           ContentSubtype.normalize(contentSubtype!) != ContentSubtype.undecided;
+    }
+    if (artifact == ArtifactType.site || artifact == ArtifactType.promoSite) {
+      return SiteSubtypeContract.isKnown(siteSubtype);
     }
     return true;
   }
@@ -237,6 +246,7 @@ class ProjectDesignState {
     wizardSessionId: wizardSessionId,
     artifactType: artifactType,
     contentSubtype: contentSubtype,
+    siteSubtype: siteSubtype,
     selectedAudiences: List<String>.from(selectedAudiences),
     customAudience: customAudience,
     selectedTopicIds: List<String>.from(selectedTopicIds),
@@ -359,6 +369,8 @@ class ProjectDesignState {
         'useEnvironment': useEnvironment,
         'mainPainPoint': mainPainPoint,
         'digitalSkillLevel': digitalSkillLevel,
+        if ((siteSubtype ?? '').trim().isNotEmpty)
+          'siteSubtype': siteSubtype!.trim(),
       },
     );
   }
@@ -410,6 +422,13 @@ class ProjectDesignState {
       wizardSessionId: w.customTexts['wizardSessionId'],
       artifactType: w.artifactType,
       contentSubtype: w.contentSubtype,
+      siteSubtype: () {
+        final fromText = (w.customTexts['siteSubtype'] ?? '').trim();
+        if (fromText.isNotEmpty) return fromText;
+        final fromProd = production['site_kind'] ?? production['siteKind'];
+        if (fromProd != null && fromProd.isNotEmpty) return fromProd.first;
+        return null;
+      }(),
       selectedAudiences: audiences,
       customAudience: custom,
       selectedTopicIds: topics,
@@ -482,6 +501,7 @@ class ProjectDesignState {
     'wizardSessionId': wizardSessionId,
     'artifactType': artifactType,
     'contentSubtype': contentSubtype,
+    'siteSubtype': siteSubtype,
     'selectedAudiences': selectedAudiences,
     'customAudience': customAudience,
     'selectedTopicIds': selectedTopicIds,
@@ -575,6 +595,14 @@ class ProjectDesignState {
       contentSubtype: json['contentSubtype'] == null
           ? null
           : '${json['contentSubtype']}',
+      siteSubtype: () {
+        if (json['siteSubtype'] != null && '${json['siteSubtype']}'.trim().isNotEmpty) {
+          return '${json['siteSubtype']}'.trim();
+        }
+        final fromProd = prod['site_kind'] ?? prod['siteKind'];
+        if (fromProd != null && fromProd.isNotEmpty) return fromProd.first;
+        return null;
+      }(),
       selectedAudiences:
           (json['selectedAudiences'] as List?)?.map((e) => '$e').toList() ??
           const [],

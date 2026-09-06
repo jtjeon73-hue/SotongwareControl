@@ -388,7 +388,15 @@ class InstructionContractBuilder {
         }
         _ensureKey(spec, undecided, 'publishingChannel');
       case ArtifactType.site:
-        spec.putIfAbsent('sitePurpose', () => 'knowledge');
+        final fromDesign = design?.siteSubtype ?? '';
+        final purpose = fromDesign.trim().isNotEmpty
+            ? fromDesign.trim()
+            : (spec['sitePurpose']?.toString() ?? '');
+        if (purpose.isNotEmpty) {
+          spec['sitePurpose'] = purpose;
+        } else {
+          undecided.add('sitePurpose');
+        }
         _ensureKey(spec, undecided, 'hosting');
         _ensureKey(spec, undecided, 'seo');
       case ArtifactType.promoSite:

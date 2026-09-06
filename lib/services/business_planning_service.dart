@@ -192,14 +192,33 @@ class BusinessPlanningService {
         : ContentSubtype.normalize(input.contentSubtype);
     final selected = input.normalizedDeliverables;
     final recommended = analysis.recommendations.map((r) => r.type).toList();
-    final types = {
+    final sitePurpose = () {
+      final fromProfile =
+          commercialQuality?.siteProfile.sitePurpose.trim() ?? '';
+      if (fromProfile.isNotEmpty) return fromProfile;
+      final fromAttachment =
+          commercialQuality?.siteProfile.siteSubtype.trim() ?? '';
+      return fromAttachment;
+    }();
+    final types = <String>[
       artifact,
+      if ((artifact == ArtifactType.site || artifact == ArtifactType.promoSite) &&
+          sitePurpose.isNotEmpty &&
+          sitePurpose != artifact)
+        sitePurpose,
       if (selected.isNotEmpty)
         ...selected.where((t) => ArtifactType.normalize(t) != artifact),
       ...recommended
           .map(ArtifactType.normalize)
           .where((t) => t != artifact && t != ArtifactType.undecided),
-    }.take(3).toList();
+    ];
+    // Deduplicate while preserving order; cap at 3.
+    final seen = <String>{};
+    final deduped = <String>[];
+    for (final t in types) {
+      if (seen.add(t)) deduped.add(t);
+      if (deduped.length >= 3) break;
+    }
     final primaryTrack = ArtifactType.primaryTrackId(artifact);
     final followUps =
         followUpTracks ?? _defaultFollowUpTracks(artifact, subtype: subtype);
@@ -237,8 +256,8 @@ class BusinessPlanningService {
       businessPurpose: input.desiredOutcome.trim(),
       customerProblem: input.customerProblem.trim(),
       targetCustomer: input.targetCustomer.trim(),
-      deliverableTypes: types,
-      recommendedSequence: types,
+      deliverableTypes: deduped,
+      recommendedSequence: deduped,
       valueProposition: valueProp,
       requiredMaterials: _materialsFor(artifact, input, subtype: subtype),
       workflowSteps: steps,

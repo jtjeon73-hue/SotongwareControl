@@ -184,7 +184,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     final first = selected.first;
     var next = state.copy();
     var changed = false;
-    if (next.uniqueValue.trim().isEmpty && first.uniqueValue.trim().isNotEmpty) {
+    if (next.uniqueValue.trim().isEmpty &&
+        first.uniqueValue.trim().isNotEmpty) {
       next.uniqueValue = first.uniqueValue.trim();
       _uniqueValueCtrl.text = next.uniqueValue;
       changed = true;
@@ -420,10 +421,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         const SizedBox(height: 6),
         Text(
           '현재: ${_creationModeSummary()}',
-          style: const TextStyle(
-            fontSize: 12,
-            color: ControlColors.textMuted,
-          ),
+          style: const TextStyle(fontSize: 12, color: ControlColors.textMuted),
         ),
         if (_state.creationMode == 'revise_existing') ...[
           const SizedBox(height: 12),
@@ -462,8 +460,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
               labelText: '요청 변경 사항 (줄 또는 쉼표로 구분)',
               border: OutlineInputBorder(),
             ),
-            onChanged: (v) =>
-                _state.requestedChanges = _parseMultilineList(v),
+            onChanged: (v) => _state.requestedChanges = _parseMultilineList(v),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -525,7 +522,21 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                               ..contentSubtype =
                                   card.id == ArtifactType.contents
                                   ? _state.contentSubtype
+                                  : null
+                              ..siteSubtype =
+                                  (card.id == ArtifactType.site ||
+                                      card.id == ArtifactType.promoSite)
+                                  ? _state.siteSubtype
                                   : null;
+                            if (card.id != ArtifactType.site &&
+                                card.id != ArtifactType.promoSite) {
+                              final prod = Map<String, List<String>>.from(
+                                next.productionSelections,
+                              );
+                              prod.remove('site_kind');
+                              prod.remove('siteKind');
+                              next.productionSelections = prod;
+                            }
                             _emit(next);
                           },
                         ),
@@ -545,16 +556,22 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                     children: [
                       for (final kind in ProjectDesignCatalog.siteKinds)
                         FilterChip(
+                          key: ValueKey('site-kind-${kind.id}'),
                           label: Text(kind.label),
-                          selected: kind.id == ArtifactType.promoSite
-                              ? _state.artifactType == ArtifactType.promoSite
-                              : _state.artifactType == ArtifactType.site &&
-                                    kind.id == ArtifactType.site,
+                          selected: _state.siteSubtype == kind.id,
                           onSelected: (_) {
-                            final artifact = kind.id == ArtifactType.promoSite
-                                ? ArtifactType.promoSite
-                                : ArtifactType.site;
-                            _emit(_state.copy()..artifactType = artifact);
+                            final prod = Map<String, List<String>>.from(
+                              _state.productionSelections,
+                            );
+                            prod['site_kind'] = [kind.id];
+                            prod.remove('siteKind');
+                            _emit(
+                              _state.copy()
+                                ..artifactType = ArtifactType.site
+                                ..siteSubtype = kind.id
+                                ..contentSubtype = null
+                                ..productionSelections = prod,
+                            );
                           },
                         ),
                     ],
@@ -577,7 +594,11 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                   label: Text(opt.label),
                   selected: _state.contentSubtype == opt.id,
                   onSelected: (_) {
-                    _emit(_state.copy()..contentSubtype = opt.id);
+                    _emit(
+                      _state.copy()
+                        ..contentSubtype = opt.id
+                        ..siteSubtype = null,
+                    );
                   },
                 ),
             ],
@@ -856,10 +877,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           ],
         ),
         const SizedBox(height: 16),
-        const Text(
-          '차별 가치',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
+        const Text('차별 가치', style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         TextField(
           controller: _uniqueValueCtrl,
@@ -874,10 +892,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           },
         ),
         const SizedBox(height: 10),
-        const Text(
-          '구매·이용 이유',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
+        const Text('구매·이용 이유', style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         TextField(
           controller: _reasonsToPayCtrl,
@@ -888,9 +903,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             border: OutlineInputBorder(),
           ),
           onChanged: (v) {
-            _emit(
-              _state.copy()..reasonsToPay = _parseMultilineList(v),
-            );
+            _emit(_state.copy()..reasonsToPay = _parseMultilineList(v));
           },
         ),
         const SizedBox(height: 16),
@@ -984,10 +997,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             const Text(
               '자동 승인이 켜져 있어도 다음 단계에서는 반드시 멈춥니다: '
               '사용자 품질 검토, owner review, 외부 공개, 앱스토어·사업부 등록',
-              style: TextStyle(
-                fontSize: 11.5,
-                color: ControlColors.accentWarm,
-              ),
+              style: TextStyle(fontSize: 11.5, color: ControlColors.accentWarm),
             ),
           ],
           const SizedBox(height: 12),
@@ -1124,11 +1134,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             _state.reasonsToPay.join('\n'),
             DesignFieldStatus.userEdited,
           ),
-        _confirmRow(
-          '외부 공개',
-          '금지',
-          DesignFieldStatus.userConfirmed,
-        ),
+        _confirmRow('외부 공개', '금지', DesignFieldStatus.userConfirmed),
         _confirmRow(
           '품질 검토',
           '사용자 품질 검토 · owner review 필수',
@@ -1247,14 +1253,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         _kv('핵심 문제', synced.customerProblem),
         _kv('기대 결과', synced.desiredOutcome),
         _kv('확정', synced.planningConfirmed ? '사용자 확정' : '미확정 (생성 불가)'),
-        _kv(
-          '파이프라인',
-          _pipelinePhaseLabel(synced.studioPipelinePhase),
-        ),
-        _kv(
-          '로컬 검증',
-          synced.commercialLocalValidated ? '완료' : '미완료',
-        ),
+        _kv('파이프라인', _pipelinePhaseLabel(synced.studioPipelinePhase)),
+        _kv('로컬 검증', synced.commercialLocalValidated ? '완료' : '미완료'),
         if (synced.designMemo.trim().isNotEmpty)
           _kv('추가 메모', synced.designMemo),
         const SizedBox(height: 12),
@@ -1298,7 +1298,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                 ),
                 OutlinedButton.icon(
                   key: const Key('planning_local_validate'),
-                  onPressed: canValidate && widget.onRequestLocalValidate != null
+                  onPressed:
+                      canValidate && widget.onRequestLocalValidate != null
                       ? () {
                           _emit(synced);
                           widget.onRequestLocalValidate?.call();
@@ -1425,10 +1426,7 @@ class _CreationModeCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 2),
               Text(
                 subtitle,

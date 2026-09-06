@@ -12,6 +12,7 @@ import '../models/project_design_state.dart';
 import '../data/concept_catalog.dart';
 import '../data/concept_commercial_catalog.dart';
 import 'content_subtype_contract.dart';
+import 'site_subtype_contract.dart';
 
 class CommercialStudioBuilder {
   const CommercialStudioBuilder();
@@ -104,6 +105,8 @@ class CommercialStudioBuilder {
       'uniqueValue': uniqueValue,
       'reasonsToPay': reasons,
       if (state.contentSubtype != null) 'contentSubtype': state.contentSubtype,
+      if ((state.siteSubtype ?? '').trim().isNotEmpty)
+        'siteSubtype': state.siteSubtype,
     };
 
     final brief = WorkInstructionBrief(
@@ -227,6 +230,7 @@ class CommercialStudioBuilder {
         );
       case 'site':
         final purpose = _sitePurpose(state);
+        if (purpose.isEmpty) return null;
         return CommercialQualityAttachment(
           brief: brief,
           siteQualityContractVersion: 1,
@@ -443,13 +447,19 @@ class CommercialStudioBuilder {
     }
   }
 
+  /// Resolves selected site subtype. Empty when unset — never invents a default.
   String _sitePurpose(ProjectDesignState state) {
+    final direct = SiteSubtypeContract.normalizeOrEmpty(state.siteSubtype);
+    if (direct.isNotEmpty) return direct;
     final fromProd =
         state.productionSelections['site_kind'] ??
         state.productionSelections['siteKind'] ??
-        const [];
-    if (fromProd.isNotEmpty) return fromProd.first;
-    return 'marketing_site';
+        const <String>[];
+    for (final raw in fromProd) {
+      final n = SiteSubtypeContract.normalizeOrEmpty(raw);
+      if (n.isNotEmpty) return n;
+    }
+    return '';
   }
 
   String _slugFrom(String title, String projectId) {

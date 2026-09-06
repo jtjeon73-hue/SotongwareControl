@@ -1,5 +1,6 @@
 import '../models/artifact_type.dart';
 import '../models/project_design_state.dart';
+import 'site_subtype_contract.dart';
 
 /// 사용자 입력을 구조화·보완하는 규칙 기반 제안(원격 LLM 없이 로컬 생성).
 class WorkInstructionRequirementEnhancer {
@@ -23,6 +24,10 @@ class WorkInstructionRequirementEnhancer {
           if (artifact == ArtifactType.contents &&
               (state.contentSubtype ?? '').isNotEmpty)
             '콘텐츠 하위유형: ${ContentSubtype.labelKo(state.contentSubtype!)}',
+          if ((artifact == ArtifactType.site ||
+                  artifact == ArtifactType.promoSite) &&
+              (state.siteSubtype ?? '').isNotEmpty)
+            '사이트 유형: ${SiteSubtypeContract.labelKo(state.siteSubtype!)}',
           '목표: ${outcome.isEmpty ? "상용 배포·판매 가능한 품질의 결과물" : outcome}',
         ],
       ),
