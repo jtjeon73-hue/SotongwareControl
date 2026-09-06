@@ -237,6 +237,11 @@ void main() {
         final state = baseState(artifact: artifact, subtype: subtype)
           ..topic = '상용 테스트 제목'
           ..displayTitle = '상용 테스트 제목';
+        if (artifact == ArtifactType.site ||
+            artifact == ArtifactType.promoSite) {
+          state.siteSubtype = 'marketing_site';
+          state.productionSelections['site_kind'] = const ['marketing_site'];
+        }
         final attachment = builder.tryBuild(
           state: state,
           input: inputFrom(state),

@@ -193,6 +193,13 @@ void main() {
             contentSubtype: artifact == ArtifactType.contents
                 ? ContentSubtype.music
                 : null,
+            siteSubtype:
+                (artifact == ArtifactType.site ||
+                    artifact == ArtifactType.promoSite)
+                ? (artifact == ArtifactType.promoSite
+                      ? 'marketing_site'
+                      : 'knowledge_site')
+                : null,
             selectedAudiences: seed.audienceWeights.keys.take(2).toList(),
             selectedConceptIds: ['${seed.id}__$artifact'],
             topic: displayTitle,
@@ -294,8 +301,7 @@ void main() {
     }) {
       final seed = ConceptCatalog.seeds.firstWhere((s) => s.id == seedId);
       final meta = ConceptCommercialCatalog.resolve(seed);
-      final title =
-          seed.variants[artifact]?.$1 ?? meta.shortDescription;
+      final title = seed.variants[artifact]?.$1 ?? meta.shortDescription;
       return ProjectDesignState(
         artifactType: artifact,
         contentSubtype: subtype,
@@ -350,10 +356,11 @@ void main() {
         final state = confirmed(artifact: artifact, subtype: subtype);
         if (artifact == ArtifactType.site ||
             artifact == ArtifactType.promoSite) {
+          state.siteSubtype = artifact == ArtifactType.promoSite
+              ? 'marketing_site'
+              : 'knowledge_site';
           state.productionSelections['site_kind'] = [
-            artifact == ArtifactType.promoSite
-                ? 'marketing_site'
-                : 'knowledge_site',
+            state.siteSubtype!,
           ];
         }
         final attachment = builder.tryBuild(
