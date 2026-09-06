@@ -70,6 +70,86 @@ class BusinessPlanningService {
     ),
   ];
 
+  /// Sotong24Work SiteStageContract와 동일한 사이트 Production 18단계.
+  /// 전자책 공통 ID(materials_prep 등)나 UI용 22단계 가이드 ID를 넣으면 Agent가
+  /// SiteStageContract 기준으로 라우팅하지 못한다.
+  static const siteWorkflowStages = <(String, String, String)>[
+    ('idea_clarify', '사이트 아이디어 정리', '문제·핵심 가치·대상·한 줄 사이트 정의를 만든다.'),
+    ('problem_validate', '고객·검색 문제 검증', '고객 문제·검색 의도·대체수단을 검증한다.'),
+    (
+      'site_materials_prep',
+      '홍보·서비스 대상 자료 정리',
+      '대상·지역·업종·신뢰 자료와 저작권·개인정보를 정리한다.',
+    ),
+    (
+      'site_audience_search',
+      '목표 고객·지역·검색 의도 분석',
+      '목표 고객·지역·검색어·전환 의도를 분석한다.',
+    ),
+    (
+      'site_information_architecture',
+      '정보 구조·사용자 흐름',
+      'IA·메뉴·핵심 사용자 흐름을 설계한다.',
+    ),
+    (
+      'site_brand_conversion',
+      '브랜드·메시지·전환 목표',
+      '브랜드·메시지·CTA·전환 목표를 고정한다.',
+    ),
+    (
+      'site_responsive_ux',
+      '반응형 UI/UX 설계',
+      '모바일·태블릿·데스크톱 반응형 UX를 설계한다.',
+    ),
+    (
+      'site_content_media_plan',
+      '콘텐츠·미디어 배치 계획',
+      '핵심 페이지 콘텐츠·미디어 배치를 계획한다.',
+    ),
+    ('site_project_scaffold', '사이트 프로젝트 생성', '사이트 프로젝트 골격·라우팅을 생성한다.'),
+    ('site_core_pages', '핵심 페이지 구현', '홈·소개·서비스·문의 등 핵심 페이지를 구현한다.'),
+    (
+      'site_conversion_features',
+      '업종별 전환 기능',
+      '문의·예약·CTA 등 전환 기능을 구현한다.',
+    ),
+    (
+      'site_seo_metadata',
+      'SEO·구조화 데이터·메타',
+      'title/meta/OG·구조화 데이터를 점검한다.',
+    ),
+    (
+      'site_a11y_perf_security',
+      '접근성·성능·보안·법적 표시',
+      '접근성·성능·HTTPS·쿠키/법적 고지를 점검한다.',
+    ),
+    (
+      'site_build_preview_test',
+      '빌드·preview·테스트',
+      '빌드·프리뷰·링크·뷰포트 테스트를 수행한다.',
+    ),
+    (
+      'site_user_review',
+      '사용자 검토 패키지',
+      '검토용 URL/패키지를 준비하고 사용자 검토를 받는다.',
+    ),
+    (
+      'site_revision_quality',
+      '보완·품질 검증',
+      '보완 요청을 반영하고 품질 회귀를 검증한다.',
+    ),
+    (
+      'site_launch_package',
+      '출시 준비 패키지',
+      '배포 체크리스트·승인 근거·출시 자료를 준비한다.',
+    ),
+    (
+      'site_deploy_release',
+      '배포 실행(사용자 승인 후)',
+      '사용자 배포 승인 후에만 배포를 실행한다. 외부 공개는 별도 승인 gate.',
+    ),
+  ];
+
   PlanningAnalysisResult analyze(BusinessPlanInput input) {
     final criteria = _scoreCriteria(input);
     final average =
@@ -558,6 +638,18 @@ class BusinessPlanningService {
             title: appWorkflowStages[i].$2,
             applicable: true,
             completionCriteria: appWorkflowStages[i].$3,
+          ),
+      ];
+    }
+    if (primary == ArtifactType.site || primary == ArtifactType.promoSite) {
+      return [
+        for (var i = 0; i < siteWorkflowStages.length; i++)
+          WorkflowStep(
+            order: i + 1,
+            id: siteWorkflowStages[i].$1,
+            title: siteWorkflowStages[i].$2,
+            applicable: true,
+            completionCriteria: siteWorkflowStages[i].$3,
           ),
       ];
     }

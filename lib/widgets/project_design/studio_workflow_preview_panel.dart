@@ -54,10 +54,14 @@ class StudioWorkflowPreviewPanel extends StatelessWidget {
             ),
             if (limitedBackend) ...[
               const SizedBox(height: 8),
-              const Text(
-                '참고: 사이트/콘텐츠는 UI 18단계 미리보기를 제공하며, '
-                '백엔드 canonical validator는 ebook/app 대비 제한될 수 있습니다.',
-                style: TextStyle(
+              Text(
+                normalized == ArtifactType.contents
+                    ? '참고: 콘텐츠는 ContentStageContract 18단계이며, '
+                          '백엔드 검증 범위는 subtype별로 제한될 수 있습니다.'
+                    : '정본: Sotong24Work SiteStageContract 18단계. '
+                          '배포 실행(STEP 18)은 사용자 승인 후이며, '
+                          '콘텐츠 업데이트·방문자 분석·수익화는 출시 후 운영(WI 18단계 밖)입니다.',
+                style: const TextStyle(
                   fontSize: 11.5,
                   color: ControlColors.accentWarm,
                 ),

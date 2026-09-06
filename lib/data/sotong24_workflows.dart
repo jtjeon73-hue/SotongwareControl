@@ -421,69 +421,55 @@ class Sotong24WorkflowCatalog {
 
   static final site = Sotong24WorkflowDef(
     productType: ArtifactType.site,
-    title: '지식사이트 제작',
-    summary: '정보구조·콘텐츠·SEO·배포·운영',
-    stages: _numbered(
-      [
-        ('site_topic', '주제 선정', '다룰 지식 영역을 정한다.'),
-        ('site_audience', '대상 사용자', '독자·이용 목적을 정의한다.'),
-        ('site_demand', '시장/검색수요 조사', '검색·수요를 조사한다.'),
-        ('site_compete', '경쟁사이트 조사', '경쟁·벤치마크를 본다.'),
-        ('site_ia', '정보구조', '콘텐츠 계층을 설계한다.'),
-        ('site_menu', '메뉴 설계', '네비게이션을 확정한다.'),
-        ('site_content_plan', '콘텐츠 기획', '초기 콘텐츠 목록을 잡는다.'),
-        ('site_ux', 'UI/UX', '페이지 레이아웃을 설계한다.'),
-        ('site_dev', '개발', '사이트를 구현한다.'),
-        ('site_write', '콘텐츠 제작', '글을 작성·검수한다.'),
-        ('site_search', '검색', '사이트 내 검색을 점검한다.'),
-        ('site_seo', 'SEO', '메타·구조화 데이터를 점검한다.'),
-        ('site_analytics', 'Analytics', '측정 태그를 연결한다.'),
-        ('site_mobile', '모바일 테스트', '휴대폰 화면을 검증한다.'),
-        ('site_perf', '성능검사', '로딩·성능을 점검한다.'),
-        ('site_bug', '오류검사', '링크·표시 오류를 고친다.'),
-        ('site_host', 'Firebase/Hosting', '호스팅 설정을 준비한다.'),
-        ('site_approve', '배포 승인', '사용자가 배포를 승인한다.'),
-        ('site_launch', '공개', '공개 URL을 확정한다.'),
-        ('site_update', '콘텐츠 업데이트', '주기 업데이트를 한다.'),
-        ('site_traffic', '방문자 분석', '유입·체류를 본다.'),
-        ('site_monetize', '수익화', '문의·광고·상품 연계를 검토한다.'),
-      ],
-      approvalIds: {'site_approve', 'site_launch'},
-    ),
+    title: '사이트 제작',
+    summary:
+        'Sotong24Work SiteStageContract 18단계 (배포 실행은 사용자 승인 후). '
+        '콘텐츠 업데이트·방문자 분석·수익화는 출시 후 운영으로 Production WI 18단계 밖이다.',
+    stages: [
+      for (var i = 0; i < BusinessPlanningService.siteWorkflowStages.length; i++)
+        _siteStage(
+          BusinessPlanningService.siteWorkflowStages[i].$1,
+          BusinessPlanningService.siteWorkflowStages[i].$2,
+          BusinessPlanningService.siteWorkflowStages[i].$3,
+          i + 1,
+        ),
+    ],
   );
 
   static final promoSite = Sotong24WorkflowDef(
     productType: ArtifactType.promoSite,
     title: '마케팅사이트 제작',
-    summary: '판매·전환 중심 랜딩/상세 페이지',
-    stages: _numbered(
-      [
-        ('promo_product', '홍보 상품 선정', '무엇을 팔지/알릴지 정한다.'),
-        ('promo_customer', '고객 정의', '구매 고객을 정의한다.'),
-        ('promo_pain', '고객 문제 분석', '구매 동기를 분석한다.'),
-        ('promo_compete', '경쟁상품 조사', '대안·경쟁을 본다.'),
-        ('promo_usp', '핵심 판매포인트', 'USP를 문장으로 고정한다.'),
-        ('promo_brand', '브랜드/메시지', '톤·메시지를 정한다.'),
-        ('promo_copy', '카피라이팅', '헤드라인·본문 카피를 쓴다.'),
-        ('promo_structure', '상세페이지 구조', '섹션 순서를 설계한다.'),
-        ('promo_cta', 'CTA', '행동 유도 버튼을 설계한다.'),
-        ('promo_trust', '신뢰요소', '후기·실적·보증을 배치한다.'),
-        ('promo_media', '이미지/영상', '시각 자료를 준비한다.'),
-        ('promo_dev', '랜딩페이지 개발', '페이지를 구현한다.'),
-        ('promo_mobile', '모바일 최적화', '휴대폰 전환을 최적화한다.'),
-        ('promo_seo', 'SEO', '검색·공유 메타를 점검한다.'),
-        ('promo_analytics', 'Analytics', '유입 측정을 연결한다.'),
-        ('promo_convert', '전환 추적', '문의/구매 추적을 점검한다.'),
-        ('promo_test', '테스트', '폼·링크·속도를 시험한다.'),
-        ('promo_deploy', '배포', '배포는 수동 승인 후.'),
-        ('promo_traffic', '유입', '유입 채널을 가동한다.'),
-        ('promo_cvr', '전환율 분석', '전환을 분석한다.'),
-        ('promo_ab', 'A/B 개선', '카피·CTA를 개선한다.'),
-        ('promo_ongoing', '지속 홍보', '반복 캠페인을 운영한다.'),
-      ],
-      approvalIds: {'promo_deploy'},
-    ),
+    summary:
+        'SiteStageContract 18단계와 동일 트랙(marketing_site). '
+        '배포·외부 공개는 사용자 승인 gate 이후에만 진행한다.',
+    stages: site.stages,
   );
+
+  static Sotong24WorkflowStageDef _siteStage(
+    String id,
+    String name,
+    String purpose,
+    int order,
+  ) {
+    final approval =
+        id == 'site_user_review' ||
+        id == 'site_revision_quality' ||
+        id == 'site_launch_package' ||
+        id == 'site_deploy_release';
+    return Sotong24WorkflowStageDef(
+      id: id,
+      order: order,
+      name: name,
+      purpose: purpose,
+      workDescription: purpose,
+      aiWork: '단계 산출물·검증 증거를 작성한다.',
+      outputs: name,
+      qualityChecks: const ['계약 산출물', '증거', '과장 금지'],
+      userChecks: approval ? const ['사용자 확인/승인'] : const ['단계 확인'],
+      nextHint: order >= 18 ? 'Production Complete / 출시 후 운영' : '다음 단계',
+      approvalTypicallyRequired: approval,
+    );
+  }
 
   static Sotong24WorkflowDef contentsFor(String subtype) {
     final label = ContentSubtype.labelKo(subtype);

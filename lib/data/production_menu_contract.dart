@@ -69,14 +69,17 @@ class ProductionMenuContract {
       titleKo: '사이트',
       status: ProductionMenuStatus.pilot,
       statusLabelKo: '시험 운영',
-      supportedScopeKo: 'SiteStageContract STEP 1~18 (검증: STEP 3까지)',
+      supportedScopeKo: 'SiteStageContract STEP 1~18 (검증: marketing_site STEP 7까지)',
       subtypesKo:
           'corporate_site, marketing_site, knowledge_site, education_site, information_portal',
-      lastValidatedStepKo: 'STEP 3 (site_materials_prep)',
+      lastValidatedStepKo:
+          'STEP 7 (site_responsive_ux) / testedSubtype=marketing_site',
       goldenRunComplete: false,
-      expectedDeliverablesKo: '기획·IA·페이지·SEO·배포 체크리스트',
+      expectedDeliverablesKo: '기획·IA·페이지·SEO·검토·배포 준비 패키지',
       cautionKo:
-          'Firebase Hosting 실배포는 사용자 최종 승인 전 금지. STEP 4~18 Cursor E2E 미완료',
+          'Firebase Hosting 실배포는 사용자 최종 승인 전 금지. '
+          '콘텐츠 업데이트·방문자 분석·수익화는 출시 후 운영(WI 18단계 밖). '
+          'testedSubtype=marketing_site만 검증',
     ),
     ProductionMenuCardDef(
       trackId: 'contents',

@@ -103,8 +103,12 @@ class WorkInstructionStudioPreflight {
         id: 'product_type',
         label: '제작 유형',
         status: StudioPreflightStatus.warning,
-        detail:
-            '${ArtifactType.labelKo(artifact)}: 백엔드 canonical 18단계 계약이 ebook/app 대비 제한적일 수 있습니다.',
+        detail: artifact == ArtifactType.site
+            ? '사이트: SiteStageContract 18단계. '
+                  '검증된 subtype/단계는 ProductionMenuContract 기준이며, '
+                  '배포·외부 공개는 사용자 승인 gate 이후에만 가능합니다.'
+            : '${ArtifactType.labelKo(artifact)}: 백엔드 canonical 18단계 계약이 '
+                  'ebook/app 대비 제한적일 수 있습니다.',
       );
     }
     return StudioPreflightCheck(

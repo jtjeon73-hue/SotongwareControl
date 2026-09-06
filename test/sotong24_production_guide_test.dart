@@ -74,11 +74,15 @@ void main() {
 
     final site = Sotong24ProductionGuideCatalog.guideFor('site');
     expect(site.totalStages, Sotong24WorkflowCatalog.site.totalStages);
-    expect(site.totalStages, 22);
+    expect(site.totalStages, 18);
+    expect(
+      site.totalStages,
+      BusinessPlanningService.siteWorkflowStages.length,
+    );
 
     final promo = Sotong24ProductionGuideCatalog.guideFor('promo_site');
     expect(promo.totalStages, Sotong24WorkflowCatalog.promoSite.totalStages);
-    expect(promo.totalStages, 22);
+    expect(promo.totalStages, 18);
 
     final contents = Sotong24ProductionGuideCatalog.guideFor(
       'contents',
