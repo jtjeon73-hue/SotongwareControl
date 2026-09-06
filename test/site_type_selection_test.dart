@@ -4,7 +4,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/data/project_design_catalog.dart';
-import 'package:sotong_ware_control/models/artifact_type.dart';
 import 'package:sotong_ware_control/models/business_planning.dart';
 import 'package:sotong_ware_control/models/project_design_state.dart';
 import 'package:sotong_ware_control/services/business_planning_service.dart';
@@ -17,7 +16,9 @@ void main() {
 
   group('site subtype contract', () {
     test('canonical tokens match catalog', () {
-      final catalogIds = ProjectDesignCatalog.siteKinds.map((e) => e.id).toSet();
+      final catalogIds = ProjectDesignCatalog.siteKinds
+          .map((e) => e.id)
+          .toSet();
       expect(catalogIds, SiteSubtypeContract.knownWorkSubtypes);
     });
 
@@ -51,18 +52,24 @@ void main() {
 
     test('ebook / app unchanged', () {
       expect(
-        ProjectDesignState(artifactType: ArtifactType.ebook).canProceedFromArtifact,
+        ProjectDesignState(
+          artifactType: ArtifactType.ebook,
+        ).canProceedFromArtifact,
         isTrue,
       );
       expect(
-        ProjectDesignState(artifactType: ArtifactType.app).canProceedFromArtifact,
+        ProjectDesignState(
+          artifactType: ArtifactType.app,
+        ).canProceedFromArtifact,
         isTrue,
       );
     });
 
     test('contents still requires contentSubtype', () {
       expect(
-        ProjectDesignState(artifactType: ArtifactType.contents).canProceedFromArtifact,
+        ProjectDesignState(
+          artifactType: ArtifactType.contents,
+        ).canProceedFromArtifact,
         isFalse,
       );
       expect(
@@ -95,7 +102,9 @@ void main() {
         artifactType: ArtifactType.site,
         siteSubtype: SiteSubtypeContract.knowledgeSite,
       );
-      final restored = ProjectDesignState.fromWizardState(state.toWizardState());
+      final restored = ProjectDesignState.fromWizardState(
+        state.toWizardState(),
+      );
       expect(restored.siteSubtype, SiteSubtypeContract.knowledgeSite);
       expect(restored.step, ProjectDesignStep.audience);
     });
@@ -327,10 +336,7 @@ void main() {
         },
       );
       expect(latest!.siteSubtype, SiteSubtypeContract.marketingSite);
-      expect(
-        find.widgetWithText(FilterChip, '기업·기관 홈페이지'),
-        findsOneWidget,
-      );
+      expect(find.widgetWithText(FilterChip, '기업·기관 홈페이지'), findsOneWidget);
       final corporate = tester.widget<FilterChip>(
         find.widgetWithText(FilterChip, '기업·기관 홈페이지'),
       );

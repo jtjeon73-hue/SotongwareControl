@@ -202,7 +202,8 @@ class BusinessPlanningService {
     }();
     final types = <String>[
       artifact,
-      if ((artifact == ArtifactType.site || artifact == ArtifactType.promoSite) &&
+      if ((artifact == ArtifactType.site ||
+              artifact == ArtifactType.promoSite) &&
           sitePurpose.isNotEmpty &&
           sitePurpose != artifact)
         sitePurpose,

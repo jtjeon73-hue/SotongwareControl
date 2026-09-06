@@ -596,7 +596,8 @@ class ProjectDesignState {
           ? null
           : '${json['contentSubtype']}',
       siteSubtype: () {
-        if (json['siteSubtype'] != null && '${json['siteSubtype']}'.trim().isNotEmpty) {
+        if (json['siteSubtype'] != null &&
+            '${json['siteSubtype']}'.trim().isNotEmpty) {
           return '${json['siteSubtype']}'.trim();
         }
         final fromProd = prod['site_kind'] ?? prod['siteKind'];
