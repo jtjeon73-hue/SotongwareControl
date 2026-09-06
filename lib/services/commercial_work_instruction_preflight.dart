@@ -3,8 +3,10 @@
 library;
 
 import '../models/artifact_type.dart';
+import '../models/commercial/commercial_depth_plan.dart';
 import '../models/commercial/commercial_quality_attachment.dart';
 import '../models/commercial/commercial_quality_standard.dart';
+import '../models/commercial/commercial_track_profiles.dart';
 import '../models/commercial/work_instruction_brief.dart';
 import '../models/instruction_contract.dart';
 import 'content_subtype_contract.dart';
@@ -490,7 +492,7 @@ class CommercialWorkInstructionPreflight {
       return;
     }
     final p = a.appProfile;
-    if (p.schemaVersion < 1) {
+    if (p.schemaVersion < CommercialAppQualityProfile.kMinSchemaVersion) {
       issues.add(
         const CommercialPreflightIssue(
           code: 'CAQP_INVALID_SCHEMA_VERSION',
@@ -599,6 +601,124 @@ class CommercialWorkInstructionPreflight {
         ),
       );
     }
+
+    final needsDepth =
+        p.schemaVersion >= CommercialAppQualityProfile.kDepthPlanRequiredFrom ||
+        (a.appQualityContractVersion ?? 0) >=
+            CommercialAppQualityProfile.kDepthPlanRequiredFrom;
+    if (needsDepth) {
+      _validateAppDepthPlan(issues, missing, p.commercialDepthPlan);
+    }
+  }
+
+  static void _validateAppDepthPlan(
+    List<CommercialPreflightIssue> issues,
+    List<String> missing,
+    CommercialDepthPlan depth,
+  ) {
+    const prefix = 'commercialAppQualityProfile.commercialDepthPlan';
+    if (!depth.present) {
+      _req(
+        issues,
+        missing,
+        'CAQP_DEPTH_PLAN_REQUIRED',
+        prefix,
+        'schemaVersion/contractVersion >= 2 앱은 commercialDepthPlan이 필요합니다.',
+      );
+      return;
+    }
+
+    void need(String code, String path, String v) {
+      if (v.trim().isEmpty) {
+        _req(issues, missing, code, path, '앱 depth plan 필수 항목이 비어 있습니다.');
+      }
+    }
+
+    void needMinList(String code, String path, List<String> v, int min) {
+      if (v.length < min) {
+        _req(
+          issues,
+          missing,
+          code,
+          path,
+          '앱 depth plan 목록이 부족합니다(최소 $min).',
+        );
+      }
+    }
+
+    void needContains(String code, String path, List<String> v, String token) {
+      if (!v.contains(token)) {
+        issues.add(
+          CommercialPreflightIssue(
+            code: code,
+            fieldPath: path,
+            severity: CommercialIssueSeverity.error,
+            userMessageKo: '앱 depth plan에 필수 항목이 없습니다: $token',
+            developerDetail: '$path must include $token',
+          ),
+        );
+      }
+    }
+
+    need('CAQP_DEPTH_MISSING_PURPOSE', '$prefix.appPurpose', depth.appPurpose);
+    needMinList(
+      'CAQP_DEPTH_FLOWS_TOO_FEW',
+      '$prefix.coreUserFlows',
+      depth.coreUserFlows,
+      2,
+    );
+    needMinList(
+      'CAQP_DEPTH_FEATURES_TOO_FEW',
+      '$prefix.coreFeatures',
+      depth.coreFeatures,
+      3,
+    );
+    needMinList(
+      'CAQP_DEPTH_SCREENS_TOO_FEW',
+      '$prefix.requiredScreens',
+      depth.requiredScreens,
+      4,
+    );
+
+    for (final s in const [
+      'appbar_back',
+      'system_back',
+      'dirty_exit_guard',
+      'home_return',
+    ]) {
+      needContains(
+        'CAQP_DEPTH_BACK_SCENARIO_MISSING',
+        '$prefix.navigationBackScenarios',
+        depth.navigationBackScenarios,
+        s,
+      );
+    }
+    for (final w in CommercialDepthPlan.kRequiredViewportWidths) {
+      needContains(
+        'CAQP_DEPTH_VIEWPORT_MISSING',
+        '$prefix.mobileViewportWidthsPx',
+        depth.mobileViewportWidthsPx,
+        w,
+      );
+    }
+    needContains(
+      'CAQP_DEPTH_TEXTSCALE_2_MISSING',
+      '$prefix.mobileTextScales',
+      depth.mobileTextScales,
+      '2.0',
+    );
+    needContains(
+      'CAQP_DEPTH_ANTIPATTERN_MISSING',
+      '$prefix.antiPatternsBanned',
+      depth.antiPatternsBanned,
+      'listtile_trailing_title_squeeze',
+    );
+    needContains(
+      'CAQP_DEPTH_ANTIPATTERN_MISSING',
+      '$prefix.antiPatternsBanned',
+      depth.antiPatternsBanned,
+      'one_glyph_vertical_wrap',
+    );
   }
 
   static void _validateEbook(

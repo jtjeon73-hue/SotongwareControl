@@ -39,7 +39,8 @@ class CommercialQualityAttachment {
       out['workInstructionBrief'] = brief.toJson();
     }
     if (appProfile.present) {
-      out['appQualityContractVersion'] = appQualityContractVersion ?? 1;
+      out['appQualityContractVersion'] =
+          appQualityContractVersion ?? CommercialAppQualityProfile.kSchemaVersion;
       out['commercialAppQualityProfile'] = appProfile.toJson();
     }
     if (ebookProfile.present) {

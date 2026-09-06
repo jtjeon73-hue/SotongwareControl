@@ -3,6 +3,7 @@
 library;
 
 import '../models/business_planning.dart';
+import '../models/commercial/commercial_depth_plan.dart';
 import '../models/commercial/commercial_quality_attachment.dart';
 import '../models/commercial/commercial_quality_standard.dart';
 import '../models/commercial/commercial_track_profiles.dart';
@@ -186,7 +187,7 @@ class CommercialStudioBuilder {
       case 'app':
         return CommercialQualityAttachment(
           brief: brief,
-          appQualityContractVersion: 1,
+          appQualityContractVersion: CommercialAppQualityProfile.kSchemaVersion,
           appProfile: _appProfile(input, problem, outcome, uniqueValue),
         );
       case 'ebook':
@@ -315,8 +316,18 @@ class CommercialStudioBuilder {
     String outcome,
     String uniqueValue,
   ) {
+    final users = input.targetCustomer.trim();
+    final depth = CommercialDepthPlan.defaultsForStandardApp(
+      appPurpose: problem.trim().isNotEmpty
+          ? problem.trim()
+          : (outcome.trim().isNotEmpty
+                ? outcome.trim()
+                : 'declare_before_implementation'),
+      targetUsers: users,
+    );
     return CommercialAppQualityProfile(
-      targetUsers: input.targetCustomer.trim(),
+      schemaVersion: CommercialAppQualityProfile.kSchemaVersion,
+      targetUsers: users,
       realWorldProblem: problem,
       primaryUseEnvironment: 'mobile_primary',
       coreUserJourneys: const ['핵심여정-시작-저장-확인'],
@@ -359,13 +370,17 @@ class CommercialStudioBuilder {
         'offline',
         'permission_denied',
       ],
-      responsiveRequirements: 'small_phone_first',
-      supportedTextScales: const ['1.0', '1.3', '1.5'],
+      responsiveRequirements:
+          'galaxy_widths_320_360_390_412_430;textScale_2_0;no_one_glyph_wrap;no_overflow_clip;touch_target_48',
+      supportedTextScales: const ['1.0', '1.3', '1.5', '2.0'],
       supportedOrientations: const ['portrait'],
       referenceLevel: 'commercial_candidate_not_clone',
       prohibitedPatterns: const [
         'placeholder_only_screens',
         'internal_enum_slug_in_ui',
+        'listtile_trailing_title_squeeze',
+        'one_glyph_vertical_wrap',
+        'shallow_domain_templates',
       ],
       performanceBudget: 'cold_start_under_3s_target',
       accessibilityChecks: const ['touch_target_48', 'contrast_aa'],
@@ -382,6 +397,7 @@ class CommercialStudioBuilder {
         'independent_review',
         'no_blocker_high',
       ],
+      commercialDepthPlan: depth,
     );
   }
 

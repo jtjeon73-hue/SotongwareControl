@@ -3,6 +3,7 @@
 library;
 
 import 'package:sotong_ware_control/models/artifact_type.dart';
+import 'package:sotong_ware_control/models/commercial/commercial_depth_plan.dart';
 import 'package:sotong_ware_control/models/commercial/commercial_quality_attachment.dart';
 import 'package:sotong_ware_control/models/commercial/commercial_quality_standard.dart';
 import 'package:sotong_ware_control/models/commercial/commercial_track_profiles.dart';
@@ -82,6 +83,7 @@ class CommercialFixtures {
 
   static CommercialAppQualityProfile
   appProfile() => CommercialAppQualityProfile(
+    schemaVersion: 1,
     targetUsers: '농작업 현장 작업자·관리자',
     realWorldProblem: '전기·농기계 안전 점검을 현장에서 누락 없이 수행',
     primaryUseEnvironment: '야외 농장·설비 현장 휴대 단말',
@@ -159,6 +161,65 @@ class CommercialFixtures {
       'no_blocker_high',
     ],
   );
+
+  /// Current (schemaVersion 2) app profile with DefaultsForStandardApp-like depth.
+  static CommercialAppQualityProfile appProfileV2() {
+    final base = appProfile();
+    return CommercialAppQualityProfile(
+      schemaVersion: CommercialAppQualityProfile.kSchemaVersion,
+      targetUsers: base.targetUsers,
+      realWorldProblem: base.realWorldProblem,
+      primaryUseEnvironment: base.primaryUseEnvironment,
+      coreUserJourneys: base.coreUserJourneys,
+      commercialGoal: base.commercialGoal,
+      monetizationModel: base.monetizationModel,
+      offlineRequirement: base.offlineRequirement,
+      loginRequirement: base.loginRequirement,
+      loginRequirementRationale: base.loginRequirementRationale,
+      privacyRiskLevel: base.privacyRiskLevel,
+      accessibilityTarget: base.accessibilityTarget,
+      localizationTarget: base.localizationTarget,
+      requiredCapabilities: base.requiredCapabilities,
+      criticalUserJourneys: base.criticalUserJourneys,
+      domainSpecificCapabilities: base.domainSpecificCapabilities,
+      dataLifecycle: base.dataLifecycle,
+      importExportShare: base.importExportShare,
+      recoveryBackup: base.recoveryBackup,
+      notifications: base.notifications,
+      settingsHelpAbout: base.settingsHelpAbout,
+      explicitlyOutOfScope: base.explicitlyOutOfScope,
+      designDirection: base.designDirection,
+      brandIdentity: base.brandIdentity,
+      designTokens: base.designTokens,
+      navigationModel: base.navigationModel,
+      screenInventory: base.screenInventory,
+      screenPurpose: base.screenPurpose,
+      primaryAction: base.primaryAction,
+      informationHierarchy: base.informationHierarchy,
+      reusableComponents: base.reusableComponents,
+      iconPolicy: base.iconPolicy,
+      stateUxRequired: base.stateUxRequired,
+      responsiveRequirements: base.responsiveRequirements,
+      supportedTextScales: const ['1.0', '1.3', '1.5', '2.0'],
+      supportedOrientations: base.supportedOrientations,
+      referenceLevel: base.referenceLevel,
+      prohibitedPatterns: base.prohibitedPatterns,
+      performanceBudget: base.performanceBudget,
+      accessibilityChecks: base.accessibilityChecks,
+      visualEvidenceRequirements: base.visualEvidenceRequirements,
+      deviceMatrix: base.deviceMatrix,
+      testMatrix: base.testMatrix,
+      ownerReviewRequired: base.ownerReviewRequired,
+      independentReviewRequired: base.independentReviewRequired,
+      externalTesterReviewRequired: base.externalTesterReviewRequired,
+      severityPolicy: base.severityPolicy,
+      releaseReadinessCriteria: base.releaseReadinessCriteria,
+      commercialDepthPlan: CommercialDepthPlan.defaultsForStandardApp(
+        appPurpose: base.realWorldProblem,
+        targetUsers: base.targetUsers,
+      ),
+    );
+  }
 
   static CommercialEbookQualityProfile ebookProfile() =>
       CommercialEbookQualityProfile(

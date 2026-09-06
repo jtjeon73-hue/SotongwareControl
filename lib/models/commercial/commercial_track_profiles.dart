@@ -1,6 +1,7 @@
-/// Track commercial quality profiles — mirrors Sotong24Work HEAD 5b204b7.
+/// Track commercial quality profiles — mirrors Sotong24Work AppCommercialQualityProfile.
 library;
 
+import 'commercial_depth_plan.dart';
 import 'commercial_quality_standard.dart';
 
 class CommercialAppQualityProfile {
@@ -54,9 +55,13 @@ class CommercialAppQualityProfile {
     this.externalTesterReviewRequired = false,
     this.severityPolicy = '',
     this.releaseReadinessCriteria = const [],
+    this.commercialDepthPlan = const CommercialDepthPlan(present: false),
   });
 
-  static const kSchemaVersion = 1;
+  /// Current schema for newly emitted app profiles (depth plan required).
+  static const kSchemaVersion = 2;
+  static const kMinSchemaVersion = 1;
+  static const kDepthPlanRequiredFrom = 2;
 
   final bool present;
   final int schemaVersion;
@@ -107,10 +112,11 @@ class CommercialAppQualityProfile {
   final bool externalTesterReviewRequired;
   final String severityPolicy;
   final List<String> releaseReadinessCriteria;
+  final CommercialDepthPlan commercialDepthPlan;
 
   Map<String, dynamic> toJson() {
     if (!present) return {};
-    return {
+    final out = <String, dynamic>{
       'schemaVersion': schemaVersion > 0 ? schemaVersion : kSchemaVersion,
       'targetUsers': targetUsers,
       'realWorldProblem': realWorldProblem,
@@ -160,6 +166,10 @@ class CommercialAppQualityProfile {
       'severityPolicy': severityPolicy,
       'releaseReadinessCriteria': releaseReadinessCriteria,
     };
+    if (commercialDepthPlan.present) {
+      out['commercialDepthPlan'] = commercialDepthPlan.toJson();
+    }
+    return out;
   }
 
   factory CommercialAppQualityProfile.fromJson(Map<String, dynamic>? json) {
@@ -169,6 +179,7 @@ class CommercialAppQualityProfile {
         schemaVersion: 0,
       );
     }
+    final depthNode = json['commercialDepthPlan'];
     return CommercialAppQualityProfile(
       present: true,
       schemaVersion: _asInt(json['schemaVersion'], kSchemaVersion),
@@ -224,6 +235,9 @@ class CommercialAppQualityProfile {
           json['externalTesterReviewRequired'] == true,
       severityPolicy: '${json['severityPolicy'] ?? ''}',
       releaseReadinessCriteria: _asStringList(json['releaseReadinessCriteria']),
+      commercialDepthPlan: CommercialDepthPlan.fromJson(
+        depthNode is Map ? Map<String, dynamic>.from(depthNode) : null,
+      ),
     );
   }
 }

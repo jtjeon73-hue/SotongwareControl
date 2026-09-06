@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/models/artifact_type.dart';
+import 'package:sotong_ware_control/models/commercial/commercial_quality_attachment.dart';
+import 'package:sotong_ware_control/models/commercial/commercial_track_profiles.dart';
 import 'package:sotong_ware_control/models/commercial/work_instruction_brief.dart';
 import 'package:sotong_ware_control/models/instruction_contract.dart';
 import 'package:sotong_ware_control/services/commercial_work_instruction_preflight.dart';
@@ -68,10 +70,82 @@ void main() {
       expect(json['briefContractVersion'], 1);
       expect(json['appQualityContractVersion'], 1);
       expect(json['commercialAppQualityProfile'], isA<Map>());
+      expect(
+        (json['commercialAppQualityProfile'] as Map)['schemaVersion'],
+        1,
+      );
+      expect(
+        (json['commercialAppQualityProfile'] as Map).containsKey(
+          'commercialDepthPlan',
+        ),
+        isFalse,
+      );
       expect(json['workInstructionBrief']['originalUserBrief'], isNotEmpty);
       expect(
         json['workInstructionBrief']['aiAugmentedBrief'],
         isNot(equals(json['workInstructionBrief']['originalUserBrief'])),
+      );
+    });
+
+    test('app schemaVersion 2 requires commercialDepthPlan', () {
+      final json = CommercialFixtures.mergeIntoInstruction(
+        base(ArtifactType.app),
+        attachment: CommercialQualityAttachment(
+          brief: CommercialFixtures.brief(
+            displayTitle: '농작업 안전 점검 앱',
+            original: '농촌 작업 전에 안전항목을 점검하고 사진과 조치내용을 저장하는 앱',
+          ),
+          appQualityContractVersion: 2,
+          appProfile: CommercialFixtures.appProfileV2(),
+        ),
+      );
+      final r = CommercialWorkInstructionPreflight.evaluate(json);
+      expect(r.ok, isTrue, reason: r.errors.map((e) => e.code).join(','));
+      expect(json['appQualityContractVersion'], 2);
+      expect(
+        (json['commercialAppQualityProfile'] as Map)['schemaVersion'],
+        2,
+      );
+      expect(
+        (json['commercialAppQualityProfile'] as Map)['commercialDepthPlan'],
+        isA<Map>(),
+      );
+    });
+
+    test('app schemaVersion 2 without depth plan fails', () {
+      final json = CommercialFixtures.mergeIntoInstruction(
+        base(ArtifactType.app),
+        attachment: CommercialQualityAttachment(
+          brief: CommercialFixtures.brief(
+            displayTitle: '농작업 안전 점검 앱',
+            original: '농촌 작업 전에 안전항목을 점검하고 사진과 조치내용을 저장하는 앱',
+          ),
+          appQualityContractVersion: 2,
+          appProfile: CommercialAppQualityProfile(
+            schemaVersion: 2,
+            targetUsers: 'users',
+            realWorldProblem: 'problem',
+            primaryUseEnvironment: 'mobile',
+            coreUserJourneys: const ['a'],
+            commercialGoal: 'goal',
+            criticalUserJourneys: const ['a'],
+            requiredCapabilities: const ['c'],
+            screenInventory: const ['home', 'list', 'detail', 'settings'],
+            designDirection: 'd',
+            brandIdentity: 'b',
+            navigationModel: 'nav',
+            stateUxRequired: const ['empty'],
+            severityPolicy: 'BLOCKER=0',
+            releaseReadinessCriteria: const ['owner_ok'],
+            loginRequirement: 'deferred',
+          ),
+        ),
+      );
+      final r = CommercialWorkInstructionPreflight.evaluate(json);
+      expect(r.ok, isFalse);
+      expect(
+        r.errors.any((e) => e.code == 'CAQP_DEPTH_PLAN_REQUIRED'),
+        isTrue,
       );
     });
 
