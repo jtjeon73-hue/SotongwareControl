@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../data/sotong24_workflows.dart';
 import '../models/artifact_type.dart';
+import '../models/instruction_contract.dart';
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import '../models/sotong24_monitoring.dart';
@@ -558,6 +559,30 @@ class _Sotong24RemoteDetailScreenState
               }
             }
           }
+          // Prefer STEP15 site review while waiting for explicit user decision,
+          // even if a stale remote currentStage still points at STEP16–18.
+          // Do not pin to STEP15 merely because preview artifacts exist after a
+          // trusted approval (current may correctly advance to 16+).
+          Sotong24RemoteStage? siteReviewCandidate;
+          if (project.productType == ArtifactType.site) {
+            for (final candidate in project.stages) {
+              if (candidate.stageId != 'site_user_review') continue;
+              final awaiting =
+                  candidate.status == Sotong24WorkStatus.awaitingApproval ||
+                  candidate.approvalStatus == ApprovalStatus.pending ||
+                  project.approvalStatus == ApprovalStatus.pending;
+              if (awaiting) {
+                siteReviewCandidate = candidate;
+                break;
+              }
+            }
+          }
+          if (siteReviewCandidate != null &&
+              (project.currentStageDoc?.stageId != 'site_user_review' ||
+                  project.currentStageDoc?.status ==
+                      Sotong24WorkStatus.completed)) {
+            stage = siteReviewCandidate;
+          }
           final workflow = Sotong24WorkflowCatalog.forProduct(
             project.productType,
             contentSubtype: project.contentSubtype,
@@ -597,13 +622,33 @@ class _Sotong24RemoteDetailScreenState
               (monitoringSnapshot.health == Sotong24StageHealth.inactive ||
                   monitoringSnapshot.health == Sotong24StageHealth.stalled);
           final showSiteUserReview =
-              stage != null &&
-              project.productType == ArtifactType.site &&
-              stage.stageId == 'site_user_review' &&
-              (stage.status == Sotong24WorkStatus.awaitingApproval ||
-                  stage.hasOpenableResult ||
-                  showApprovalActions);
-          final siteReviewStage = showSiteUserReview ? stage : null;
+              siteReviewCandidate != null ||
+              (stage != null &&
+                  project.productType == ArtifactType.site &&
+                  stage.stageId == 'site_user_review' &&
+                  (stage.status == Sotong24WorkStatus.awaitingApproval ||
+                      stage.hasOpenableResult ||
+                      showApprovalActions));
+          final siteReviewStage = showSiteUserReview
+              ? (siteReviewCandidate ?? stage)
+              : null;
+          final displayCurrentNumber =
+              siteReviewStage?.stageNumber ?? project.currentStage;
+          final displayCurrentLine = siteReviewStage == null
+              ? Sotong24WorkshopPresentation.currentStageLine(project)
+              : (() {
+                  final name = siteReviewStage.stageName.trim();
+                  return name.isEmpty
+                      ? '${siteReviewStage.stageNumber}단계'
+                      : '${siteReviewStage.stageNumber}단계 · $name';
+                })();
+          final displayStatusLabel =
+              siteReviewStage != null &&
+                  (siteReviewStage.status ==
+                          Sotong24WorkStatus.awaitingApproval ||
+                      project.approvalStatus == ApprovalStatus.pending)
+              ? '사용자 검토 대기'
+              : project.userFacingStatusLabel;
           _scrollToApkIfNeeded(project);
 
           return ListView(
@@ -661,9 +706,9 @@ class _Sotong24RemoteDetailScreenState
               const SizedBox(height: 8),
               _Kv(
                 '현재 단계',
-                Sotong24WorkshopPresentation.currentStageLine(project),
+                displayCurrentLine,
               ),
-              _Kv('상태', project.userFacingStatusLabel),
+              _Kv('상태', displayStatusLabel),
               _Kv('현재 작업자', _workerLabel(project, stage)),
               _Kv('승인 방식', project.approvalMode == 'auto' ? '자동 승인' : '수동 승인'),
               if (project.productionReviewStatus != null) ...[
@@ -932,9 +977,24 @@ class _Sotong24RemoteDetailScreenState
               const SizedBox(height: 8),
               for (final s in project.stages)
                 Sotong24ExpandableStageTile(
-                  stage: s,
+                  stage: s.stageId == 'site_user_review' &&
+                          siteReviewStage != null
+                      ? siteReviewStage.copyWith(
+                          status: Sotong24WorkStatus.awaitingApproval,
+                          errorMessage: '',
+                          activityState: '',
+                        )
+                      : (s.stageId == 'site_user_review'
+                            ? s.copyWith(
+                                errorMessage:
+                                    s.status ==
+                                            Sotong24WorkStatus.awaitingApproval
+                                        ? ''
+                                        : s.errorMessage,
+                              )
+                            : s),
                   project: project,
-                  isCurrent: s.stageNumber == project.currentStage,
+                  isCurrent: s.stageNumber == displayCurrentNumber,
                   def:
                       workflow.byId(s.stageId) ??
                       workflow.byOrder(s.stageNumber),
@@ -959,10 +1019,29 @@ class _Sotong24RemoteDetailScreenState
                       _onRevision(project, siteReviewStage),
                   onDesignChange: () =>
                       _onSiteDesignChange(project, siteReviewStage),
-                  onHold: () {
+                  onHold: () async {
+                    setState(() => _busy = true);
+                    final revLabel =
+                        'r${siteReviewStage.revision > 0 ? siteReviewStage.revision : 1}';
+                    final payload = SiteReviewDecisionPayload(
+                      reviewDecision: 'on_hold',
+                      reviewedRevision: revLabel,
+                      reviewComment: '사용자 보류 · STEP16 미진입 · 결과 보존',
+                    ).toRevisionMessage();
+                    final err = await widget.repository.requestRevision(
+                      projectId: project.projectId,
+                      stageId: siteReviewStage.stageId,
+                      requestId: _resolveRequestId(siteReviewStage),
+                      message: payload,
+                    );
+                    if (!mounted) return;
+                    setState(() => _busy = false);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('보류했습니다. 결과는 보존되며 STEP16은 시작되지 않습니다.'),
+                      SnackBar(
+                        content: Text(
+                          err ??
+                              '보류했습니다. 결과는 보존되며 STEP16은 시작되지 않습니다.',
+                        ),
                       ),
                     );
                   },

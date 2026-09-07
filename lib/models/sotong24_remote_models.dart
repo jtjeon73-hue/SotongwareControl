@@ -345,6 +345,8 @@ class Sotong24RemoteStage {
     String? activeRequestId,
     String? updatedAt,
     int? revision,
+    String? errorMessage,
+    String? activityState,
   }) {
     return Sotong24RemoteStage(
       stageId: stageId,
@@ -354,7 +356,7 @@ class Sotong24RemoteStage {
       summary: summary ?? this.summary,
       resultPreview: resultPreview,
       workReport: workReport,
-      errorMessage: errorMessage,
+      errorMessage: errorMessage ?? this.errorMessage,
       userAttention: userAttention,
       resultUrl: resultUrl,
       previewUrl: previewUrl,
@@ -368,7 +370,7 @@ class Sotong24RemoteStage {
       completedAt: completedAt,
       workDurationMs: workDurationMs,
       lastActivityAt: lastActivityAt,
-      activityState: activityState,
+      activityState: activityState ?? this.activityState,
       activityType: activityType,
       activityProgress: activityProgress,
       attemptCount: attemptCount,
