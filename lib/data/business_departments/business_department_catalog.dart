@@ -207,7 +207,8 @@ class BusinessDepartmentCatalog {
   static final knowledgeSite = BusinessDepartmentConfig(
     id: 'site_manager',
     title: '지식·교육 사이트 개발부',
-    purpose: '전문 지식을 검색·학습 가능한 사이트로 구조화하고, '
+    purpose:
+        '전문 지식을 검색·학습 가능한 사이트로 구조화하고, '
         'SotongSiteManager로 전문관을 통합 관리합니다.',
     artifactType: 'site',
     linkedSites: [
