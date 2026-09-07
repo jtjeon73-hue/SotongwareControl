@@ -259,7 +259,7 @@ class Sotong24StageMonitoring {
       case 'approval_preparing':
         return '승인 대기 준비 중';
       case 'worker_dispatch_waiting':
-        return '작업자 시작 대기';
+        return '작업자 시작 준비';
       case 'stage_transitioning':
         return '다음 작업 준비 중';
       case 'auto_approval':
@@ -279,7 +279,7 @@ class Sotong24StageMonitoring {
       case 'stage_transition_failed':
         return '지연 감지 / 자동 확인 중';
       default:
-        return state.trim().isEmpty ? '작업자 시작 대기' : '작업 상태 동기화 중';
+        return state.trim().isEmpty ? '작업자 시작 준비' : '작업 상태 동기화 중';
     }
   }
 
@@ -287,7 +287,7 @@ class Sotong24StageMonitoring {
   static String waitPhaseLabel(Duration? activityAge) {
     if (activityAge == null) return '다음 작업 준비 중';
     if (activityAge <= const Duration(minutes: 2)) return '다음 작업 준비 중';
-    if (activityAge <= const Duration(minutes: 8)) return '작업자 시작 대기';
+    if (activityAge <= const Duration(minutes: 8)) return '작업자 시작 준비';
     if (activityAge <= const Duration(minutes: 15)) {
       return '지연 감지 / 자동 확인 중';
     }

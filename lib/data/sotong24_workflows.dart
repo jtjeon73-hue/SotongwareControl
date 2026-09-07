@@ -426,7 +426,11 @@ class Sotong24WorkflowCatalog {
         'Sotong24Work SiteStageContract 18단계 (배포 실행은 사용자 승인 후). '
         '콘텐츠 업데이트·방문자 분석·수익화는 출시 후 운영으로 Production WI 18단계 밖이다.',
     stages: [
-      for (var i = 0; i < BusinessPlanningService.siteWorkflowStages.length; i++)
+      for (
+        var i = 0;
+        i < BusinessPlanningService.siteWorkflowStages.length;
+        i++
+      )
         _siteStage(
           BusinessPlanningService.siteWorkflowStages[i].$1,
           BusinessPlanningService.siteWorkflowStages[i].$2,
@@ -451,11 +455,10 @@ class Sotong24WorkflowCatalog {
     String purpose,
     int order,
   ) {
-    final approval =
-        id == 'site_user_review' ||
-        id == 'site_revision_quality' ||
-        id == 'site_launch_package' ||
-        id == 'site_deploy_release';
+    // STEP15: review decision after package ready (UI actions).
+    // STEP16/17: auto-run after STEP15 decision — no duplicate entry approval.
+    // STEP18: final production deploy gate only.
+    final approval = id == 'site_user_review' || id == 'site_deploy_release';
     return Sotong24WorkflowStageDef(
       id: id,
       order: order,
