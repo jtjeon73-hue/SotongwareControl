@@ -231,4 +231,30 @@ void main() {
     expect(result.health, Sotong24StageHealth.pausedQuota);
     expect(result.activityLabel, 'AI 사용량 초기화 대기');
   });
+
+  test('validation retry waiting is delayed, not inactive stall', () {
+    final retrying = Sotong24RemoteStage(
+      stageId: 'site_seo_metadata',
+      stageNumber: 12,
+      stageName: 'SEO·메타데이터',
+      status: Sotong24WorkStatus.resultValidationRetrying,
+      startedAt: '2026-08-19T00:00:00.000Z',
+      lastActivityAt: '2026-08-19T00:04:50.000Z',
+      activityState: 'validation_retry_waiting',
+      retryCount: 1,
+      maxRetries: 3,
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(
+        heartbeat: '2026-08-19T00:04:55.000Z',
+        stage: retrying,
+        status: Sotong24WorkStatus.resultValidationRetrying,
+      ),
+      stage: retrying,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T00:05:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.delayed);
+    expect(result.activityLabel, '결과 검증 자동 재시도 대기');
+  });
 }

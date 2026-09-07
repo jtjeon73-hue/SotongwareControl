@@ -185,6 +185,10 @@ class Sotong24StageMonitoring {
         status == Sotong24WorkStatus.aiProcessFailed ||
         status == Sotong24WorkStatus.resultValidationFailed) {
       health = Sotong24StageHealth.error;
+    } else if (status == Sotong24WorkStatus.resultValidationRetrying ||
+        stage.activityState == 'validation_retry_waiting') {
+      // Retry backoff is expected work, not inactivity stall.
+      health = Sotong24StageHealth.delayed;
     } else if (status == Sotong24WorkStatus.awaitingApproval) {
       health = Sotong24StageHealth.awaitingUser;
     } else if (!online) {
@@ -192,7 +196,8 @@ class Sotong24StageMonitoring {
     } else if (activityAge == null || activityAge > policy.noActivityAfter) {
       // True inactivity (default 15m). Backend stalled/transition-failed with
       // fresh heartbeats must not paint a red stall before this window.
-      health = (status == Sotong24WorkStatus.stalled ||
+      health =
+          (status == Sotong24WorkStatus.stalled ||
               status == Sotong24WorkStatus.stageTransitionFailed)
           ? Sotong24StageHealth.stalled
           : Sotong24StageHealth.inactive;

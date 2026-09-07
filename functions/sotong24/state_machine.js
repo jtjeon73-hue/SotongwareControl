@@ -117,10 +117,17 @@ function mergeMonotonicStage(previous, incoming) {
   const staleRetryAttempt = incomingRevision === previousRevision &&
     statusRank(next.status) <= 1 && Number(prior.attemptCount || 0) > 0 &&
     Number(next.attemptCount || 0) < Number(prior.attemptCount || 0);
+  // Allow stalled → running/in_progress when a live worker/activity signal is present.
+  // Blindly holding stalled caused Control to keep past-stage stall banners after recovery.
+  const hasLiveWorkerSignal = Number(next.processId || next.workerPid || 0) > 0
+    || String(next.handoffSessionId || "").trim().length > 0
+    || ["codex_running", "cursor_running", "result_validating", "generating_result",
+      "ai_requesting", "validation_retry_waiting"].includes(String(next.activityState || ""));
   const staleStallRecovery = incomingRevision === previousRevision &&
     ["stalled", "stage_transition_failed"].includes(String(prior.status || "")) &&
     ["ready", "in_progress", "running"].includes(String(next.status || "")) &&
-    Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0);
+    Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0) &&
+    !hasLiveWorkerSignal;
   const heldRecovery = prior.recoveryState === "safe_stopped" &&
     incomingRevision === previousRevision && next.recoveryState !== "resumed";
   if (!heldRecovery && !staleRevision && !sameRevisionRegression && !staleRetryAttempt &&
@@ -165,10 +172,15 @@ function mergeMonotonicProject(previous, incoming) {
   const staleRetryAttempt = priorOrder > 0 && priorOrder === nextOrder &&
     statusRank(next.status) <= 1 && Number(prior.attemptCount || 0) > 0 &&
     Number(next.attemptCount || 0) < Number(prior.attemptCount || 0);
+  const hasLiveWorkerSignal = Number(next.processId || next.workerPid || 0) > 0
+    || String(next.handoffSessionId || "").trim().length > 0
+    || ["codex_running", "cursor_running", "result_validating", "generating_result",
+      "ai_requesting", "validation_retry_waiting"].includes(String(next.activityState || ""));
   const staleStallRecovery = priorOrder > 0 && priorOrder === nextOrder &&
     ["stalled", "stage_transition_failed"].includes(String(prior.status || "")) &&
     ["ready", "in_progress", "running"].includes(String(next.status || "")) &&
-    Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0);
+    Number(next.attemptCount || 0) <= Number(prior.attemptCount || 0) &&
+    !hasLiveWorkerSignal;
   const heldRecovery = prior.recoveryState === "safe_stopped" &&
     priorOrder === nextOrder && next.recoveryState !== "resumed";
   if (!heldRecovery && !regressedStage && !sameStageRegression && !staleRetryAttempt &&

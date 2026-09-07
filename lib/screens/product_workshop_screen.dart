@@ -252,14 +252,14 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                 .toList();
             final focusId = widget.focusInstructionId?.trim() ?? '';
             final focusing = focusId.isNotEmpty;
-        final resolution = Sotong24WorkshopPresentation.resolveFocus(
-          projects: projects,
-          focusInstructionId: widget.focusInstructionId,
-        );
-        final focus = resolution.project;
-        // Exact focus id가 아직 project/envelope에 없으면 준비 중 카드 유지
-        // (handoff 직후 project 생성 대기). 전체 화면 무한 loading은 사용하지 않음.
-        final waiting = resolution.waitingForExactProject;
+            final resolution = Sotong24WorkshopPresentation.resolveFocus(
+              projects: projects,
+              focusInstructionId: widget.focusInstructionId,
+            );
+            final focus = resolution.project;
+            // Exact focus id가 아직 project/envelope에 없으면 준비 중 카드 유지
+            // (handoff 직후 project 생성 대기). 전체 화면 무한 loading은 사용하지 않음.
+            final waiting = resolution.waitingForExactProject;
             if (focusing && focus != null && _openedFocusForId != focusId) {
               final opened = focus;
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -586,6 +586,10 @@ class _Sotong24RemoteDetailScreenState
               widget.job != null &&
               monitoringSnapshot != null &&
               !project.isProductionComplete &&
+              stage.stageNumber == project.currentStage &&
+              stage.status != Sotong24WorkStatus.completed &&
+              stage.activityState != 'validation_retry_waiting' &&
+              stage.status != Sotong24WorkStatus.resultValidationRetrying &&
               (monitoringSnapshot.health == Sotong24StageHealth.inactive ||
                   monitoringSnapshot.health == Sotong24StageHealth.stalled);
           _scrollToApkIfNeeded(project);
@@ -1813,6 +1817,9 @@ class _StageMonitoringPanel extends StatelessWidget {
                 ? '작업 완료 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
                 : snapshot.health == Sotong24StageHealth.awaitingUser
                 ? '작업 완료 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
+                : stage.status == Sotong24WorkStatus.resultValidationRetrying ||
+                        stage.activityState == 'validation_retry_waiting'
+                ? '단계 경과 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} · 재시도 대기 중'
                 : '진행 중 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} 경과',
             style: const TextStyle(fontSize: 13),
           ),
@@ -1838,7 +1845,9 @@ class _StageMonitoringPanel extends StatelessWidget {
             ),
           if (!productionComplete &&
               (snapshot.health == Sotong24StageHealth.inactive ||
-                  snapshot.health == Sotong24StageHealth.stalled)) ...[
+                  snapshot.health == Sotong24StageHealth.stalled) &&
+              stage.status != Sotong24WorkStatus.resultValidationRetrying &&
+              stage.activityState != 'validation_retry_waiting') ...[
             const SizedBox(height: 4),
             Text(
               'PC는 온라인이어도 실제 작업 활동이 없습니다. 자동 복구 ${stage.recoveryAttempt}/${stage.maxRecoveryAttempts > 0 ? stage.maxRecoveryAttempts : 3}${stage.recoveryState == 'exhausted' ? ' 소진' : ' 시도 중'}',

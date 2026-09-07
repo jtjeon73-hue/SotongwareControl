@@ -24,7 +24,7 @@ const { httpError, sendOk } = require("./http");
 const { nowIso } = require("./log");
 const { assertProtocolVersion } = require("./auth");
 const { pickAiUsageCodex } = require("./ai_usage");
-const { loadPolicy, enqueueNotification } = require("./monitoring");
+const { loadPolicy, enqueueNotification, dismissStaleStageNotifications } = require("./monitoring");
 const {
   mergeMonotonicStage,
   mergeMonotonicProject,
@@ -705,6 +705,18 @@ async function handleReportStage(db, ctx, body) {
       tx.set(projectRef, safeProject, { merge: true });
     }
   });
+  // Auto-clear prior-stage stall banners once this job's current stage moved on
+  // or the reported stage completed/recovered.
+  try {
+    await dismissStaleStageNotifications(db, {
+      ownerUid: job.ownerUid || ctx.agent.ownerUid || "",
+      instructionId: job.instructionId || "",
+      jobId,
+      currentStageId: stageId,
+    });
+  } catch (_) {
+    // Non-fatal: stall banner cleanup must not block stage reporting.
+  }
   if (status === WORK_STATUS.COMPLETED &&
       stageDefinition?.productionBoundary === true &&
       stageDefinition.order === 18) {

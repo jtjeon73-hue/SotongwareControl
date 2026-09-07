@@ -1024,7 +1024,21 @@ class Sotong24UserFacingStatus {
       Sotong24WorkStatus.stageTransitionFailed,
     };
     if (interruptions.contains(stageStatus)) return stageStatus;
-    if (interruptions.contains(projectStatus)) return projectStatus;
+    // Project-level stall/error left over from a prior stage must not override a
+    // live current stage that has already advanced or recovered.
+    if (interruptions.contains(projectStatus)) {
+      final liveStage = stageStatus == Sotong24WorkStatus.inProgress ||
+          stageStatus == Sotong24WorkStatus.ready ||
+          stageStatus == Sotong24WorkStatus.completed ||
+          stageStatus == Sotong24WorkStatus.awaitingApproval ||
+          stageStatus == Sotong24WorkStatus.revision;
+      if (liveStage) {
+        return stageStatus == Sotong24WorkStatus.ready
+            ? Sotong24WorkStatus.inProgress
+            : stageStatus;
+      }
+      return projectStatus;
+    }
 
     if (projectStatus == Sotong24WorkStatus.error ||
         stageStatus == Sotong24WorkStatus.error) {

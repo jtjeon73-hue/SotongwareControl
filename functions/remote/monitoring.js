@@ -328,6 +328,45 @@ async function enqueueNotification(db, data, rawPolicy) {
   return { created, id: ref.id, idempotencyKey: key };
 }
 
+async function dismissStaleStageNotifications(db, {
+  ownerUid,
+  instructionId,
+  jobId,
+  currentStageId,
+  nowMs = Date.now(),
+}) {
+  const stallTypes = new Set([
+    "activity_stalled",
+    "recovery_exhausted",
+    "recovery_action_required",
+    "agent_offline",
+    "work_error",
+  ]);
+  if (!instructionId || !currentStageId) return { dismissed: 0 };
+  let query = db.collection(COL.NOTIFICATION_EVENTS)
+    .where("instructionId", "==", String(instructionId));
+  if (ownerUid) query = query.where("ownerUid", "==", String(ownerUid));
+  const snap = await query.get();
+  let dismissed = 0;
+  const ts = new Date(nowMs).toISOString();
+  for (const doc of snap.docs) {
+    const data = doc.data() || {};
+    if (!stallTypes.has(String(data.eventType || ""))) continue;
+    if (String(data.status || "") === "dismissed") continue;
+    if (jobId && data.jobId && String(data.jobId) !== String(jobId)) continue;
+    const eventStage = String(data.stageId || "");
+    if (!eventStage || eventStage === String(currentStageId)) continue;
+    await doc.ref.set({
+      status: "dismissed",
+      dismissedReason: "stage_advanced_or_recovered",
+      dismissedAt: ts,
+      updatedAt: ts,
+    }, { merge: true });
+    dismissed += 1;
+  }
+  return { dismissed };
+}
+
 async function evaluateActiveJobs(db, nowMs = Date.now()) {
   const policy = await loadPolicy(db);
   const jobsSnap = await db.collection(COL.JOBS).get();
@@ -352,6 +391,14 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     if (!stageSnap.exists) continue;
     const stage = stageSnap.data() || {};
     const agent = agentSnap.exists ? agentSnap.data() || {} : {};
+    // Drop prior-stage stall banners once the job has moved on.
+    await dismissStaleStageNotifications(db, {
+      ownerUid: job.ownerUid,
+      instructionId: job.instructionId,
+      jobId: job.jobId || doc.id,
+      currentStageId: stage.stageId || job.currentStage,
+      nowMs,
+    });
     const health = evaluateStageHealth({ job, stage, agent, policy, nowMs });
     let eventType = "";
     if (health.state === "offline") eventType = "agent_offline";
@@ -657,4 +704,5 @@ module.exports = {
   recoveryBackoffMs,
   isRecoveryImportOnly,
   recoverySucceeded,
+  dismissStaleStageNotifications,
 };
