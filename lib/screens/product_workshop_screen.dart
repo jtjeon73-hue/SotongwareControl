@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/sotong24_workflows.dart';
+import '../models/artifact_type.dart';
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import '../models/sotong24_monitoring.dart';
@@ -18,6 +19,7 @@ import '../services/production_review_workshop_merge.dart';
 import 'pdf_preview_screen.dart';
 import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
+import '../widgets/site_user_review_actions.dart';
 import '../widgets/operational_collapsible_section.dart';
 import '../widgets/pdf_download_button.dart';
 import '../widgets/apk_download_button.dart';
@@ -588,10 +590,20 @@ class _Sotong24RemoteDetailScreenState
               !project.isProductionComplete &&
               stage.stageNumber == project.currentStage &&
               stage.status != Sotong24WorkStatus.completed &&
+              stage.status != Sotong24WorkStatus.awaitingApproval &&
               stage.activityState != 'validation_retry_waiting' &&
+              stage.activityState != 'approval_preparing' &&
               stage.status != Sotong24WorkStatus.resultValidationRetrying &&
               (monitoringSnapshot.health == Sotong24StageHealth.inactive ||
                   monitoringSnapshot.health == Sotong24StageHealth.stalled);
+          final showSiteUserReview =
+              stage != null &&
+              project.productType == ArtifactType.site &&
+              stage.stageId == 'site_user_review' &&
+              (stage.status == Sotong24WorkStatus.awaitingApproval ||
+                  stage.hasOpenableResult ||
+                  showApprovalActions);
+          final siteReviewStage = showSiteUserReview ? stage : null;
           _scrollToApkIfNeeded(project);
 
           return ListView(
@@ -691,7 +703,7 @@ class _Sotong24RemoteDetailScreenState
                   stage: stage,
                   policy: widget.monitoringPolicy,
                 ),
-                if (showStallFollowUp) ...[
+                if (showStallFollowUp && !showSiteUserReview) ...[
                   const SizedBox(height: 10),
                   StallFollowUpActionBar(
                     project: project,
@@ -927,7 +939,35 @@ class _Sotong24RemoteDetailScreenState
                       workflow.byId(s.stageId) ??
                       workflow.byOrder(s.stageNumber),
                 ),
-              if (stage != null) ...[
+              if (siteReviewStage != null) ...[
+                const SizedBox(height: 14),
+                Text(
+                  '결과 확인 · 사용자 검토',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _ResultPanel(stage: siteReviewStage, project: project),
+                const SizedBox(height: 10),
+                SiteUserReviewActions(
+                  project: project,
+                  stage: siteReviewStage,
+                  busy: _busy,
+                  onApprove: () => _onApprove(project, siteReviewStage),
+                  onChangesRequested: () =>
+                      _onRevision(project, siteReviewStage),
+                  onDesignChange: () =>
+                      _onSiteDesignChange(project, siteReviewStage),
+                  onHold: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('보류했습니다. 결과는 보존되며 STEP16은 시작되지 않습니다.'),
+                      ),
+                    );
+                  },
+                ),
+              ] else if (stage != null) ...[
                 const SizedBox(height: 14),
                 Text(
                   '결과 확인',
@@ -938,7 +978,9 @@ class _Sotong24RemoteDetailScreenState
                 const SizedBox(height: 6),
                 _ResultPanel(stage: stage, project: project),
               ],
-              if (showApprovalActions && stage != null) ...[
+              if (showApprovalActions &&
+                  stage != null &&
+                  !showSiteUserReview) ...[
                 const SizedBox(height: 16),
                 Text(
                   '승인',
@@ -1055,18 +1097,53 @@ class _Sotong24RemoteDetailScreenState
       return;
     }
 
+    final revLabel = 'r${stage.revision > 0 ? stage.revision : 1}';
+    final payload =
+        project.productType == ArtifactType.site &&
+            stage.stageId == 'site_user_review'
+        ? SiteReviewDecisionPayload(
+            reviewDecision: 'changes_requested',
+            reviewedRevision: revLabel,
+            reviewComment: message,
+          ).toRevisionMessage()
+        : message;
+
     setState(() => _busy = true);
     final err = await widget.repository.requestRevision(
       projectId: project.projectId,
       stageId: stage.stageId,
       requestId: _resolveRequestId(stage),
-      message: message,
+      message: payload,
     );
     if (!mounted) return;
     setState(() => _busy = false);
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(err ?? '보완 요청을 전송했습니다.')));
+  }
+
+  Future<void> _onSiteDesignChange(
+    Sotong24RemoteProject project,
+    Sotong24RemoteStage stage,
+  ) async {
+    final revLabel = 'r${stage.revision > 0 ? stage.revision : 1}';
+    final decision = await showSiteDesignChangeDialog(
+      context,
+      reviewedRevision: revLabel,
+    );
+    if (decision == null || !mounted) return;
+    setState(() => _busy = true);
+    final err = await widget.repository.requestRevision(
+      projectId: project.projectId,
+      stageId: stage.stageId,
+      requestId: _resolveRequestId(stage),
+      message: decision.toRevisionMessage(),
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(err ?? '디자인 변경 요청을 전송했습니다. 기존 r1은 보존됩니다.')),
+    );
   }
 
   Future<void> _onCancelRun(Sotong24RemoteProject project) async {

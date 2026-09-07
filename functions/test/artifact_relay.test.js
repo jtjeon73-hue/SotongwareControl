@@ -176,6 +176,15 @@ describe("artifact URL sanitize", () => {
       /storage_host_required/
     );
   });
+
+  it("allows sotongware-control Hosting review channel URLs", () => {
+    const u = sanitizeHttpsUrl(
+      "https://sotongware-control--sr-demo-r1.web.app/",
+      "previewUrl",
+      { requireStorageHost: true }
+    );
+    assert.equal(u, "https://sotongware-control--sr-demo-r1.web.app/");
+  });
 });
 
 describe("artifact path / filename", () => {

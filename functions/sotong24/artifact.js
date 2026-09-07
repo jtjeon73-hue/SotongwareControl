@@ -218,10 +218,15 @@ function sanitizeHttpsUrl(value, field, { requireStorageHost = false } = {}) {
 
   if (requireStorageHost) {
     const host = u.hostname.toLowerCase();
-    const ok = STORAGE_HOST_SUFFIXES.some(
+    const storageOk = STORAGE_HOST_SUFFIXES.some(
       (suf) => host === suf || host.endsWith(`.${suf}`)
     );
-    if (!ok) {
+    // Site STEP15 review channels under Control Hosting (not production homepage).
+    const reviewHostOk =
+      /^sotongware-control(--[a-z0-9-]+)?\.(web\.app|firebaseapp\.com)$/i.test(
+        host
+      );
+    if (!storageOk && !reviewHostOk) {
       reject("invalid_argument", `${field} storage_host_required`);
     }
   }
