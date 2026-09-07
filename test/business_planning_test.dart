@@ -257,7 +257,7 @@ void main() {
 
     expect(find.text('작업지시 제작소'), findsOneWidget);
     expect(find.text('사업유형 선택'), findsOneWidget);
-    expect(find.text('전자책 개발'), findsWidgets);
+    expect(find.text('전자책'), findsWidgets);
     expect(find.text('다음'), findsOneWidget);
     expect(find.text('이전'), findsOneWidget);
     expect(find.text('취소'), findsOneWidget);
@@ -274,8 +274,12 @@ void main() {
       const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('기타 작업'));
+    final other = find.byKey(const Key('planning_other_actions'));
+    await tester.ensureVisible(other);
     await tester.pumpAndSettle();
+    await tester.tap(find.text('상세 설정 · 기타 작업'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('직접 입력'));
     await tester.tap(find.text('직접 입력'));
     await tester.pumpAndSettle();
     expect(find.text('사업 주제 *'), findsOneWidget);
@@ -292,7 +296,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byKey(const ValueKey('artifact-ebook')));
+      final ebook = find.byKey(const ValueKey('biz-kind-ebook'));
+      await tester.ensureVisible(ebook);
+      await tester.pumpAndSettle();
+      await tester.tap(ebook);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     });

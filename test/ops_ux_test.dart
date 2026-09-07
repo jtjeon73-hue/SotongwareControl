@@ -71,9 +71,9 @@ void main() {
     expect(find.text('작업지시 JSON 붙여넣기'), findsNothing);
     expect(tester.takeException(), isNull);
 
-    await tester.ensureVisible(find.byKey(const ValueKey('artifact-ebook')));
+    await tester.ensureVisible(find.byKey(const ValueKey('biz-kind-ebook')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('artifact-ebook')));
+    await tester.tap(find.byKey(const ValueKey('biz-kind-ebook')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('다음'),
