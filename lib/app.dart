@@ -153,6 +153,24 @@ class _ControlCenterShellState extends State<ControlCenterShell> {
     final title = message.notification?.title?.trim();
     final body = message.notification?.body?.trim();
     final deepLink = Uri.tryParse('${message.data['deepLink'] ?? ''}'.trim());
+    final eventType = '${message.data['eventType'] ?? ''}'.trim();
+    final eventStageId = '${message.data['stageId'] ?? ''}'.trim();
+    final focusStageId = (_workshopFocusStageId ?? '').trim();
+    const stallTypes = {
+      'activity_stalled',
+      'recovery_exhausted',
+      'recovery_action_required',
+      'agent_offline',
+      'work_error',
+    };
+    // Do not surface prior-stage stall banners while the workshop focus / live
+    // stage has already moved on.
+    if (stallTypes.contains(eventType) &&
+        eventStageId.isNotEmpty &&
+        focusStageId.isNotEmpty &&
+        eventStageId != focusStageId) {
+      return;
+    }
     final text = [
       if (title != null && title.isNotEmpty) title,
       if (body != null && body.isNotEmpty) body,

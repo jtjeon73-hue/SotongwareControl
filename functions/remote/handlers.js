@@ -578,7 +578,17 @@ async function handleReportStage(db, ctx, body) {
     WORK_STATUS.STAGE_TRANSITION_FAILED,
   ]);
   if (!previous.startedAt && activeStatus.has(status)) patch.startedAt = ts;
-  patch.lastActivityAt = ts;
+  // Heartbeat-adjacent status echoes must not refresh worker activity clocks.
+  // Only real transitions / interruptions / completion count as activity.
+  const statusChanged = String(previous.status || "") !== String(status || "");
+  const countsAsWorkerActivity = statusChanged
+    || interruptionStatus.has(status)
+    || reportsCompletion
+    || status === WORK_STATUS.WAITING_APPROVAL
+    || status === WORK_STATUS.RESULT_VALIDATION_RETRYING;
+  if (countsAsWorkerActivity || !previous.lastActivityAt) {
+    patch.lastActivityAt = ts;
+  }
   patch.activityType = status === WORK_STATUS.WAITING_APPROVAL
     ? ACTIVITY_TYPE.APPROVAL_TRANSITION
     : ACTIVITY_TYPE.STAGE_STATUS;
@@ -602,7 +612,9 @@ async function handleReportStage(db, ctx, body) {
     currentStageNumber: Number(body.stageNumber || previous.stageNumber) ||
       stageDefinition?.order || 0,
     updatedAt: ts,
-    lastActivityAt: ts,
+    ...(countsAsWorkerActivity || !job.lastActivityAt
+      ? { lastActivityAt: ts }
+      : {}),
     ...(body.criteriaMet != null ? { currentStageCriteriaMet: body.criteriaMet === true } : {}),
     ...(body.approvalRequired != null ? { approvalRequired: body.approvalRequired === true } : {}),
     ...(patch.attemptCount != null ? { attemptCount: patch.attemptCount } : {}),
@@ -681,7 +693,9 @@ async function handleReportStage(db, ctx, body) {
           stageDefinition?.order || 0,
         currentStageId: stageId,
         status: projectStatus,
-        lastActivityAt: ts,
+        ...(countsAsWorkerActivity || !currentProject.lastActivityAt
+          ? { lastActivityAt: ts }
+          : {}),
         activityState: projectStagePatch.activityState || "",
         approvalMode: job.approvalMode === "auto" ? "auto" : "manual",
         updatedAt: ts,

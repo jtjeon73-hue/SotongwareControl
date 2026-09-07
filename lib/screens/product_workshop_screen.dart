@@ -1820,7 +1820,8 @@ class _StageMonitoringPanel extends StatelessWidget {
                 : stage.status == Sotong24WorkStatus.resultValidationRetrying ||
                       stage.activityState == 'validation_retry_waiting'
                 ? '단계 경과 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} · 재시도 대기 중'
-                : '진행 중 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} 경과',
+                : '단계 경과 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
+                      '${snapshot.workerElapsed != null ? ' · worker ${Sotong24StageMonitoring.compactDuration(snapshot.workerElapsed)}' : ''}',
             style: const TextStyle(fontSize: 13),
           ),
           Text(
@@ -1829,8 +1830,8 @@ class _StageMonitoringPanel extends StatelessWidget {
                 : snapshot.health == Sotong24StageHealth.awaitingUser
                 ? '사용자 승인 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.approvalWaitAge)}'
                 : snapshot.agentOnline
-                ? 'PC/Agent 온라인 · heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}'
-                : 'Agent 연결 복구 필요 · heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}',
+                ? 'PC/Agent 온라인 · Agent heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}'
+                : 'Agent 연결 복구 필요 · Agent heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}',
             style: TextStyle(
               fontSize: 13,
               color: healthColor,
@@ -1840,7 +1841,7 @@ class _StageMonitoringPanel extends StatelessWidget {
           if (!productionComplete &&
               snapshot.health != Sotong24StageHealth.awaitingUser)
             Text(
-              '현재 작업 · ${snapshot.activityLabel} · 마지막 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
+              '현재 작업 · ${snapshot.activityLabel} · 마지막 worker 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
               style: const TextStyle(fontSize: 13),
             ),
           if (!productionComplete &&

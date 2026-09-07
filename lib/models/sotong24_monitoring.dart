@@ -96,6 +96,7 @@ class Sotong24StageMonitoringSnapshot {
   const Sotong24StageMonitoringSnapshot({
     required this.health,
     required this.elapsed,
+    this.workerElapsed,
     required this.lastActivityAge,
     required this.heartbeatAge,
     required this.agentOnline,
@@ -105,7 +106,12 @@ class Sotong24StageMonitoringSnapshot {
   });
 
   final Sotong24StageHealth health;
+
+  /// Stage wall time from first stage entry (startedAt).
   final Duration? elapsed;
+
+  /// Current worker session age when a live executor is reported.
+  final Duration? workerElapsed;
   final Duration? lastActivityAge;
   final Duration? heartbeatAge;
   final bool agentOnline;
@@ -153,20 +159,32 @@ class Sotong24StageMonitoring {
     }
 
     final heartbeatAge = age(project.lastHeartbeat);
-    final activityAge = age(
-      stage.lastActivityAt.isNotEmpty
-          ? stage.lastActivityAt
-          : project.lastActivityAt,
-    );
-    final startedAt = DateTime.tryParse(
-      stage.startedAt.isNotEmpty ? stage.startedAt : project.startedAt,
-    )?.toUtc();
+    // Worker/output activity only. Never fall back to project.lastActivityAt —
+    // PROJECT_SYNC / status echoes can refresh that without real worker progress.
+    final activityAge = age(stage.lastActivityAt);
+    // Stage elapsed must use the stage's own startedAt (first entry / dispatch).
+    // Falling back to project.startedAt caused 1s timer resets whenever Save
+    // rewrote project timestamps.
+    final startedAt = DateTime.tryParse(stage.startedAt)?.toUtc();
     final completedAt = DateTime.tryParse(stage.completedAt)?.toUtc();
     final elapsed = startedAt == null
         ? null
         : ((completedAt ?? clock).difference(startedAt).isNegative
               ? Duration.zero
               : (completedAt ?? clock).difference(startedAt));
+    final workerStartedAt = DateTime.tryParse(
+      stage.activityState.startsWith('cursor_') ||
+              stage.activityState.startsWith('codex_')
+          ? (stage.lastActivityAt.isNotEmpty
+                ? stage.lastActivityAt
+                : stage.startedAt)
+          : '',
+    )?.toUtc();
+    final workerElapsed = workerStartedAt == null
+        ? null
+        : (clock.difference(workerStartedAt).isNegative
+              ? Duration.zero
+              : clock.difference(workerStartedAt));
     final approvalWaitAge = age(
       stage.completedAt.isNotEmpty ? stage.completedAt : stage.lastActivityAt,
     );
@@ -216,6 +234,7 @@ class Sotong24StageMonitoring {
     return Sotong24StageMonitoringSnapshot(
       health: health,
       elapsed: elapsed,
+      workerElapsed: workerElapsed,
       lastActivityAge: activityAge,
       heartbeatAge: heartbeatAge,
       agentOnline: online,

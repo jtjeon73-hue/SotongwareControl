@@ -257,4 +257,39 @@ void main() {
     expect(result.health, Sotong24StageHealth.delayed);
     expect(result.activityLabel, '결과 검증 자동 재시도 대기');
   });
+
+  test('stage elapsed ignores project.startedAt and project.lastActivityAt', () {
+    final live = Sotong24RemoteStage(
+      stageId: 'site_build_preview_test',
+      stageNumber: 14,
+      stageName: '빌드·preview·테스트',
+      status: Sotong24WorkStatus.inProgress,
+      startedAt: '2026-08-19T00:00:00.000Z',
+      lastActivityAt: '2026-08-19T00:01:00.000Z',
+      activityState: 'worker_dispatch_waiting',
+    );
+    final proj = Sotong24RemoteProject(
+      projectId: 'wi_test_monitor',
+      title: 'monitor',
+      productType: 'site',
+      currentStage: 14,
+      totalStages: 18,
+      progress: 72,
+      status: Sotong24WorkStatus.inProgress,
+      lastHeartbeat: '2026-08-19T00:04:55.000Z',
+      startedAt: '2026-08-19T00:04:50.000Z',
+      lastActivityAt: '2026-08-19T00:04:50.000Z',
+      stages: [live],
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: proj,
+      stage: live,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T00:05:00.000Z'),
+    );
+    expect(result.elapsed, const Duration(minutes: 5));
+    expect(result.lastActivityAge, const Duration(minutes: 4));
+    expect(result.heartbeatAge, const Duration(seconds: 5));
+    expect(result.agentOnline, isTrue);
+  });
 }
