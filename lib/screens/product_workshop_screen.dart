@@ -2282,7 +2282,12 @@ class _ResultPanel extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              stage.summary,
+              _displaySafeText(
+                stage.summary,
+                fallback: stage.stageId == 'site_user_review'
+                    ? '사용자 검토 대기 · Preview 확인 후 승인/보완/디자인변경/보류'
+                    : stage.summary,
+              ),
               style: const TextStyle(height: 1.4, fontSize: 15),
             ),
             const SizedBox(height: 10),
@@ -2669,6 +2674,17 @@ String _formatTime(String iso) {
   String two(int n) => n.toString().padLeft(2, '0');
   return '${local.year}-${two(local.month)}-${two(local.day)} '
       '${two(local.hour)}:${two(local.minute)}';
+}
+
+String _displaySafeText(String raw, {required String fallback}) {
+  final t = raw.trim();
+  if (t.isEmpty) return fallback;
+  final replacement = RegExp(r'[\uFFFD?]').allMatches(t).length;
+  // Garbled remote summaries often collapse Hangul into '?' / U+FFFD.
+  if (replacement >= 3 && replacement * 2 >= t.replaceAll(' ', '').length) {
+    return fallback;
+  }
+  return t;
 }
 
 String _workerLabel(Sotong24RemoteProject project, Sotong24RemoteStage? stage) {
