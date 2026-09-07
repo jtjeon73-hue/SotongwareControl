@@ -23,6 +23,8 @@ class PublicServicesScreen extends StatelessWidget {
         return Icons.campaign_outlined;
       case 'industrial':
         return Icons.precision_manufacturing_outlined;
+      case 'site_manager':
+        return Icons.hub_outlined;
       default:
         return Icons.public_outlined;
     }

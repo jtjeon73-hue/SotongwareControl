@@ -129,7 +129,7 @@ void main() {
     expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
     expect(ControlDestination.businessStudy.label, '사업 전략연구실');
     expect(ControlDestination.webMarketing.label, '마케팅사이트 개발부');
-    expect(ControlDestination.siteManager.label, '지식사이트 개발부');
+    expect(ControlDestination.siteManager.label, '지식·교육 사이트 매니저');
     expect(ControlDestination.industrialAutomation.label, '산업자동화SW개발부');
     expect(ControlDestination.appDevelopment.label, '앱 개발부');
     expect(ControlDestination.ebook.label, '전자책 개발부');

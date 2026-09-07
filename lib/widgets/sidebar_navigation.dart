@@ -121,7 +121,7 @@ extension ControlDestinationX on ControlDestination {
       case ControlDestination.webMarketing:
         return '마케팅사이트 개발부';
       case ControlDestination.siteManager:
-        return '지식사이트 개발부';
+        return '지식·교육 사이트 매니저';
       case ControlDestination.businessStudy:
         return '사업 전략연구실';
       case ControlDestination.publicServices:

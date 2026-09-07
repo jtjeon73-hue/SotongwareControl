@@ -194,7 +194,7 @@ void main() {
     await tester.drag(find.byType(ListView).first, const Offset(0, -800));
     await tester.pumpAndSettle();
     expect(find.text('마케팅사이트 개발부'), findsWidgets);
-    expect(find.text('지식사이트 개발부'), findsWidgets);
+    expect(find.text('지식·교육 사이트 매니저'), findsWidgets);
     expect(find.text('시스템 설정'), findsWidgets);
     expect(find.text('관리자 로그인'), findsNothing);
     expect(tester.takeException(), isNull);

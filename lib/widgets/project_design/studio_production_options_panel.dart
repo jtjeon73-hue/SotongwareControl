@@ -44,8 +44,8 @@ class StudioProductionOptionsPanel extends StatelessWidget {
               SegmentedButton<String>(
                 key: const Key('studio_approval_mode'),
                 segments: const [
-                  ButtonSegment(value: 'manual', label: Text('수동 승인')),
                   ButtonSegment(value: 'auto', label: Text('자동 승인')),
+                  ButtonSegment(value: 'manual', label: Text('수동 승인')),
                 ],
                 selected: {approvalMode},
                 onSelectionChanged: (v) => onApprovalModeChanged(v.first),
@@ -53,8 +53,8 @@ class StudioProductionOptionsPanel extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 approvalMode == 'auto'
-                    ? 'validator PASS 시 다음 단계 자동 진행 (continuous)'
-                    : '각 주요 단계에서 사용자 확인 (hold)',
+                    ? 'validator PASS 단계는 자동 진행. STEP15 검토·STEP18 배포·스토어/외부 공개는 사용자 확인'
+                    : '계약상 승인 필요 단계마다 사용자가 직접 확인 후 진행',
                 style: const TextStyle(
                   fontSize: 11.5,
                   color: ControlColors.textMuted,

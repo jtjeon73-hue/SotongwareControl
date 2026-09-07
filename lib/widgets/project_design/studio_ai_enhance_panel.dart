@@ -79,6 +79,21 @@ class _StudioAiEnhancePanelState extends State<StudioAiEnhancePanel> {
                 label: const Text('AI로 제작 요구사항 보완'),
               ),
             ] else ...[
+              Text(
+                'AI가 이렇게 이해했습니다',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: ControlColors.teal,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _result!.suggestedNotes.trim().isEmpty
+                    ? '${_result!.suggestedProblem} → ${_result!.suggestedOutcome}'
+                    : _result!.suggestedNotes.trim(),
+                style: const TextStyle(fontSize: 13, height: 1.35),
+              ),
+              const SizedBox(height: 12),
               for (final section in _result!.sections) ...[
                 Text(
                   section.title,
@@ -138,16 +153,16 @@ class _StudioAiEnhancePanelState extends State<StudioAiEnhancePanel> {
                         const SnackBar(content: Text('보완 내용을 적용했습니다.')),
                       );
                     },
-                    child: const Text('적용'),
+                    child: const Text('그대로 사용'),
                   ),
                   OutlinedButton(
                     onPressed: () => setState(() => _editing = true),
-                    child: const Text('수정'),
+                    child: const Text('일부 수정'),
                   ),
                   OutlinedButton(
                     key: const Key('studio_ai_enhance_retry'),
                     onPressed: _runEnhance,
-                    child: const Text('다시 보완'),
+                    child: const Text('다시 AI 보완'),
                   ),
                   TextButton(
                     key: const Key('studio_ai_enhance_keep'),

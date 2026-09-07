@@ -12,6 +12,7 @@ import 'concept_picker_panel.dart';
 import 'studio_ai_enhance_panel.dart';
 import 'studio_production_options_panel.dart';
 import 'studio_workflow_preview_panel.dart';
+import '../../services/studio_title_recommendations.dart';
 
 /// Project Design Engine Wizard (STEP 0~6).
 class ProjectDesignWizard extends StatefulWidget {
@@ -27,7 +28,7 @@ class ProjectDesignWizard extends StatefulWidget {
     this.onOccupiedConcept,
     this.instructionGenerated = false,
     this.instructionStale = false,
-    this.approvalMode = 'manual',
+    this.approvalMode = 'auto',
     this.workerPreference = 'auto',
     this.aiProductionPilot = true,
     this.onApprovalModeChanged,
@@ -284,21 +285,6 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     _emit(next);
   }
 
-  IconData _artifactIcon(String name) {
-    switch (name) {
-      case 'phone_android':
-        return Icons.phone_android_outlined;
-      case 'play_circle':
-        return Icons.play_circle_outline;
-      case 'language':
-        return Icons.language_outlined;
-      case 'campaign':
-        return Icons.campaign_outlined;
-      default:
-        return Icons.menu_book_outlined;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -477,17 +463,58 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         ],
         const SizedBox(height: 16),
         const Text(
-          '무엇을 만들까요? 4대 제작 유형 중 하나를 선택하세요.',
+          '사업 종류를 선택하세요. (내부 track은 app / ebook / site / content 로 매핑됩니다)',
           style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
         ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 720;
-            final cards = ProjectDesignCatalog.studioMainCards;
+            final kinds = StudioTitleRecommendations.businessKinds;
+            final kindSel =
+                _state.productionSelections['business_kind'] ?? const <String>[];
+            final selectedKindId =
+                kindSel.isEmpty ? null : kindSel.first.toString();
             final isSiteFamily =
                 _state.artifactType == ArtifactType.site ||
                 _state.artifactType == ArtifactType.promoSite;
+            IconData kindIcon(String id) {
+              switch (id) {
+                case 'industrial_sw':
+                  return Icons.precision_manufacturing_outlined;
+                case 'app':
+                  return Icons.phone_android;
+                case 'ebook':
+                  return Icons.menu_book_outlined;
+                case 'knowledge_site':
+                  return Icons.school_outlined;
+                case 'marketing_site':
+                  return Icons.campaign_outlined;
+                case 'content':
+                  return Icons.play_circle_outline;
+                default:
+                  return Icons.category_outlined;
+              }
+            }
+
+            bool isKindSelected(
+              ({
+                String id,
+                String label,
+                String artifactType,
+                String? siteSubtype,
+              }) kind,
+            ) {
+              if (selectedKindId != null && selectedKindId.isNotEmpty) {
+                return selectedKindId == kind.id;
+              }
+              if (kind.siteSubtype != null) {
+                return isSiteFamily && _state.siteSubtype == kind.siteSubtype;
+              }
+              return _state.artifactType == kind.artifactType &&
+                  !isSiteFamily;
+            }
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -495,48 +522,44 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    for (final card in cards)
+                    for (final kind in kinds)
                       SizedBox(
                         width: wide
                             ? (constraints.maxWidth - 10) / 2
                             : constraints.maxWidth,
                         child: _ArtifactSelectCard(
-                          key: ValueKey('artifact-${card.id}'),
-                          selected: card.id == ArtifactType.site
-                              ? isSiteFamily
-                              : _state.artifactType == card.id,
-                          selectedKey:
-                              (card.id == ArtifactType.site
-                                  ? isSiteFamily
-                                  : _state.artifactType == card.id)
-                              ? Key('planning_artifact_${card.id}_selected')
+                          key: ValueKey('biz-kind-${kind.id}'),
+                          selected: isKindSelected(kind),
+                          selectedKey: isKindSelected(kind)
+                              ? Key(
+                                  'planning_artifact_${kind.artifactType}_selected',
+                                )
                               : null,
-                          title: card.title,
-                          subtitle: card.subtitle,
-                          icon: _artifactIcon(card.iconName),
+                          title: kind.label,
+                          subtitle: kind.siteSubtype == null
+                              ? 'track · ${kind.artifactType}'
+                              : 'site · ${kind.siteSubtype}',
+                          icon: kindIcon(kind.id),
                           onTap: () {
                             final next = _state.copy()
-                              ..artifactType = card.id == ArtifactType.site
-                                  ? ArtifactType.site
-                                  : card.id
+                              ..artifactType = kind.artifactType
                               ..contentSubtype =
-                                  card.id == ArtifactType.contents
+                                  kind.artifactType == ArtifactType.contents
                                   ? _state.contentSubtype
                                   : null
-                              ..siteSubtype =
-                                  (card.id == ArtifactType.site ||
-                                      card.id == ArtifactType.promoSite)
-                                  ? _state.siteSubtype
-                                  : null;
-                            if (card.id != ArtifactType.site &&
-                                card.id != ArtifactType.promoSite) {
-                              final prod = Map<String, List<String>>.from(
-                                next.productionSelections,
-                              );
+                              ..siteSubtype = kind.siteSubtype;
+                            final prod = Map<String, List<String>>.from(
+                              next.productionSelections,
+                            );
+                            prod['business_kind'] = [kind.id];
+                            if (kind.siteSubtype != null) {
+                              prod['site_kind'] = [kind.siteSubtype!];
+                              prod.remove('siteKind');
+                            } else {
                               prod.remove('site_kind');
                               prod.remove('siteKind');
-                              next.productionSelections = prod;
                             }
+                            next.productionSelections = prod;
                             _emit(next);
                           },
                         ),
@@ -546,8 +569,16 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                 if (isSiteFamily) ...[
                   const SizedBox(height: 16),
                   const Text(
-                    '사이트 유형',
+                    '사이트 subtype (필수)',
                     style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'corporate / marketing / knowledge / education / information_portal',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: ControlColors.textMuted,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -565,6 +596,12 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                             );
                             prod['site_kind'] = [kind.id];
                             prod.remove('siteKind');
+                            if (kind.id == 'marketing_site') {
+                              prod['business_kind'] = ['marketing_site'];
+                            } else if (kind.id == 'knowledge_site' ||
+                                kind.id == 'education_site') {
+                              prod['business_kind'] = ['knowledge_site'];
+                            }
                             _emit(
                               _state.copy()
                                 ..artifactType = ArtifactType.site
@@ -664,14 +701,120 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
 
   Widget _buildTopicsStep() {
     final concepts = _engine.recommendConceptsSync(_state, limit: 50);
+    final kindSel =
+        _state.productionSelections['business_kind'] ?? const <String>[];
+    final businessKindId = kindSel.isEmpty ? null : kindSel.first.toString();
+    final titles = StudioTitleRecommendations.recommend(
+      artifactType: _state.artifactType ?? '',
+      siteSubtype: _state.siteSubtype,
+      audienceIds: _state.selectedAudiences,
+      businessKindId: businessKindId,
+      limit: StudioTitleRecommendations.maxTitles,
+    );
+    final preview = titles.take(StudioTitleRecommendations.topPreview).toList();
+    final more = titles.skip(StudioTitleRecommendations.topPreview).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '대상 고객·결과물에 맞는 컨셉을 추천합니다. 여러 개를 선택할 수 있습니다.',
+          '추천 제목을 고르거나 직접 입력하세요. 클릭하면 핵심 아이디어에 바로 적용됩니다.',
           style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
         ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _topicCtrl,
+          decoration: InputDecoration(
+            labelText: '핵심 아이디어 / 작업 제목',
+            hintText: StudioTitleRecommendations.ideaPlaceholder(
+              artifactType: _state.artifactType ?? '',
+              siteSubtype: _state.siteSubtype,
+              audienceIds: _state.selectedAudiences,
+              businessKindId: businessKindId,
+            ),
+            border: const OutlineInputBorder(),
+          ),
+          minLines: 2,
+          maxLines: 4,
+          onChanged: (_) {
+            _emit(
+              _engine.markFieldEdited(
+                _state.copy()..topic = _topicCtrl.text,
+                field: 'topic',
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 12),
+        const Text(
+          '추천 TOP 10',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final t in preview)
+              ActionChip(
+                key: Key('studio_title_rec_${t.hashCode}'),
+                label: Text(t, style: const TextStyle(fontSize: 12.5)),
+                onPressed: () {
+                  _topicCtrl.text = t;
+                  final next = _engine.markFieldEdited(
+                    _state.copy()
+                      ..topic = t
+                      ..displayTitle = t
+                      ..titleSource = 'ai_suggested',
+                    field: 'topic',
+                  );
+                  _emit(next);
+                },
+              ),
+          ],
+        ),
+        if (more.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ExpansionTile(
+            key: const Key('studio_title_rec_more'),
+            tilePadding: EdgeInsets.zero,
+            title: Text(
+              '더 보기 · 최대 ${titles.length}개',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+            ),
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final t in more)
+                      ActionChip(
+                        label: Text(t, style: const TextStyle(fontSize: 12.5)),
+                        onPressed: () {
+                          _topicCtrl.text = t;
+                          final next = _engine.markFieldEdited(
+                            _state.copy()
+                              ..topic = t
+                              ..displayTitle = t
+                              ..titleSource = 'ai_suggested',
+                            field: 'topic',
+                          );
+                          _emit(next);
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
+        const Text(
+          '관련 컨셉 (선택)',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
         ConceptPickerPanel(
           candidates: concepts,
           selectedIds: _state.selectedConceptIds,
@@ -684,7 +827,9 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             var next = _state.copy()..selectedConceptIds = ids;
             next.planningConfirmed = false;
             next = _engine.syncSentences(next);
-            _topicCtrl.text = next.topic;
+            if (_topicCtrl.text.trim().isEmpty) {
+              _topicCtrl.text = next.topic;
+            }
             _problemCtrl.text = next.customerProblem;
             _outcomeCtrl.text = next.desiredOutcome;
             _prefillCommercialFromConcepts(next);
@@ -987,65 +1132,109 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           StudioProductionOptionsPanel(
             approvalMode: widget.approvalMode,
             workerPreference: widget.workerPreference,
-            showApprovalMode: true,
+            // Approval is always visible on the studio main screen.
+            showApprovalMode: false,
             onApprovalModeChanged: (v) => widget.onApprovalModeChanged?.call(v),
             onWorkerPreferenceChanged: (v) =>
                 widget.onWorkerPreferenceChanged?.call(v),
           ),
-          if (widget.approvalMode == 'auto') ...[
-            const SizedBox(height: 8),
-            const Text(
-              '자동 승인이 켜져 있어도 다음 단계에서는 반드시 멈춥니다: '
-              '사용자 품질 검토, owner review, 외부 공개, 앱스토어·사업부 등록',
-              style: TextStyle(fontSize: 11.5, color: ControlColors.accentWarm),
+          ExpansionTile(
+            key: const Key('studio_production_detail_accordion'),
+            initiallyExpanded: false,
+            tilePadding: EdgeInsets.zero,
+            title: const Text(
+              '상세 제작 설정',
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
-          ],
+            subtitle: const Text(
+              '기술·플랫폼·SEO·고급 옵션은 필요할 때만 펼치세요.',
+              style: TextStyle(fontSize: 12, color: ControlColors.textSecondary),
+            ),
+            children: [
+              if (widget.approvalMode == 'auto')
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    '자동 승인이어도 STEP15 사용자 검토·STEP18 배포·스토어/외부 공개는 '
+                    '사용자가 직접 확인합니다.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: ControlColors.accentWarm,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 12),
         ],
         if (groups.isEmpty)
           const Text('이 결과물은 추가 제작 정보가 필수는 아닙니다. 다음으로 진행하세요.')
         else ...[
-          const Text(
-            '결과물에 맞는 제작 정보를 선택하세요.',
-            style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
-          ),
-          const SizedBox(height: 12),
-          for (final g in groups) ...[
-            Text(g.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final opt in g.options)
-                  FilterChip(
-                    label: Text(opt.label),
-                    selected: (_state.productionSelections[g.id] ?? const [])
-                        .contains(opt.id),
-                    onSelected: (on) {
-                      final next = _state.copy();
-                      final cur = List<String>.from(
-                        next.productionSelections[g.id] ?? const [],
-                      );
-                      if (g.multi) {
-                        if (on) {
-                          if (!cur.contains(opt.id)) cur.add(opt.id);
-                        } else {
-                          cur.remove(opt.id);
-                        }
-                      } else {
-                        cur
-                          ..clear()
-                          ..addAll(on ? [opt.id] : []);
-                      }
-                      next.productionSelections[g.id] = cur;
-                      _emit(next);
-                    },
-                  ),
-              ],
+          ExpansionTile(
+            key: const Key('studio_production_groups_accordion'),
+            initiallyExpanded: false,
+            tilePadding: EdgeInsets.zero,
+            title: const Text(
+              '결과물별 제작 정보',
+              style: TextStyle(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 12),
-          ],
+            children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '결과물에 맞는 제작 정보를 선택하세요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: ControlColors.textSecondary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final g in groups) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    g.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final opt in g.options)
+                      FilterChip(
+                        label: Text(opt.label),
+                        selected:
+                            (_state.productionSelections[g.id] ?? const [])
+                                .contains(opt.id),
+                        onSelected: (on) {
+                          final next = _state.copy();
+                          final cur = List<String>.from(
+                            next.productionSelections[g.id] ?? const [],
+                          );
+                          if (g.multi) {
+                            if (on) {
+                              if (!cur.contains(opt.id)) cur.add(opt.id);
+                            } else {
+                              cur.remove(opt.id);
+                            }
+                          } else {
+                            cur
+                              ..clear()
+                              ..addAll(on ? [opt.id] : []);
+                          }
+                          next.productionSelections[g.id] = cur;
+                          _emit(next);
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+            ],
+          ),
         ],
       ],
     );

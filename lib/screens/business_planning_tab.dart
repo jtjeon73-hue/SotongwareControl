@@ -107,7 +107,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   /// 새 ebook WI에만 Codex 1단계 pilot 정책 부착. 기존 WI에는 자동 삽입하지 않음.
   bool _aiProductionPilot = true;
-  String _approvalMode = 'manual';
+  String _approvalMode = 'auto';
   String _workerPreference = 'cursor';
   DevWorkDocState? _devDocState;
   List<RemoteAgentDoc> _remoteAgents = const [];
@@ -1943,7 +1943,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _resumeInput = null;
     _resumePlanId = null;
     _aiProductionPilot = true;
-    _approvalMode = 'manual';
+    _approvalMode = 'auto';
     _inputModeQuick = true;
     _wizardState = PlanningWizardState(mode: 'quick');
     _designState = WorkInstructionWizardSession.emptyDesign();
@@ -2140,8 +2140,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             const SizedBox(height: 10),
             _buildEmptyWorkshopPrepBanner(),
           ],
-          const SizedBox(height: 12),
-          _buildTransferredInstructionList(),
+          if (_showApprovalModeChoice) ...[
+            const SizedBox(height: 12),
+            _buildApprovalModeCard(),
+          ],
           const SizedBox(height: 12),
           if (_inputModeQuick)
             ProjectDesignWizard(
@@ -2167,10 +2169,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             )
           else
             _buildAdvancedForm(),
-          if (_showApprovalModeChoice && !_inputModeQuick) ...[
-            const SizedBox(height: 12),
-            _buildApprovalModeCard(),
-          ],
           if (_instruction != null) ...[
             const SizedBox(height: 12),
             StudioPreflightPanel(
@@ -2184,9 +2182,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _buildMainActions(),
           ],
           const SizedBox(height: 12),
+          _buildTransferredInstructionList(),
+          const SizedBox(height: 12),
           OperationalCollapsibleSection(
-            title: '기타 작업',
-            subtitle: '직접 입력·제작 설정·원문',
+            title: '상세 설정 · 기타 작업',
+            subtitle: '직접 입력 · 제작 기술 · 원문 · 고급 옵션',
             initiallyExpanded: false,
             sectionKey: const Key('planning_other_actions'),
             child: Column(
@@ -2250,96 +2250,90 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   Widget _buildTransferredInstructionList() {
     final sent = _transferredPlans;
     if (sent.isEmpty) return const SizedBox.shrink();
-    return Column(
+    return Card(
       key: const Key('planning_transferred_list'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text(
-          '전송 작업지시 목록',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Sotong24Work로 전송에 성공한 작업지시만 표시합니다. 진행·승인은 AI 제작공정에서 관리합니다.',
-          style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
-        ),
-        const SizedBox(height: 8),
-        for (final plan in sent)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Material(
-              color: ControlColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: false,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          title: Text(
+            '전송 작업지시 ${sent.length}건',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+          ),
+          subtitle: const Text(
+            '펼치면 제목·사업 종류·상태만 표시합니다. 진행·승인은 AI 제작공정에서 관리합니다.',
+            style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
+          ),
+          children: [
+            for (final plan in sent)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: ControlColors.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: ControlColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ArtifactType.labelKo(plan.input.resolvedArtifactType),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: ControlColors.teal,
-                      ),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: ControlColors.border),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      plan.input.topic.trim().isEmpty
-                          ? '(제목 없음)'
-                          : plan.input.topic.trim(),
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatTransferTime(plan.lastTransferAt),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: ControlColors.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      _transferStatusLabel(plan),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 0,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextButton(
-                          onPressed: plan.instruction == null
-                              ? null
-                              : () => _showInstructionViewer(plan: plan),
-                          child: const Text('작업지시 내용 보기'),
-                        ),
-                        if (widget.onOpenProductWorkshop != null)
-                          TextButton(
-                            onPressed: () =>
-                                _openWorkshopFor(plan.stableInstructionId),
-                            child: Text(
-                              Sotong24WorkshopPresentation.projectForInstruction(
-                                        _remoteProjects,
-                                        plan.stableInstructionId,
-                                      ) ==
-                                      null
-                                  ? 'AI 제작공정 준비 중'
-                                  : 'AI 제작공정에서 보기',
-                            ),
+                        Text(
+                          ArtifactType.labelKo(plan.input.resolvedArtifactType),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: ControlColors.teal,
                           ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          plan.input.topic.trim().isEmpty
+                              ? '(제목 없음)'
+                              : plan.input.topic.trim(),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_formatTransferTime(plan.lastTransferAt)} · '
+                          '${_transferStatusLabel(plan)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: ControlColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 4,
+                          children: [
+                            TextButton(
+                              onPressed: plan.instruction == null
+                                  ? null
+                                  : () => _showInstructionViewer(plan: plan),
+                              child: const Text('상세보기'),
+                            ),
+                            if (widget.onOpenProductWorkshop != null)
+                              TextButton(
+                                onPressed: () => _openWorkshopFor(
+                                  plan.stableInstructionId,
+                                ),
+                                child: const Text('AI 제작공정'),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -2375,6 +2369,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               '사업유형',
               ArtifactType.labelKo(input.resolvedArtifactType),
             ),
+            if (_designState.siteSubtype != null &&
+                _designState.siteSubtype!.trim().isNotEmpty)
+              _sendSummaryRow('site subtype', _designState.siteSubtype!.trim()),
             _sendSummaryRow(
               '제목',
               input.topic.trim().isEmpty ? '(미입력)' : input.topic.trim(),
@@ -2400,6 +2397,12 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                   : input.customerProblem.trim(),
               maxLines: 3,
             ),
+            if (_designState.aiAugmentedBrief.trim().isNotEmpty)
+              _sendSummaryRow(
+                'AI 보완 요약',
+                _designState.aiAugmentedBrief.trim(),
+                maxLines: 4,
+              ),
             _sendSummaryRow(
               '제작 방식',
               WorkInstructionWorkshopPresentation.productionMethodLabel(
@@ -2409,10 +2412,22 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
             _sendSummaryRow(
               '승인 방식',
-              WorkInstructionWorkshopPresentation.approvalModeLabel(
-                approvalRequired:
-                    isAiProductionPilot && _approvalMode == 'manual',
-              ),
+              _approvalMode == 'manual' ? '수동승인' : '자동승인',
+            ),
+            _sendSummaryRow('예상 공정', '18단계 표준 제작공정'),
+            _sendSummaryRow(
+              '사용자 검토 gate',
+              ArtifactType.normalize(input.resolvedArtifactType) ==
+                      ArtifactType.site
+                  ? 'STEP15 사이트 사용자 검토 (자동승인 불가)'
+                  : '트랙별 사용자 직접 검토 단계 유지',
+            ),
+            _sendSummaryRow(
+              '최종 공개 gate',
+              ArtifactType.normalize(input.resolvedArtifactType) ==
+                      ArtifactType.site
+                  ? 'STEP18 배포 · 사용자 명시 승인'
+                  : '스토어/외부 공개 · 사용자 명시 승인',
             ),
             if (isAiProductionPilot) _sendSummaryRow('AI 작업자', 'Cursor (고정)'),
             if (input.constraints.trim().isNotEmpty)
@@ -2664,15 +2679,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
-  bool get _showApprovalModeChoice {
-    if (!_aiProductionPilot) return false;
-    final artifact = ArtifactType.normalize(
-      _artifactType == ArtifactType.undecided
-          ? _currentInput.resolvedArtifactType
-          : _artifactType,
-    );
-    return artifact != ArtifactType.undecided;
-  }
+  /// 승인 방식은 상세설정에 숨기지 않고 메인에 항상 노출.
+  bool get _showApprovalModeChoice => true;
 
   Widget _buildApprovalModeCard() {
     final instructionMode = _instruction?.aiExecution?.approvalMode;
@@ -2680,7 +2688,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         instructionMode != null && instructionMode != _approvalMode;
     return Card(
       key: const Key('planning_approval_mode_card'),
-      color: ControlColors.warningBg,
+      color: ControlColors.surface,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -2694,7 +2702,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
             const SizedBox(height: 4),
             const Text(
-              '작업지시를 최종 생성·전송하기 전에 반드시 확인해 주세요.',
+              '자동승인을 권장합니다. 사용자 검토·최종 공개 단계는 자동으로 대신 승인하지 않습니다.',
               style: TextStyle(
                 fontSize: 12.5,
                 color: ControlColors.textSecondary,
@@ -2704,8 +2712,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             SegmentedButton<String>(
               key: const Key('planning_approval_mode_selector'),
               segments: const [
-                ButtonSegment(value: 'manual', label: Text('수동 승인')),
                 ButtonSegment(value: 'auto', label: Text('자동 승인')),
+                ButtonSegment(value: 'manual', label: Text('수동 승인')),
               ],
               selected: {_approvalMode},
               onSelectionChanged: (value) {
@@ -2714,16 +2722,18 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             ),
             const SizedBox(height: 12),
             const _ApprovalModeDescription(
-              icon: Icons.touch_app_outlined,
-              title: '수동 승인',
-              description: '각 단계 검증 PASS 후 기다립니다. 결과를 보고 승인 또는 보완 요청할 수 있습니다.',
+              icon: Icons.auto_awesome_outlined,
+              title: '자동 승인 (권장)',
+              description:
+                  'validator PASS·자동진행 가능 단계는 진행합니다. '
+                  '사이트 STEP15 사용자 검토, STEP18 배포, 스토어·외부 공개 등 '
+                  '최종 공개 gate는 사용자가 직접 확인합니다.',
             ),
             const SizedBox(height: 8),
             const _ApprovalModeDescription(
-              icon: Icons.auto_awesome_outlined,
-              title: '자동 승인',
-              description:
-                  'validator와 단계 계약을 통과한 결과만 다음 단계로 진행합니다. 오류·지연·quota·보안 문제는 자동 승인하지 않습니다.',
+              icon: Icons.touch_app_outlined,
+              title: '수동 승인',
+              description: '계약상 승인 필요 단계마다 사용자가 직접 확인한 뒤 진행합니다.',
             ),
             if (needsRecreate) ...[
               const SizedBox(height: 10),

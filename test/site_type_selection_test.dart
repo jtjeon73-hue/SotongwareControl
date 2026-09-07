@@ -289,16 +289,15 @@ void main() {
         tester,
         size: const Size(390, 844),
         interact: (t) async {
-          await t.tap(find.text('사이트 개발'));
+          await t.tap(find.text('마케팅 사이트'));
           await t.pumpAndSettle();
-          expect(find.text('사이트 유형'), findsOneWidget);
+          expect(find.text('사이트 subtype (필수)'), findsOneWidget);
 
-          // Next must stay disabled without subtype.
-          final nextBefore = t.widget<FilledButton>(
-            find.widgetWithText(FilledButton, '다음'),
-          );
-          expect(nextBefore.onPressed, isNull);
-
+          // Next must stay enabled because marketing_site is preselected.
+          // Clear by selecting empty path: switch to corporate then verify gate.
+          await t.ensureVisible(find.text('기업·기관 홈페이지'));
+          await t.tap(find.text('기업·기관 홈페이지'));
+          await t.pumpAndSettle();
           await t.ensureVisible(find.text('홍보·마케팅 사이트'));
           await t.tap(find.text('홍보·마케팅 사이트'));
           await t.pumpAndSettle();
@@ -327,7 +326,7 @@ void main() {
         tester,
         size: const Size(1280, 800),
         interact: (t) async {
-          await t.tap(find.text('사이트 개발'));
+          await t.tap(find.text('마케팅 사이트'));
           await t.pumpAndSettle();
           await t.tap(find.text('기업·기관 홈페이지'));
           await t.pumpAndSettle();

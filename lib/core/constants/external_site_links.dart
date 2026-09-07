@@ -73,20 +73,22 @@ class ExternalSiteLinks {
 
   static const siteManager = ExternalSiteLink(
     id: 'site_manager',
-    title: '소통사이트매니저',
-    subtitle: '지식·운영 사이트 통합 허브',
+    title: '지식·교육 사이트 매니저',
+    subtitle: 'SotongSiteManager · 지식 전문관 통합 허브',
     url: 'https://sotongsitemanager.web.app',
     icon: 'site_manager',
     category: '공개 서비스',
-    description: '여러 지식 전문관과 운영 사이트의 등록·연결·분류·이동을 담당하는 통합 관리 사이트',
+    description: '여러 지식·교육 전문관과 운영 사이트의 등록·연결·분류·이동을 담당하는 통합 관리 사이트',
   );
 
+  /// 대시보드·요약 칩에 반드시 포함 (지식·교육 매니저 누락 방지).
   static const requiredSites = <ExternalSiteLink>[
     apps,
     ebook,
     contents,
     aiStory,
     marketing,
+    siteManager,
   ];
 
   /// 기존 산업자동화 공개 사이트 (유지·선택 표시)
@@ -110,10 +112,9 @@ class ExternalSiteLinks {
     siteManager,
   ];
 
-  /// 허브 페이지에 표시할 전체 (요청 5개 + 산업자동화)
+  /// 허브 페이지에 표시할 전체 (required + 산업자동화; siteManager는 required에 포함)
   static List<ExternalSiteLink> get hubSites => [
     ...requiredSites,
     industrialAutomation,
-    siteManager,
   ];
 }
