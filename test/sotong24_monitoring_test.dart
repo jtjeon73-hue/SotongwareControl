@@ -101,7 +101,50 @@ void main() {
       policy: policy,
       now: DateTime.parse('2026-08-19T00:05:00.000Z'),
     );
-    expect(result.activityLabel, '작업 worker 시작 대기');
+    expect(result.activityLabel, '작업자 시작 대기');
+  });
+
+  test('fresh stalled status softens to delayed before inactivity window', () {
+    final s = Sotong24RemoteStage(
+      stageId: 'site_project_scaffold',
+      stageNumber: 9,
+      stageName: '프로젝트 골격',
+      status: Sotong24WorkStatus.stalled,
+      startedAt: '2026-08-19T00:00:00.000Z',
+      lastActivityAt: '2026-08-19T00:04:30.000Z',
+      activityState: 'stalled',
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(
+        heartbeat: '2026-08-19T00:04:50.000Z',
+        stage: s,
+        status: Sotong24WorkStatus.stalled,
+      ),
+      stage: s,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T00:05:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.delayed);
+    expect(result.activityLabel, '지연 감지 / 자동 확인 중');
+  });
+
+  test('wait phase labels follow 2/8/15 minute buckets', () {
+    expect(
+      Sotong24StageMonitoring.waitPhaseLabel(const Duration(minutes: 1)),
+      '다음 작업 준비 중',
+    );
+    expect(
+      Sotong24StageMonitoring.waitPhaseLabel(const Duration(minutes: 5)),
+      '작업자 시작 대기',
+    );
+    expect(
+      Sotong24StageMonitoring.waitPhaseLabel(const Duration(minutes: 10)),
+      '지연 감지 / 자동 확인 중',
+    );
+    expect(
+      Sotong24StageMonitoring.waitPhaseLabel(const Duration(minutes: 16)),
+      '작업 정체',
+    );
   });
 
   test('recovery metadata survives remote model round trip', () {

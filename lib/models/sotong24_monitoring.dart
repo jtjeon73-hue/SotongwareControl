@@ -181,24 +181,30 @@ class Sotong24StageMonitoring {
       health = Sotong24StageHealth.pausedQuota;
     } else if (status == Sotong24WorkStatus.pausedNetwork) {
       health = Sotong24StageHealth.pausedNetwork;
-    } else if (status == Sotong24WorkStatus.stalled) {
-      health = Sotong24StageHealth.stalled;
     } else if (status == Sotong24WorkStatus.error ||
         status == Sotong24WorkStatus.aiProcessFailed ||
-        status == Sotong24WorkStatus.resultValidationFailed ||
-        status == Sotong24WorkStatus.stageTransitionFailed ||
-        stage.errorMessage.isNotEmpty) {
+        status == Sotong24WorkStatus.resultValidationFailed) {
       health = Sotong24StageHealth.error;
     } else if (status == Sotong24WorkStatus.awaitingApproval) {
       health = Sotong24StageHealth.awaitingUser;
     } else if (!online) {
       health = Sotong24StageHealth.offline;
     } else if (activityAge == null || activityAge > policy.noActivityAfter) {
-      health = Sotong24StageHealth.inactive;
+      // True inactivity (default 15m). Backend stalled/transition-failed with
+      // fresh heartbeats must not paint a red stall before this window.
+      health = (status == Sotong24WorkStatus.stalled ||
+              status == Sotong24WorkStatus.stageTransitionFailed)
+          ? Sotong24StageHealth.stalled
+          : Sotong24StageHealth.inactive;
+    } else if (status == Sotong24WorkStatus.stalled ||
+        status == Sotong24WorkStatus.stageTransitionFailed) {
+      health = Sotong24StageHealth.delayed;
     } else {
       final range = policy.expectedRangeFor(stage.stageId);
       final max = range?.max ?? policy.defaultExpectedMax;
-      health = elapsed != null && elapsed > max
+      final slowByElapsed = elapsed != null && elapsed > max;
+      final slowByActivity = activityAge > const Duration(minutes: 8);
+      health = (slowByElapsed || slowByActivity)
           ? Sotong24StageHealth.delayed
           : Sotong24StageHealth.healthy;
     }
@@ -229,9 +235,9 @@ class Sotong24StageMonitoring {
       case 'approval_preparing':
         return '승인 대기 준비 중';
       case 'worker_dispatch_waiting':
-        return '작업 worker 시작 대기';
+        return '작업자 시작 대기';
       case 'stage_transitioning':
-        return '다음 단계 전환 중';
+        return '다음 작업 준비 중';
       case 'auto_approval':
         return '검증 완료 · 자동 승인 중';
       case 'paused_quota':
@@ -239,7 +245,7 @@ class Sotong24StageMonitoring {
       case 'paused_network':
         return '네트워크 복구 대기';
       case 'stalled':
-        return '작업 정체 감지';
+        return '지연 감지 / 자동 확인 중';
       case 'ai_process_failed':
         return 'AI 실행 실패';
       case 'result_validation_failed':
@@ -247,10 +253,21 @@ class Sotong24StageMonitoring {
       case 'validation_retry_waiting':
         return '결과 검증 자동 재시도 대기';
       case 'stage_transition_failed':
-        return '단계 전환 실패';
+        return '지연 감지 / 자동 확인 중';
       default:
-        return state.trim().isEmpty ? '작업 worker 시작 대기' : '작업 상태 동기화 중';
+        return state.trim().isEmpty ? '작업자 시작 대기' : '작업 상태 동기화 중';
     }
+  }
+
+  /// Soft phase copy for transition/wait windows (0–2 / 2–8 / 8–15 / 15+).
+  static String waitPhaseLabel(Duration? activityAge) {
+    if (activityAge == null) return '다음 작업 준비 중';
+    if (activityAge <= const Duration(minutes: 2)) return '다음 작업 준비 중';
+    if (activityAge <= const Duration(minutes: 8)) return '작업자 시작 대기';
+    if (activityAge <= const Duration(minutes: 15)) {
+      return '지연 감지 / 자동 확인 중';
+    }
+    return '작업 정체';
   }
 
   static String compactDuration(Duration? value) {
