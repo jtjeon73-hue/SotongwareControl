@@ -53,7 +53,7 @@ void main() {
     for (final (size, scale) in cases) {
       await pumpWizard(tester, size: size, textScale: scale);
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('무엇을 만들까요'), findsWidgets);
+      expect(find.textContaining('사업 종류'), findsWidgets);
       // Creation mode cards
       expect(find.textContaining('새 결과물'), findsWidgets);
     }
