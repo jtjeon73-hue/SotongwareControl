@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
 import '../models/sotong24_monitoring.dart';
+import '../widgets/site_user_review_actions.dart';
 import 'business_planning_service.dart';
 import 'firebase_ready.dart';
 
@@ -242,18 +243,31 @@ class Sotong24RemoteRepository {
   }
 
   /// 승인: approvalStatus=approved. 외부 배포/push는 수행하지 않는다.
+  /// STEP15/STEP18은 approvalSource=user_control_ui 명시 provenance를 남긴다.
   Future<String?> approveStage({
     required String projectId,
     required String stageId,
     required String requestId,
+    String reviewDecision = 'approved',
+    String reviewedRevision = 'r1',
   }) {
+    final payload = stageId == 'site_user_review'
+        ? SiteReviewDecisionPayload(
+            reviewDecision: reviewDecision,
+            reviewedRevision: reviewedRevision,
+            reviewComment: 'Control 사용자 검토 승인',
+          ).toRevisionMessage()
+        : '';
     return _submitDecision(
       projectId: projectId,
       stageId: stageId,
       requestId: requestId,
       requestType: 'approve',
       decision: ApprovalStatus.approved,
-      message: '',
+      message: payload,
+      approvalSource: 'user_control_ui',
+      approvalMode: 'explicit',
+      reviewDecision: reviewDecision,
     );
   }
 
@@ -523,6 +537,9 @@ class Sotong24RemoteRepository {
     required String requestType,
     required String decision,
     required String message,
+    String approvalSource = '',
+    String approvalMode = '',
+    String reviewDecision = '',
   }) async {
     final project = await getProject(projectId);
     if (project == null) return '프로젝트를 찾을 수 없습니다.';
@@ -557,6 +574,14 @@ class Sotong24RemoteRepository {
     if (error != null) return error;
 
     final now = DateTime.now().toUtc().toIso8601String();
+    final explicitSource = approvalSource.isNotEmpty
+        ? approvalSource
+        : (requestType == 'approve' || requestType == 'revision_request'
+              ? 'user_control_ui'
+              : '');
+    final explicitMode = approvalMode.isNotEmpty
+        ? approvalMode
+        : (explicitSource.isNotEmpty ? 'explicit' : '');
     final request = Sotong24RemoteRequest(
       requestId: resolvedId,
       projectId: projectId,
@@ -569,6 +594,9 @@ class Sotong24RemoteRepository {
       processedAt: now,
       revision: stage.revision > 0 ? stage.revision : 1,
       processed: true,
+      approvalSource: explicitSource,
+      approvalMode: explicitMode,
+      reviewDecision: reviewDecision,
     );
 
     if (usesMemory || _projects == null || project.isDemo) {
@@ -591,6 +619,10 @@ class Sotong24RemoteRepository {
         'activeRequestId': resolvedId,
         'updatedAt': now,
         if (message.isNotEmpty) 'userAttention': message,
+        if (explicitSource.isNotEmpty) 'approvalSource': explicitSource,
+        if (explicitMode.isNotEmpty) 'approvalMode': explicitMode,
+        if (explicitSource.isNotEmpty) 'approvalEventId': resolvedId,
+        if (reviewDecision.isNotEmpty) 'reviewDecision': reviewDecision,
       }, SetOptions(merge: true));
       batch.set(doc, {
         'approvalStatus': decision,

@@ -405,6 +405,9 @@ class Sotong24RemoteRequest {
     this.processed = false,
     this.workflowApplied = false,
     this.workflowAppliedAt = '',
+    this.approvalSource = '',
+    this.approvalMode = '',
+    this.reviewDecision = '',
   });
 
   final String requestId;
@@ -423,6 +426,11 @@ class Sotong24RemoteRequest {
   final bool workflowApplied;
   final String workflowAppliedAt;
 
+  /// Explicit Control provenance for STEP15/STEP18 gates.
+  final String approvalSource;
+  final String approvalMode;
+  final String reviewDecision;
+
   Map<String, dynamic> toMap() => {
     'requestId': requestId,
     'projectId': projectId,
@@ -437,6 +445,10 @@ class Sotong24RemoteRequest {
     'processed': processed,
     'workflowApplied': workflowApplied,
     if (workflowAppliedAt.isNotEmpty) 'workflowAppliedAt': workflowAppliedAt,
+    if (approvalSource.isNotEmpty) 'approvalSource': approvalSource,
+    if (approvalMode.isNotEmpty) 'approvalMode': approvalMode,
+    if (reviewDecision.isNotEmpty) 'reviewDecision': reviewDecision,
+    if (approvalSource.isNotEmpty) 'approvalEventId': requestId,
   };
 
   factory Sotong24RemoteRequest.fromMap(
@@ -457,6 +469,9 @@ class Sotong24RemoteRequest {
       processed: map['processed'] == true,
       workflowApplied: map['workflowApplied'] == true,
       workflowAppliedAt: '${map['workflowAppliedAt'] ?? ''}',
+      approvalSource: '${map['approvalSource'] ?? ''}',
+      approvalMode: '${map['approvalMode'] ?? ''}',
+      reviewDecision: '${map['reviewDecision'] ?? ''}',
     );
   }
 }
