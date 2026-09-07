@@ -290,9 +290,10 @@ class _NotificationDiagnosticsCardState
               ),
             )
           else
-            for (final item in diagnostics.recentNotifications
-                .where((n) => n.status != 'dismissed')
-                .take(5))
+            for (final item
+                in diagnostics.recentNotifications
+                    .where((n) => n.status != 'dismissed')
+                    .take(5))
               ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,

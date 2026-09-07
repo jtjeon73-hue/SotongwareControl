@@ -1818,7 +1818,7 @@ class _StageMonitoringPanel extends StatelessWidget {
                 : snapshot.health == Sotong24StageHealth.awaitingUser
                 ? '작업 완료 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
                 : stage.status == Sotong24WorkStatus.resultValidationRetrying ||
-                        stage.activityState == 'validation_retry_waiting'
+                      stage.activityState == 'validation_retry_waiting'
                 ? '단계 경과 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} · 재시도 대기 중'
                 : '진행 중 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} 경과',
             style: const TextStyle(fontSize: 13),

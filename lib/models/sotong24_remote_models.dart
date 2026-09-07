@@ -1027,7 +1027,8 @@ class Sotong24UserFacingStatus {
     // Project-level stall/error left over from a prior stage must not override a
     // live current stage that has already advanced or recovered.
     if (interruptions.contains(projectStatus)) {
-      final liveStage = stageStatus == Sotong24WorkStatus.inProgress ||
+      final liveStage =
+          stageStatus == Sotong24WorkStatus.inProgress ||
           stageStatus == Sotong24WorkStatus.ready ||
           stageStatus == Sotong24WorkStatus.completed ||
           stageStatus == Sotong24WorkStatus.awaitingApproval ||
