@@ -704,10 +704,7 @@ class _Sotong24RemoteDetailScreenState
                 ),
               ],
               const SizedBox(height: 8),
-              _Kv(
-                '현재 단계',
-                displayCurrentLine,
-              ),
+              _Kv('현재 단계', displayCurrentLine),
               _Kv('상태', displayStatusLabel),
               _Kv('현재 작업자', _workerLabel(project, stage)),
               _Kv('승인 방식', project.approvalMode == 'auto' ? '자동 승인' : '수동 승인'),
@@ -977,8 +974,8 @@ class _Sotong24RemoteDetailScreenState
               const SizedBox(height: 8),
               for (final s in project.stages)
                 Sotong24ExpandableStageTile(
-                  stage: s.stageId == 'site_user_review' &&
-                          siteReviewStage != null
+                  stage:
+                      s.stageId == 'site_user_review' && siteReviewStage != null
                       ? siteReviewStage.copyWith(
                           status: Sotong24WorkStatus.awaitingApproval,
                           errorMessage: '',
@@ -988,9 +985,9 @@ class _Sotong24RemoteDetailScreenState
                             ? s.copyWith(
                                 errorMessage:
                                     s.status ==
-                                            Sotong24WorkStatus.awaitingApproval
-                                        ? ''
-                                        : s.errorMessage,
+                                        Sotong24WorkStatus.awaitingApproval
+                                    ? ''
+                                    : s.errorMessage,
                               )
                             : s),
                   project: project,
@@ -1021,6 +1018,7 @@ class _Sotong24RemoteDetailScreenState
                       _onSiteDesignChange(project, siteReviewStage),
                   onHold: () async {
                     setState(() => _busy = true);
+                    final messenger = ScaffoldMessenger.of(context);
                     final revLabel =
                         'r${siteReviewStage.revision > 0 ? siteReviewStage.revision : 1}';
                     final payload = SiteReviewDecisionPayload(
@@ -1036,11 +1034,10 @@ class _Sotong24RemoteDetailScreenState
                     );
                     if (!mounted) return;
                     setState(() => _busy = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(
-                          err ??
-                              '보류했습니다. 결과는 보존되며 STEP16은 시작되지 않습니다.',
+                          err ?? '보류했습니다. 결과는 보존되며 STEP16은 시작되지 않습니다.',
                         ),
                       ),
                     );
