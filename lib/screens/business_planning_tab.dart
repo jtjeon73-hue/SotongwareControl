@@ -35,6 +35,8 @@ import '../services/work_instruction_validator.dart';
 import '../services/work_instruction_wizard_session.dart';
 import '../services/work_instruction_workshop_presentation.dart';
 import '../services/transferred_work_reconciliation.dart';
+import '../services/studio_title_recommendations.dart';
+import '../data/project_design_catalog.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/project_design/instruction_preview_panel.dart';
@@ -2264,7 +2266,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           ),
           subtitle: const Text(
             '펼치면 제목·사업 종류·상태만 표시합니다. 진행·승인은 AI 제작공정에서 관리합니다.',
-            style: TextStyle(fontSize: 12.5, color: ControlColors.textSecondary),
+            style: TextStyle(
+              fontSize: 12.5,
+              color: ControlColors.textSecondary,
+            ),
           ),
           children: [
             for (final plan in sent)
@@ -2319,9 +2324,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                             ),
                             if (widget.onOpenProductWorkshop != null)
                               TextButton(
-                                onPressed: () => _openWorkshopFor(
-                                  plan.stableInstructionId,
-                                ),
+                                onPressed: () =>
+                                    _openWorkshopFor(plan.stableInstructionId),
                                 child: const Text('AI 제작공정'),
                               ),
                           ],
@@ -2517,6 +2521,54 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Widget _buildResumeDraftBanner() {
+    final input = _resumeInput;
+    final design = input == null
+        ? null
+        : WorkInstructionWizardSession.restoreDesign(input);
+    final kindSel =
+        design?.productionSelections['business_kind'] ?? const <String>[];
+    final kindId = kindSel.isEmpty ? null : kindSel.first.toString();
+    final kindLabel = StudioTitleRecommendations.labelForBusinessKind(
+      artifactType: design?.artifactType ?? input?.resolvedArtifactType ?? '',
+      siteSubtype: design?.siteSubtype,
+      businessKindId: kindId,
+    );
+    final audiences = design?.selectedAudiences ?? const <String>[];
+    final audienceLabel = audiences.isEmpty
+        ? (input?.targetCustomer.trim().isNotEmpty == true
+              ? input!.targetCustomer.trim()
+              : '대상 미정')
+        : audiences
+              .map((id) {
+                for (final a in ProjectDesignCatalog.audiences) {
+                  if (a.id == id) return a.label;
+                }
+                return id;
+              })
+              .join(' · ');
+    final title = (design?.displayTitle.trim().isNotEmpty == true
+            ? design!.displayTitle
+            : (design?.topic.trim().isNotEmpty == true
+                  ? design!.topic
+                  : (input?.topic.trim().isNotEmpty == true
+                        ? input!.topic.trim()
+                        : '제목 미정')))
+        .trim();
+    final step = (design?.step ?? 0).clamp(0, ProjectDesignStep.count - 1);
+    final stepLabel =
+        'STEP ${step + 1}/${ProjectDesignStep.count}';
+    String updatedLabel = '최근';
+    if (_resumePlanId != null) {
+      final match = _allPlans.where((p) => p.id == _resumePlanId);
+      if (match.isNotEmpty) {
+        final dt = DateTime.tryParse(match.first.updatedAt)?.toLocal();
+        if (dt != null) {
+          updatedLabel =
+              '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        }
+      }
+    }
+
     return Material(
       key: const Key('planning_resume_draft_banner'),
       elevation: 1,
@@ -2535,10 +2587,32 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '이전에 작성하던 작업이 있습니다.',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              '이전에 작성하던 작업',
+              style: TextStyle(fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            Text(
+              '$kindLabel · $audienceLabel',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: ControlColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '"$title"',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$stepLabel · 마지막 수정 $updatedLabel',
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: ControlColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -2550,7 +2624,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 ),
                 OutlinedButton(
                   key: const Key('planning_new_work_button'),
-                  onPressed: () => unawaited(_startNewPlan()),
+                  onPressed: () => unawaited(_confirmStartNewPlan()),
                   child: const Text('새 작업 시작'),
                 ),
               ],
@@ -2559,6 +2633,49 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmStartNewPlan({IdeaToPlanningSeed? seed}) async {
+    final hasDraft =
+        (_resumeInput != null &&
+            WorkInstructionWizardSession.isUnsentResumable(
+              _resumeInput,
+              _allPlans,
+            )) ||
+        WorkInstructionWizardSession.isUnsentResumable(
+          _currentInput,
+          _allPlans,
+        );
+    if (!hasDraft) {
+      await _startNewPlan(seed: seed);
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('새 작업 시작'),
+        content: const Text(
+          '현재 작성 중인 초안만 보관(또는 교체)합니다.\n'
+          '이미 전송된 작업지시·AI 제작공정 프로젝트는 변경되지 않습니다.\n\n'
+          '· 보존: 기존 초안은 “보관 초안”으로 남겨 이어하기에 다시 표시될 수 있습니다.\n'
+          '· 삭제되지 않음: 전송 완료 WI / 제작공정 job\n'
+          '· 새 화면: 빈 새 작업으로 시작합니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('초안 보관 후 새 작업'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await _startNewPlan(seed: seed);
+    }
   }
 
   Widget _buildEmptyWorkshopPrepBanner() {

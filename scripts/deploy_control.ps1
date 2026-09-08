@@ -73,11 +73,16 @@ Write-Host "== release build (admin email/UID via dart-define, quoted for PowerS
 # Flutter writes informational warnings to stderr (e.g. Wasm dry run). PowerShell
 # 7+ can treat that as a terminating NativeCommandError even when exit code is 0.
 # Run through cmd.exe so only the real exit code gates the deploy.
+$GitSha = (git rev-parse --short HEAD 2>$null)
+if ([string]::IsNullOrWhiteSpace($GitSha)) { $GitSha = "unknown" }
+$BuiltAt = Get-Date -Format "yyyy-MM-dd"
 $buildCmd = @(
   "flutter build web --release --base-href /",
   "--dart-define=SOTONG_ADMIN_AUTH_EMAIL=$AdminEmail",
   "--dart-define=SOTONG_ADMIN_UID=$AdminUid",
-  "--dart-define=SOTONG_FCM_WEB_VAPID_KEY=$FcmWebVapidKey"
+  "--dart-define=SOTONG_FCM_WEB_VAPID_KEY=$FcmWebVapidKey",
+  "--dart-define=SOTONG_GIT_SHA=$GitSha",
+  "--dart-define=SOTONG_BUILT_AT=$BuiltAt"
 ) -join " "
 cmd.exe /c $buildCmd
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

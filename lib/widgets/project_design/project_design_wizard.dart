@@ -463,7 +463,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         ],
         const SizedBox(height: 16),
         const Text(
-          '사업 종류를 선택하세요. (내부 track은 app / ebook / site / content 로 매핑됩니다)',
+          '사업 종류를 선택하세요.',
           style: TextStyle(fontSize: 13, color: ControlColors.textSecondary),
         ),
         const SizedBox(height: 12),
@@ -472,9 +472,11 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             final wide = constraints.maxWidth >= 720;
             final kinds = StudioTitleRecommendations.businessKinds;
             final kindSel =
-                _state.productionSelections['business_kind'] ?? const <String>[];
-            final selectedKindId =
-                kindSel.isEmpty ? null : kindSel.first.toString();
+                _state.productionSelections['business_kind'] ??
+                const <String>[];
+            final selectedKindId = kindSel.isEmpty
+                ? null
+                : kindSel.first.toString();
             final isSiteFamily =
                 _state.artifactType == ArtifactType.site ||
                 _state.artifactType == ArtifactType.promoSite;
@@ -503,7 +505,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                 String label,
                 String artifactType,
                 String? siteSubtype,
-              }) kind,
+              })
+              kind,
             ) {
               if (selectedKindId != null && selectedKindId.isNotEmpty) {
                 return selectedKindId == kind.id;
@@ -511,8 +514,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
               if (kind.siteSubtype != null) {
                 return isSiteFamily && _state.siteSubtype == kind.siteSubtype;
               }
-              return _state.artifactType == kind.artifactType &&
-                  !isSiteFamily;
+              return _state.artifactType == kind.artifactType && !isSiteFamily;
             }
 
             return Column(
@@ -536,9 +538,15 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                                 )
                               : null,
                           title: kind.label,
-                          subtitle: kind.siteSubtype == null
-                              ? 'track · ${kind.artifactType}'
-                              : 'site · ${kind.siteSubtype}',
+                          subtitle: switch (kind.id) {
+                            'industrial_sw' => '상담·연동·유지보수까지',
+                            'app' => '모바일 앱·현장 도구',
+                            'ebook' => '가이드·매뉴얼·입문서',
+                            'knowledge_site' => '학습·지식·FAQ 허브',
+                            'marketing_site' => '소개·문의·전환 사이트',
+                            'content' => '쇼츠·영상·홍보 콘텐츠',
+                            _ => '',
+                          },
                           icon: kindIcon(kind.id),
                           onTap: () {
                             final next = _state.copy()
@@ -569,16 +577,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                 if (isSiteFamily) ...[
                   const SizedBox(height: 16),
                   const Text(
-                    '사이트 subtype (필수)',
+                    '사이트 유형 (필수)',
                     style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'corporate / marketing / knowledge / education / information_portal',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: ControlColors.textMuted,
-                    ),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -713,6 +713,41 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     );
     final preview = titles.take(StudioTitleRecommendations.topPreview).toList();
     final more = titles.skip(StudioTitleRecommendations.topPreview).toList();
+    final selectedTitle = (_state.displayTitle.trim().isNotEmpty
+            ? _state.displayTitle
+            : _state.topic)
+        .trim();
+
+    Widget titleChip(String t) {
+      final selected = selectedTitle == t.trim();
+      return FilterChip(
+        key: Key('studio_title_rec_${t.hashCode}'),
+        selected: selected,
+        showCheckmark: true,
+        selectedColor: ControlColors.teal.withValues(alpha: 0.22),
+        checkmarkColor: ControlColors.teal,
+        label: Text(
+          selected ? '선택됨 · $t' : t,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? ControlColors.teal : null,
+          ),
+        ),
+        onSelected: (_) {
+          _topicCtrl.text = t;
+          final next = _engine.markFieldEdited(
+            _state.copy()
+              ..topic = t
+              ..displayTitle = t
+              ..titleSource = 'ai_suggested',
+            field: 'topic',
+          );
+          _emit(next);
+        },
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -738,39 +773,22 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           onChanged: (_) {
             _emit(
               _engine.markFieldEdited(
-                _state.copy()..topic = _topicCtrl.text,
+                _state.copy()
+                  ..topic = _topicCtrl.text
+                  ..displayTitle = _topicCtrl.text
+                  ..titleSource = 'user',
                 field: 'topic',
               ),
             );
           },
         ),
         const SizedBox(height: 12),
-        const Text(
-          '추천 TOP 10',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        const Text('추천 TOP 10', style: TextStyle(fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: [
-            for (final t in preview)
-              ActionChip(
-                key: Key('studio_title_rec_${t.hashCode}'),
-                label: Text(t, style: const TextStyle(fontSize: 12.5)),
-                onPressed: () {
-                  _topicCtrl.text = t;
-                  final next = _engine.markFieldEdited(
-                    _state.copy()
-                      ..topic = t
-                      ..displayTitle = t
-                      ..titleSource = 'ai_suggested',
-                    field: 'topic',
-                  );
-                  _emit(next);
-                },
-              ),
-          ],
+          children: [for (final t in preview) titleChip(t)],
         ),
         if (more.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -778,8 +796,11 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             key: const Key('studio_title_rec_more'),
             tilePadding: EdgeInsets.zero,
             title: Text(
-              '더 보기 · 최대 ${titles.length}개',
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+              '더 보기 · 추가 ${more.length}개 (총 ${titles.length}/50)',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+              ),
             ),
             children: [
               Align(
@@ -787,121 +808,121 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: [
-                    for (final t in more)
-                      ActionChip(
-                        label: Text(t, style: const TextStyle(fontSize: 12.5)),
-                        onPressed: () {
-                          _topicCtrl.text = t;
-                          final next = _engine.markFieldEdited(
-                            _state.copy()
-                              ..topic = t
-                              ..displayTitle = t
-                              ..titleSource = 'ai_suggested',
-                            field: 'topic',
-                          );
-                          _emit(next);
-                        },
-                      ),
-                  ],
+                  children: [for (final t in more) titleChip(t)],
                 ),
               ),
             ],
           ),
         ],
-        const SizedBox(height: 16),
-        const Text(
-          '관련 컨셉 (선택)',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 6),
-        ConceptPickerPanel(
-          candidates: concepts,
-          selectedIds: _state.selectedConceptIds,
-          userAdded: _state.userAddedConcepts,
-          occupancy: widget.occupancy,
-          artifactType: _state.artifactType ?? '',
-          audiences: _state.selectedAudiences,
-          onOccupiedTap: widget.onOccupiedConcept,
-          onSelectionChanged: (ids) {
-            var next = _state.copy()..selectedConceptIds = ids;
-            next.planningConfirmed = false;
-            next = _engine.syncSentences(next);
-            if (_topicCtrl.text.trim().isEmpty) {
-              _topicCtrl.text = next.topic;
-            }
-            _problemCtrl.text = next.customerProblem;
-            _outcomeCtrl.text = next.desiredOutcome;
-            _prefillCommercialFromConcepts(next);
-            _emit(next);
-          },
-          onAddUserConcept: (title, memo) {
-            final added = ConceptCandidate.userAdded(
-              title: title,
-              memo: memo,
+        const SizedBox(height: 12),
+        ExpansionTile(
+          key: const Key('studio_related_concepts_collapsed'),
+          tilePadding: EdgeInsets.zero,
+          initiallyExpanded: false,
+          title: const Text(
+            '관련 아이디어 더 보기',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: const Text(
+            '관련 컨셉·결합 방향·추가 메모',
+            style: TextStyle(fontSize: 12),
+          ),
+          children: [
+            ConceptPickerPanel(
+              candidates: concepts,
+              selectedIds: _state.selectedConceptIds,
+              userAdded: _state.userAddedConcepts,
+              occupancy: widget.occupancy,
               artifactType: _state.artifactType ?? '',
               audiences: _state.selectedAudiences,
-            );
-            final occ = widget.occupancy?.viewFor(
-              conceptId: added.id,
-              artifactType: _state.artifactType ?? '',
-              title: added.title,
-              audiences: _state.selectedAudiences,
-            );
-            if (occ != null && occ.isOccupied) {
-              widget.onOccupiedConcept?.call(occ);
-              return;
-            }
-            var next = _state.copy();
-            next.userAddedConcepts = [...next.userAddedConcepts, added];
-            next.selectedConceptIds = [...next.selectedConceptIds, added.id];
-            next.planningConfirmed = false;
-            next = _engine.syncSentences(next);
-            _topicCtrl.text = next.topic;
-            _problemCtrl.text = next.customerProblem;
-            _outcomeCtrl.text = next.desiredOutcome;
-            _prefillCommercialFromConcepts(next);
-            _emit(next);
-          },
-        ),
-        if (_state.combinedDirection.trim().isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: ControlColors.border),
-              borderRadius: BorderRadius.circular(8),
-              color: ControlColors.surface,
+              onOccupiedTap: widget.onOccupiedConcept,
+              onSelectionChanged: (ids) {
+                var next = _state.copy()..selectedConceptIds = ids;
+                next.planningConfirmed = false;
+                next = _engine.syncSentences(next);
+                if (_topicCtrl.text.trim().isEmpty) {
+                  _topicCtrl.text = next.topic;
+                }
+                _problemCtrl.text = next.customerProblem;
+                _outcomeCtrl.text = next.desiredOutcome;
+                _prefillCommercialFromConcepts(next);
+                _emit(next);
+              },
+              onAddUserConcept: (title, memo) {
+                final added = ConceptCandidate.userAdded(
+                  title: title,
+                  memo: memo,
+                  artifactType: _state.artifactType ?? '',
+                  audiences: _state.selectedAudiences,
+                );
+                final occ = widget.occupancy?.viewFor(
+                  conceptId: added.id,
+                  artifactType: _state.artifactType ?? '',
+                  title: added.title,
+                  audiences: _state.selectedAudiences,
+                );
+                if (occ != null && occ.isOccupied) {
+                  widget.onOccupiedConcept?.call(occ);
+                  return;
+                }
+                var next = _state.copy();
+                next.userAddedConcepts = [...next.userAddedConcepts, added];
+                next.selectedConceptIds = [
+                  ...next.selectedConceptIds,
+                  added.id,
+                ];
+                next.planningConfirmed = false;
+                next = _engine.syncSentences(next);
+                _topicCtrl.text = next.topic;
+                _problemCtrl.text = next.customerProblem;
+                _outcomeCtrl.text = next.desiredOutcome;
+                _prefillCommercialFromConcepts(next);
+                _emit(next);
+              },
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '결합 방향 (AI 추천·미확정)',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            if (_state.combinedDirection.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: ControlColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                  color: ControlColors.surface,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  _state.combinedDirection,
-                  style: const TextStyle(fontSize: 13),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '결합 방향 (AI 추천·미확정)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _state.combinedDirection,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            const Text('추가 메모', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _memoCtrl,
+              minLines: 3,
+              maxLines: 6,
+              decoration: const InputDecoration(
+                hintText: '추가 아이디어, 반드시 포함할 내용, 주의사항, 경험, 차별화 포인트',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _state.designMemo = v,
             ),
-          ),
-        ],
-        const SizedBox(height: 16),
-        const Text('추가 메모', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _memoCtrl,
-          minLines: 3,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            hintText: '추가 아이디어, 반드시 포함할 내용, 주의사항, 경험, 차별화 포인트',
-            border: OutlineInputBorder(),
-          ),
-          onChanged: (v) => _state.designMemo = v,
+          ],
         ),
       ],
     );
@@ -1148,7 +1169,10 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             ),
             subtitle: const Text(
               '기술·플랫폼·SEO·고급 옵션은 필요할 때만 펼치세요.',
-              style: TextStyle(fontSize: 12, color: ControlColors.textSecondary),
+              style: TextStyle(
+                fontSize: 12,
+                color: ControlColors.textSecondary,
+              ),
             ),
             children: [
               if (widget.approvalMode == 'auto')

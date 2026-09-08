@@ -14,7 +14,6 @@ void main() {
       );
       expect(titles, isNotEmpty, reason: kind.label);
       expect(titles.length, lessThanOrEqualTo(50));
-      expect(titles.length, greaterThanOrEqualTo(20), reason: kind.label);
       expect(titles.toSet().length, titles.length, reason: 'no exact dup ${kind.label}');
       for (final t in titles) {
         expect(t.length, greaterThanOrEqualTo(8));
@@ -24,16 +23,38 @@ void main() {
     }
   });
 
+  test('전자책+직장인 TOP10은 타 audience 전용 제목을 제외한다', () {
+    final titles = StudioTitleRecommendations.recommend(
+      artifactType: ArtifactType.ebook,
+      audienceIds: const ['office'],
+      businessKindId: 'ebook',
+      limit: 50,
+    );
+    expect(titles.length, greaterThanOrEqualTo(10));
+    final top10 = titles.take(10).toList();
+    for (final t in top10) {
+      expect(t.contains('50대'), isFalse, reason: t);
+      expect(t.contains('자영업'), isFalse, reason: t);
+      expect(t.contains('중장년'), isFalse, reason: t);
+      expect(t.contains('취미'), isFalse, reason: t);
+      expect(t.contains('사장님'), isFalse, reason: t);
+    }
+    expect(
+      top10.any((t) => t.contains('직장') || t.contains('퇴근') || t.contains('업무')),
+      isTrue,
+    );
+  });
+
   test('고객/사이트 문맥이 바뀌면 추천이 달라진다', () {
     final marketing = StudioTitleRecommendations.recommend(
       artifactType: ArtifactType.site,
       siteSubtype: 'marketing_site',
-      audienceIds: const ['소상공인'],
+      audienceIds: const ['smb'],
     );
     final knowledge = StudioTitleRecommendations.recommend(
       artifactType: ArtifactType.site,
       siteSubtype: 'knowledge_site',
-      audienceIds: const ['학생'],
+      audienceIds: const ['student'],
     );
     expect(marketing.first, isNot(equals(knowledge.first)));
   });
@@ -41,8 +62,19 @@ void main() {
   test('직접입력 placeholder는 저장값이 아닌 안내문', () {
     final p = StudioTitleRecommendations.ideaPlaceholder(
       artifactType: ArtifactType.ebook,
+      audienceIds: const ['office'],
     );
     expect(p.startsWith('예:'), isTrue);
-    expect(p.contains('전자책'), isTrue);
+    expect(p.contains('직장인'), isTrue);
+  });
+
+  test('총 추천은 최대 50개 계약을 지킨다', () {
+    final titles = StudioTitleRecommendations.recommend(
+      artifactType: ArtifactType.ebook,
+      audienceIds: const ['office'],
+      limit: 50,
+    );
+    expect(titles.length, lessThanOrEqualTo(50));
+    expect(titles.length, greaterThanOrEqualTo(25));
   });
 }

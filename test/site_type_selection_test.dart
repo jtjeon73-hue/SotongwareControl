@@ -291,7 +291,8 @@ void main() {
         interact: (t) async {
           await t.tap(find.text('마케팅 사이트'));
           await t.pumpAndSettle();
-          expect(find.text('사이트 subtype (필수)'), findsOneWidget);
+          expect(find.text('사이트 유형 (필수)'), findsOneWidget);
+
 
           // Next must stay enabled because marketing_site is preselected.
           // Clear by selecting empty path: switch to corporate then verify gate.
