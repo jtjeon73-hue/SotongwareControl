@@ -1,7 +1,7 @@
 /// Build/release identity shown in Control chrome.
 /// Prefer dart-define injection at deploy time.
 abstract final class ReleaseInfo {
-  static const version = '0.2.3';
+  static const version = '0.2.4';
 
   /// Short git SHA (e.g. bff58e5). Injected via --dart-define=SOTONG_GIT_SHA=...
   static const gitSha = String.fromEnvironment(

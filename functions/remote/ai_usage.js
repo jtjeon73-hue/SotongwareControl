@@ -9,7 +9,7 @@ const CODEX_STATUS = new Set([
   "timeout",
   "parse_error",
 ]);
-const CURSOR_STATUS = new Set(["unknown", "manual", "ok"]);
+const CURSOR_STATUS = new Set(["unknown", "manual", "ok", "MANUAL_CHECK_REQUIRED"]);
 
 const SECRET_KEY_RE =
   /(?:token|secret|apikey|api_key|password|credential|authorization|cookie|email)/i;

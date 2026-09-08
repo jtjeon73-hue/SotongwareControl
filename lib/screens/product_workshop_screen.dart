@@ -1031,6 +1031,7 @@ class _Sotong24RemoteDetailScreenState
                       stageId: siteReviewStage.stageId,
                       requestId: _resolveRequestId(siteReviewStage),
                       message: payload,
+                      reviewDecision: 'on_hold',
                     );
                     if (!mounted) return;
                     setState(() => _busy = false);
@@ -1190,6 +1191,11 @@ class _Sotong24RemoteDetailScreenState
       stageId: stage.stageId,
       requestId: _resolveRequestId(stage),
       message: payload,
+      reviewDecision:
+          project.productType == ArtifactType.site &&
+              stage.stageId == 'site_user_review'
+          ? 'changes_requested'
+          : '',
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -1208,17 +1214,27 @@ class _Sotong24RemoteDetailScreenState
       reviewedRevision: revLabel,
     );
     if (decision == null || !mounted) return;
+    final alreadyRequested = stage.isDesignChangeRequested;
     setState(() => _busy = true);
     final err = await widget.repository.requestRevision(
       projectId: project.projectId,
       stageId: stage.stageId,
       requestId: _resolveRequestId(stage),
       message: decision.toRevisionMessage(),
+      reviewDecision: decision.reviewDecision,
+      selectedDesignDirection: decision.selectedDesignDirection,
     );
     if (!mounted) return;
     setState(() => _busy = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(err ?? '디자인 변경 요청을 전송했습니다. 기존 r1은 보존됩니다.')),
+      SnackBar(
+        content: Text(
+          err ??
+              (alreadyRequested
+                  ? '디자인 변경 요청이 이미 저장되어 있습니다. Agent 반영을 기다려 주세요.'
+                  : '디자인 변경 요청을 전송했습니다. 기존 revision은 보존됩니다.'),
+        ),
+      ),
     );
   }
 
@@ -1996,6 +2012,29 @@ class _StageMonitoringPanel extends StatelessWidget {
             Text(
               '현재 작업 · ${snapshot.activityLabel} · 마지막 worker 활동 ${Sotong24StageMonitoring.relative(snapshot.lastActivityAge)}',
               style: const TextStyle(fontSize: 13),
+            ),
+          if (stage.executorKind.isNotEmpty || stage.taskId.isNotEmpty)
+            Text(
+              [
+                if (stage.executorKind.isNotEmpty)
+                  'executor · ${stage.executorKind}',
+                if (stage.taskId.isNotEmpty) 'task · ${stage.taskId}',
+                'retry · ${stage.recoveryAttempt}/${stage.maxRecoveryAttempts > 0 ? stage.maxRecoveryAttempts : 3}',
+              ].join(' · '),
+              style: const TextStyle(
+                fontSize: 12,
+                color: ControlColors.textSecondary,
+              ),
+            ),
+          if (stage.activityState == 'waiting_for_cursor_run_approval' ||
+              stage.failureType == 'cursor_run_approval_needed')
+            Text(
+              'Cursor 사용자 승인 필요',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.orange.shade900,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           if (!productionComplete &&
               (snapshot.health == Sotong24StageHealth.inactive ||

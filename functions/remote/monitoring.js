@@ -103,6 +103,23 @@ function evaluateStageHealth({ job, stage, agent, policy: rawPolicy, nowMs = Dat
       approvalWaitSeconds: ageSeconds(stage.completedAt || stage.lastActivityAt, nowMs),
     };
   }
+  const activityState = String(stage.activityState || "").toLowerCase();
+  const stageId = String(stage.stageId || job.currentStage || "").toLowerCase();
+  if (
+    activityState === "waiting_user_review" ||
+    activityState === "approval_preparing" ||
+    activityState === "on_hold" ||
+    stageId === "site_user_review" ||
+    stageId === "site_publish" ||
+    String(stage.reviewDecision || "").toLowerCase() === "on_hold"
+  ) {
+    return {
+      state: "awaiting_user",
+      shouldNotify: false,
+      reason: "user_gate_not_stalled",
+      heartbeatAgeSeconds,
+    };
+  }
   if (heartbeatAgeSeconds > policy.offlineAfterSeconds) {
     return { state: "offline", shouldNotify: true, heartbeatAgeSeconds };
   }
@@ -212,6 +229,31 @@ function recoverySucceeded(stage = {}) {
 function notificationContent(eventType, stageNumber, stageName, revision, data = {}) {
   const label = `${stageNumber > 0 ? `${stageNumber}단계 ` : ""}${stageName || "제작 단계"}`;
   switch (eventType) {
+    case "worker_start_failed":
+      return {
+        title: "작업자 시작 실패",
+        body: `${label} Cursor worker 시작에 실패했습니다. 자동복구를 확인하거나 PC에서 Cursor 승인을 점검해 주세요.`,
+      };
+    case "user_review_needed":
+      return {
+        title: "사용자 검토 필요",
+        body: `${label} 결과 검토가 필요합니다. 승인/보완/보류를 선택해 주세요.`,
+      };
+    case "deploy_approval_needed":
+      return {
+        title: "최종 배포 승인 필요",
+        body: `${label} STEP18 공개 배포 승인이 필요합니다. 자동 배포는 금지됩니다.`,
+      };
+    case "cursor_usage_manual_check":
+      return {
+        title: "Cursor 사용량 수동 확인 필요",
+        body: "공식 자동 사용량 API가 없어 잔여량을 추정하지 않습니다. Cursor 설정에서 사용량을 확인한 뒤 작업을 재개해 주세요.",
+      };
+    case "cursor_run_approval_needed":
+      return {
+        title: "Cursor 사용자 승인 필요",
+        body: `${label} Cursor Run 승인이 대기 중일 수 있습니다. PC에서 승인 버튼을 확인해 주세요.`,
+      };
     case "approval_required":
       return { title: "승인이 필요합니다", body: `${label}이 완료되었습니다. 결과를 확인하고 승인 또는 보완을 선택해주세요.` };
     case "revision_completed":

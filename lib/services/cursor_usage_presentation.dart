@@ -6,11 +6,16 @@ class CursorUsagePresentation {
   static List<String> detailLines(RemoteAgentDoc? agent) {
     final usage = agent?.cursorUsage;
     if (usage == null || !usage.hasQuota) {
+      final status = usage?.status.trim() ?? '';
+      final manual =
+          status == 'MANUAL_CHECK_REQUIRED' ||
+          status.isEmpty ||
+          status == 'unknown';
       return [
-        '확인 불가',
+        manual ? 'MANUAL_CHECK_REQUIRED' : status,
         '공식 자동 사용량 API가 없어 값을 추정하지 않습니다.',
         if (usage?.collectedAt != null) '최근 확인 ${_time(usage!.collectedAt!)}',
-        '향후 공식 provider 또는 수동 입력으로 연결 가능',
+        'Cursor 설정에서 사용량을 확인한 뒤 작업을 재개하세요.',
       ];
     }
     final used = usage.usedPercent!;
@@ -27,7 +32,15 @@ class CursorUsagePresentation {
 
   static String headline(RemoteAgentDoc? agent) {
     final usage = agent?.cursorUsage;
-    if (usage == null || !usage.hasQuota) return '확인 불가';
+    if (usage == null || !usage.hasQuota) {
+      final status = usage?.status.trim() ?? '';
+      if (status == 'MANUAL_CHECK_REQUIRED' ||
+          status.isEmpty ||
+          status == 'unknown') {
+        return 'MANUAL_CHECK_REQUIRED';
+      }
+      return status;
+    }
     return '사용 ${usage.usedPercent}% · 잔여 ${usage.remainingPercent}%';
   }
 

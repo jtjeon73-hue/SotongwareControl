@@ -1,0 +1,17 @@
+{
+  "autoRun": {
+    "allow_instructions": [
+      "Allow read-only git inspection such as status, diff, log, show, rev-parse, and branch listing.",
+      "Allow Flutter analyze/test and dart test/format in this Control workspace.",
+      "Allow npm test/lint/build for functions packages.",
+      "Allow reading project files and logs needed for validation."
+    ],
+    "block_instructions": [
+      "Every production Hosting/Functions deploy outside scripts/deploy_control.ps1 must go through approval first.",
+      "Every git push, force push, reset --hard, or git clean must go through approval first.",
+      "Every credential/secret change and wildcard delete must go through approval first.",
+      "Never auto-approve STEP15 user review decisions or STEP18 public production publish.",
+      "Never auto-approve overwriting sotongware.com or automation.sotongware.com."
+    ]
+  }
+}

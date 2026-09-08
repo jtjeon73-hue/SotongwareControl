@@ -16,9 +16,9 @@ void main() {
     final a = agent(
       CursorUsageTelemetry(collectedAt: DateTime.utc(2026, 8, 21, 0, 0)),
     );
-    expect(CursorUsagePresentation.headline(a), '확인 불가');
+    expect(CursorUsagePresentation.headline(a), 'MANUAL_CHECK_REQUIRED');
     final lines = CursorUsagePresentation.detailLines(a);
-    expect(lines, contains('확인 불가'));
+    expect(lines, contains('MANUAL_CHECK_REQUIRED'));
     expect(lines.join(' '), contains('공식 자동 사용량 API'));
     expect(lines.join(' '), isNot(contains('사용 100%')));
   });
