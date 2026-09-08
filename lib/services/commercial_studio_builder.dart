@@ -13,6 +13,7 @@ import '../data/concept_catalog.dart';
 import '../data/concept_commercial_catalog.dart';
 import 'content_subtype_contract.dart';
 import 'site_subtype_contract.dart';
+import '../models/design_system/design_system_catalog.dart';
 
 class CommercialStudioBuilder {
   const CommercialStudioBuilder();
@@ -186,17 +187,43 @@ class CommercialStudioBuilder {
     );
 
     final track = CommercialQualityAttachment.expectedTrack(artifact);
+    final designSelection = DesignSelection(
+      designSystemVersion: state.designSystemVersion.isEmpty
+          ? DesignSystemCatalog.kVersion
+          : state.designSystemVersion,
+      designProfileId: state.designProfileId.isEmpty
+          ? 'ds_profile_a_standard'
+          : state.designProfileId,
+      designProfileCode: state.designProfileCode.isEmpty
+          ? 'A'
+          : state.designProfileCode.toUpperCase(),
+      designProfileVersion: state.designProfileVersion.isEmpty
+          ? '1.0.0'
+          : state.designProfileVersion,
+      designDirection: _legacyDirectionForCode(state.designProfileCode),
+      designSource: state.designSource.isEmpty
+          ? 'ai_recommended'
+          : state.designSource,
+    );
     switch (track) {
       case 'app':
         return CommercialQualityAttachment(
           brief: brief,
           appQualityContractVersion: CommercialAppQualityProfile.kSchemaVersion,
-          appProfile: _appProfile(input, problem, outcome, uniqueValue),
+          appProfile: _appProfile(
+            input,
+            problem,
+            outcome,
+            uniqueValue,
+            designDirection: designSelection.designDirection,
+          ),
+          designSelection: designSelection,
         );
       case 'ebook':
         return CommercialQualityAttachment(
           brief: brief,
           ebookQualityContractVersion: 1,
+          designSelection: designSelection,
           ebookProfile: CommercialEbookQualityProfile(
             standard: standard,
             readerLevel: 'beginner_friendly',
@@ -234,6 +261,7 @@ class CommercialStudioBuilder {
         return CommercialQualityAttachment(
           brief: brief,
           siteQualityContractVersion: 1,
+          designSelection: designSelection,
           siteProfile: CommercialSiteQualityProfile(
             standard: standard,
             sitePurpose: purpose,
@@ -271,6 +299,7 @@ class CommercialStudioBuilder {
         return CommercialQualityAttachment(
           brief: brief,
           contentQualityContractVersion: 1,
+          designSelection: designSelection,
           contentProfile: CommercialContentQualityProfile(
             standard: standard,
             contentSubtype: subtype,
@@ -318,8 +347,9 @@ class CommercialStudioBuilder {
     BusinessPlanInput input,
     String problem,
     String outcome,
-    String uniqueValue,
-  ) {
+    String uniqueValue, {
+    String designDirection = 'clarity_first',
+  }) {
     final users = input.targetCustomer.trim();
     final depth = CommercialDepthPlan.defaultsForStandardApp(
       appPurpose: problem.trim().isNotEmpty
@@ -357,7 +387,7 @@ class CommercialStudioBuilder {
         'play_store_submit',
         'external_publish_without_ok',
       ],
-      designDirection: 'clarity_first',
+      designDirection: designDirection.isEmpty ? 'clarity_first' : designDirection,
       brandIdentity: uniqueValue,
       designTokens: 'color_type_space_v1',
       navigationModel: 'bottom_or_simple_nav',
@@ -470,5 +500,21 @@ class CommercialStudioBuilder {
         .replaceAll(RegExp(r'^-|-$'), '');
     if (cleaned.length >= 4) return cleaned;
     return 'proj-$projectId';
+  }
+
+  String _legacyDirectionForCode(String code) {
+    switch (code.trim().toUpperCase()) {
+      case 'B':
+        return 'premium_industrial';
+      case 'C':
+        return 'friendly_modern';
+      case 'D':
+        return 'minimal_professional';
+      case 'E':
+        return 'dynamic_content';
+      case 'A':
+      default:
+        return 'clarity_first';
+    }
   }
 }

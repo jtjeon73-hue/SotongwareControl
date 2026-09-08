@@ -1,0 +1,585 @@
+{
+  "designSystemVersion": "1.0.0",
+  "updatedAt": "2026-09-08T01:20:00Z",
+  "brandCore": {
+    "publicName": "SotongWare",
+    "personality": ["신뢰성", "기술 전문성", "명료함", "실제 사용성", "과장되지 않은 전문 이미지"],
+    "nonNegotiables": [
+      "공개 표기는 SotongWare",
+      "과장 마케팅 카피 금지",
+      "접근성 최소 기준 유지",
+      "프로필이 바뀌어도 브랜드 정체성 완전 소멸 금지"
+    ],
+    "defaultProfileCode": "A"
+  },
+  "tracks": [
+    "app",
+    "site",
+    "ebook",
+    "knowledge_education",
+    "marketing",
+    "contents"
+  ],
+  "contentSubtypes": [
+    "music_audio",
+    "shorts",
+    "comic_video",
+    "image_design"
+  ],
+  "profiles": [
+    {
+      "profileId": "ds_profile_a_standard",
+      "profileCode": "A",
+      "profileName": "SotongWare Standard",
+      "profileDescription": "명료하고 신뢰감 있는 기본 대표 스타일. 범용 기업·서비스에 균형 잡힌 정보 밀도.",
+      "profileCategory": "standard",
+      "supportedTracks": ["app", "site", "ebook", "knowledge_education", "marketing", "contents"],
+      "isDefault": true,
+      "isActive": true,
+      "version": "1.0.0",
+      "legacyDesignDirection": "clarity_first",
+      "revisionDirectionHint": "keep_current_partial_edit",
+      "brand": {
+        "primary": "#0F766E",
+        "secondary": "#334155",
+        "accent": "#0EA5E9",
+        "neutral": ["#F8FAFC", "#E2E8F0", "#94A3B8", "#475569", "#0F172A"],
+        "semantic": { "success": "#059669", "warning": "#D97706", "danger": "#DC2626", "info": "#0284C7" },
+        "surface": "#FFFFFF",
+        "background": "#F1F5F9",
+        "text": { "primary": "#0F172A", "secondary": "#475569", "muted": "#64748B", "inverse": "#F8FAFC" }
+      },
+      "typography": {
+        "display": { "family": "Pretendard", "size": 40, "weight": 700, "lineHeight": 1.2 },
+        "headline": { "family": "Pretendard", "size": 28, "weight": 700, "lineHeight": 1.25 },
+        "title": { "family": "Pretendard", "size": 20, "weight": 600, "lineHeight": 1.35 },
+        "body": { "family": "Pretendard", "size": 16, "weight": 400, "lineHeight": 1.6 },
+        "label": { "family": "Pretendard", "size": 14, "weight": 600, "lineHeight": 1.4 },
+        "caption": { "family": "Pretendard", "size": 12, "weight": 400, "lineHeight": 1.4 },
+        "numeric": { "family": "IBM Plex Sans", "size": 16, "weight": 500, "lineHeight": 1.4 },
+        "letterSpacing": { "display": "-0.02em", "body": "0" }
+      },
+      "layout": {
+        "maxWidth": 1120,
+        "grid": 12,
+        "columns": { "mobile": 4, "tablet": 8, "desktop": 12 },
+        "spacingScale": [4, 8, 12, 16, 24, 32, 48, 64],
+        "sectionSpacing": 56,
+        "contentDensity": "balanced"
+      },
+      "components": {
+        "button": { "radius": 10, "height": 44, "style": "solid_primary" },
+        "card": { "radius": 14, "padding": 20, "border": true, "elevation": "soft" },
+        "input": { "radius": 10, "border": "1px solid #CBD5E1" },
+        "navigation": { "style": "top_or_bottom_clear", "sticky": true },
+        "dialog": { "radius": 16, "scrim": 0.4 },
+        "chips": { "radius": 999, "tone": "neutral" },
+        "badges": { "style": "subtle" },
+        "tableList": { "density": "comfortable", "zebra": false },
+        "cta": { "placement": "section_end", "emphasis": "primary" }
+      },
+      "visual": {
+        "border": "1px solid #E2E8F0",
+        "radius": { "sm": 8, "md": 12, "lg": 16 },
+        "shadow": "0 8px 24px rgba(15,23,42,0.06)",
+        "iconStyle": "line_rounded",
+        "illustrationStyle": "clean_vector",
+        "imageDirection": "real_product_context",
+        "texture": "soft_gradient_wash"
+      },
+      "motion": {
+        "duration": { "fast": 120, "normal": 220, "slow": 360 },
+        "easing": "cubic-bezier(0.2,0.8,0.2,1)",
+        "hover": "lift_2",
+        "entrance": "fade_up",
+        "pageTransition": "fade",
+        "reducedMotion": "respect"
+      },
+      "responsive": {
+        "breakpoints": { "mobile": 0, "tablet": 768, "desktop": 1024, "largeDesktop": 1440 },
+        "navigationRules": { "mobile": "bottom_or_drawer", "desktop": "top_or_side" }
+      },
+      "accessibility": {
+        "contrast": "AA",
+        "minimumFontSize": 14,
+        "touchTarget": 44,
+        "focusState": "ring_2_primary",
+        "keyboardNavigation": true,
+        "reducedMotion": true
+      },
+      "trackAdaptation": {
+        "site": { "hero": "split_copy_visual", "sections": ["services", "proof", "cta"], "nav": "top_sticky" },
+        "app": { "shell": "bottom_nav", "home": "status_cards", "forms": "single_column" },
+        "ebook": { "cover": "balanced_title", "chapter": "serif_optional_body", "callout": "left_accent" },
+        "knowledge_education": { "hero": "course_path", "sections": ["modules", "faq"] },
+        "marketing": { "hero": "offer_first", "sections": ["benefits", "social_proof", "cta"] },
+        "contents": { "shorts": { "framing": "safe_caption_band", "motion": "snappy" } }
+      },
+      "preview": {
+        "swatches": ["#0F766E", "#0EA5E9", "#F1F5F9"],
+        "heroLabel": "명확한 가치 제안 + 안정적 CTA",
+        "sampleHeadline": "복잡한 업무를 한눈에 정리합니다"
+      }
+    },
+    {
+      "profileId": "ds_profile_b_premium_technology",
+      "profileCode": "B",
+      "profileName": "Premium Technology",
+      "profileDescription": "고급 산업·전문기업형. 강한 위계와 구조적 레이아웃, 기술 그래픽 중심.",
+      "profileCategory": "premium_industrial",
+      "supportedTracks": ["app", "site", "ebook", "knowledge_education", "marketing", "contents"],
+      "isDefault": false,
+      "isActive": true,
+      "version": "1.0.0",
+      "legacyDesignDirection": "premium_industrial",
+      "revisionDirectionHint": "more_professional_industrial",
+      "brand": {
+        "primary": "#0B1F33",
+        "secondary": "#1E3A5F",
+        "accent": "#38BDF8",
+        "neutral": ["#07111C", "#122033", "#334155", "#94A3B8", "#E2E8F0"],
+        "semantic": { "success": "#10B981", "warning": "#F59E0B", "danger": "#F43F5E", "info": "#38BDF8" },
+        "surface": "#0F172A",
+        "background": "#07111C",
+        "text": { "primary": "#F8FAFC", "secondary": "#CBD5E1", "muted": "#94A3B8", "inverse": "#0B1F33" }
+      },
+      "typography": {
+        "display": { "family": "Söhne", "size": 44, "weight": 600, "lineHeight": 1.1 },
+        "headline": { "family": "Söhne", "size": 30, "weight": 600, "lineHeight": 1.2 },
+        "title": { "family": "IBM Plex Sans", "size": 20, "weight": 600, "lineHeight": 1.3 },
+        "body": { "family": "IBM Plex Sans", "size": 16, "weight": 400, "lineHeight": 1.55 },
+        "label": { "family": "IBM Plex Sans", "size": 13, "weight": 600, "lineHeight": 1.35 },
+        "caption": { "family": "IBM Plex Sans", "size": 12, "weight": 400, "lineHeight": 1.35 },
+        "numeric": { "family": "IBM Plex Mono", "size": 15, "weight": 500, "lineHeight": 1.3 },
+        "letterSpacing": { "display": "-0.03em", "body": "0.01em" }
+      },
+      "layout": {
+        "maxWidth": 1200,
+        "grid": 12,
+        "columns": { "mobile": 4, "tablet": 8, "desktop": 12 },
+        "spacingScale": [4, 8, 12, 16, 24, 40, 64, 96],
+        "sectionSpacing": 72,
+        "contentDensity": "structured"
+      },
+      "components": {
+        "button": { "radius": 4, "height": 46, "style": "angular_accent" },
+        "card": { "radius": 8, "padding": 24, "border": true, "elevation": "panel" },
+        "input": { "radius": 4, "border": "1px solid #334155" },
+        "navigation": { "style": "rail_or_top_technical", "sticky": true },
+        "dialog": { "radius": 8, "scrim": 0.55 },
+        "chips": { "radius": 4, "tone": "tech" },
+        "badges": { "style": "mono_tag" },
+        "tableList": { "density": "compact", "zebra": true },
+        "cta": { "placement": "hero_and_sticky", "emphasis": "accent_outline" }
+      },
+      "visual": {
+        "border": "1px solid #1E293B",
+        "radius": { "sm": 2, "md": 6, "lg": 10 },
+        "shadow": "0 0 0 1px rgba(56,189,248,0.12)",
+        "iconStyle": "technical_glyph",
+        "illustrationStyle": "schematic_diagram",
+        "imageDirection": "industrial_process",
+        "texture": "grid_overlay_dark"
+      },
+      "motion": {
+        "duration": { "fast": 100, "normal": 180, "slow": 280 },
+        "easing": "cubic-bezier(0.16,1,0.3,1)",
+        "hover": "border_glow",
+        "entrance": "slide_panel",
+        "pageTransition": "crossfade_sharp",
+        "reducedMotion": "respect"
+      },
+      "responsive": {
+        "breakpoints": { "mobile": 0, "tablet": 800, "desktop": 1100, "largeDesktop": 1440 },
+        "navigationRules": { "mobile": "compact_rail", "desktop": "rail_or_top" }
+      },
+      "accessibility": {
+        "contrast": "AA_dark",
+        "minimumFontSize": 14,
+        "touchTarget": 44,
+        "focusState": "ring_accent",
+        "keyboardNavigation": true,
+        "reducedMotion": true
+      },
+      "trackAdaptation": {
+        "site": { "hero": "full_bleed_dark_diagram", "sections": ["capability_grid", "architecture", "cta"], "nav": "technical_top" },
+        "app": { "shell": "side_rail", "home": "ops_dashboard", "forms": "dense_validated" },
+        "ebook": { "cover": "industrial_mark", "chapter": "mono_headers", "callout": "spec_box" },
+        "knowledge_education": { "hero": "curriculum_map", "sections": ["modules", "lab"] },
+        "marketing": { "hero": "capability_claim", "sections": ["proof_metrics", "cta"] },
+        "contents": { "shorts": { "framing": "tech_lower_third", "motion": "precision_cuts" } }
+      },
+      "preview": {
+        "swatches": ["#0B1F33", "#38BDF8", "#07111C"],
+        "heroLabel": "구조적 Hero + 기술 다이어그램",
+        "sampleHeadline": "산업 자동화를 설계 수준으로 보여줍니다"
+      }
+    },
+    {
+      "profileId": "ds_profile_c_friendly_modern",
+      "profileCode": "C",
+      "profileName": "Friendly Modern",
+      "profileDescription": "친근하고 현대적. 쉬운 설명과 부드러운 UI. 교육·생활·일반 소비자형.",
+      "profileCategory": "friendly",
+      "supportedTracks": ["app", "site", "ebook", "knowledge_education", "marketing", "contents"],
+      "isDefault": false,
+      "isActive": true,
+      "version": "1.0.0",
+      "legacyDesignDirection": "friendly_modern",
+      "revisionDirectionHint": "more_friendly_service",
+      "brand": {
+        "primary": "#2563EB",
+        "secondary": "#7C3AED",
+        "accent": "#F97316",
+        "neutral": ["#FFF7ED", "#FFEDD5", "#FED7AA", "#9A3412", "#1C1917"],
+        "semantic": { "success": "#16A34A", "warning": "#EA580C", "danger": "#E11D48", "info": "#2563EB" },
+        "surface": "#FFFFFF",
+        "background": "#FFFBEB",
+        "text": { "primary": "#1C1917", "secondary": "#57534E", "muted": "#78716C", "inverse": "#FFFBEB" }
+      },
+      "typography": {
+        "display": { "family": "Nunito", "size": 42, "weight": 800, "lineHeight": 1.15 },
+        "headline": { "family": "Nunito", "size": 28, "weight": 700, "lineHeight": 1.25 },
+        "title": { "family": "Nunito", "size": 20, "weight": 700, "lineHeight": 1.35 },
+        "body": { "family": "Noto Sans KR", "size": 16, "weight": 400, "lineHeight": 1.7 },
+        "label": { "family": "Noto Sans KR", "size": 14, "weight": 600, "lineHeight": 1.4 },
+        "caption": { "family": "Noto Sans KR", "size": 12, "weight": 400, "lineHeight": 1.45 },
+        "numeric": { "family": "Nunito", "size": 16, "weight": 700, "lineHeight": 1.3 },
+        "letterSpacing": { "display": "-0.01em", "body": "0" }
+      },
+      "layout": {
+        "maxWidth": 1080,
+        "grid": 12,
+        "columns": { "mobile": 4, "tablet": 8, "desktop": 12 },
+        "spacingScale": [4, 8, 12, 16, 24, 32, 48, 72],
+        "sectionSpacing": 48,
+        "contentDensity": "airy"
+      },
+      "components": {
+        "button": { "radius": 999, "height": 48, "style": "pill_soft" },
+        "card": { "radius": 20, "padding": 20, "border": false, "elevation": "soft_float" },
+        "input": { "radius": 14, "border": "1px solid #FDBA74" },
+        "navigation": { "style": "rounded_tabs", "sticky": true },
+        "dialog": { "radius": 24, "scrim": 0.35 },
+        "chips": { "radius": 999, "tone": "pastel" },
+        "badges": { "style": "soft_pill" },
+        "tableList": { "density": "relaxed", "zebra": false },
+        "cta": { "placement": "mid_and_end", "emphasis": "warm_primary" }
+      },
+      "visual": {
+        "border": "none",
+        "radius": { "sm": 12, "md": 18, "lg": 28 },
+        "shadow": "0 12px 30px rgba(37,99,235,0.12)",
+        "iconStyle": "duotone_friendly",
+        "illustrationStyle": "soft_character",
+        "imageDirection": "people_and_everyday",
+        "texture": "warm_blob"
+      },
+      "motion": {
+        "duration": { "fast": 140, "normal": 260, "slow": 420 },
+        "easing": "cubic-bezier(0.34,1.56,0.64,1)",
+        "hover": "scale_102",
+        "entrance": "pop_in",
+        "pageTransition": "slide_soft",
+        "reducedMotion": "respect"
+      },
+      "responsive": {
+        "breakpoints": { "mobile": 0, "tablet": 768, "desktop": 1024, "largeDesktop": 1400 },
+        "navigationRules": { "mobile": "bottom_friendly", "desktop": "top_tabs" }
+      },
+      "accessibility": {
+        "contrast": "AA",
+        "minimumFontSize": 15,
+        "touchTarget": 48,
+        "focusState": "ring_warm",
+        "keyboardNavigation": true,
+        "reducedMotion": true
+      },
+      "trackAdaptation": {
+        "site": { "hero": "friendly_illustration", "sections": ["how_it_works", "stories", "cta"], "nav": "rounded_top" },
+        "app": { "shell": "bottom_friendly", "home": "guided_cards", "forms": "large_labels" },
+        "ebook": { "cover": "warm_photo", "chapter": "large_body", "callout": "tip_bubble" },
+        "knowledge_education": { "hero": "learning_path", "sections": ["lessons", "quiz"] },
+        "marketing": { "hero": "benefit_first", "sections": ["testimonials", "cta"] },
+        "contents": { "shorts": { "framing": "caption_friendly", "motion": "bounce_light" } }
+      },
+      "preview": {
+        "swatches": ["#2563EB", "#F97316", "#FFFBEB"],
+        "heroLabel": "쉬운 설명 + 따뜻한 CTA",
+        "sampleHeadline": "처음에도 바로 이해할 수 있게"
+      }
+    },
+    {
+      "profileId": "ds_profile_d_minimal_professional",
+      "profileCode": "D",
+      "profileName": "Minimal Professional",
+      "profileDescription": "타이포·여백 중심의 절제된 전문 컨설팅/지식형. 시각 잡음 최소화.",
+      "profileCategory": "minimal",
+      "supportedTracks": ["app", "site", "ebook", "knowledge_education", "marketing", "contents"],
+      "isDefault": false,
+      "isActive": true,
+      "version": "1.0.0",
+      "legacyDesignDirection": "minimal_professional",
+      "revisionDirectionHint": "more_premium",
+      "brand": {
+        "primary": "#111111",
+        "secondary": "#444444",
+        "accent": "#B45309",
+        "neutral": ["#FFFFFF", "#F5F5F4", "#D6D3D1", "#78716C", "#1C1917"],
+        "semantic": { "success": "#166534", "warning": "#92400E", "danger": "#9F1239", "info": "#1E3A8A" },
+        "surface": "#FFFFFF",
+        "background": "#FAFAF9",
+        "text": { "primary": "#111111", "secondary": "#44403C", "muted": "#78716C", "inverse": "#FAFAF9" }
+      },
+      "typography": {
+        "display": { "family": "Newsreader", "size": 48, "weight": 500, "lineHeight": 1.08 },
+        "headline": { "family": "Newsreader", "size": 32, "weight": 500, "lineHeight": 1.2 },
+        "title": { "family": "Inter", "size": 18, "weight": 600, "lineHeight": 1.35 },
+        "body": { "family": "Inter", "size": 16, "weight": 400, "lineHeight": 1.75 },
+        "label": { "family": "Inter", "size": 12, "weight": 600, "lineHeight": 1.4 },
+        "caption": { "family": "Inter", "size": 12, "weight": 400, "lineHeight": 1.45 },
+        "numeric": { "family": "Inter", "size": 15, "weight": 500, "lineHeight": 1.4 },
+        "letterSpacing": { "display": "-0.04em", "body": "0.01em" }
+      },
+      "layout": {
+        "maxWidth": 880,
+        "grid": 8,
+        "columns": { "mobile": 4, "tablet": 6, "desktop": 8 },
+        "spacingScale": [4, 8, 16, 24, 40, 64, 96, 128],
+        "sectionSpacing": 96,
+        "contentDensity": "sparse"
+      },
+      "components": {
+        "button": { "radius": 0, "height": 44, "style": "underline_or_solid" },
+        "card": { "radius": 0, "padding": 0, "border": false, "elevation": "none" },
+        "input": { "radius": 0, "border": "0 0 1px 0 solid #D6D3D1" },
+        "navigation": { "style": "hairline_top", "sticky": true },
+        "dialog": { "radius": 0, "scrim": 0.3 },
+        "chips": { "radius": 0, "tone": "mono" },
+        "badges": { "style": "text_only" },
+        "tableList": { "density": "editorial", "zebra": false },
+        "cta": { "placement": "inline_text", "emphasis": "quiet_link" }
+      },
+      "visual": {
+        "border": "1px solid #E7E5E4",
+        "radius": { "sm": 0, "md": 0, "lg": 0 },
+        "shadow": "none",
+        "iconStyle": "minimal_line",
+        "illustrationStyle": "editorial_photo",
+        "imageDirection": "single_anchor_image",
+        "texture": "paper_white"
+      },
+      "motion": {
+        "duration": { "fast": 80, "normal": 160, "slow": 240 },
+        "easing": "linear",
+        "hover": "opacity_90",
+        "entrance": "fade_only",
+        "pageTransition": "none",
+        "reducedMotion": "prefer"
+      },
+      "responsive": {
+        "breakpoints": { "mobile": 0, "tablet": 720, "desktop": 960, "largeDesktop": 1200 },
+        "navigationRules": { "mobile": "minimal_top", "desktop": "hairline_top" }
+      },
+      "accessibility": {
+        "contrast": "AAA_preferred",
+        "minimumFontSize": 16,
+        "touchTarget": 44,
+        "focusState": "underline_focus",
+        "keyboardNavigation": true,
+        "reducedMotion": true
+      },
+      "trackAdaptation": {
+        "site": { "hero": "typography_only", "sections": ["essay", "services", "contact"], "nav": "hairline" },
+        "app": { "shell": "minimal_top", "home": "list_first", "forms": "editorial" },
+        "ebook": { "cover": "title_dominant", "chapter": "longform", "callout": "margin_note" },
+        "knowledge_education": { "hero": "essay_lead", "sections": ["outline", "reading"] },
+        "marketing": { "hero": "quiet_claim", "sections": ["proof", "contact"] },
+        "contents": { "shorts": { "framing": "quiet_caption", "motion": "still_cuts" } }
+      },
+      "preview": {
+        "swatches": ["#111111", "#B45309", "#FAFAF9"],
+        "heroLabel": "타이포 Hero + 넓은 여백",
+        "sampleHeadline": "필요한 말만 남깁니다"
+      }
+    },
+    {
+      "profileId": "ds_profile_e_dynamic_content",
+      "profileCode": "E",
+      "profileName": "Dynamic Content",
+      "profileDescription": "콘텐츠·미디어·마케팅 중심. 강한 이미지/영상 hierarchy와 쇼츠/홍보에 적합.",
+      "profileCategory": "media",
+      "supportedTracks": ["app", "site", "ebook", "knowledge_education", "marketing", "contents"],
+      "isDefault": false,
+      "isActive": true,
+      "version": "1.0.0",
+      "legacyDesignDirection": "dynamic_content",
+      "revisionDirectionHint": "more_modern_tech",
+      "brand": {
+        "primary": "#DB2777",
+        "secondary": "#7C3AED",
+        "accent": "#22D3EE",
+        "neutral": ["#030712", "#111827", "#374151", "#9CA3AF", "#F9FAFB"],
+        "semantic": { "success": "#34D399", "warning": "#FBBF24", "danger": "#FB7185", "info": "#22D3EE" },
+        "surface": "#111827",
+        "background": "#030712",
+        "text": { "primary": "#F9FAFB", "secondary": "#D1D5DB", "muted": "#9CA3AF", "inverse": "#030712" }
+      },
+      "typography": {
+        "display": { "family": "Clash Display", "size": 48, "weight": 700, "lineHeight": 1.05 },
+        "headline": { "family": "Clash Display", "size": 32, "weight": 700, "lineHeight": 1.15 },
+        "title": { "family": "Inter", "size": 20, "weight": 700, "lineHeight": 1.3 },
+        "body": { "family": "Inter", "size": 15, "weight": 400, "lineHeight": 1.55 },
+        "label": { "family": "Inter", "size": 13, "weight": 700, "lineHeight": 1.3 },
+        "caption": { "family": "Inter", "size": 12, "weight": 500, "lineHeight": 1.35 },
+        "numeric": { "family": "Inter", "size": 16, "weight": 700, "lineHeight": 1.2 },
+        "letterSpacing": { "display": "-0.03em", "body": "0" }
+      },
+      "layout": {
+        "maxWidth": 1280,
+        "grid": 12,
+        "columns": { "mobile": 4, "tablet": 8, "desktop": 12 },
+        "spacingScale": [4, 8, 12, 16, 20, 28, 40, 64],
+        "sectionSpacing": 40,
+        "contentDensity": "media_heavy"
+      },
+      "components": {
+        "button": { "radius": 12, "height": 48, "style": "gradient_cta" },
+        "card": { "radius": 18, "padding": 12, "border": false, "elevation": "media_tile" },
+        "input": { "radius": 12, "border": "1px solid #374151" },
+        "navigation": { "style": "overlay_media", "sticky": true },
+        "dialog": { "radius": 18, "scrim": 0.6 },
+        "chips": { "radius": 999, "tone": "neon" },
+        "badges": { "style": "live_pill" },
+        "tableList": { "density": "media_feed", "zebra": false },
+        "cta": { "placement": "over_media", "emphasis": "gradient" }
+      },
+      "visual": {
+        "border": "none",
+        "radius": { "sm": 10, "md": 16, "lg": 24 },
+        "shadow": "0 20px 50px rgba(219,39,119,0.25)",
+        "iconStyle": "bold_fill",
+        "illustrationStyle": "cinematic_still",
+        "imageDirection": "full_bleed_media",
+        "texture": "grain_and_glow"
+      },
+      "motion": {
+        "duration": { "fast": 90, "normal": 200, "slow": 500 },
+        "easing": "cubic-bezier(0.22,1,0.36,1)",
+        "hover": "zoom_media",
+        "entrance": "scale_in",
+        "pageTransition": "wipe",
+        "reducedMotion": "respect"
+      },
+      "responsive": {
+        "breakpoints": { "mobile": 0, "tablet": 768, "desktop": 1080, "largeDesktop": 1440 },
+        "navigationRules": { "mobile": "overlay", "desktop": "overlay_or_top" }
+      },
+      "accessibility": {
+        "contrast": "AA_dark_media",
+        "minimumFontSize": 14,
+        "touchTarget": 48,
+        "focusState": "ring_cyan",
+        "keyboardNavigation": true,
+        "reducedMotion": true
+      },
+      "trackAdaptation": {
+        "site": { "hero": "full_bleed_video", "sections": ["reels", "campaigns", "cta"], "nav": "overlay" },
+        "app": { "shell": "media_tabs", "home": "feed", "forms": "quick_compose" },
+        "ebook": { "cover": "poster", "chapter": "visual_breaks", "callout": "quote_card" },
+        "knowledge_education": { "hero": "trailer", "sections": ["clips", "modules"] },
+        "marketing": { "hero": "campaign_reel", "sections": ["offers", "cta"] },
+        "contents": { "shorts": { "framing": "safe_zone_9_16", "motion": "hook_first_3s" } }
+      },
+      "preview": {
+        "swatches": ["#DB2777", "#22D3EE", "#030712"],
+        "heroLabel": "풀블리드 미디어 + 강한 CTA",
+        "sampleHeadline": "3초 안에 시선을 잡습니다"
+      }
+    }
+  ],
+  "designChangeContract": {
+    "version": "1.0.0",
+    "changeType": "design_change_requested",
+    "preserve": [
+      "business_logic",
+      "data_model",
+      "core_features",
+      "api_contract",
+      "user_inputs",
+      "primary_content",
+      "seo_content",
+      "project_identity",
+      "artifact_revision_history"
+    ],
+    "mutable": [
+      "layout",
+      "typography",
+      "colors",
+      "component_style",
+      "navigation_presentation",
+      "card_layout",
+      "spacing",
+      "illustration_image_direction",
+      "animation",
+      "visual_hierarchy"
+    ],
+    "revisionRules": {
+      "neverOverwritePriorRevision": true,
+      "requireParentRevision": true,
+      "returnToUserReview": true,
+      "storeDesignMetadataOnRevision": true
+    }
+  },
+  "designQualityProfile": {
+    "version": "1.0.0",
+    "dimensions": [
+      "brand_fit",
+      "visual_hierarchy",
+      "readability",
+      "consistency",
+      "information_density",
+      "responsive_quality",
+      "mobile_usability",
+      "accessibility",
+      "cta_clarity",
+      "professionalism",
+      "content_design_balance",
+      "media_quality",
+      "interaction_quality"
+    ],
+    "issueSeverities": ["info", "warning", "error", "blocker"],
+    "hooks": {
+      "preReviewQualityGate": true,
+      "recommendedDesignProfile": true,
+      "autoImprovementLoop": false
+    }
+  },
+  "recommendationRules": [
+    {
+      "id": "industrial_to_b",
+      "when": { "anyKeyword": ["산업자동화", "제조", "설비", "B2B", "공장"] },
+      "recommend": "B",
+      "reason": "산업·전문기업 맥락에는 Premium Technology가 적합합니다."
+    },
+    {
+      "id": "ebook_senior_to_c_or_d",
+      "when": { "artifact": "ebook", "anyKeyword": ["초보", "50대", "입문", "쉽게"] },
+      "recommend": "C",
+      "alternates": ["D"],
+      "reason": "쉬운 설명·가독성이 중요한 전자책은 Friendly Modern 또는 Minimal Professional을 권장합니다."
+    },
+    {
+      "id": "shorts_to_e",
+      "when": { "anyKeyword": ["쇼츠", "shorts", "영상", "릴스", "콘텐츠"] },
+      "recommend": "E",
+      "reason": "쇼츠·미디어 중심 결과물은 Dynamic Content가 적합합니다."
+    },
+    {
+      "id": "default_a",
+      "when": { "fallback": true },
+      "recommend": "A",
+      "reason": "기본 대표 스타일 SotongWare Standard를 권장합니다."
+    }
+  ]
+}

@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../../data/project_design_catalog.dart';
 import '../../models/artifact_type.dart';
 import '../../models/concept_candidate.dart';
+import '../../models/design_system/design_system_catalog.dart';
 import '../../models/project_design_state.dart';
+import '../../services/design_system/design_system_service.dart';
 import '../../services/project_design_engine.dart';
 import '../../services/work_instruction_concept_occupancy.dart';
 import '../../services/work_instruction_workshop_presentation.dart';
 import '../../theme/control_theme.dart';
+import '../design_system/studio_design_profile_panel.dart';
 import 'concept_picker_panel.dart';
 import 'studio_ai_enhance_panel.dart';
 import 'studio_production_options_panel.dart';
@@ -75,12 +78,50 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
   final _requestedChangesCtrl = TextEditingController();
   final _preservedHashesCtrl = TextEditingController();
   DesignReviewReport? _review;
+  DesignSystemCatalog? _designCatalog;
+  String _recommendedDesignCode = 'A';
 
   @override
   void initState() {
     super.initState();
     _state = widget.initial.copy();
     _syncControllers();
+    _loadDesignCatalog();
+  }
+
+  Future<void> _loadDesignCatalog() async {
+    try {
+      final catalog = await DesignSystemService.instance.loadCatalog();
+      if (!mounted) return;
+      final contextText = [
+        _state.topic,
+        _state.customerProblem,
+        _state.desiredOutcome,
+        _state.displayTitle,
+        _state.designMemo,
+        ..._state.selectedAudiences,
+      ].join(' ');
+      final rec = DesignSystemService.instance.recommend(
+        catalog: catalog,
+        artifactType: _state.artifactType ?? '',
+        contextText: contextText,
+      );
+      setState(() {
+        _designCatalog = catalog;
+        _recommendedDesignCode = rec.designProfileCode;
+        if (_state.designSource == 'ai_recommended' ||
+            _state.designProfileCode.trim().isEmpty) {
+          _state.designProfileCode = rec.designProfileCode;
+          _state.designProfileId = rec.designProfileId;
+          _state.designProfileVersion = rec.designProfileVersion;
+          _state.designSystemVersion = rec.designSystemVersion;
+          _state.designSource = 'ai_recommended';
+          widget.onChanged(_state);
+        }
+      });
+    } catch (_) {
+      // Catalog optional at draft time; WI build still defaults to A.
+    }
   }
 
   @override
@@ -713,10 +754,11 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     );
     final preview = titles.take(StudioTitleRecommendations.topPreview).toList();
     final more = titles.skip(StudioTitleRecommendations.topPreview).toList();
-    final selectedTitle = (_state.displayTitle.trim().isNotEmpty
-            ? _state.displayTitle
-            : _state.topic)
-        .trim();
+    final selectedTitle =
+        (_state.displayTitle.trim().isNotEmpty
+                ? _state.displayTitle
+                : _state.topic)
+            .trim();
 
     Widget titleChip(String t) {
       final selected = selectedTitle == t.trim();
@@ -1149,6 +1191,48 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_designCatalog != null) ...[
+          StudioDesignProfilePanel(
+            catalog: _designCatalog!,
+            selectedCode: _state.designProfileCode,
+            recommendedCode: _recommendedDesignCode,
+            designSource: _state.designSource,
+            reason: DesignSystemService.instance.reasonFor(
+              catalog: _designCatalog!,
+              profileCode: _state.designProfileCode,
+              artifactType: _state.artifactType ?? '',
+              contextText: [
+                _state.topic,
+                _state.customerProblem,
+                _state.desiredOutcome,
+                _state.displayTitle,
+              ].join(' '),
+            ),
+            onSelectAiRecommended: () {
+              final p =
+                  _designCatalog!.byCode(_recommendedDesignCode) ??
+                  _designCatalog!.defaultProfile;
+              final next = _state.copy()
+                ..designProfileCode = p.profileCode
+                ..designProfileId = p.profileId
+                ..designProfileVersion = p.version
+                ..designSystemVersion = _designCatalog!.designSystemVersion
+                ..designSource = 'ai_recommended';
+              _emit(next);
+            },
+            onSelectCode: (code) {
+              final p = _designCatalog!.byCode(code) ?? _designCatalog!.defaultProfile;
+              final next = _state.copy()
+                ..designProfileCode = p.profileCode
+                ..designProfileId = p.profileId
+                ..designProfileVersion = p.version
+                ..designSystemVersion = _designCatalog!.designSystemVersion
+                ..designSource = 'user_selected';
+              _emit(next);
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
         if (widget.aiProductionPilot) ...[
           StudioProductionOptionsPanel(
             approvalMode: widget.approvalMode,

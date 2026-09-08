@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/sotong24_remote_models.dart';
 import '../theme/control_theme.dart';
+import 'site_mobile_preview_dialog.dart';
 
 /// Structured STEP15 site review decision payload for STEP16 revision.
 class SiteReviewDecisionPayload {
@@ -11,12 +12,16 @@ class SiteReviewDecisionPayload {
     required this.reviewDecision,
     required this.reviewComment,
     this.selectedDesignDirection = '',
+    this.designProfileCode = '',
+    this.designSystemVersion = '1.0.0',
     this.reviewedRevision = 'r1',
   });
 
   final String reviewDecision;
   final String reviewComment;
   final String selectedDesignDirection;
+  final String designProfileCode;
+  final String designSystemVersion;
   final String reviewedRevision;
 
   /// Wire format consumed by Agent / STEP16 prompts.
@@ -28,13 +33,43 @@ class SiteReviewDecisionPayload {
     if (selectedDesignDirection.trim().isNotEmpty) {
       buf.writeln('[selectedDesignDirection=$selectedDesignDirection]');
     }
+    if (designProfileCode.trim().isNotEmpty) {
+      buf.writeln('[designProfileCode=$designProfileCode]');
+      buf.writeln('[designSource=revision_change]');
+      buf.writeln('[designSystemVersion=$designSystemVersion]');
+    }
     if (reviewComment.trim().isNotEmpty) {
       buf.writeln(reviewComment.trim());
     }
     return buf.toString().trim();
   }
+
+  /// Extract structured tags from a revision message (Control ↔ Agent contract).
+  static ({
+    String reviewDecision,
+    String selectedDesignDirection,
+    String designProfileCode,
+    String reviewedRevision,
+  })
+  parseTags(String message) {
+    String field(String name) {
+      final m = RegExp(
+        '\\[$name=([^\\]]*)\\]',
+        multiLine: true,
+      ).firstMatch(message);
+      return (m?.group(1) ?? '').trim();
+    }
+
+    return (
+      reviewDecision: field('reviewDecision'),
+      selectedDesignDirection: field('selectedDesignDirection'),
+      designProfileCode: field('designProfileCode'),
+      reviewedRevision: field('reviewedRevision'),
+    );
+  }
 }
 
+/// Legacy free-form directions (still accepted for older revision messages).
 const kSiteDesignDirections = <(String, String)>[
   ('keep_current_partial_edit', '현재 디자인 유지 + 일부 수정'),
   ('more_professional_industrial', '더 전문적인 산업형'),
@@ -42,6 +77,16 @@ const kSiteDesignDirections = <(String, String)>[
   ('more_friendly_service', '더 친근한 서비스형'),
   ('more_premium', '더 고급스러운 프리미엄형'),
   ('custom_request', '직접 요청'),
+];
+
+/// Design System v1 profile picks for post-result design change.
+const kDesignSystemProfileOptions = <(String, String, String)>[
+  // code, label, legacy selectedDesignDirection
+  ('A', 'A · SotongWare Standard', 'keep_current_partial_edit'),
+  ('B', 'B · Premium Technology', 'more_professional_industrial'),
+  ('C', 'C · Friendly Modern', 'more_friendly_service'),
+  ('D', 'D · Minimal Professional', 'more_premium'),
+  ('E', 'E · Dynamic Content', 'more_modern_tech'),
 ];
 
 Future<void> openSiteReviewUrl(String url) async {
@@ -71,11 +116,14 @@ class SiteUserReviewActions extends StatelessWidget {
   final VoidCallback onDesignChange;
   final VoidCallback onHold;
 
-  String? get _openUrl => stage.openablePreviewUrl ?? stage.openableResultUrl;
+  /// Hosting review channel only — never Storage artifact downloadUrl.
+  String? get _openUrl => stage.openableSiteReviewPreviewUrl;
 
   @override
   Widget build(BuildContext context) {
     final url = _openUrl;
+    // Prefer stage.revision (synced site review rev). Do not inflate via
+    // project.finalRevision when stage revision is already set.
     final rev = stage.revision > 0 ? stage.revision : project.finalRevision;
     return Container(
       width: double.infinity,
@@ -93,16 +141,65 @@ class SiteUserReviewActions extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
           ),
           const SizedBox(height: 4),
-          const Text(
-            'STEP15 검토 준비 완료. 결과를 확인한 뒤 승인·보완·디자인 변경·보류를 선택하세요. '
-            '이 승인은 외부 공개(STEP18) 승인이 아닙니다.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.35,
-              color: ControlColors.textSecondary,
+          if (stage.isOnHold) ...[
+            Container(
+              key: const Key('site_review_hold_status'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: ControlColors.teal.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: ControlColors.teal.withValues(alpha: 0.45),
+                ),
+              ),
+              child: const Text(
+                '사용자 보류 · 결과는 보존되며 STEP16은 시작되지 않습니다.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: ControlColors.teal,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 8),
+          ] else if (stage.isDesignChangeRequested) ...[
+            Container(
+              key: const Key('site_review_design_change_status'),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: ControlColors.teal.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: ControlColors.teal.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Text(
+                stage.selectedDesignDirection.trim().isEmpty
+                    ? '디자인 변경 요청됨 · Agent가 STEP16/r${rev + 1}로 반영할 때까지 대기합니다.'
+                    : '디자인 변경 요청됨 (${stage.selectedDesignDirection}) · '
+                          'Agent가 STEP16/r${rev + 1}로 반영할 때까지 대기합니다.',
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: ControlColors.teal,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ] else ...[
+            const Text(
+              'STEP15 검토 준비 완료. 결과를 확인한 뒤 승인·보완·디자인 변경·보류를 선택하세요. '
+              '이 승인은 외부 공개(STEP18) 승인이 아닙니다.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.35,
+                color: ControlColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (url != null) ...[
             FilledButton.icon(
               key: const Key('site_review_open'),
@@ -113,7 +210,9 @@ class SiteUserReviewActions extends StatelessWidget {
             const SizedBox(height: 8),
             OutlinedButton.icon(
               key: const Key('site_review_mobile'),
-              onPressed: busy ? null : () => openSiteReviewUrl(url),
+              onPressed: busy
+                  ? null
+                  : () => showSiteMobilePreviewDialog(context, previewUrl: url),
               icon: const Icon(Icons.phone_iphone),
               label: const Text('모바일에서 보기'),
             ),
@@ -177,8 +276,18 @@ class SiteUserReviewActions extends StatelessWidget {
 Future<SiteReviewDecisionPayload?> showSiteDesignChangeDialog(
   BuildContext context, {
   String reviewedRevision = 'r1',
+  String currentProfileCode = '',
 }) async {
-  String selected = kSiteDesignDirections.first.$1;
+  String selectedCode = currentProfileCode.trim().isNotEmpty
+      ? currentProfileCode.trim().toUpperCase()
+      : 'B';
+  if (!kDesignSystemProfileOptions.any((o) => o.$1 == selectedCode)) {
+    selectedCode = 'A';
+  }
+  // Prefer a different profile than current when changing design.
+  if (currentProfileCode.trim().toUpperCase() == selectedCode) {
+    selectedCode = selectedCode == 'A' ? 'B' : 'A';
+  }
   final comment = TextEditingController();
   try {
     final ok = await showDialog<bool>(
@@ -187,32 +296,38 @@ Future<SiteReviewDecisionPayload?> showSiteDesignChangeDialog(
         return StatefulBuilder(
           builder: (ctx, setLocal) {
             return AlertDialog(
-              title: const Text('디자인 변경 요청'),
+              title: const Text('디자인 변경'),
               content: SizedBox(
-                width: 420,
+                width: 440,
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
-                        '기존 r1 결과는 보존됩니다. 선택 내용은 STEP16 revision 요청으로 전달됩니다.',
-                        style: TextStyle(fontSize: 13, height: 1.35),
+                      Text(
+                        currentProfileCode.trim().isEmpty
+                            ? '현재 디자인을 Design System 프로필로 변경합니다. 기존 revision은 보존됩니다.'
+                            : '현재 디자인: $currentProfileCode\n변경 시 기능·내용은 보존하고 시각 스타일만 새 revision으로 적용합니다.',
+                        style: const TextStyle(fontSize: 13, height: 1.35),
                       ),
                       const SizedBox(height: 12),
-                      for (final opt in kSiteDesignDirections)
+                      for (final opt in kDesignSystemProfileOptions)
                         RadioListTile<String>(
                           dense: true,
                           value: opt.$1,
                           // ignore: deprecated_member_use
-                          groupValue: selected,
+                          groupValue: selectedCode,
                           title: Text(
                             opt.$2,
                             style: const TextStyle(fontSize: 14),
                           ),
+                          subtitle: Text(
+                            'legacy: ${opt.$3}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
                           // ignore: deprecated_member_use
                           onChanged: (v) {
                             if (v == null) return;
-                            setLocal(() => selected = v);
+                            setLocal(() => selectedCode = v);
                           },
                         ),
                       TextField(
@@ -245,12 +360,18 @@ Future<SiteReviewDecisionPayload?> showSiteDesignChangeDialog(
       },
     );
     if (ok != true) return null;
+    final opt = kDesignSystemProfileOptions.firstWhere(
+      (o) => o.$1 == selectedCode,
+      orElse: () => kDesignSystemProfileOptions.first,
+    );
     return SiteReviewDecisionPayload(
       reviewDecision: 'design_change_requested',
-      selectedDesignDirection: selected,
+      selectedDesignDirection: opt.$3,
+      designProfileCode: opt.$1,
+      designSystemVersion: '1.0.0',
       reviewedRevision: reviewedRevision,
       reviewComment: comment.text.trim().isEmpty
-          ? '디자인 방향 변경 요청'
+          ? '디자인 프로필 ${opt.$1} 변경 요청 (기능·내용 보존)'
           : comment.text.trim(),
     );
   } finally {

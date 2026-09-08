@@ -5,6 +5,7 @@ library;
 import '../artifact_type.dart';
 import 'commercial_track_profiles.dart';
 import 'work_instruction_brief.dart';
+import '../design_system/design_system_catalog.dart';
 
 class CommercialQualityAttachment {
   const CommercialQualityAttachment({
@@ -18,6 +19,7 @@ class CommercialQualityAttachment {
     this.ebookProfile = const CommercialEbookQualityProfile(present: false),
     this.siteProfile = const CommercialSiteQualityProfile(present: false),
     this.contentProfile = const CommercialContentQualityProfile(present: false),
+    this.designSelection,
   });
 
   final int briefContractVersion;
@@ -30,6 +32,7 @@ class CommercialQualityAttachment {
   final CommercialEbookQualityProfile ebookProfile;
   final CommercialSiteQualityProfile siteProfile;
   final CommercialContentQualityProfile contentProfile;
+  final DesignSelection? designSelection;
 
   /// Fields merged at instruction root (Work parser paths).
   Map<String, dynamic> toInstructionJsonFields() {
@@ -40,7 +43,8 @@ class CommercialQualityAttachment {
     }
     if (appProfile.present) {
       out['appQualityContractVersion'] =
-          appQualityContractVersion ?? CommercialAppQualityProfile.kSchemaVersion;
+          appQualityContractVersion ??
+          CommercialAppQualityProfile.kSchemaVersion;
       out['commercialAppQualityProfile'] = appProfile.toJson();
     }
     if (ebookProfile.present) {
@@ -54,6 +58,10 @@ class CommercialQualityAttachment {
     if (contentProfile.present) {
       out['contentQualityContractVersion'] = contentQualityContractVersion ?? 1;
       out['commercialContentQualityProfile'] = contentProfile.toJson();
+    }
+    final design = designSelection;
+    if (design != null) {
+      out.addAll(design.toInstructionJsonFields());
     }
     return out;
   }
@@ -98,6 +106,19 @@ class CommercialQualityAttachment {
       contentProfile: CommercialContentQualityProfile.fromJson(
         asMap(json['commercialContentQualityProfile']),
       ),
+      designSelection: (json['designProfileCode'] != null ||
+              json['designProfileId'] != null)
+          ? DesignSelection(
+              designSystemVersion:
+                  '${json['designSystemVersion'] ?? DesignSystemCatalog.kVersion}',
+              designProfileId: '${json['designProfileId'] ?? ''}',
+              designProfileCode: '${json['designProfileCode'] ?? 'A'}',
+              designProfileVersion:
+                  '${json['designProfileVersion'] ?? '1.0.0'}',
+              designDirection: '${json['designDirection'] ?? 'clarity_first'}',
+              designSource: '${json['designSource'] ?? 'ai_recommended'}',
+            )
+          : null,
     );
   }
 

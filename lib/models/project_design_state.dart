@@ -89,6 +89,11 @@ class ProjectDesignState {
     this.useEnvironment = '',
     this.mainPainPoint = '',
     this.digitalSkillLevel = '',
+    this.designProfileCode = 'A',
+    this.designProfileId = 'ds_profile_a_standard',
+    this.designSource = 'ai_recommended',
+    this.designProfileVersion = '1.0.0',
+    this.designSystemVersion = '1.0.0',
   }) : selectedAudiences = selectedAudiences ?? [],
        selectedTopicIds = selectedTopicIds ?? [],
        selectedConceptIds = selectedConceptIds ?? [],
@@ -168,6 +173,13 @@ class ProjectDesignState {
   String useEnvironment;
   String mainPainPoint;
   String digitalSkillLevel;
+
+  /// SotongWare Design System v1 selection (studio).
+  String designProfileCode;
+  String designProfileId;
+  String designSource; // ai_recommended | user_selected | inherited | revision_change
+  String designProfileVersion;
+  String designSystemVersion;
 
   bool get hasArtifact {
     final a = artifactType;
@@ -294,6 +306,11 @@ class ProjectDesignState {
     useEnvironment: useEnvironment,
     mainPainPoint: mainPainPoint,
     digitalSkillLevel: digitalSkillLevel,
+    designProfileCode: designProfileCode,
+    designProfileId: designProfileId,
+    designSource: designSource,
+    designProfileVersion: designProfileVersion,
+    designSystemVersion: designSystemVersion,
   );
 
   /// 기존 마법사/저장 파이프라인과 호환되는 상태로 변환.
@@ -546,6 +563,11 @@ class ProjectDesignState {
     'useEnvironment': useEnvironment,
     'mainPainPoint': mainPainPoint,
     'digitalSkillLevel': digitalSkillLevel,
+    'designProfileCode': designProfileCode,
+    'designProfileId': designProfileId,
+    'designSource': designSource,
+    'designProfileVersion': designProfileVersion,
+    'designSystemVersion': designSystemVersion,
   };
 
   factory ProjectDesignState.fromJson(Map<String, dynamic> json) {
@@ -657,6 +679,12 @@ class ProjectDesignState {
       useEnvironment: '${json['useEnvironment'] ?? ''}',
       mainPainPoint: '${json['mainPainPoint'] ?? ''}',
       digitalSkillLevel: '${json['digitalSkillLevel'] ?? ''}',
+      designProfileCode: '${json['designProfileCode'] ?? 'A'}',
+      designProfileId:
+          '${json['designProfileId'] ?? 'ds_profile_a_standard'}',
+      designSource: '${json['designSource'] ?? 'ai_recommended'}',
+      designProfileVersion: '${json['designProfileVersion'] ?? '1.0.0'}',
+      designSystemVersion: '${json['designSystemVersion'] ?? '1.0.0'}',
     );
   }
 }
