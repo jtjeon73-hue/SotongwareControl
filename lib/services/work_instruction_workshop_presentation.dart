@@ -5,6 +5,7 @@ import '../services/business_planning_store.dart';
 import '../services/instruction_contract_validator.dart';
 import '../services/plan_execution_index.dart';
 import '../services/plan_execution_status.dart';
+import '../services/studio_title_recommendations.dart';
 import '../services/transferred_work_reconciliation.dart';
 
 /// 작업지시 제작소 — 운영 UI 표시 helper.
@@ -104,12 +105,15 @@ class WorkInstructionWorkshopPresentation {
   static String productionMethodLabel({
     required bool aiPilotEnabled,
     required String artifactType,
+    String? siteSubtype,
+    String? businessKindId,
   }) {
-    if (!aiPilotEnabled) return '수동·혼합 제작';
-    final label = ArtifactType.labelKo(
-      artifactType.trim().isEmpty ? ArtifactType.ebook : artifactType,
+    return StudioTitleRecommendations.aiProductionModeLabel(
+      aiPilotEnabled: aiPilotEnabled,
+      artifactType: artifactType,
+      siteSubtype: siteSubtype,
+      businessKindId: businessKindId,
     );
-    return 'AI 자동 제작 ($label)';
   }
 
   static String approvalModeLabel({required bool approvalRequired}) {

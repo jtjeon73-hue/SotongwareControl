@@ -63,11 +63,40 @@ class StudioTitleRecommendations {
     if (art == ArtifactType.site && site.contains('marketing')) {
       return '마케팅 사이트';
     }
+    if (art == ArtifactType.promoSite) return '마케팅 사이트';
     if (art == ArtifactType.site) return '지식·교육 사이트';
     if (art == ArtifactType.ebook) return '전자책';
     if (art == ArtifactType.contents) return '콘텐츠';
     if (art == ArtifactType.app) return '앱';
     return ArtifactType.labelKo(art);
+  }
+
+  /// 상세 제작 설정용 AI 자동 제작 라벨 (사업유형 동기화).
+  /// 미선택 시 전자책으로 폴백하지 않는다.
+  static String aiProductionModeLabel({
+    required bool aiPilotEnabled,
+    String artifactType = '',
+    String? siteSubtype,
+    String? businessKindId,
+  }) {
+    if (!aiPilotEnabled) return '수동·혼합 제작';
+    final kind = (businessKindId ?? '').trim();
+    final art = ArtifactType.normalize(artifactType);
+    final site = (siteSubtype ?? '').trim();
+    final hasSelection =
+        kind.isNotEmpty ||
+        (art.isNotEmpty && art != ArtifactType.undecided) ||
+        site.isNotEmpty;
+    if (!hasSelection) return 'AI 자동 제작';
+    final label = labelForBusinessKind(
+      artifactType: artifactType,
+      siteSubtype: siteSubtype,
+      businessKindId: businessKindId,
+    );
+    if (label.isEmpty || label == ArtifactType.labelKo(ArtifactType.undecided)) {
+      return 'AI 자동 제작';
+    }
+    return 'AI 자동 제작 ($label)';
   }
 
   static String ideaPlaceholder({
@@ -80,8 +109,7 @@ class StudioTitleRecommendations {
     final site = (siteSubtype ?? '').trim();
     final kind = (businessKindId ?? '').trim();
     final audiences = _normalizeAudiences(audienceIds);
-    if (kind == 'industrial_sw' ||
-        audiences.any(_isIndustrialAudience)) {
+    if (kind == 'industrial_sw' || audiences.any(_isIndustrialAudience)) {
       return '예: 중소 제조업체가 여러 자동화 업체를 따로 찾지 않고 '
           '상담부터 개발·연동·유지보수까지 한 곳에서 받을 수 있는 서비스';
     }
@@ -122,9 +150,9 @@ class StudioTitleRecommendations {
     final art = ArtifactType.normalize(artifactType);
     final site = (siteSubtype ?? '').trim();
     final kind = (businessKindId ?? '').trim();
-    final audiences = _normalizeAudiences(audienceIds)
-        .where((a) => a != 'general')
-        .toList();
+    final audiences = _normalizeAudiences(
+      audienceIds,
+    ).where((a) => a != 'general').toList();
     final capped = limit.clamp(1, maxTitles);
 
     final seeds = <_TitleSeed>[
@@ -239,10 +267,7 @@ class StudioTitleRecommendations {
   }
 
   /// Drop titles that are exclusive to a non-selected audience family.
-  static bool _compatibleWithAudiences(
-    _TitleSeed seed,
-    List<String> selected,
-  ) {
+  static bool _compatibleWithAudiences(_TitleSeed seed, List<String> selected) {
     if (seed.audienceTags.isEmpty) {
       // Keyword hard-block for exclusive foreign phrases.
       return !_hasForeignExclusiveKeywords(seed.text, selected);
@@ -251,7 +276,8 @@ class StudioTitleRecommendations {
   }
 
   static bool _hasForeignExclusiveKeywords(String text, List<String> selected) {
-    final officeOnly = selected.every(_isOfficeAudience) &&
+    final officeOnly =
+        selected.every(_isOfficeAudience) &&
         selected.isNotEmpty &&
         !selected.any(
           (a) =>
@@ -261,9 +287,7 @@ class StudioTitleRecommendations {
               _isIndustrialAudience(a),
         );
     if (!officeOnly) return false;
-    final foreign = RegExp(
-      r'(50대|중장년|자영업|사장님|소상공|부모님|취미|학부모|학생)',
-    );
+    final foreign = RegExp(r'(50대|중장년|자영업|사장님|소상공|부모님|취미|학부모|학생)');
     return foreign.hasMatch(text);
   }
 
@@ -457,21 +481,21 @@ class StudioTitleRecommendations {
       }
       if (_isOfficeAudience(a) && art == ArtifactType.ebook) {
         out.addAll(const [
-        _TitleSeed('직장인이 퇴근 후 쓰는 실무 전자책 시작법', ['office']),
-        _TitleSeed('업무 시간을 아끼는 한 장 요약형 실전 노트', ['office']),
-        _TitleSeed('자기계발을 결과로 남기는 직장인 전자책 가이드', ['office']),
-        _TitleSeed('점심 휴게시간에 끝내는 짧은 업무 정리법', ['office']),
-        _TitleSeed('상사 보고 전에 읽는 한 장 핵심 정리', ['office']),
-        _TitleSeed('직장 메일을 덜 오래 쓰는 실무 문장 가이드', ['office']),
-        _TitleSeed('야근을 줄이는 할 일 정리 습관 입문서', ['office']),
-        _TitleSeed('이직 준비 전에 정리하는 경력 스토리 노트', ['office']),
-        _TitleSeed('회의를 짧게 끝내는 안건 작성 실전법', ['office']),
-        _TitleSeed('팀 협업 갈등을 줄이는 직장 커뮤니케이션', ['office']),
-        _TitleSeed('성과 리뷰 전에 읽는 자기평가 작성법', ['office']),
-        _TitleSeed('출장·외근 중에도 이어가는 학습 습관', ['office']),
-        _TitleSeed('직장인이 AI로 자료 조사를 빠르게 하는 법', ['office']),
-        _TitleSeed('부서 공통 지식을 책으로 남기는 실무 템플릿', ['office']),
-        _TitleSeed('연말 정산·문서 업무를 덜 헤매는 체크 가이드', ['office']),
+          _TitleSeed('직장인이 퇴근 후 쓰는 실무 전자책 시작법', ['office']),
+          _TitleSeed('업무 시간을 아끼는 한 장 요약형 실전 노트', ['office']),
+          _TitleSeed('자기계발을 결과로 남기는 직장인 전자책 가이드', ['office']),
+          _TitleSeed('점심 휴게시간에 끝내는 짧은 업무 정리법', ['office']),
+          _TitleSeed('상사 보고 전에 읽는 한 장 핵심 정리', ['office']),
+          _TitleSeed('직장 메일을 덜 오래 쓰는 실무 문장 가이드', ['office']),
+          _TitleSeed('야근을 줄이는 할 일 정리 습관 입문서', ['office']),
+          _TitleSeed('이직 준비 전에 정리하는 경력 스토리 노트', ['office']),
+          _TitleSeed('회의를 짧게 끝내는 안건 작성 실전법', ['office']),
+          _TitleSeed('팀 협업 갈등을 줄이는 직장 커뮤니케이션', ['office']),
+          _TitleSeed('성과 리뷰 전에 읽는 자기평가 작성법', ['office']),
+          _TitleSeed('출장·외근 중에도 이어가는 학습 습관', ['office']),
+          _TitleSeed('직장인이 AI로 자료 조사를 빠르게 하는 법', ['office']),
+          _TitleSeed('부서 공통 지식을 책으로 남기는 실무 템플릿', ['office']),
+          _TitleSeed('연말 정산·문서 업무를 덜 헤매는 체크 가이드', ['office']),
         ]);
       }
     }
@@ -479,17 +503,17 @@ class StudioTitleRecommendations {
   }
 
   static List<_TitleSeed> get _industrialSeeds => const [
-        _TitleSeed('공장 설비가 멈추기 전에 먼저 알려주는 스마트 모니터링', ['industrial']),
-        _TitleSeed('중소 공장이 상담부터 유지보수까지 한곳에서 받는 자동화 창구', ['industrial']),
-        _TitleSeed('생산기술 담당자가 라인 이상을 바로 공유하는 현장 보드', ['industrial']),
-        _TitleSeed('설비보전 팀이 점검 순서를 놓치지 않게 돕는 일지 앱', ['industrial']),
-        _TitleSeed('품질 이상 사진을 즉시 남기는 간단한 보고 흐름', ['industrial']),
-        _TitleSeed('자동화 담당자가 여러 업체를 비교하기 쉽게 정리한 상담 가이드', ['industrial']),
-        _TitleSeed('교대 근무 인계가 빠지지 않게 돕는 현장 체크', ['industrial']),
-        _TitleSeed('중소 제조 대표가 현황을 한눈에 보는 운영 요약', ['industrial']),
-        _TitleSeed('설비가 왜 멈췄는지 더 빨리 찾는 보전 도우미', ['industrial']),
-        _TitleSeed('라인별 알람을 우선순위로 정리해 주는 알림 보드', ['industrial']),
-      ];
+    _TitleSeed('공장 설비가 멈추기 전에 먼저 알려주는 스마트 모니터링', ['industrial']),
+    _TitleSeed('중소 공장이 상담부터 유지보수까지 한곳에서 받는 자동화 창구', ['industrial']),
+    _TitleSeed('생산기술 담당자가 라인 이상을 바로 공유하는 현장 보드', ['industrial']),
+    _TitleSeed('설비보전 팀이 점검 순서를 놓치지 않게 돕는 일지 앱', ['industrial']),
+    _TitleSeed('품질 이상 사진을 즉시 남기는 간단한 보고 흐름', ['industrial']),
+    _TitleSeed('자동화 담당자가 여러 업체를 비교하기 쉽게 정리한 상담 가이드', ['industrial']),
+    _TitleSeed('교대 근무 인계가 빠지지 않게 돕는 현장 체크', ['industrial']),
+    _TitleSeed('중소 제조 대표가 현황을 한눈에 보는 운영 요약', ['industrial']),
+    _TitleSeed('설비가 왜 멈췄는지 더 빨리 찾는 보전 도우미', ['industrial']),
+    _TitleSeed('라인별 알람을 우선순위로 정리해 주는 알림 보드', ['industrial']),
+  ];
 
   static List<String> _fallback(String art, List<String> audiences) {
     if (audiences.any(_isOfficeAudience) && art == ArtifactType.ebook) {

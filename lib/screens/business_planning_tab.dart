@@ -35,6 +35,7 @@ import '../services/work_instruction_validator.dart';
 import '../services/work_instruction_wizard_session.dart';
 import '../services/work_instruction_workshop_presentation.dart';
 import '../services/transferred_work_reconciliation.dart';
+import '../services/studio_title_recommendations.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/project_design/instruction_preview_panel.dart';
@@ -414,10 +415,36 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   void _onDesignChanged(ProjectDesignState state) {
     _designState = state;
     _wizardState = state.toWizardState();
+    // 상세 제작 설정·payload가 STEP1 사업유형과 즉시 동기화되도록 반영.
+    final art = (state.artifactType ?? '').trim();
+    if (art.isNotEmpty) {
+      _artifactType = ArtifactType.normalize(art);
+    }
+    final subtype = (state.contentSubtype ?? '').trim();
+    if (_artifactType == ArtifactType.contents) {
+      _contentSubtype = subtype;
+    } else if (art.isNotEmpty) {
+      _contentSubtype = '';
+    }
     _wizardTimer?.cancel();
     _wizardTimer = Timer(const Duration(milliseconds: 500), _persistDraft);
     setState(() {});
   }
+
+  String? get _currentBusinessKindId {
+    final sel = _designState.productionSelections['business_kind'];
+    if (sel == null || sel.isEmpty) return null;
+    final id = sel.first.toString().trim();
+    return id.isEmpty ? null : id;
+  }
+
+  String get _aiProductionModeTitle =>
+      StudioTitleRecommendations.aiProductionModeLabel(
+        aiPilotEnabled: _aiProductionPilot,
+        artifactType: _designState.artifactType ?? _artifactType,
+        siteSubtype: _designState.siteSubtype,
+        businessKindId: _currentBusinessKindId,
+      );
 
   Future<void> _persistDraft() async {
     await _store.saveDraftInput(_currentInput);
@@ -2266,16 +2293,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   Widget _buildSendSummaryCard() {
     final input = _currentInput;
-    final isEbookPilot =
-        _aiProductionPilot &&
-        ArtifactType.normalize(input.resolvedArtifactType) ==
-            ArtifactType.ebook;
-    final isAiProductionPilot =
-        _aiProductionPilot &&
-        (ArtifactType.normalize(input.resolvedArtifactType) ==
-                ArtifactType.ebook ||
-            ArtifactType.normalize(input.resolvedArtifactType) ==
-                ArtifactType.app);
+    final isAiProductionPilot = _aiProductionPilot;
     final validation = _contractValidation;
 
     return Card(
@@ -2294,7 +2312,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             const SizedBox(height: 10),
             _sendSummaryRow(
               '사업유형',
-              ArtifactType.labelKo(input.resolvedArtifactType),
+              StudioTitleRecommendations.labelForBusinessKind(
+                artifactType: input.resolvedArtifactType,
+                siteSubtype: _designState.siteSubtype,
+                businessKindId: _currentBusinessKindId,
+              ),
             ),
             if (_designState.siteSubtype != null &&
                 _designState.siteSubtype!.trim().isNotEmpty)
@@ -2333,8 +2355,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             _sendSummaryRow(
               '제작 방식',
               WorkInstructionWorkshopPresentation.productionMethodLabel(
-                aiPilotEnabled: isEbookPilot,
+                aiPilotEnabled: _aiProductionPilot,
                 artifactType: input.resolvedArtifactType,
+                siteSubtype: _designState.siteSubtype,
+                businessKindId: _currentBusinessKindId,
               ),
             ),
             _sendSummaryRow(
@@ -2571,19 +2595,17 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Widget _buildProductionSettingsCard() {
-    final artifactLabel = ArtifactType.labelKo(
-      _artifactType == ArtifactType.undecided
-          ? ArtifactType.ebook
-          : ArtifactType.normalize(_artifactType),
-    );
+    final modeTitle = _aiProductionModeTitle;
     return Column(
+      key: const Key('planning_production_settings_card'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('제작 설정', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         SwitchListTile(
+          key: const Key('planning_ai_production_mode_switch'),
           contentPadding: EdgeInsets.zero,
-          title: Text('AI 자동 제작 ($artifactLabel)'),
+          title: Text(modeTitle, key: const Key('planning_ai_production_mode_label')),
           subtitle: const Text(
             '검증을 통과한 제작 단계를 순서대로 진행합니다. 외부 등록·출시는 실행하지 않습니다.',
             style: TextStyle(fontSize: 12.5),
@@ -2596,7 +2618,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           '제작 방식',
           WorkInstructionWorkshopPresentation.productionMethodLabel(
             aiPilotEnabled: _aiProductionPilot,
-            artifactType: _artifactType,
+            artifactType: _designState.artifactType ?? _artifactType,
+            siteSubtype: _designState.siteSubtype,
+            businessKindId: _currentBusinessKindId,
           ),
         ),
         _sendSummaryRow(
