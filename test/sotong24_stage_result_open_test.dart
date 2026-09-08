@@ -23,6 +23,34 @@ Sotong24RemoteStage _stage({
 
 void main() {
   group('Sotong24RemoteStage openable links', () {
+    test('site hosting preview is preferred over storage artifact', () {
+      const result =
+          'https://storage.googleapis.com/bucket/15_site_user_review_result.md';
+      const preview = 'https://sotongware-control--sr-demo-r2.web.app';
+      final s = _stage(
+        number: 15,
+        id: 'site_user_review',
+        resultUrl: result,
+        previewUrl: preview,
+      );
+      expect(s.openableResultUrl, result);
+      expect(s.openableSiteReviewPreviewUrl, preview);
+      expect(s.openablePreviewUrl, preview);
+    });
+
+    test('storage-only site urls are not site preview', () {
+      const url =
+          'https://storage.googleapis.com/bucket/15_site_user_review_result.md';
+      final s = _stage(
+        number: 15,
+        id: 'site_user_review',
+        resultUrl: url,
+        previewUrl: url,
+      );
+      expect(s.openableResultUrl, url);
+      expect(s.openableSiteReviewPreviewUrl, isNull);
+    });
+
     test('past stage resultUrl is openable', () {
       const url =
           'https://storage.googleapis.com/sotongware-control.firebasestorage.app/sotong24/artifacts/test/wi_test/draft/r2/a.md';

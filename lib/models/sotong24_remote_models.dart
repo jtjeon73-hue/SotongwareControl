@@ -164,6 +164,8 @@ class Sotong24RemoteStage {
     this.manualRecoveryUsed = false,
     this.executorKind = '',
     this.taskId = '',
+    this.reviewDecision = '',
+    this.selectedDesignDirection = '',
   });
 
   final String stageId;
@@ -182,6 +184,13 @@ class Sotong24RemoteStage {
   final String approvalStatus;
   final String activeRequestId;
   final String updatedAt;
+
+  /// STEP15 structured decision (approved / changes_requested /
+  /// design_change_requested / on_hold). Empty when unset.
+  final String reviewDecision;
+
+  /// Design direction id when reviewDecision=design_change_requested.
+  final String selectedDesignDirection;
 
   /// Agent/stage_sync가 보낸 최신 revision. 0이면 미보고.
   final int revision;
@@ -214,6 +223,21 @@ class Sotong24RemoteStage {
   final String executorKind;
   final String taskId;
 
+  /// True when Control persisted a design-change request for this stage.
+  /// Falls back to message tags in userAttention if stage fields lag.
+  bool get isDesignChangeRequested {
+    if (reviewDecision.trim() == 'design_change_requested') return true;
+    final attention = userAttention;
+    return attention.contains('[reviewDecision=design_change_requested]');
+  }
+
+  /// User parked STEP15 (보류). Prefer stage field; fall back to tags.
+  bool get isOnHold {
+    if (reviewDecision.trim() == 'on_hold') return true;
+    final attention = userAttention;
+    return attention.contains('[reviewDecision=on_hold]');
+  }
+
   bool get hasOpenableResult =>
       openableResultUrl != null || openablePreviewUrl != null;
 
@@ -230,6 +254,26 @@ class Sotong24RemoteStage {
     final r = resultUrl.trim();
     if (isOpenableHttpUrl(r) && p == r) return null;
     return p;
+  }
+
+  /// Site STEP15 "결과 사이트 열기" 전용 — Firebase Hosting review channel만.
+  /// Storage signed downloadUrl(Markdown 등)은 결과물 보기로 분리한다.
+  String? get openableSiteReviewPreviewUrl {
+    final p = previewUrl.trim();
+    if (isOpenableHttpUrl(p) && isFirebaseHostingReviewUrl(p)) return p;
+    final r = resultUrl.trim();
+    if (isOpenableHttpUrl(r) && isFirebaseHostingReviewUrl(r)) return r;
+    return null;
+  }
+
+  static bool isFirebaseHostingReviewUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null || !uri.hasScheme) return false;
+    if (uri.scheme != 'https' && uri.scheme != 'http') return false;
+    final host = uri.host.toLowerCase();
+    return RegExp(
+      r'^sotongware-control(--[a-z0-9-]+)?\.(web\.app|firebaseapp\.com)$',
+    ).hasMatch(host);
   }
 
   static bool isOpenableHttpUrl(String value) {
@@ -290,6 +334,9 @@ class Sotong24RemoteStage {
     if (recoveryState.trim().isNotEmpty) 'recoveryState': recoveryState,
     if (executorKind.trim().isNotEmpty) 'executorKind': executorKind,
     if (taskId.trim().isNotEmpty) 'taskId': taskId,
+    if (reviewDecision.trim().isNotEmpty) 'reviewDecision': reviewDecision,
+    if (selectedDesignDirection.trim().isNotEmpty)
+      'selectedDesignDirection': selectedDesignDirection,
   };
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
@@ -334,6 +381,8 @@ class Sotong24RemoteStage {
       manualRecoveryUsed: map['manualRecoveryUsed'] == true,
       executorKind: '${map['executorKind'] ?? map['worker'] ?? ''}',
       taskId: '${map['taskId'] ?? ''}',
+      reviewDecision: '${map['reviewDecision'] ?? ''}',
+      selectedDesignDirection: '${map['selectedDesignDirection'] ?? ''}',
     );
   }
 
@@ -347,6 +396,9 @@ class Sotong24RemoteStage {
     int? revision,
     String? errorMessage,
     String? activityState,
+    String? reviewDecision,
+    String? selectedDesignDirection,
+    String? userAttention,
   }) {
     return Sotong24RemoteStage(
       stageId: stageId,
@@ -357,7 +409,7 @@ class Sotong24RemoteStage {
       resultPreview: resultPreview,
       workReport: workReport,
       errorMessage: errorMessage ?? this.errorMessage,
-      userAttention: userAttention,
+      userAttention: userAttention ?? this.userAttention,
       resultUrl: resultUrl,
       previewUrl: previewUrl,
       approvalRequired: approvalRequired,
@@ -388,6 +440,9 @@ class Sotong24RemoteStage {
       manualRecoveryUsed: manualRecoveryUsed,
       executorKind: executorKind,
       taskId: taskId,
+      reviewDecision: reviewDecision ?? this.reviewDecision,
+      selectedDesignDirection:
+          selectedDesignDirection ?? this.selectedDesignDirection,
     );
   }
 }
@@ -1062,6 +1117,11 @@ class Sotong24UserFacingStatus {
         stageStatus == Sotong24WorkStatus.error) {
       return Sotong24WorkStatus.error;
     }
+    // on_hold is parked STEP15 — never surface as "보완 중" even if an older
+    // Control path wrote approvalStatus=revision_requested.
+    if (stage?.isOnHold == true) {
+      return Sotong24WorkStatus.awaitingApproval;
+    }
     if (projectStatus == Sotong24WorkStatus.revision ||
         stageStatus == Sotong24WorkStatus.revision ||
         approval == ApprovalStatus.revisionRequested ||
@@ -1158,6 +1218,9 @@ class Sotong24UserFacingStatus {
       case Sotong24WorkStatus.revision:
         return '보완 작업이 진행될 예정입니다.';
       case Sotong24WorkStatus.awaitingApproval:
+        if (stage?.isOnHold == true) {
+          return '사용자 보류 · 결과는 보존되며 STEP16은 시작되지 않습니다.';
+        }
         if (stage?.approvalStatus == ApprovalStatus.approved) {
           return '승인 요청을 전송했습니다. Agent가 다음 단계를 준비 중입니다.';
         }

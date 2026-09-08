@@ -6,6 +6,7 @@ import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
 import 'package:sotong_ware_control/services/business_planning_service.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/widgets/sidebar_navigation.dart';
+import 'package:sotong_ware_control/widgets/site_user_review_actions.dart';
 import 'package:sotong_ware_control/widgets/sotong24_stage_widgets.dart';
 
 Sotong24RemoteProject _operationalEbookFromDemo() {
@@ -178,6 +179,65 @@ void main() {
     expect(after.userFacingStatus, Sotong24WorkStatus.revision);
     expect(after.showApprovalActions, isFalse);
   });
+
+  test(
+    'design_change_requested persists stage fields and is idempotent',
+    () async {
+      final repo = Sotong24RemoteRepository(forceMemory: true);
+      addTearDown(repo.dispose);
+      final project = (await repo.watchProjects().first).firstWhere(
+        (p) => p.projectId == Sotong24RemoteDemoCatalog.demoProjectId,
+      );
+      final stage = project.currentStageDoc!;
+      final payload = SiteReviewDecisionPayload(
+        reviewDecision: 'design_change_requested',
+        selectedDesignDirection: 'more_premium',
+        reviewedRevision: 'r${stage.revision > 0 ? stage.revision : 1}',
+        reviewComment: '프리미엄 톤으로',
+      ).toRevisionMessage();
+
+      expect(
+        await repo.requestRevision(
+          projectId: project.projectId,
+          stageId: stage.stageId,
+          requestId: stage.activeRequestId,
+          message: payload,
+          reviewDecision: 'design_change_requested',
+          selectedDesignDirection: 'more_premium',
+        ),
+        isNull,
+      );
+      final after = await repo.getProject(project.projectId);
+      expect(after!.currentStageDoc!.reviewDecision, 'design_change_requested');
+      expect(after.currentStageDoc!.selectedDesignDirection, 'more_premium');
+      expect(after.currentStageDoc!.isDesignChangeRequested, isTrue);
+      final reqs = await repo.listRequests(project.projectId);
+      expect(
+        reqs.where((r) => r.message.contains('design_change_requested')).length,
+        1,
+      );
+
+      // Second click must not error or duplicate.
+      expect(
+        await repo.requestRevision(
+          projectId: project.projectId,
+          stageId: stage.stageId,
+          requestId: after.currentStageDoc!.activeRequestId,
+          message: payload,
+          reviewDecision: 'design_change_requested',
+          selectedDesignDirection: 'more_premium',
+        ),
+        isNull,
+      );
+      final reqs2 = await repo.listRequests(project.projectId);
+      expect(
+        reqs2
+            .where((r) => r.message.contains('design_change_requested'))
+            .length,
+        1,
+      );
+    },
+  );
 
   test('allocateRequestId: 동일 revision terminal은 재사용, r2만 신규', () {
     final stage = Sotong24RemoteStage(

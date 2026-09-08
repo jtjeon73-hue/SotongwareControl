@@ -271,25 +271,144 @@ class Sotong24RemoteRepository {
     );
   }
 
-  /// 보완 요청: approvalStatus=revision_requested.
+  /// 보완/디자인변경 요청: approvalStatus=revision_requested.
+  /// STEP15 site messages carry [reviewDecision=...] tags; those are also
+  /// persisted on stage/request so Control UI and Agent stay aligned.
   Future<String?> requestRevision({
     required String projectId,
     required String stageId,
     required String requestId,
     required String message,
-  }) {
+    String reviewDecision = '',
+    String selectedDesignDirection = '',
+  }) async {
     final trimmed = message.trim();
     if (trimmed.isEmpty) {
-      return Future.value('보완 내용을 입력해 주세요.');
+      return '보완 내용을 입력해 주세요.';
     }
+    final tags = SiteReviewDecisionPayload.parseTags(trimmed);
+    final decision = reviewDecision.trim().isNotEmpty
+        ? reviewDecision.trim()
+        : tags.reviewDecision;
+    final direction = selectedDesignDirection.trim().isNotEmpty
+        ? selectedDesignDirection.trim()
+        : tags.selectedDesignDirection;
+
+    final project = await getProject(projectId);
+    if (project == null) return '프로젝트를 찾을 수 없습니다.';
+    Sotong24RemoteStage? stage;
+    for (final s in project.stages) {
+      if (s.stageId == stageId) {
+        stage = s;
+        break;
+      }
+    }
+    if (stage == null) return '해당 단계를 찾을 수 없습니다.';
+
+    final existing = await _loadRequests(projectId);
+    final stageRev = stage.revision > 0 ? stage.revision : 1;
+    for (final r in existing) {
+      if (r.stageId != stageId) continue;
+      if (r.status != ApprovalStatus.revisionRequested) continue;
+      final reqRev = r.revision > 0 ? r.revision : 1;
+      if (reqRev != stageRev) continue;
+      final existingDecision = r.reviewDecision.trim().isNotEmpty
+          ? r.reviewDecision.trim()
+          : SiteReviewDecisionPayload.parseTags(r.message).reviewDecision;
+      if (decision.isEmpty || existingDecision != decision) continue;
+      // Same-revision identical decision already saved — patch display fields,
+      // do not create a duplicate request.
+      return _ensureStageReviewDecisionFields(
+        projectId: projectId,
+        stageId: stageId,
+        requestId: r.requestId,
+        reviewDecision: decision,
+        selectedDesignDirection: direction.isNotEmpty
+            ? direction
+            : SiteReviewDecisionPayload.parseTags(
+                r.message,
+              ).selectedDesignDirection,
+        message: r.message,
+        project: project,
+      );
+    }
+
+    // on_hold is a parked STEP15 decision — not a STEP16 revision. Persist
+    // approvalStatus as pending_review so Control matches Agent canonical.
+    final stageApproval = decision == 'on_hold'
+        ? 'pending_review'
+        : ApprovalStatus.revisionRequested;
     return _submitDecision(
       projectId: projectId,
       stageId: stageId,
       requestId: requestId,
       requestType: 'revision_request',
-      decision: ApprovalStatus.revisionRequested,
+      decision: stageApproval,
       message: trimmed,
+      reviewDecision: decision,
+      selectedDesignDirection: direction,
+      requestStatus: ApprovalStatus.revisionRequested,
     );
+  }
+
+  /// Sync stage display fields for an already-saved STEP15 decision.
+  /// Does not create requests or mark workflowApplied.
+  Future<String?> _ensureStageReviewDecisionFields({
+    required String projectId,
+    required String stageId,
+    required String requestId,
+    required String reviewDecision,
+    required String selectedDesignDirection,
+    required String message,
+    required Sotong24RemoteProject project,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final stageApproval = reviewDecision == 'on_hold'
+        ? 'pending_review'
+        : ApprovalStatus.revisionRequested;
+    if (usesMemory || _projects == null || project.isDemo) {
+      final stages = project.stages.map((s) {
+        if (s.stageId != stageId) return s;
+        return s.copyWith(
+          approvalStatus: stageApproval,
+          activeRequestId: requestId,
+          updatedAt: now,
+          reviewDecision: reviewDecision,
+          selectedDesignDirection: selectedDesignDirection,
+          userAttention: message.isNotEmpty ? message : s.userAttention,
+        );
+      }).toList();
+      final updated = project.copyWith(
+        stages: stages,
+        approvalStatus: stageApproval,
+        updatedAt: now,
+      );
+      _memory = [
+        for (final p in _memory)
+          if (p.projectId == projectId) updated else p,
+      ];
+      _memoryController.add(List.unmodifiable(_memory));
+      return null;
+    }
+    try {
+      final doc = _projects!.doc(projectId);
+      await doc.collection('stages').doc(stageId).set({
+        'approvalStatus': stageApproval,
+        'activeRequestId': requestId,
+        'updatedAt': now,
+        if (message.isNotEmpty) 'userAttention': message,
+        if (reviewDecision.isNotEmpty) 'reviewDecision': reviewDecision,
+        if (selectedDesignDirection.isNotEmpty)
+          'selectedDesignDirection': selectedDesignDirection,
+      }, SetOptions(merge: true));
+      await doc.set({
+        'approvalStatus': stageApproval,
+        'updatedAt': now,
+      }, SetOptions(merge: true));
+      return null;
+    } catch (e) {
+      return '저장에 실패했습니다. 네트워크·권한을 확인해 주세요. ($e)';
+    }
   }
 
   /// 제작 완료본 보완. 기존 18단계 결과를 보존하고 maintain의 새 revision을
@@ -540,6 +659,11 @@ class Sotong24RemoteRepository {
     String approvalSource = '',
     String approvalMode = '',
     String reviewDecision = '',
+    String selectedDesignDirection = '',
+
+    /// Request doc status; defaults to [decision]. Hold keeps
+    /// revision_requested on the request while stage uses pending_review.
+    String? requestStatus,
   }) async {
     final project = await getProject(projectId);
     if (project == null) return '프로젝트를 찾을 수 없습니다.';
@@ -582,12 +706,13 @@ class Sotong24RemoteRepository {
     final explicitMode = approvalMode.isNotEmpty
         ? approvalMode
         : (explicitSource.isNotEmpty ? 'explicit' : '');
+    final resolvedRequestStatus = requestStatus ?? decision;
     final request = Sotong24RemoteRequest(
       requestId: resolvedId,
       projectId: projectId,
       stageId: stageId,
       requestType: requestType,
-      status: decision,
+      status: resolvedRequestStatus,
       message: message,
       createdAt: now,
       updatedAt: now,
@@ -623,6 +748,8 @@ class Sotong24RemoteRepository {
         if (explicitMode.isNotEmpty) 'approvalMode': explicitMode,
         if (explicitSource.isNotEmpty) 'approvalEventId': resolvedId,
         if (reviewDecision.isNotEmpty) 'reviewDecision': reviewDecision,
+        if (selectedDesignDirection.isNotEmpty)
+          'selectedDesignDirection': selectedDesignDirection,
       }, SetOptions(merge: true));
       batch.set(doc, {
         'approvalStatus': decision,
@@ -652,6 +779,18 @@ class Sotong24RemoteRepository {
         activeRequestId: request.requestId,
         updatedAt: now,
         summary: request.message.isNotEmpty ? request.message : s.summary,
+        reviewDecision: request.reviewDecision.isNotEmpty
+            ? request.reviewDecision
+            : s.reviewDecision,
+        selectedDesignDirection: (() {
+          final tags = SiteReviewDecisionPayload.parseTags(request.message);
+          return tags.selectedDesignDirection.isNotEmpty
+              ? tags.selectedDesignDirection
+              : s.selectedDesignDirection;
+        })(),
+        userAttention: request.message.isNotEmpty
+            ? request.message
+            : s.userAttention,
       );
     }).toList();
 
