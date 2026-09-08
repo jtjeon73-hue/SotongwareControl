@@ -75,7 +75,8 @@ Write-Host "== release build (admin email/UID via dart-define, quoted for PowerS
 # Run through cmd.exe so only the real exit code gates the deploy.
 $GitSha = (git rev-parse --short HEAD 2>$null)
 if ([string]::IsNullOrWhiteSpace($GitSha)) { $GitSha = "unknown" }
-$BuiltAt = Get-Date -Format "yyyy-MM-dd"
+$kst = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Korea Standard Time')
+$BuiltAt = $kst.ToString('yyyy-MM-dd HH:mm') + ' KST'
 $buildCmd = @(
   "flutter build web --release --base-href /",
   "--dart-define=SOTONG_ADMIN_AUTH_EMAIL=$AdminEmail",
@@ -84,6 +85,7 @@ $buildCmd = @(
   "--dart-define=SOTONG_GIT_SHA=$GitSha",
   "--dart-define=SOTONG_BUILT_AT=$BuiltAt"
 ) -join " "
+Write-Host "BuiltAt dart-define: $BuiltAt"
 cmd.exe /c $buildCmd
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

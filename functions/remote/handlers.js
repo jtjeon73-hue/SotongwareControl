@@ -180,6 +180,31 @@ async function handleHeartbeat(db, ctx, body) {
     patch.aiUsage = aiUsage;
   }
 
+  // Cursor unattended approval signal (hook → Agent → heartbeat). Never fails heartbeat.
+  if (isPlainObject(body.cursorApproval)) {
+    const ca = body.cursorApproval;
+    const state = String(ca.state || "").trim().slice(0, 64);
+    const allowed = new Set([
+      "cursor_running",
+      "cursor_waiting_approval",
+      "cursor_waiting_user_gate",
+      "cursor_stalled",
+      "cursor_completed",
+    ]);
+    if (allowed.has(state)) {
+      patch.cursorApproval = {
+        state,
+        approvalCategory: String(ca.approvalCategory || "").slice(0, 64),
+        riskCategory: String(ca.riskCategory || "").slice(0, 64),
+        permission: String(ca.permission || "").slice(0, 16),
+        reasonKo: String(ca.reasonKo || "").slice(0, 240),
+        summary: String(ca.summary || "").slice(0, 200),
+        updatedAt: String(ca.updatedAt || "").slice(0, 40),
+        userActionRequired: ca.userActionRequired === true,
+      };
+    }
+  }
+
   await ctx.agentRef.set(patch, { merge: true });
 
   // Optional production review envelope — reject must NOT fail heartbeat.

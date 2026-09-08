@@ -1,7 +1,7 @@
 /// Build/release identity shown in Control chrome.
 /// Prefer dart-define injection at deploy time.
 abstract final class ReleaseInfo {
-  static const version = '0.2.5';
+  static const version = '0.2.6';
 
   /// Short git SHA (e.g. bff58e5). Injected via --dart-define=SOTONG_GIT_SHA=...
   static const gitSha = String.fromEnvironment(
@@ -9,10 +9,11 @@ abstract final class ReleaseInfo {
     defaultValue: 'local',
   );
 
-  /// Build/deploy date YYYY-MM-DD. Injected via --dart-define=SOTONG_BUILT_AT=...
+  /// Build/deploy timestamp, e.g. 2026-09-08 11:04 KST.
+  /// Injected via --dart-define=SOTONG_BUILT_AT=...
   static const builtAt = String.fromEnvironment(
     'SOTONG_BUILT_AT',
-    defaultValue: '2026-09-08',
+    defaultValue: '2026-09-08 11:20 KST',
   );
 
   /// Backward-compatible alias used by older call sites.

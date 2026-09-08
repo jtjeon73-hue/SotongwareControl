@@ -123,6 +123,16 @@ function evaluateStageHealth({ job, stage, agent, policy: rawPolicy, nowMs = Dat
   if (heartbeatAgeSeconds > policy.offlineAfterSeconds) {
     return { state: "offline", shouldNotify: true, heartbeatAgeSeconds };
   }
+  // Cursor IDE Run/Edit approval wait must not be treated as stalled worker.
+  const cursorApproval = agent.cursorApproval || {};
+  if (String(cursorApproval.state || "") === "cursor_waiting_approval") {
+    return {
+      state: "awaiting_user",
+      shouldNotify: false,
+      reason: "cursor_waiting_approval_not_stalled",
+      heartbeatAgeSeconds,
+    };
+  }
   const activityAgeSeconds = ageSeconds(stage.lastActivityAt || job.lastActivityAt, nowMs);
   if (activityAgeSeconds > policy.noActivityAfterSeconds) {
     return { state: "inactive", shouldNotify: true, activityAgeSeconds };
@@ -241,8 +251,9 @@ function notificationContent(eventType, stageNumber, stageName, revision, data =
       };
     case "deploy_approval_needed":
       return {
-        title: "최종 배포 승인 필요",
-        body: `${label} STEP18 공개 배포 승인이 필요합니다. 자동 배포는 금지됩니다.`,
+        title: "사용자 확인 필요",
+        body: String(data.reasonKo || "").trim() ||
+          `${label} production 배포 승인 · 개발·테스트는 완료되어 안전 대기 중`,
       };
     case "cursor_usage_manual_check":
       return {
@@ -251,8 +262,15 @@ function notificationContent(eventType, stageNumber, stageName, revision, data =
       };
     case "cursor_run_approval_needed":
       return {
-        title: "Cursor 사용자 승인 필요",
-        body: `${label} Cursor Run 승인이 대기 중일 수 있습니다. PC에서 승인 버튼을 확인해 주세요.`,
+        title: "사용자 확인 필요",
+        body: String(data.reasonKo || "").trim() ||
+          `${label} Cursor 승인 대기 중일 수 있습니다. PC에서 승인 버튼을 확인해 주세요.`,
+      };
+    case "unattended_task_completed":
+      return {
+        title: "Sotong24Work 작업 완료",
+        body: String(data.reasonKo || "").trim() ||
+          `${label} 수정/테스트/빌드가 완료되었습니다. Control에서 결과를 확인해 주세요.`,
       };
     case "approval_required":
       return { title: "승인이 필요합니다", body: `${label}이 완료되었습니다. 결과를 확인하고 승인 또는 보완을 선택해주세요.` };
@@ -645,6 +663,64 @@ async function evaluateAiUsageNotifications(db, nowMs = Date.now()) {
   return results;
 }
 
+/** Cursor hook approval-waiting / completion signals from Agent heartbeat. */
+async function evaluateCursorApprovalNotifications(db, nowMs = Date.now()) {
+  const policy = await loadPolicy(db);
+  const agents = await db.collection(COL.AGENTS).get();
+  const results = [];
+  for (const doc of agents.docs) {
+    const agent = doc.data() || {};
+    if (!agent.ownerUid || agent.enabled === false) continue;
+    const ca = agent.cursorApproval;
+    if (!ca || typeof ca !== "object") continue;
+    const state = String(ca.state || "");
+    const updatedAt = String(ca.updatedAt || "");
+    const ageSec = ageSeconds(updatedAt, nowMs);
+    // Ignore stale signals (>30m) to prevent spam after resolved approvals.
+    if (!Number.isFinite(ageSec) || ageSec > 1800) continue;
+
+    if (state === "cursor_waiting_approval" && ca.userActionRequired === true) {
+      const risk = String(ca.riskCategory || "UNKNOWN");
+      const out = await enqueueNotification(db, {
+        ownerUid: agent.ownerUid,
+        instructionId: String(agent.currentInstructionId || ""),
+        jobId: String(agent.currentJobId || ""),
+        stageId: String(agent.currentStage || "cursor_unattended"),
+        stageNumber: 0,
+        stageName: "Cursor 무인 작업",
+        revision: 1,
+        eventType: risk === "PRODUCTION" ? "deploy_approval_needed" : "cursor_run_approval_needed",
+        severity: "warning",
+        actionRequired: true,
+        source: "cursor_approval_signal",
+        reasonKo: String(ca.reasonKo || ""),
+        idempotencyDiscriminator: `${doc.id}|${updatedAt}|${risk}`,
+        nowMs,
+      }, policy);
+      results.push({ agentId: doc.id, state, ...out });
+    } else if (state === "cursor_completed") {
+      const out = await enqueueNotification(db, {
+        ownerUid: agent.ownerUid,
+        instructionId: String(agent.currentInstructionId || ""),
+        jobId: String(agent.currentJobId || ""),
+        stageId: String(agent.currentStage || "cursor_unattended"),
+        stageNumber: 0,
+        stageName: "Cursor 무인 작업",
+        revision: 1,
+        eventType: "unattended_task_completed",
+        severity: "info",
+        actionRequired: false,
+        source: "cursor_approval_signal",
+        reasonKo: String(ca.reasonKo || "작업이 완료되었습니다."),
+        idempotencyDiscriminator: `${doc.id}|${updatedAt}|completed`,
+        nowMs,
+      }, policy);
+      results.push({ agentId: doc.id, state, ...out });
+    }
+  }
+  return results;
+}
+
 async function deliverNotificationEvent(db, messaging, eventId) {
   const ref = db.collection(COL.NOTIFICATION_EVENTS).doc(eventId);
   let event = null;
@@ -741,6 +817,7 @@ module.exports = {
   evaluateActiveJobs,
   usageThreshold,
   evaluateAiUsageNotifications,
+  evaluateCursorApprovalNotifications,
   deliverNotificationEvent,
   buildStallDiagnostic,
   recoveryBackoffMs,

@@ -13,6 +13,17 @@
       "Shell(Select-String)",
       "Shell(rg)",
       "Shell(findstr)",
+      "Shell(Copy-Item)",
+      "Shell(Move-Item)",
+      "Shell(Rename-Item)",
+      "Shell(New-Item)",
+      "Shell(Test-Path)",
+      "Shell(Join-Path)",
+      "Shell(Split-Path)",
+      "Shell(Resolve-Path)",
+      "Shell(Get-FileHash)",
+      "Shell(Get-Process)",
+      "Shell(Get-CimInstance)",
       "Shell(git:status*)",
       "Shell(git:diff*)",
       "Shell(git:log*)",
@@ -21,6 +32,8 @@
       "Shell(git:branch*)",
       "Shell(git:fetch*)",
       "Shell(git:remote*)",
+      "Shell(git:add*)",
+      "Shell(git:commit*)",
       "Shell(flutter)",
       "Shell(dart)",
       "Shell(npm)",
@@ -35,6 +48,7 @@
       "Shell(msbuild)",
       "Shell(dotnet)",
       "Read(**)",
+      "Write(**)",
       "WebFetch(docs.cursor.com)",
       "WebFetch(cursor.com)",
       "WebFetch(*.github.com)",
@@ -60,7 +74,10 @@
       "Write(**/.env*)",
       "Write(**/*.key)",
       "Write(**/*credential*)",
-      "Write(**/*secret*)"
+      "Write(**/*secret*)",
+      "Write(**/*serviceAccount*)",
+      "Write(**/id_rsa*)",
+      "Write(**/*.pem)"
     ]
   }
 }

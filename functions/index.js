@@ -17,6 +17,7 @@ const { handleApiRequest } = require("./remote/router");
 const {
   evaluateActiveJobs,
   evaluateAiUsageNotifications,
+  evaluateCursorApprovalNotifications,
   deliverNotificationEvent,
 } = require("./remote/monitoring");
 const { createAdminStorageDeps } = require("./sotong24/artifact");
@@ -174,6 +175,7 @@ exports.monitorStageHealth = onSchedule(
   async () => {
     await evaluateActiveJobs(admin.firestore());
     await evaluateAiUsageNotifications(admin.firestore());
+    await evaluateCursorApprovalNotifications(admin.firestore());
   }
 );
 

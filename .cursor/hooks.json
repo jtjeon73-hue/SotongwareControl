@@ -7,6 +7,21 @@
         "timeout": 8,
         "failClosed": false
       }
+    ],
+    "preToolUse": [
+      {
+        "command": "python .cursor/hooks/write_gate.py",
+        "timeout": 8,
+        "failClosed": false,
+        "matcher": "Write|Edit|StrReplace"
+      }
+    ],
+    "stop": [
+      {
+        "command": "python .cursor/hooks/session_complete.py",
+        "timeout": 8,
+        "failClosed": false
+      }
     ]
   }
 }
