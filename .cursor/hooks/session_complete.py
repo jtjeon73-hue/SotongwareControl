@@ -10,7 +10,6 @@ from pathlib import Path
 
 
 def main() -> int:
-    # Consume stdin (may be empty / large).
     try:
         sys.stdin.read()
     except Exception:
@@ -27,9 +26,15 @@ def main() -> int:
             "permission": "allow",
             "updatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "userActionRequired": False,
-            "reasonKo": "Cursor 무인 작업이 완료되었습니다. Control에서 결과를 확인해 주세요.",
+            "reasonKo": (
+                "Cursor \ubb34\uc778 \uc791\uc5c5\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4. "
+                "Control\uc5d0\uc11c \uacb0\uacfc\ub97c \ud655\uc778\ud574 \uc8fc\uc138\uc694."
+            ),
         }
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
     except OSError:
         pass
     print(json.dumps({"continue": True}))
