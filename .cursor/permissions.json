@@ -8,8 +8,8 @@
       "Allow git read commands including status/diff/log/show/rev-parse/rev-list/ls-files/ls-tree/describe/merge-base and compound read-only chains.",
       "Allow explicit git add of related files and git commit. Keep git add . / -A gated.",
       "Allow Flutter/Dart analyze, test, format, pub get, and local builds.",
-      "Allow npm/npx test/lint/build and python scripts under scripts/, scripts/cursor_safe/, test_*.py.",
-      "Allow HTTP GET/HEAD verification (Invoke-WebRequest/curl/urllib) for allowlisted hosts. Never auto POST/PUT/PATCH/DELETE."
+      "Allow only trusted python under scripts/cursor_safe/* and scripts/test_*.py / verify_*.py / test_unattended_ops_*.py after path containment. Never broad-allow Shell(python).",
+      "Allow HTTP GET/HEAD verification (Invoke-WebRequest/curl) for allowlisted hosts. Never auto POST/PUT/PATCH/DELETE / --data / -d / -F."
     ],
     "block_instructions": [
       "Every production deploy or firebase deploy or scripts/deploy_control.ps1 execution must go through approval first.",
@@ -18,7 +18,8 @@
       "Never auto-approve STEP15/STEP18/Golden Run/START_JOB/new WI transfer.",
       "Never auto-approve Write outside Sotong24Work/SotongwareControl (SotongwareWeb stays gated).",
       "Never auto-approve secret/credential/env/key/pem edits.",
-      "Do not broad-allow Shell(powershell)/Shell(*)/arbitrary python -c mutation."
+      "Never auto-approve python -c / python -m / arbitrary scripts/*.py / HTTP write / redirect to secrets.",
+      "Do not broad-allow Shell(powershell)/Shell(*)/Shell(python)/Shell(python3)/Shell(py)."
     ]
   }
 }

@@ -5,14 +5,14 @@
       {
         "command": "python .cursor/hooks/shell_gate.py",
         "timeout": 8,
-        "failClosed": false
+        "failClosed": true
       }
     ],
     "preToolUse": [
       {
         "command": "python .cursor/hooks/write_gate.py",
         "timeout": 8,
-        "failClosed": false,
+        "failClosed": true,
         "matcher": "Write|Edit|StrReplace"
       }
     ],

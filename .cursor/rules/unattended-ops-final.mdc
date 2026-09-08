@@ -1,15 +1,16 @@
 ---
-description: Prefer scripts/cursor_safe helpers for verification; SAFE auto, RISKY gated
+description: Prefer scripts/cursor_safe helpers for verification; SAFE auto, RISKY gated (phase 4.1)
 globs:
 alwaysApply: true
 ---
 
-# Unattended ops (FINAL)
+# Unattended ops (FINAL / phase 4.1)
 
 When verifying git/HTTP/version/UI in Sotong24Work or SotongwareControl:
 
 1. Prefer `scripts/cursor_safe/*` helpers over complex inline Python/PowerShell.
 2. SAFE (no user Run): read git, analyze/test/build, explicit `git add` related files, `git commit`, HTTP GET/HEAD via helpers.
-3. Always stop for user approval: `git push`, `deploy_control.ps1`, `firebase deploy`, `Remove-Item`, `git stash/reset/clean/checkout --/restore`, secrets, SotongwareWeb writes, Golden Run / STEP15 / STEP18 / START_JOB / new WI.
+3. Always stop for user approval: `git push`, `deploy_control.ps1`, `firebase deploy`, `Remove-Item`, `git stash/reset/clean/checkout --/restore`, secrets, SotongwareWeb writes, Golden Run / STEP15 / STEP18 / START_JOB / new WI, `python -c`, HTTP POST/write, redirects to secrets.
 4. Never use `git add .` or `git add -A` when unrelated dirty files may exist — add related paths only.
 5. Do not stash/reset/clean unrelated dirty WIP.
+6. Hooks are failClosed=true — uncertain shell/write must ask, never auto-run on hook failure.
