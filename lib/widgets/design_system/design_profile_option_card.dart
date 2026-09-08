@@ -13,7 +13,11 @@ Color _hex(String raw, [Color fallback = const Color(0xFF0F766E)]) {
 
 /// Compact structural thumbnail that differs by profile code (not color-only).
 class DesignProfileThumb extends StatelessWidget {
-  const DesignProfileThumb({super.key, required this.profile, this.height = 72});
+  const DesignProfileThumb({
+    super.key,
+    required this.profile,
+    this.height = 72,
+  });
 
   final DesignProfile profile;
   final double height;
@@ -94,7 +98,9 @@ class DesignProfileThumb extends StatelessWidget {
                         height: 10,
                         width: code == 'C' ? 42 : 34,
                         decoration: BoxDecoration(
-                          color: code == 'E' ? const Color(0xFFDB2777) : primary,
+                          color: code == 'E'
+                              ? const Color(0xFFDB2777)
+                              : primary,
                           borderRadius: BorderRadius.circular(
                             code == 'C' ? 999 : 4,
                           ),
@@ -114,9 +120,7 @@ class DesignProfileThumb extends StatelessWidget {
                       color: code == 'E'
                           ? const Color(0xFFDB2777).withValues(alpha: 0.55)
                           : Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(
-                        code == 'C' ? 18 : 8,
-                      ),
+                      borderRadius: BorderRadius.circular(code == 'C' ? 18 : 8),
                       border: Border.all(
                         color: primary.withValues(alpha: 0.45),
                       ),

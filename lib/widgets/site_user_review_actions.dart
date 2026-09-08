@@ -298,6 +298,10 @@ Future<SiteReviewDecisionPayload?> showSiteDesignChangeDialog(
   } catch (_) {
     catalog = null;
   }
+  if (!context.mounted) {
+    comment.dispose();
+    return null;
+  }
   try {
     final ok = await showDialog<bool>(
       context: context,
@@ -336,7 +340,8 @@ Future<SiteReviewDecisionPayload?> showSiteDesignChangeDialog(
                               profile: p,
                               selected: selectedCode == p.profileCode,
                               compact: true,
-                              badge: currentProfileCode.trim().toUpperCase() ==
+                              badge:
+                                  currentProfileCode.trim().toUpperCase() ==
                                       p.profileCode
                                   ? '현재'
                                   : null,
