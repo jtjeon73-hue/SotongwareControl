@@ -1660,7 +1660,11 @@
     "hooks": {
       "preReviewQualityGate": true,
       "recommendedDesignProfile": true,
-      "autoImprovementLoop": false
+      "autoImprovementLoop": true,
+      "maxInternalRefineAttempts": 2,
+      "passScoreThreshold": 90,
+      "userRevisionPolicy": "internal_refine_does_not_increment_user_revision",
+      "qualityContractVersion": "1.0.0"
     }
   },
   "recommendationRules": [

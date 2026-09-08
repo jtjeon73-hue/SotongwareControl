@@ -201,7 +201,7 @@ class StudioDesignProfilePanel extends StatelessWidget {
               if (catalog.designQualityProfile['hooks'] is Map) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'preReviewQualityGate 준비됨 · 자동 루프 OFF'
+                  'Pre-Review Quality Loop ON · 내부 refine ≤2 · 사용자 r 미증가'
                   ' · recommendedDesignProfile=${selected.profileCode}',
                   style: TextStyle(
                     fontSize: 11,

@@ -77,10 +77,57 @@ class DesignSystemService {
     return '선택한 디자인 프로필을 적용합니다.';
   }
 
-  /// Hook for future r1 auto-upgrade — no infinite loop in v1.1.
+  /// Pre-Review Quality Loop summary for Control UI.
+  /// Work writes output/pre_review_quality_report.json; this maps it (or stub).
   DesignQualityReport buildPreReviewHook({
     required String recommendedDesignProfileCode,
+    Map<String, dynamic>? reportJson,
   }) {
+    if (reportJson != null && reportJson.isNotEmpty) {
+      final issuesRaw = reportJson['criticalIssues'] ??
+          reportJson['majorIssues'] ??
+          reportJson['issues'] ??
+          const [];
+      final issues = <DesignQualityIssue>[];
+      if (issuesRaw is List) {
+        for (final item in issuesRaw) {
+          if (item is! Map) continue;
+          final m = Map<String, dynamic>.from(item);
+          issues.add(
+            DesignQualityIssue(
+              dimension: '${m['dimension'] ?? 'quality'}',
+              severity: '${m['severity'] ?? 'info'}',
+              message: '${m['message'] ?? ''}',
+              recommendation: '${m['recommendation'] ?? ''}',
+            ),
+          );
+        }
+      }
+      final scoreVal = reportJson['score'];
+      final score = scoreVal is num
+          ? scoreVal.toDouble()
+          : double.tryParse('$scoreVal') ?? 0;
+      return DesignQualityReport(
+        designSystemVersion:
+            '${reportJson['designSystemVersion'] ?? DesignSystemCatalog.kVersion}',
+        recommendedDesignProfileCode:
+            '${reportJson['designProfile'] ?? recommendedDesignProfileCode}',
+        score: score,
+        preReviewQualityGate: reportJson['preReviewQualityGate'] == true,
+        issues: issues.isEmpty
+            ? [
+                DesignQualityIssue(
+                  dimension: 'release_readiness',
+                  severity: 'info',
+                  message:
+                      'verdict=${reportJson['verdict']} attempts=${reportJson['internalRefineAttempts']}',
+                  recommendation:
+                      'internal refine does not increment user revision; STEP15/18 stay user-gated',
+                ),
+              ]
+            : issues,
+      );
+    }
     return DesignQualityReport(
       designSystemVersion: DesignSystemCatalog.kVersion,
       recommendedDesignProfileCode: recommendedDesignProfileCode,
@@ -88,12 +135,12 @@ class DesignSystemService {
       preReviewQualityGate: false,
       issues: const [
         DesignQualityIssue(
-          dimension: 'brand_fit',
+          dimension: 'release_readiness',
           severity: 'info',
           message:
-              'preReviewQualityGate foundation ready — automatic r1 upgrade loop remains disabled',
+              'Pre-Review Quality Loop active in Work (max 2 internal refine, pass≥90)',
           recommendation:
-              'Apply recommendedDesignProfile early; use design_change_requested for post-result changes',
+              'Wait for output/pre_review_quality_report.json before STEP15 user review',
         ),
         DesignQualityIssue(
           dimension: 'visual_system',

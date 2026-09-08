@@ -163,17 +163,33 @@ void main() {
     ]);
   });
 
-  test('preReview quality hook prepared without auto loop', () {
+  test('preReview quality loop enabled with max refine attempts', () {
     final report = DesignSystemService.instance.buildPreReviewHook(
       recommendedDesignProfileCode: 'B',
     );
-    expect(report.preReviewQualityGate, isFalse);
     expect(report.recommendedDesignProfileCode, 'B');
     expect(report.issues, isNotEmpty);
     expect(catalog.designQualityProfile['hooks'], isA<Map>());
     final hooks = Map<String, dynamic>.from(
       catalog.designQualityProfile['hooks'] as Map,
     );
-    expect(hooks['autoImprovementLoop'], isFalse);
+    expect(hooks['autoImprovementLoop'], isTrue);
+    expect(hooks['maxInternalRefineAttempts'], 2);
+    expect(hooks['preReviewQualityGate'], isTrue);
+
+    final fromWork = DesignSystemService.instance.buildPreReviewHook(
+      recommendedDesignProfileCode: 'A',
+      reportJson: {
+        'designProfile': 'C',
+        'score': 92,
+        'preReviewQualityGate': true,
+        'verdict': 'pass',
+        'internalRefineAttempts': 1,
+        'criticalIssues': [],
+      },
+    );
+    expect(fromWork.preReviewQualityGate, isTrue);
+    expect(fromWork.score, 92);
+    expect(fromWork.recommendedDesignProfileCode, 'C');
   });
 }
