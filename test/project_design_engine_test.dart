@@ -34,11 +34,22 @@ void main() {
     expect(input.customerProblem, isNotEmpty);
   });
 
-  test('제작 옵션 그룹이 결과물별로 다르다', () {
+  test('제작 옵션 그룹이 결과물·사업종류별로 다르다', () {
     final ebook = ProjectDesignCatalog.productionGroupsFor(ArtifactType.ebook);
     final app = ProjectDesignCatalog.productionGroupsFor(ArtifactType.app);
+    final industrial = ProjectDesignCatalog.productionGroupsFor(
+      ArtifactType.app,
+      businessKind: 'industrial_sw',
+    );
+    final knowledge = ProjectDesignCatalog.productionGroupsFor(
+      ArtifactType.site,
+      businessKind: 'knowledge_site',
+      siteSubtype: 'knowledge_site',
+    );
     expect(ebook.any((g) => g.id == 'format'), isTrue);
     expect(app.any((g) => g.id == 'platform'), isTrue);
+    expect(industrial.any((g) => g.id == 'industrial_stack'), isTrue);
+    expect(knowledge.any((g) => g.id == 'knowledge_content'), isTrue);
     expect(ebook.map((g) => g.id), isNot(equals(app.map((g) => g.id))));
   });
 

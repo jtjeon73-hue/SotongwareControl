@@ -274,7 +274,32 @@ class ProjectDesignCatalog {
   static List<DesignOptionGroup> productionGroupsFor(
     String artifactType, {
     String contentSubtype = '',
+    String businessKind = '',
+    String siteSubtype = '',
   }) {
+    final kind = businessKind.trim();
+    final site = siteSubtype.trim().isNotEmpty
+        ? siteSubtype.trim()
+        : (kind == 'knowledge_site' || kind == 'marketing_site' ? kind : '');
+
+    if (kind == 'industrial_sw') {
+      return const [
+        DesignOptionGroup(
+          id: 'industrial_stack',
+          title: '산업자동화 기술',
+          options: [
+            DesignOption(id: 'plc_comm', label: 'PLC/통신'),
+            DesignOption(id: 'mes_db', label: 'MES/DB'),
+            DesignOption(id: 'vision', label: '비전'),
+            DesignOption(id: 'equipment_link', label: '설비 연동'),
+            DesignOption(id: 'windows_pc', label: 'Windows/현장 PC'),
+            DesignOption(id: 'field_network', label: '현장 네트워크'),
+            DesignOption(id: 'alarm_log', label: '알람/로그'),
+          ],
+        ),
+      ];
+    }
+
     switch (ArtifactType.normalize(artifactType)) {
       case ArtifactType.ebook:
         return const [
@@ -288,7 +313,7 @@ class ProjectDesignCatalog {
           ),
           DesignOptionGroup(
             id: 'pages',
-            title: '페이지 수',
+            title: '예상 분량',
             multi: false,
             options: [
               DesignOption(id: 'p30', label: '30페이지 내외'),
@@ -304,6 +329,16 @@ class ProjectDesignCatalog {
               DesignOption(id: 'friendly', label: '친절·쉬운 설명'),
               DesignOption(id: 'practical', label: '실전·체크리스트'),
               DesignOption(id: 'professional', label: '전문·체계적'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'ebook_structure',
+            title: '구성·언어',
+            options: [
+              DesignOption(id: 'toc', label: '목차 구성'),
+              DesignOption(id: 'tables_figures', label: '표/그림'),
+              DesignOption(id: 'ko_only', label: '한국어'),
+              DesignOption(id: 'ko_en', label: '한/영'),
             ],
           ),
           DesignOptionGroup(
@@ -335,23 +370,91 @@ class ProjectDesignCatalog {
             title: '플랫폼',
             options: [
               DesignOption(id: 'android', label: 'Android'),
+              DesignOption(id: 'ios', label: 'iOS'),
+              DesignOption(id: 'web', label: 'Web'),
               DesignOption(id: 'flutter', label: 'Flutter'),
             ],
           ),
           DesignOptionGroup(
-            id: 'monetization',
-            title: '수익·기능',
+            id: 'app_features',
+            title: '핵심 기능',
             options: [
-              DesignOption(id: 'ads', label: '광고'),
-              DesignOption(id: 'iap', label: '인앱 결제'),
               DesignOption(id: 'login', label: '로그인'),
+              DesignOption(id: 'db', label: 'DB'),
+              DesignOption(id: 'offline', label: '오프라인'),
+              DesignOption(id: 'push', label: '알림'),
+              DesignOption(id: 'ads', label: '광고'),
+              DesignOption(id: 'iap', label: '결제'),
               DesignOption(id: 'firebase', label: 'Firebase'),
+            ],
+          ),
+          DesignOptionGroup(
+            id: 'deploy_target',
+            title: '배포 대상',
+            multi: false,
+            options: [
+              DesignOption(id: 'internal', label: '내부/현장'),
+              DesignOption(id: 'store', label: '스토어'),
+              DesignOption(id: 'apk_direct', label: 'APK 직접 배포'),
             ],
           ),
         ];
       case ArtifactType.contents:
         return productionGroupsForContentSubtype(contentSubtype);
       case ArtifactType.site:
+        if (site == 'marketing_site' || kind == 'marketing_site') {
+          return const [
+            DesignOptionGroup(
+              id: 'site_subtype',
+              title: '사이트 subtype',
+              multi: false,
+              options: [
+                DesignOption(id: 'landing', label: '랜딩'),
+                DesignOption(id: 'corporate', label: '기업 소개'),
+                DesignOption(id: 'campaign', label: '캠페인'),
+              ],
+            ),
+            DesignOptionGroup(
+              id: 'marketing_features',
+              title: '마케팅 구성',
+              options: [
+                DesignOption(id: 'consult', label: '상담/문의'),
+                DesignOption(id: 'cta', label: 'CTA'),
+                DesignOption(id: 'seo', label: 'SEO'),
+                DesignOption(id: 'local_keywords', label: '지역/검색어'),
+                DesignOption(id: 'firebase_hosting', label: 'Hosting'),
+              ],
+            ),
+          ];
+        }
+        if (site == 'knowledge_site' ||
+            site == 'education_site' ||
+            kind == 'knowledge_site') {
+          return const [
+            DesignOptionGroup(
+              id: 'knowledge_content',
+              title: '콘텐츠 유형',
+              options: [
+                DesignOption(id: 'lecture', label: '강의'),
+                DesignOption(id: 'knowledge', label: '지식'),
+                DesignOption(id: 'faq', label: 'FAQ'),
+                DesignOption(id: 'library', label: '자료실'),
+              ],
+            ),
+            DesignOptionGroup(
+              id: 'knowledge_features',
+              title: '회원·운영',
+              options: [
+                DesignOption(id: 'members', label: '회원'),
+                DesignOption(id: 'free', label: '무료'),
+                DesignOption(id: 'paid', label: '유료'),
+                DesignOption(id: 'subscription', label: '구독'),
+                DesignOption(id: 'search_category', label: '검색/카테고리'),
+                DesignOption(id: 'admin', label: '관리자 기능'),
+              ],
+            ),
+          ];
+        }
         return const [
           DesignOptionGroup(
             id: 'stack',
@@ -374,6 +477,8 @@ class ProjectDesignCatalog {
               DesignOption(id: 'cta', label: '전환 CTA'),
               DesignOption(id: 'firebase_hosting', label: 'Firebase Hosting'),
               DesignOption(id: 'analytics', label: '유입 분석'),
+              DesignOption(id: 'seo', label: 'SEO'),
+              DesignOption(id: 'consult', label: '상담/문의'),
             ],
           ),
         ];

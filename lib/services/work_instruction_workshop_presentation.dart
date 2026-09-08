@@ -105,11 +105,11 @@ class WorkInstructionWorkshopPresentation {
     required bool aiPilotEnabled,
     required String artifactType,
   }) {
-    if (aiPilotEnabled &&
-        ArtifactType.normalize(artifactType) == ArtifactType.ebook) {
-      return 'AI 자동 제작 (승인 후 단계 진행)';
-    }
-    return '수동·혼합 제작';
+    if (!aiPilotEnabled) return '수동·혼합 제작';
+    final label = ArtifactType.labelKo(
+      artifactType.trim().isEmpty ? ArtifactType.ebook : artifactType,
+    );
+    return 'AI 자동 제작 ($label)';
   }
 
   static String approvalModeLabel({required bool approvalRequired}) {

@@ -327,6 +327,11 @@ class InstructionContractBuilder {
     final groups = ProjectDesignCatalog.productionGroupsFor(
       artifact,
       contentSubtype: contentSubtype,
+      businessKind: () {
+        final sel = design?.productionSelections['business_kind'];
+        return (sel == null || sel.isEmpty) ? '' : sel.first;
+      }(),
+      siteSubtype: design?.siteSubtype ?? '',
     );
     final spec = <String, dynamic>{};
     final undecided = <String>[];
@@ -430,6 +435,39 @@ class InstructionContractBuilder {
     }
   }
 
+  void _putAppSpec(
+    Map<String, dynamic> spec,
+    String groupId,
+    List<String> ids,
+    List<String> labels,
+  ) {
+    switch (groupId) {
+      case 'platform':
+        spec['platform'] = ids;
+        if (ids.contains('flutter')) {
+          spec['framework'] = 'flutter';
+        } else {
+          spec.putIfAbsent('framework', () => 'undecided');
+        }
+      case 'monetization':
+      case 'app_features':
+        spec['ads'] = ids.contains('ads');
+        spec['payment'] = ids.contains('iap');
+        spec['login'] = ids.contains('login');
+        spec['backend'] = ids.contains('firebase') || ids.contains('db')
+            ? (ids.contains('firebase') ? 'firebase' : 'db')
+            : 'undecided';
+        spec['notifications'] = ids.contains('push') ? true : 'undecided';
+        if (ids.contains('offline')) spec['offline'] = true;
+      case 'deploy_target':
+        spec['deployTarget'] = ids.isNotEmpty ? ids.first : 'undecided';
+      case 'industrial_stack':
+        spec['industrialStack'] = ids;
+      default:
+        spec[groupId] = labels;
+    }
+  }
+
   void _putEbookSpec(
     Map<String, dynamic> spec,
     String groupId,
@@ -447,31 +485,8 @@ class InstructionContractBuilder {
         spec['difficulty'] = labels.isNotEmpty ? labels.first : ids.first;
       case 'pricing':
         spec['salesDirection'] = labels.isNotEmpty ? labels.first : ids.first;
-      default:
-        spec[groupId] = labels;
-    }
-  }
-
-  void _putAppSpec(
-    Map<String, dynamic> spec,
-    String groupId,
-    List<String> ids,
-    List<String> labels,
-  ) {
-    switch (groupId) {
-      case 'platform':
-        spec['platform'] = ids;
-        if (ids.contains('flutter')) {
-          spec['framework'] = 'flutter';
-        } else {
-          spec.putIfAbsent('framework', () => 'undecided');
-        }
-      case 'monetization':
-        spec['ads'] = ids.contains('ads');
-        spec['payment'] = ids.contains('iap');
-        spec['login'] = ids.contains('login');
-        spec['backend'] = ids.contains('firebase') ? 'firebase' : 'undecided';
-        spec['notifications'] = 'undecided';
+      case 'ebook_structure':
+        spec['ebookStructure'] = ids;
       default:
         spec[groupId] = labels;
     }
@@ -524,6 +539,27 @@ class InstructionContractBuilder {
         if (ids.contains('flutter_web')) {
           spec['framework'] = 'flutter_web';
         }
+      case 'marketing_features':
+        spec['hosting'] = ids.contains('firebase_hosting')
+            ? 'firebase_hosting'
+            : (spec['hosting'] ?? 'undecided');
+        spec['seo'] = ids.contains('seo');
+        spec['CTA'] = ids.contains('cta');
+        spec['consult'] = ids.contains('consult');
+        if (ids.contains('local_keywords')) {
+          spec['localKeywords'] = true;
+        }
+      case 'knowledge_content':
+      case 'knowledge_features':
+        spec[groupId] = ids;
+        if (ids.contains('admin')) {
+          spec['contentStructure'] = 'admin_managed';
+        }
+        if (ids.contains('search_category')) {
+          spec['search'] = true;
+        }
+      case 'site_subtype':
+        if (ids.isNotEmpty) spec['sitePurposeDetail'] = ids.first;
       default:
         spec[groupId] = labels;
     }

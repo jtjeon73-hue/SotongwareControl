@@ -35,8 +35,6 @@ import '../services/work_instruction_validator.dart';
 import '../services/work_instruction_wizard_session.dart';
 import '../services/work_instruction_workshop_presentation.dart';
 import '../services/transferred_work_reconciliation.dart';
-import '../services/studio_title_recommendations.dart';
-import '../data/project_design_catalog.dart';
 import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/project_design/instruction_preview_panel.dart';
@@ -46,7 +44,7 @@ import '../widgets/project_design/project_design_wizard.dart';
 import '../widgets/project_design/studio_preflight_panel.dart';
 
 /// 작업지시 제작소 본문 (로컬 규칙 기반).
-/// Production AI는 새 ebook WI에만 opt-in `aiExecution`으로 연결한다.
+/// 미전송 draft는 휘발성. 전송 WI는 영구 이력.
 class BusinessPlanningTab extends StatefulWidget {
   const BusinessPlanningTab({
     super.key,
@@ -124,9 +122,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   DevWorkDocWriteResult? _lastDevWorkDocResult;
   Timer? _draftTimer;
   Timer? _wizardTimer;
-  bool _showResumeBanner = false;
-  BusinessPlanInput? _resumeInput;
-  String? _resumePlanId;
 
   static const _artifactOptions = [
     ...ArtifactType.allSelectable,
@@ -203,6 +198,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   void dispose() {
     _draftTimer?.cancel();
     _wizardTimer?.cancel();
+    // 미전송 draft는 휘발성 — 제작소 이탈 시 폐기 (전송 WI는 별도 보존).
+    unawaited(_discardUnsentDraftPersistence());
     _remoteProjectsSub?.cancel();
     _remoteJobsSub?.cancel();
     _remoteAgentsSub?.cancel();
@@ -211,6 +208,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _discardUnsentDraftPersistence() async {
+    try {
+      await _store.saveDraftInput(const BusinessPlanInput());
+      await _store.saveParkedDraftInput(null);
+      await _store.persistActivePlanId(null);
+    } catch (_) {}
   }
 
   List<TextEditingController> get _allControllers => [
@@ -242,9 +247,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
 
   Future<void> _loadInitial() async {
     try {
-      // Active context MUST be restored before cleanup (see bootstrapSession).
+      // Active transferred plans load for history; unsent draft never resumes.
       final boot = await BusinessPlanningStore.bootstrapSession(_store);
-      final draft = await _store.loadDraftInput();
       final devDoc = await _devWorkDoc.currentState();
       var agents = <RemoteAgentDoc>[];
       try {
@@ -261,41 +265,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       }
       if (!mounted) return;
       final plans = BusinessPlanningStore.dedupeById(boot.plans);
-      final currentResumable = WorkInstructionWizardSession.isUnsentResumable(
-        draft,
-        plans,
-      );
-      final parked = await _store.loadParkedDraftInput();
+      // 미전송 draft/parked는 휘발성 — 진입 시 폐기하고 항상 새 작업으로 시작.
+      await _discardUnsentDraftPersistence();
       if (!mounted) return;
-      final parkedResumable = WorkInstructionWizardSession.isUnsentResumable(
-        parked,
-        plans,
-      );
-      BusinessPlanInput? resumeInput;
-      String? resumePlanId;
-      if (currentResumable) {
-        resumeInput = draft;
-      } else if (parkedResumable) {
-        resumeInput = parked;
-      }
-      if (boot.activePlanId != null) {
-        final match = plans.where((p) => p.id == boot.activePlanId);
-        if (match.isNotEmpty && !match.first.wasTransferred) {
-          resumePlanId = boot.activePlanId;
-          resumeInput ??= match.first.input;
-        }
-      }
       setState(() {
         _allPlans = plans;
         _devDocState = devDoc;
         _remoteAgents = agents;
         _loading = false;
         _resetWizardToNewSession();
-        _resumeInput = resumeInput;
-        _resumePlanId = resumePlanId;
-        _showResumeBanner =
-            resumeInput != null &&
-            WorkInstructionWizardSession.isUnsentResumable(resumeInput, plans);
       });
       _consumeIdeaSeedIfNeeded();
       unawaited(_maybeRepairOrphan());
@@ -1942,8 +1920,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _instruction = null;
     _activeDoc = null;
     _lastTransferResult = null;
-    _resumeInput = null;
-    _resumePlanId = null;
     _aiProductionPilot = true;
     _approvalMode = 'auto';
     _inputModeQuick = true;
@@ -1952,28 +1928,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     _applyInput(const BusinessPlanInput());
   }
 
-  Future<void> _parkCurrentDraftIfNeeded() async {
-    final current = _currentInput;
-    if (!WorkInstructionWizardSession.isUnsentResumable(current, _allPlans)) {
-      return;
-    }
-    await _store.saveParkedDraftInput(current);
-    _resumeInput = current;
-    if (_activePlanId != null &&
-        _activeDoc != null &&
-        !_activeDoc!.wasTransferred) {
-      _resumePlanId = _activePlanId;
-    }
-  }
-
   Future<void> _startNewPlan({IdeaToPlanningSeed? seed}) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    await _parkCurrentDraftIfNeeded();
+    // 미전송 draft는 보관하지 않고 폐기한다.
+    await _discardUnsentDraftPersistence();
     if (!mounted) return;
     final s = seed ?? widget.ideaSeed;
     setState(() {
       _resetWizardToNewSession();
-      _showResumeBanner = false;
       if (s != null && s.title.trim().isNotEmpty) {
         final notes = [
           if (s.description.trim().isNotEmpty) s.description.trim(),
@@ -1994,42 +1956,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (s != null && s.title.trim().isNotEmpty) {
       _snack('아이디어「${s.title}」을(를) 새 기획으로 불러왔습니다.');
     }
-  }
-
-  void _resumeDraft() {
-    FocusManager.instance.primaryFocus?.unfocus();
-    if (_resumePlanId != null) {
-      final match = _allPlans.where(
-        (p) => p.id == _resumePlanId && !p.wasTransferred,
-      );
-      if (match.isNotEmpty) {
-        _loadPlan(match.first, silent: true);
-        setState(() => _showResumeBanner = false);
-        unawaited(_store.saveParkedDraftInput(null));
-        return;
-      }
-    }
-    final input = _resumeInput;
-    if (input == null || !WorkInstructionWizardSession.hasProgress(input)) {
-      setState(() => _showResumeBanner = false);
-      return;
-    }
-    setState(() {
-      _applyInput(input);
-      _designState = WorkInstructionWizardSession.restoreDesign(input);
-      _wizardState = _designState.toWizardState();
-      _inputModeQuick = _wizardState.mode != 'advanced';
-      _activePlanId = null;
-      _instructionId = null;
-      _version = 1;
-      _analysis = null;
-      _instruction = null;
-      _activeDoc = null;
-      _lastTransferResult = null;
-      _showResumeBanner = false;
-    });
-    unawaited(_store.saveParkedDraftInput(null));
-    _persistDraft();
   }
 
   void _onOccupiedConcept(ConceptOccupancyView view) {
@@ -2134,10 +2060,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildBanner(),
-          if (_showResumeBanner) ...[
-            const SizedBox(height: 10),
-            _buildResumeDraftBanner(),
-          ],
           if (_showWorkshopEmptyPrep) ...[
             const SizedBox(height: 10),
             _buildEmptyWorkshopPrepBanner(),
@@ -2146,6 +2068,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
             const SizedBox(height: 12),
             _buildApprovalModeCard(),
           ],
+          const SizedBox(height: 12),
+          _buildInputModeCard(),
           const SizedBox(height: 12),
           if (_inputModeQuick)
             ProjectDesignWizard(
@@ -2187,15 +2111,14 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           _buildTransferredInstructionList(),
           const SizedBox(height: 12),
           OperationalCollapsibleSection(
-            title: '상세 설정 · 기타 작업',
-            subtitle: '직접 입력 · 제작 기술 · 원문 · 고급 옵션',
+            title: '상세 제작 설정 (선택)',
+            subtitle:
+                '기본값은 AI가 자동 설정합니다. 플랫폼·분량·기술·출력 형식 등을 직접 지정할 때만 펼쳐 사용하세요.',
             initiallyExpanded: false,
             sectionKey: const Key('planning_other_actions'),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildModeToggle(),
-                const SizedBox(height: 12),
                 _buildProductionSettingsCard(),
                 const SizedBox(height: 8),
                 Wrap(
@@ -2520,162 +2443,62 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     );
   }
 
-  Widget _buildResumeDraftBanner() {
-    final input = _resumeInput;
-    final design = input == null
-        ? null
-        : WorkInstructionWizardSession.restoreDesign(input);
-    final kindSel =
-        design?.productionSelections['business_kind'] ?? const <String>[];
-    final kindId = kindSel.isEmpty ? null : kindSel.first.toString();
-    final kindLabel = StudioTitleRecommendations.labelForBusinessKind(
-      artifactType: design?.artifactType ?? input?.resolvedArtifactType ?? '',
-      siteSubtype: design?.siteSubtype,
-      businessKindId: kindId,
-    );
-    final audiences = design?.selectedAudiences ?? const <String>[];
-    final audienceLabel = audiences.isEmpty
-        ? (input?.targetCustomer.trim().isNotEmpty == true
-              ? input!.targetCustomer.trim()
-              : '대상 미정')
-        : audiences
-              .map((id) {
-                for (final a in ProjectDesignCatalog.audiences) {
-                  if (a.id == id) return a.label;
-                }
-                return id;
-              })
-              .join(' · ');
-    final title = (design?.displayTitle.trim().isNotEmpty == true
-            ? design!.displayTitle
-            : (design?.topic.trim().isNotEmpty == true
-                  ? design!.topic
-                  : (input?.topic.trim().isNotEmpty == true
-                        ? input!.topic.trim()
-                        : '제목 미정')))
-        .trim();
-    final step = (design?.step ?? 0).clamp(0, ProjectDesignStep.count - 1);
-    final stepLabel =
-        'STEP ${step + 1}/${ProjectDesignStep.count}';
-    String updatedLabel = '최근';
-    if (_resumePlanId != null) {
-      final match = _allPlans.where((p) => p.id == _resumePlanId);
-      if (match.isNotEmpty) {
-        final dt = DateTime.tryParse(match.first.updatedAt)?.toLocal();
-        if (dt != null) {
-          updatedLabel =
-              '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-        }
-      }
-    }
-
-    return Material(
-      key: const Key('planning_resume_draft_banner'),
-      elevation: 1,
-      borderRadius: BorderRadius.circular(10),
-      color: ControlColors.warningBg,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: ControlColors.accentWarm.withValues(alpha: 0.4),
-          ),
-        ),
+  Widget _buildInputModeCard() {
+    return Card(
+      key: const Key('planning_input_mode_card'),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              '이전에 작성하던 작업',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
             Text(
-              '$kindLabel · $audienceLabel',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+              '입력 방식',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '기본은 AI 보완 중심입니다. 세부 항목을 직접 채울 때만 직접 입력을 선택하세요.',
+              style: TextStyle(
+                fontSize: 12.5,
                 color: ControlColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              '"$title"',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            const SizedBox(height: 10),
+            SegmentedButton<bool>(
+              key: const Key('planning_input_mode_selector'),
+              segments: const [
+                ButtonSegment(value: true, label: Text('AI 보완 중심 (권장)')),
+                ButtonSegment(value: false, label: Text('직접 입력 중심')),
+              ],
+              selected: {_inputModeQuick},
+              onSelectionChanged: (s) {
+                setState(() {
+                  _inputModeQuick = s.first;
+                  _wizardState = _wizardState.copyWith(
+                    mode: _inputModeQuick ? 'quick' : 'advanced',
+                  );
+                  _designState = _designState.copy()
+                    ..manualOnlyMode = !_inputModeQuick;
+                });
+                _persistDraft();
+              },
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Text(
-              '$stepLabel · 마지막 수정 $updatedLabel',
+              _inputModeQuick
+                  ? '핵심 정보만 입력하면 AI가 나머지 제작 요구사항을 보완합니다.'
+                  : '세부 요구사항을 직접 지정하고 AI 자동 보완을 최소화합니다.',
               style: const TextStyle(
                 fontSize: 12.5,
                 color: ControlColors.textMuted,
               ),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton(
-                  key: const Key('planning_resume_draft_button'),
-                  onPressed: _resumeDraft,
-                  child: const Text('이어하기'),
-                ),
-                OutlinedButton(
-                  key: const Key('planning_new_work_button'),
-                  onPressed: () => unawaited(_confirmStartNewPlan()),
-                  child: const Text('새 작업 시작'),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _confirmStartNewPlan({IdeaToPlanningSeed? seed}) async {
-    final hasDraft =
-        (_resumeInput != null &&
-            WorkInstructionWizardSession.isUnsentResumable(
-              _resumeInput,
-              _allPlans,
-            )) ||
-        WorkInstructionWizardSession.isUnsentResumable(
-          _currentInput,
-          _allPlans,
-        );
-    if (!hasDraft) {
-      await _startNewPlan(seed: seed);
-      return;
-    }
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('새 작업 시작'),
-        content: const Text(
-          '현재 작성 중인 초안만 보관(또는 교체)합니다.\n'
-          '이미 전송된 작업지시·AI 제작공정 프로젝트는 변경되지 않습니다.\n\n'
-          '· 보존: 기존 초안은 “보관 초안”으로 남겨 이어하기에 다시 표시될 수 있습니다.\n'
-          '· 삭제되지 않음: 전송 완료 WI / 제작공정 job\n'
-          '· 새 화면: 빈 새 작업으로 시작합니다.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('초안 보관 후 새 작업'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await _startNewPlan(seed: seed);
-    }
   }
 
   Widget _buildEmptyWorkshopPrepBanner() {
@@ -2748,9 +2571,11 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   Widget _buildProductionSettingsCard() {
-    final isEbook =
-        _artifactType == ArtifactType.undecided ||
-        ArtifactType.normalize(_artifactType) == ArtifactType.ebook;
+    final artifactLabel = ArtifactType.labelKo(
+      _artifactType == ArtifactType.undecided
+          ? ArtifactType.ebook
+          : ArtifactType.normalize(_artifactType),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2758,29 +2583,26 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('AI 자동 제작 (전자책)'),
+          title: Text('AI 자동 제작 ($artifactLabel)'),
           subtitle: const Text(
             '검증을 통과한 제작 단계를 순서대로 진행합니다. 외부 등록·출시는 실행하지 않습니다.',
             style: TextStyle(fontSize: 12.5),
           ),
-          value: _aiProductionPilot && isEbook,
-          onChanged: !isEbook
-              ? null
-              : (v) => setState(() => _aiProductionPilot = v),
+          value: _aiProductionPilot,
+          onChanged: (v) => setState(() => _aiProductionPilot = v),
         ),
         const Divider(height: 16),
         _sendSummaryRow(
           '제작 방식',
           WorkInstructionWorkshopPresentation.productionMethodLabel(
-            aiPilotEnabled: _aiProductionPilot && isEbook,
+            aiPilotEnabled: _aiProductionPilot,
             artifactType: _artifactType,
           ),
         ),
         _sendSummaryRow(
           '승인 방식',
           WorkInstructionWorkshopPresentation.approvalModeLabel(
-            approvalRequired:
-                _aiProductionPilot && isEbook && _approvalMode == 'manual',
+            approvalRequired: _aiProductionPilot && _approvalMode == 'manual',
           ),
         ),
         _sendSummaryRow('제작 언어', '한국어 (영어는 향후 locale 확장 예정)'),
@@ -2865,31 +2687,6 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeToggle() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: true, label: Text('설계 엔진')),
-            ButtonSegment(value: false, label: Text('직접 입력')),
-          ],
-          selected: {_inputModeQuick},
-          onSelectionChanged: (s) {
-            setState(() {
-              _inputModeQuick = s.first;
-              _wizardState = _wizardState.copyWith(
-                mode: _inputModeQuick ? 'quick' : 'advanced',
-              );
-            });
-            _persistDraft();
-          },
         ),
       ),
     );

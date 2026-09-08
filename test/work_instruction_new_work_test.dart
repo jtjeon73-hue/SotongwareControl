@@ -377,7 +377,7 @@ void main() {
     });
   });
 
-  testWidgets('새 작업 시작 — 이전 draft 선택을 자동 복원하지 않음', (tester) async {
+  testWidgets('제작소 진입 — 이전 draft 배너 없음·항상 새 작업', (tester) async {
     SharedPreferences.setMockInitialValues({
       BusinessPlanningStore.draftInputKey: jsonEncode(_draftInput().toJson()),
     });
@@ -397,15 +397,17 @@ void main() {
     );
     expect(
       find.byKey(const Key('planning_resume_draft_banner')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('이전에 작성하던 작업'), findsOneWidget);
+    expect(find.text('이전에 작성하던 작업'), findsNothing);
+    expect(find.text('이어하기'), findsNothing);
+    expect(find.byKey(const Key('planning_input_mode_card')), findsOneWidget);
+    expect(find.text('AI 보완 중심 (권장)'), findsOneWidget);
+    expect(find.text('상세 직접입력'), findsNothing);
   });
 
-  testWidgets('이어하기 — 기존 draft 선택 복원', (tester) async {
-    SharedPreferences.setMockInitialValues({
-      BusinessPlanningStore.draftInputKey: jsonEncode(_draftInput().toJson()),
-    });
+  testWidgets('입력 방식 — 직접 입력 중심으로 전환 가능', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -413,19 +415,21 @@ void main() {
     await tester.pumpWidget(
       const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
     );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('planning_resume_draft_button')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('planning_resume_draft_banner')), findsNothing);
-    expect(find.text('핵심 내용'), findsOneWidget);
-    expect(find.textContaining('중장년 건강 습관'), findsWidgets);
+    await tester.ensureVisible(find.text('직접 입력 중심'));
+    await tester.tap(find.text('직접 입력 중심'));
+    await tester.pumpAndSettle();
+    expect(find.text('사업 주제 *'), findsOneWidget);
   });
 
-  testWidgets('새 작업 시작 버튼 — STEP 1 선택 없음 유지', (tester) async {
+  testWidgets('미전송 draft 재진입 — STEP1 새 작업 유지', (tester) async {
     SharedPreferences.setMockInitialValues({
       BusinessPlanningStore.draftInputKey: jsonEncode(_draftInput().toJson()),
+      BusinessPlanningStore.parkedDraftInputKey: jsonEncode(
+        _draftInput().toJson(),
+      ),
     });
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -434,11 +438,6 @@ void main() {
     await tester.pumpWidget(
       const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
     );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('planning_new_work_button')));
-    await tester.pumpAndSettle();
-    expect(find.text('초안 보관 후 새 작업'), findsOneWidget);
-    await tester.tap(find.text('초안 보관 후 새 작업'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('planning_resume_draft_banner')), findsNothing);

@@ -375,6 +375,11 @@ class ProjectDesignEngine {
     for (final group in ProjectDesignCatalog.productionGroupsFor(
       synced.artifactType ?? '',
       contentSubtype: synced.contentSubtype ?? '',
+      businessKind: () {
+        final sel = synced.productionSelections['business_kind'];
+        return (sel == null || sel.isEmpty) ? '' : sel.first;
+      }(),
+      siteSubtype: synced.siteSubtype ?? '',
     )) {
       final selectedOpts = synced.productionSelections[group.id] ?? const [];
       if (selectedOpts.isEmpty) continue;

@@ -274,13 +274,9 @@ void main() {
       const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
     );
     await tester.pumpAndSettle();
-    final other = find.byKey(const Key('planning_other_actions'));
-    await tester.ensureVisible(other);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('상세 설정 · 기타 작업'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('직접 입력'));
-    await tester.tap(find.text('직접 입력'));
+    expect(find.byKey(const Key('planning_input_mode_card')), findsOneWidget);
+    await tester.ensureVisible(find.text('직접 입력 중심'));
+    await tester.tap(find.text('직접 입력 중심'));
     await tester.pumpAndSettle();
     expect(find.text('사업 주제 *'), findsOneWidget);
   });

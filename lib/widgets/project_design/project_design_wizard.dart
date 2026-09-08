@@ -172,11 +172,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
   }
 
   String _creationModeSummary() {
-    final parts = <String>[
-      _state.creationMode == 'revise_existing' ? '기존 결과물 보완' : '새 결과물',
-    ];
-    if (_state.manualOnlyMode) parts.add('상세 직접입력');
-    return parts.join(' · ');
+    return _state.creationMode == 'revise_existing' ? '기존 결과물 보완' : '새 결과물';
   }
 
   String _pipelinePhaseLabel(String phase) {
@@ -419,7 +415,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           children: [
             _CreationModeCard(
               title: '새 결과물 만들기',
-              subtitle: '처음부터 새 프로젝트를 기획합니다',
+              subtitle: '처음부터 새 프로젝트를 기획하고 제작합니다.',
               selected: _state.creationMode == 'new_product',
               onTap: () {
                 final next = _state.copy()..creationMode = 'new_product';
@@ -429,18 +425,10 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             ),
             _CreationModeCard(
               title: '기존 결과물 보완하기',
-              subtitle: '이전 작업지시서·리비전을 기준으로 수정',
+              subtitle: '이미 만든 결과물이나 이전 revision을 불러와 수정·고도화합니다.',
               selected: _state.creationMode == 'revise_existing',
               onTap: () {
                 _emit(_state.copy()..creationMode = 'revise_existing');
-              },
-            ),
-            _CreationModeCard(
-              title: '상세 직접입력',
-              subtitle: 'AI 보완 없이 사용자 입력만 사용',
-              selected: _state.manualOnlyMode,
-              onTap: () {
-                _emit(_state.copy()..manualOnlyMode = !_state.manualOnlyMode);
               },
             ),
           ],
@@ -1184,9 +1172,14 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
   }
 
   Widget _buildProductionStep() {
+    final kindSel =
+        _state.productionSelections['business_kind'] ?? const <String>[];
+    final businessKind = kindSel.isEmpty ? '' : kindSel.first.toString();
     final groups = ProjectDesignCatalog.productionGroupsFor(
       _state.artifactType ?? '',
       contentSubtype: _state.contentSubtype ?? '',
+      businessKind: businessKind,
+      siteSubtype: _state.siteSubtype ?? '',
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1245,54 +1238,52 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
             onWorkerPreferenceChanged: (v) =>
                 widget.onWorkerPreferenceChanged?.call(v),
           ),
-          ExpansionTile(
-            key: const Key('studio_production_detail_accordion'),
-            initiallyExpanded: false,
-            tilePadding: EdgeInsets.zero,
-            title: const Text(
-              '상세 제작 설정',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: const Text(
-              '기술·플랫폼·SEO·고급 옵션은 필요할 때만 펼치세요.',
-              style: TextStyle(
-                fontSize: 12,
-                color: ControlColors.textSecondary,
-              ),
-            ),
-            children: [
-              if (widget.approvalMode == 'auto')
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    '자동 승인이어도 STEP15 사용자 검토·STEP18 배포·스토어/외부 공개는 '
-                    '사용자가 직접 확인합니다.',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: ControlColors.accentWarm,
-                    ),
-                  ),
-                ),
-            ],
-          ),
           const SizedBox(height: 12),
         ],
-        if (groups.isEmpty)
-          const Text('이 결과물은 추가 제작 정보가 필수는 아닙니다. 다음으로 진행하세요.')
-        else ...[
-          ExpansionTile(
-            key: const Key('studio_production_groups_accordion'),
-            initiallyExpanded: false,
-            tilePadding: EdgeInsets.zero,
-            title: const Text(
-              '결과물별 제작 정보',
-              style: TextStyle(fontWeight: FontWeight.w700),
+        ExpansionTile(
+          key: const Key('studio_production_detail_accordion'),
+          initiallyExpanded: false,
+          tilePadding: EdgeInsets.zero,
+          title: const Text(
+            '상세 제작 설정 (선택)',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: const Text(
+            '기본값은 AI가 자동 설정합니다. 플랫폼·분량·기술·출력 형식 등을 직접 지정할 때만 펼쳐 사용하세요.',
+            style: TextStyle(
+              fontSize: 12,
+              color: ControlColors.textSecondary,
             ),
-            children: [
+          ),
+          children: [
+            if (widget.approvalMode == 'auto')
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '자동 승인이어도 STEP15 사용자 검토·STEP18 배포·스토어/외부 공개는 '
+                  '사용자가 직접 확인합니다.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: ControlColors.accentWarm,
+                  ),
+                ),
+              ),
+            if (groups.isEmpty)
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '결과물에 맞는 제작 정보를 선택하세요.',
+                  '이 결과물은 추가 제작 정보가 필수는 아닙니다. 다음으로 진행하세요.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: ControlColors.textSecondary,
+                  ),
+                ),
+              )
+            else ...[
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '선택한 사업유형에 맞는 항목만 표시됩니다.',
                   style: TextStyle(
                     fontSize: 13,
                     color: ControlColors.textSecondary,
@@ -1344,8 +1335,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
                 const SizedBox(height: 12),
               ],
             ],
-          ),
-        ],
+          ],
+        ),
       ],
     );
   }
