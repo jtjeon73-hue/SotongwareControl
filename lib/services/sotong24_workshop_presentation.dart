@@ -124,7 +124,8 @@ class Sotong24WorkshopPresentation {
     if (!Sotong24RemoteStage.isOpenableHttpUrl(value)) return null;
     final uri = Uri.tryParse(value);
     if (uri == null || uri.pathSegments.isEmpty) return null;
-    return uri.pathSegments.last.toLowerCase() == 'final_ebook.pdf'
+    return uri.pathSegments.last.toLowerCase() == 'final_ebook.pdf' ||
+            uri.pathSegments.last.toLowerCase() == 'book.pdf'
         ? value
         : null;
   }

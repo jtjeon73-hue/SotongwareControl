@@ -41,9 +41,9 @@ class Sotong24StageResultOpenButtons extends StatelessWidget {
   bool get _isFinalPdf {
     final result = stage.openableResultUrl;
     final uri = result == null ? null : Uri.tryParse(result);
-    return uri != null &&
-        uri.pathSegments.isNotEmpty &&
-        uri.pathSegments.last.toLowerCase() == 'final_ebook.pdf';
+    if (uri == null || uri.pathSegments.isEmpty) return false;
+    final name = uri.pathSegments.last.toLowerCase();
+    return name == 'final_ebook.pdf' || name == 'book.pdf';
   }
 
   Future<void> _openDetail(BuildContext context) async {

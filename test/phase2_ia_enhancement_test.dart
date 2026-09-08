@@ -56,8 +56,10 @@ void main() {
     }
     expect(wf.byId('editorial_structure_review'), isNotNull);
     expect(wf.byId('format_build'), isNotNull);
+    expect(wf.byId('package_user_review'), isNotNull);
     expect(wf.byId('final_user_approval'), isNotNull);
     expect(wf.byId('build_test'), isNull);
+    expect(wf.byId('sales_metadata'), isNull);
   });
 
   test('앱·사이트·마케팅·콘텐츠·산업자동화 workflow 정의', () {

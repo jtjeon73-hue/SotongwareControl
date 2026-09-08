@@ -232,8 +232,9 @@ class RemoteControlApi {
     required int revision,
     required String fileName,
     String productType = 'ebook',
-    String artifactFileName = 'final_ebook.pdf',
+    String artifactFileName = 'book.pdf',
   }) async {
+    // Prefer canonical publish/book.pdf; callers may still pass final_ebook.pdf.
     final map = await _post('/api/control/artifact-download', {
       'projectId': projectId,
       'stageId': stageId,
@@ -322,7 +323,7 @@ class RemoteControlApi {
               'projectId': projectId,
               'stageId': stageId,
               'revision': revision,
-              'fileName': 'final_ebook.pdf',
+              'fileName': 'book.pdf',
             }),
           )
           .timeout(const Duration(seconds: 30));

@@ -17,10 +17,13 @@ import '../services/sotong24_remote_repository.dart';
 import '../services/sotong24_workshop_presentation.dart';
 import '../services/production_review_status_repository.dart';
 import '../services/production_review_workshop_merge.dart';
+import '../services/pdf_download_service.dart';
 import 'pdf_preview_screen.dart';
 import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
 import '../widgets/site_user_review_actions.dart';
+import '../widgets/ebook_package_user_review_panel.dart';
+import '../models/ebook_r1_package_manifest.dart';
 import '../widgets/operational_collapsible_section.dart';
 import '../widgets/pdf_download_button.dart';
 import '../widgets/apk_download_button.dart';
@@ -632,21 +635,43 @@ class _Sotong24RemoteDetailScreenState
           final siteReviewStage = showSiteUserReview
               ? (siteReviewCandidate ?? stage)
               : null;
+          final showEbookPackageReview =
+              stage != null &&
+              project.productType == ArtifactType.ebook &&
+              (stage.stageId == 'package_user_review' ||
+                  stage.stageId == 'sales_metadata') &&
+              (stage.status == Sotong24WorkStatus.awaitingApproval ||
+                  stage.hasOpenableResult ||
+                  showApprovalActions);
+          final ebookReviewStage = showEbookPackageReview ? stage : null;
           final displayCurrentNumber =
-              siteReviewStage?.stageNumber ?? project.currentStage;
-          final displayCurrentLine = siteReviewStage == null
-              ? Sotong24WorkshopPresentation.currentStageLine(project)
-              : (() {
+              siteReviewStage?.stageNumber ??
+              ebookReviewStage?.stageNumber ??
+              project.currentStage;
+          final displayCurrentLine = siteReviewStage != null
+              ? (() {
                   final name = siteReviewStage.stageName.trim();
                   return name.isEmpty
                       ? '${siteReviewStage.stageNumber}단계'
                       : '${siteReviewStage.stageNumber}단계 · $name';
-                })();
+                })()
+              : ebookReviewStage != null
+              ? (() {
+                  final name = ebookReviewStage.stageName.trim();
+                  return name.isEmpty
+                      ? '${ebookReviewStage.stageNumber}단계'
+                      : '${ebookReviewStage.stageNumber}단계 · $name';
+                })()
+              : Sotong24WorkshopPresentation.currentStageLine(project);
           final displayStatusLabel =
-              siteReviewStage != null &&
-                  (siteReviewStage.status ==
-                          Sotong24WorkStatus.awaitingApproval ||
-                      project.approvalStatus == ApprovalStatus.pending)
+              ((siteReviewStage != null &&
+                      (siteReviewStage.status ==
+                              Sotong24WorkStatus.awaitingApproval ||
+                          project.approvalStatus == ApprovalStatus.pending)) ||
+                  (ebookReviewStage != null &&
+                      (ebookReviewStage.status ==
+                              Sotong24WorkStatus.awaitingApproval ||
+                          project.approvalStatus == ApprovalStatus.pending)))
               ? '사용자 검토 대기'
               : project.userFacingStatusLabel;
           _scrollToApkIfNeeded(project);
@@ -1044,6 +1069,54 @@ class _Sotong24RemoteDetailScreenState
                     );
                   },
                 ),
+              ] else if (ebookReviewStage != null) ...[
+                const SizedBox(height: 14),
+                Text(
+                  '완성형 r1 · 사용자 검토',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                EbookPackageUserReviewPanel(
+                  project: project,
+                  stage: ebookReviewStage,
+                  busy: _busy,
+                  manifest: _tryParseEbookManifest(ebookReviewStage),
+                  onApprove: () => _onApprove(project, ebookReviewStage),
+                  onChangesRequested: () =>
+                      _onRevision(project, ebookReviewStage),
+                  onHold: () async {
+                    setState(() => _busy = true);
+                    final messenger = ScaffoldMessenger.of(context);
+                    final err = await widget.repository.requestRevision(
+                      projectId: project.projectId,
+                      stageId: ebookReviewStage.stageId,
+                      requestId: _resolveRequestId(ebookReviewStage),
+                      message:
+                          '[reviewDecision=on_hold]\n[reviewedRevision=r${ebookReviewStage.revision > 0 ? ebookReviewStage.revision : 1}]\n전자책 완성형 패키지 보류',
+                      reviewDecision: 'on_hold',
+                    );
+                    if (!mounted) return;
+                    setState(() => _busy = false);
+                    messenger.showSnackBar(
+                      SnackBar(content: Text(err ?? '보류했습니다. 패키지는 보존됩니다.')),
+                    );
+                  },
+                  onDownloadPdf: () => _downloadEbookArtifact(
+                    project,
+                    ebookReviewStage,
+                    'book.pdf',
+                  ),
+                  onDownloadEpub: () => _downloadEbookArtifact(
+                    project,
+                    ebookReviewStage,
+                    'book.epub',
+                  ),
+                  onPreviewPdf: () => _previewEbookPdf(project, ebookReviewStage),
+                ),
+                const SizedBox(height: 8),
+                _ResultPanel(stage: ebookReviewStage, project: project),
               ] else if (stage != null) ...[
                 const SizedBox(height: 14),
                 Text(
@@ -1057,7 +1130,8 @@ class _Sotong24RemoteDetailScreenState
               ],
               if (showApprovalActions &&
                   stage != null &&
-                  !showSiteUserReview) ...[
+                  !showSiteUserReview &&
+                  !showEbookPackageReview) ...[
                 const SizedBox(height: 16),
                 Text(
                   '승인',
@@ -1161,6 +1235,92 @@ class _Sotong24RemoteDetailScreenState
     );
   }
 
+  EbookR1PackageManifest? _tryParseEbookManifest(Sotong24RemoteStage stage) {
+    final candidates = <String>[stage.summary, stage.errorMessage];
+    for (final raw in candidates) {
+      final start = raw.indexOf('{');
+      final end = raw.lastIndexOf('}');
+      if (start < 0 || end <= start) continue;
+      try {
+        return EbookR1PackageManifest.fromJsonString(
+          raw.substring(start, end + 1),
+        );
+      } catch (_) {}
+    }
+    // Minimal SSOT defaults so UI still offers download when result URL exists.
+    if (stage.hasOpenableResult) {
+      return EbookR1PackageManifest(
+        revision: stage.revision > 0 ? 'r${stage.revision}' : 'r1',
+        title: '',
+        pdfPath: 'publish/book.pdf',
+        epubPath: 'publish/book.epub',
+        coverPath: '',
+        qualityReportPath: 'output/pre_review_quality_report.json',
+      );
+    }
+    return null;
+  }
+
+  Future<void> _downloadEbookArtifact(
+    Sotong24RemoteProject project,
+    Sotong24RemoteStage stage,
+    String fileName,
+  ) async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (fileName.toLowerCase().endsWith('.epub')) {
+        final grant = await RemoteControlApi().createArtifactDownloadGrant(
+          projectId: project.projectId,
+          stageId: stage.stageId,
+          revision: stage.revision > 0 ? stage.revision : 1,
+          fileName: 'ebook_r${stage.revision > 0 ? stage.revision : 1}.epub',
+          artifactFileName: 'book.epub',
+        );
+        if (!mounted) return;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              grant.downloadUrl.isEmpty
+                  ? 'EPUB 다운로드 URL을 받지 못했습니다.'
+                  : 'EPUB 다운로드 준비됨 · ${grant.fileName}',
+            ),
+          ),
+        );
+      } else {
+        final result = await const ArtifactPdfDownloadService().downloadPdf(
+          projectId: project.projectId,
+          stageId: stage.stageId,
+          title: project.title,
+          revision: stage.revision > 0 ? stage.revision : 1,
+        );
+        if (!mounted) return;
+        messenger.showSnackBar(SnackBar(content: Text(result.message)));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('다운로드 실패: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _previewEbookPdf(
+    Sotong24RemoteProject project,
+    Sotong24RemoteStage stage,
+  ) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PdfPreviewScreen(
+          projectId: project.projectId,
+          stageId: stage.stageId,
+          title: project.title,
+          revision: stage.revision > 0 ? stage.revision : 1,
+        ),
+      ),
+    );
+  }
+
   Future<void> _onRevision(
     Sotong24RemoteProject project,
     Sotong24RemoteStage stage,
@@ -1175,6 +1335,10 @@ class _Sotong24RemoteDetailScreenState
     }
 
     final revLabel = 'r${stage.revision > 0 ? stage.revision : 1}';
+    final isEbookPackageGate =
+        project.productType == ArtifactType.ebook &&
+        (stage.stageId == 'package_user_review' ||
+            stage.stageId == 'sales_metadata');
     final payload =
         project.productType == ArtifactType.site &&
             stage.stageId == 'site_user_review'
@@ -1183,6 +1347,11 @@ class _Sotong24RemoteDetailScreenState
             reviewedRevision: revLabel,
             reviewComment: message,
           ).toRevisionMessage()
+        : isEbookPackageGate
+        ? '[reviewDecision=changes_requested]\n'
+              '[reviewedRevision=$revLabel]\n'
+              '[ebookRevisionContract=1]\n'
+              '$message'
         : message;
 
     setState(() => _busy = true);
@@ -1192,8 +1361,9 @@ class _Sotong24RemoteDetailScreenState
       requestId: _resolveRequestId(stage),
       message: payload,
       reviewDecision:
-          project.productType == ArtifactType.site &&
-              stage.stageId == 'site_user_review'
+          (project.productType == ArtifactType.site &&
+                  stage.stageId == 'site_user_review') ||
+              isEbookPackageGate
           ? 'changes_requested'
           : '',
     );
