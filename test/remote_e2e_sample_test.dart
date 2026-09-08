@@ -74,9 +74,7 @@ void main() {
       expect(wi.workflowSteps.length, 18);
       expect(
         wi.workflowSteps.map((s) => s.id).toList(),
-        BusinessPlanningService.standardWorkflowTitles
-            .map((e) => e.$1)
-            .toList(),
+        BusinessPlanningService.ebookWorkflowStages.map((e) => e.$1).toList(),
       );
       expect(wi.notes, contains('[environment:test]'));
       expect(wi.notes, contains('[isTest:true]'));

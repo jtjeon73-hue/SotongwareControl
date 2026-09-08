@@ -64,7 +64,7 @@ void main() {
     expect(manual.approvalRequired, isTrue);
     expect(manual.autoAdvance, isFalse);
     expect(manual.executionMode, 'hold');
-    expect(manual.maxAutoStageOrder, 12);
+    expect(manual.maxAutoStageOrder, 14);
     expect(manual.deploymentAllowed, isFalse);
 
     expect(automatic.approvalMode, 'auto');
