@@ -1,24 +1,24 @@
 {
   "autoRun": {
     "allow_instructions": [
-      "Allow workspace Write/Edit/Create for normal source files (.dart .cpp .h .js .ts .html .css .json .yaml .md .py) inside SotongWare repos without Run prompts.",
-      "Allow safe in-repo Copy-Item / Move-Item / Rename-Item / New-Item when source and destination stay inside allowed SotongWare repository roots.",
-      "Allow read-only git inspection such as status, diff, log, show, rev-parse, and branch listing.",
-      "Allow git add and git commit for local development completion. Keep git push gated.",
-      "Allow Flutter/Dart analyze, test, format, and pub get in the workspace.",
-      "Allow npm/npx test, lint, and build scripts in the workspace.",
-      "Allow Python pytest and scripts/test_*.py validation scripts.",
-      "Allow local cmake/msbuild/dotnet build and test commands that do not deploy.",
-      "Allow reading project files and logs needed for validation."
+      "Prefer scripts/cursor_safe helpers over complex inline Python/PowerShell for verification.",
+      "Allow workspace Write/Edit/Create for normal source files inside Sotong24Work and SotongwareControl without Run prompts.",
+      "Allow safe in-repo Copy-Item / Move-Item / Rename-Item / New-Item inside Sotong24Work or SotongwareControl.",
+      "Allow read-only PowerShell inspection verbs and pipelines (Get-*, Test-Path, Select-*, Measure-*, Where-*, Sort-*, Write-Host/Output).",
+      "Allow git read commands including status/diff/log/show/rev-parse/rev-list/ls-files/ls-tree/describe/merge-base and compound read-only chains.",
+      "Allow explicit git add of related files and git commit. Keep git add . / -A gated.",
+      "Allow Flutter/Dart analyze, test, format, pub get, and local builds.",
+      "Allow npm/npx test/lint/build and python scripts under scripts/, scripts/cursor_safe/, test_*.py.",
+      "Allow HTTP GET/HEAD verification (Invoke-WebRequest/curl/urllib) for allowlisted hosts. Never auto POST/PUT/PATCH/DELETE."
     ],
     "block_instructions": [
-      "Every production deploy or firebase deploy must go through approval first.",
-      "Every git push, force push, reset --hard, or git clean must go through approval first.",
-      "Every command that deletes many files, changes credentials/secrets, or restarts Agent services must go through approval first.",
-      "Never auto-approve STEP15 site_user_review decisions or STEP18 public production publish.",
-      "Never auto-approve overwriting sotongware.com or automation.sotongware.com production sites.",
-      "Never auto-approve Write outside allowed SotongWare repository roots.",
-      "Never auto-approve secret/credential/env/key/pem edits."
+      "Every production deploy or firebase deploy or scripts/deploy_control.ps1 execution must go through approval first.",
+      "Every git push, force push, reset, clean, stash, checkout --, restore, worktree remove must go through approval first.",
+      "Every bulk delete (Remove-Item/rm) must go through approval first.",
+      "Never auto-approve STEP15/STEP18/Golden Run/START_JOB/new WI transfer.",
+      "Never auto-approve Write outside Sotong24Work/SotongwareControl (SotongwareWeb stays gated).",
+      "Never auto-approve secret/credential/env/key/pem edits.",
+      "Do not broad-allow Shell(powershell)/Shell(*)/arbitrary python -c mutation."
     ]
   }
 }
