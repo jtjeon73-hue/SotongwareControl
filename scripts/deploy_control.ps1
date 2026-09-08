@@ -77,16 +77,17 @@ $GitSha = (git rev-parse --short HEAD 2>$null)
 if ([string]::IsNullOrWhiteSpace($GitSha)) { $GitSha = "unknown" }
 $kst = [System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, 'Korea Standard Time')
 $BuiltAt = $kst.ToString('yyyy-MM-dd HH:mm') + ' KST'
-$buildCmd = @(
-  "flutter build web --release --base-href /",
+Write-Host "BuiltAt dart-define: $BuiltAt"
+# Quote each dart-define so values with spaces (date+time) survive cmd.exe.
+$buildArgs = @(
+  'build', 'web', '--release', '--base-href', '/',
   "--dart-define=SOTONG_ADMIN_AUTH_EMAIL=$AdminEmail",
   "--dart-define=SOTONG_ADMIN_UID=$AdminUid",
   "--dart-define=SOTONG_FCM_WEB_VAPID_KEY=$FcmWebVapidKey",
   "--dart-define=SOTONG_GIT_SHA=$GitSha",
   "--dart-define=SOTONG_BUILT_AT=$BuiltAt"
-) -join " "
-Write-Host "BuiltAt dart-define: $BuiltAt"
-cmd.exe /c $buildCmd
+)
+& flutter @buildArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 python -c @"
