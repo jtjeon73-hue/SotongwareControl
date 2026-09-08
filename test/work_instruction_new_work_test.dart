@@ -399,7 +399,7 @@ void main() {
       find.byKey(const Key('planning_resume_draft_banner')),
       findsOneWidget,
     );
-    expect(find.text('이전에 작성하던 작업이 있습니다.'), findsOneWidget);
+    expect(find.text('이전에 작성하던 작업'), findsOneWidget);
   });
 
   testWidgets('이어하기 — 기존 draft 선택 복원', (tester) async {
@@ -436,6 +436,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('planning_new_work_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('초안 보관 후 새 작업'), findsOneWidget);
+    await tester.tap(find.text('초안 보관 후 새 작업'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('planning_resume_draft_banner')), findsNothing);
