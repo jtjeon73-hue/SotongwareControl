@@ -86,20 +86,16 @@ class Sotong24WorkflowCatalog {
     }
   }
 
-  /// 전자책 — BusinessPlanningService.standardWorkflowTitles 18단계와 ID 일치.
+  /// 전자책 — BusinessPlanningService.ebookWorkflowStages (commercial v2)와 ID 일치.
   static final ebook = Sotong24WorkflowDef(
     productType: ArtifactType.ebook,
     title: '전자책 제작',
-    summary: 'Sotong24Work 표준 18단계 전자책 워크플로',
+    summary: 'Sotong24Work 전자책 commercial v2 18단계 워크플로',
     stages: [
-      for (
-        var i = 0;
-        i < BusinessPlanningService.standardWorkflowTitles.length;
-        i++
-      )
+      for (var i = 0; i < BusinessPlanningService.ebookWorkflowStages.length; i++)
         _ebookStage(
-          BusinessPlanningService.standardWorkflowTitles[i].$1,
-          BusinessPlanningService.standardWorkflowTitles[i].$2,
+          BusinessPlanningService.ebookWorkflowStages[i].$1,
+          BusinessPlanningService.ebookWorkflowStages[i].$2,
           i + 1,
         ),
     ],
@@ -120,7 +116,7 @@ class Sotong24WorkflowCatalog {
           quality: const <String>['기본 품질 확인'],
           user: const <String>['결과 확인'],
           next: '다음 단계로 진행',
-          approval: order == 9 || order >= 12,
+          approval: order == 9 || order == 17 || order == 18,
         );
     return Sotong24WorkflowStageDef(
       id: id,

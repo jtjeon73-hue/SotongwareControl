@@ -700,7 +700,8 @@ class AiExecutionPolicy {
     return AiExecutionPolicy(
       enabled: true,
       worker: 'cursor',
-      maxAutoStageOrder: 12,
+      // continuous may run through STEP16 final_polish; STEP9/17 are gated.
+      maxAutoStageOrder: 16,
       approvalRequired: mode == 'manual',
       artifactUploadEnabled: true,
       autoAdvance: mode == 'auto',

@@ -10,6 +10,47 @@ class BusinessPlanningService {
 
   final InstructionContractBuilder _contractBuilder;
 
+  /// Sotong24Work EbookProductionContractVersion kStagesV2와 동일.
+  /// 레거시 standardWorkflowTitles(build_test/deploy…)를 ebook WI에 넣으면
+  /// Work가 v2 commercial 공정을 무시한다.
+  static const ebookWorkflowStages = <(String, String, String)>[
+    ('idea_clarify', '아이디어 정리', '주제·문제·고객·결과가 한 페이지로 정리됨'),
+    ('problem_validate', '고객 문제 검증', ProblemValidateContract.completionCriteria),
+    ('materials_prep', '자료 준비', '필요 자료 목록과 확보 상태가 체크됨'),
+    ('planning', '기획', '최소 결과물과 비범위가 명시됨'),
+    ('project_setup', '프로젝트 생성', '전자책 워크스페이스·폴더가 준비됨'),
+    ('prompt_generate', '작성 프롬프트 생성', '초안 작성용 프롬프트 패키지가 준비됨'),
+    ('draft', '원고 초안', '목차·챕터 원고 초안이 존재함'),
+    (
+      'editorial_structure_review',
+      '편집·구조 검토',
+      '목차·분량·챕터 구조 편집 검토 보고서가 존재함',
+    ),
+    ('user_review', '사용자 검토(r1)', '고도화 r1 검토 패킷·사용자 결정이 기록됨'),
+    ('revise', '보완 수정', '피드백 반영 원고가 존재함'),
+    ('quality', '품질 검사', '상용 품질 검사 보고서가 존재함'),
+    ('cover_layout_design', '표지·레이아웃', '표지·내지 디자인 산출물이 존재함'),
+    ('format_build', 'PDF/EPUB 빌드', 'publish/book.pdf 및 publish/book.epub이 존재함'),
+    (
+      'reader_accessibility_test',
+      '가독·접근성 검사',
+      '리더기·가독성 검사 보고서가 존재함',
+    ),
+    ('sales_metadata', '판매 메타데이터', '판매 문구·메타데이터 패키지가 존재함'),
+    ('final_polish', '최종 폴리시', '최종 폴리시 보고서가 존재함'),
+    (
+      'final_user_approval',
+      '최종 사용자 승인',
+      '판매/공개 전 최종 사용자 승인이 기록됨',
+    ),
+    (
+      'publication_package',
+      '출시 준비 패키지',
+      'release_ready 패키지(외부 게시 제외)가 존재함',
+    ),
+  ];
+
+  /// 레거시/콘텐츠 등 공통 18단계(ebook v1 호환). ebook 신규 WI는 ebookWorkflowStages 사용.
   static const standardWorkflowTitles = <(String, String)>[
     ('idea_clarify', '아이디어 정리'),
     ('problem_validate', '고객 문제 검증'),
@@ -81,68 +122,24 @@ class BusinessPlanningService {
       '홍보·서비스 대상 자료 정리',
       '대상·지역·업종·신뢰 자료와 저작권·개인정보를 정리한다.',
     ),
-    (
-      'site_audience_search',
-      '목표 고객·지역·검색 의도 분석',
-      '목표 고객·지역·검색어·전환 의도를 분석한다.',
-    ),
-    (
-      'site_information_architecture',
-      '정보 구조·사용자 흐름',
-      'IA·메뉴·핵심 사용자 흐름을 설계한다.',
-    ),
-    (
-      'site_brand_conversion',
-      '브랜드·메시지·전환 목표',
-      '브랜드·메시지·CTA·전환 목표를 고정한다.',
-    ),
-    (
-      'site_responsive_ux',
-      '반응형 UI/UX 설계',
-      '모바일·태블릿·데스크톱 반응형 UX를 설계한다.',
-    ),
-    (
-      'site_content_media_plan',
-      '콘텐츠·미디어 배치 계획',
-      '핵심 페이지 콘텐츠·미디어 배치를 계획한다.',
-    ),
+    ('site_audience_search', '목표 고객·지역·검색 의도 분석', '목표 고객·지역·검색어·전환 의도를 분석한다.'),
+    ('site_information_architecture', '정보 구조·사용자 흐름', 'IA·메뉴·핵심 사용자 흐름을 설계한다.'),
+    ('site_brand_conversion', '브랜드·메시지·전환 목표', '브랜드·메시지·CTA·전환 목표를 고정한다.'),
+    ('site_responsive_ux', '반응형 UI/UX 설계', '모바일·태블릿·데스크톱 반응형 UX를 설계한다.'),
+    ('site_content_media_plan', '콘텐츠·미디어 배치 계획', '핵심 페이지 콘텐츠·미디어 배치를 계획한다.'),
     ('site_project_scaffold', '사이트 프로젝트 생성', '사이트 프로젝트 골격·라우팅을 생성한다.'),
     ('site_core_pages', '핵심 페이지 구현', '홈·소개·서비스·문의 등 핵심 페이지를 구현한다.'),
-    (
-      'site_conversion_features',
-      '업종별 전환 기능',
-      '문의·예약·CTA 등 전환 기능을 구현한다.',
-    ),
-    (
-      'site_seo_metadata',
-      'SEO·구조화 데이터·메타',
-      'title/meta/OG·구조화 데이터를 점검한다.',
-    ),
+    ('site_conversion_features', '업종별 전환 기능', '문의·예약·CTA 등 전환 기능을 구현한다.'),
+    ('site_seo_metadata', 'SEO·구조화 데이터·메타', 'title/meta/OG·구조화 데이터를 점검한다.'),
     (
       'site_a11y_perf_security',
       '접근성·성능·보안·법적 표시',
       '접근성·성능·HTTPS·쿠키/법적 고지를 점검한다.',
     ),
-    (
-      'site_build_preview_test',
-      '빌드·preview·테스트',
-      '빌드·프리뷰·링크·뷰포트 테스트를 수행한다.',
-    ),
-    (
-      'site_user_review',
-      '사용자 검토 패키지',
-      '검토용 URL/패키지를 준비하고 사용자 검토를 받는다.',
-    ),
-    (
-      'site_revision_quality',
-      '보완·품질 검증',
-      '보완 요청을 반영하고 품질 회귀를 검증한다.',
-    ),
-    (
-      'site_launch_package',
-      '출시 준비 패키지',
-      '배포 체크리스트·승인 근거·출시 자료를 준비한다.',
-    ),
+    ('site_build_preview_test', '빌드·preview·테스트', '빌드·프리뷰·링크·뷰포트 테스트를 수행한다.'),
+    ('site_user_review', '사용자 검토 패키지', '검토용 URL/패키지를 준비하고 사용자 검토를 받는다.'),
+    ('site_revision_quality', '보완·품질 검증', '보완 요청을 반영하고 품질 회귀를 검증한다.'),
+    ('site_launch_package', '출시 준비 패키지', '배포 체크리스트·승인 근거·출시 자료를 준비한다.'),
     (
       'site_deploy_release',
       '배포 실행(사용자 승인 후)',
@@ -368,6 +365,8 @@ class BusinessPlanningService {
       executionStatus: '지시서 준비',
       notes: ArtifactType.normalize(artifact) == ArtifactType.app
           ? _appProductionInstructionNotes(input)
+          : ArtifactType.normalize(artifact) == ArtifactType.ebook
+          ? _ebookProductionInstructionNotes(input)
           : input.notes.trim(),
       primaryTrack: primaryTrack,
       followUpTracks: followUps,
@@ -416,6 +415,22 @@ class BusinessPlanningService {
       '- typography hierarchy·spacing/token consistency',
       '- modern Material/Flutter UI·light/dark·responsive layout',
       '- confirmation/destructive UX·실사용자 관점 화면 구성',
+      '',
+      if (userMemo.isNotEmpty) ...['## 사용자 메모', userMemo],
+    ];
+    return sections.join('\n');
+  }
+
+  String _ebookProductionInstructionNotes(BusinessPlanInput input) {
+    final userMemo = input.notes.trim();
+    const marker = 'ebookProductionContractVersion=2';
+    final sections = <String>[
+      '[전자책 Production 계약 v2]',
+      marker,
+      '[ebook:v2]',
+      'STEP9 user_review = 고도화 r1 사용자 검토(자동승인 금지).',
+      'STEP13 format_build = PDF/EPUB. STEP17 final_user_approval = 판매 전 최종 승인.',
+      'STEP18 publication_package = release_ready만(외부 게시 금지).',
       '',
       if (userMemo.isNotEmpty) ...['## 사용자 메모', userMemo],
     ];
@@ -638,6 +653,18 @@ class BusinessPlanningService {
             title: appWorkflowStages[i].$2,
             applicable: true,
             completionCriteria: appWorkflowStages[i].$3,
+          ),
+      ];
+    }
+    if (primary == ArtifactType.ebook) {
+      return [
+        for (var i = 0; i < ebookWorkflowStages.length; i++)
+          WorkflowStep(
+            order: i + 1,
+            id: ebookWorkflowStages[i].$1,
+            title: ebookWorkflowStages[i].$2,
+            applicable: true,
+            completionCriteria: ebookWorkflowStages[i].$3,
           ),
       ];
     }

@@ -39,11 +39,11 @@ void main() {
     expect(g.totalStages, 18);
     expect(
       g.totalStages,
-      BusinessPlanningService.standardWorkflowTitles.length,
+      BusinessPlanningService.ebookWorkflowStages.length,
     );
     expect(g.workflow.stages.length, Sotong24WorkflowCatalog.ebook.totalStages);
     for (var i = 0; i < g.stages.length; i++) {
-      final expected = BusinessPlanningService.standardWorkflowTitles[i];
+      final expected = BusinessPlanningService.ebookWorkflowStages[i];
       expect(g.stages[i].stageId, expected.$1);
       expect(g.stages[i].name, expected.$2);
       expect(g.stages[i].purpose, isNotEmpty);
@@ -75,10 +75,7 @@ void main() {
     final site = Sotong24ProductionGuideCatalog.guideFor('site');
     expect(site.totalStages, Sotong24WorkflowCatalog.site.totalStages);
     expect(site.totalStages, 18);
-    expect(
-      site.totalStages,
-      BusinessPlanningService.siteWorkflowStages.length,
-    );
+    expect(site.totalStages, BusinessPlanningService.siteWorkflowStages.length);
 
     final promo = Sotong24ProductionGuideCatalog.guideFor('promo_site');
     expect(promo.totalStages, Sotong24WorkflowCatalog.promoSite.totalStages);

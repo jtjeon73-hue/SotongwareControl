@@ -39,21 +39,25 @@ void main() {
     expect(ControlDestination.aiBusinessAnalysis.label, '작업지시 제작소');
   });
 
-  test('전자책 workflow는 표준 18단계 ID와 호환', () {
+  test('전자책 workflow는 commercial v2 18단계 ID와 호환', () {
     final wf = Sotong24WorkflowCatalog.ebook;
     expect(wf.totalStages, 18);
     expect(
       wf.totalStages,
-      BusinessPlanningService.standardWorkflowTitles.length,
+      BusinessPlanningService.ebookWorkflowStages.length,
     );
     for (var i = 0; i < wf.stages.length; i++) {
       expect(
         wf.stages[i].id,
-        BusinessPlanningService.standardWorkflowTitles[i].$1,
+        BusinessPlanningService.ebookWorkflowStages[i].$1,
       );
       expect(wf.stages[i].purpose, isNotEmpty);
       expect(wf.stages[i].aiWork, isNotEmpty);
     }
+    expect(wf.byId('editorial_structure_review'), isNotNull);
+    expect(wf.byId('format_build'), isNotNull);
+    expect(wf.byId('final_user_approval'), isNotNull);
+    expect(wf.byId('build_test'), isNull);
   });
 
   test('앱·사이트·마케팅·콘텐츠·산업자동화 workflow 정의', () {
