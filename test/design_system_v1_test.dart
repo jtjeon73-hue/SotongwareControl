@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sotong_ware_control/models/artifact_type.dart';
 import 'package:sotong_ware_control/models/business_planning.dart';
 import 'package:sotong_ware_control/models/commercial/commercial_quality_attachment.dart';
 import 'package:sotong_ware_control/models/design_system/design_system_catalog.dart';
@@ -31,14 +30,17 @@ void main() {
     expect(codes.toSet().length, codes.length);
     expect(catalog.defaultProfile.profileCode, 'A');
     for (final p in catalog.profiles) {
-      expect(p.trackAdaptation.keys, containsAll([
-        'app',
-        'site',
-        'ebook',
-        'knowledge_education',
-        'marketing',
-        'contents',
-      ]));
+      expect(
+        p.trackAdaptation.keys,
+        containsAll([
+          'app',
+          'site',
+          'ebook',
+          'knowledge_education',
+          'marketing',
+          'contents',
+        ]),
+      );
     }
   });
 
@@ -141,8 +143,13 @@ void main() {
   });
 
   test('profile options A~E mapped for UI', () {
-    expect(kDesignSystemProfileOptions.map((e) => e.$1).toList(),
-        ['A', 'B', 'C', 'D', 'E']);
+    expect(kDesignSystemProfileOptions.map((e) => e.$1).toList(), [
+      'A',
+      'B',
+      'C',
+      'D',
+      'E',
+    ]);
   });
 
   test('preReview quality hook prepared without auto loop', () {

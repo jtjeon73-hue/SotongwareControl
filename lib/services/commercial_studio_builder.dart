@@ -387,7 +387,9 @@ class CommercialStudioBuilder {
         'play_store_submit',
         'external_publish_without_ok',
       ],
-      designDirection: designDirection.isEmpty ? 'clarity_first' : designDirection,
+      designDirection: designDirection.isEmpty
+          ? 'clarity_first'
+          : designDirection,
       brandIdentity: uniqueValue,
       designTokens: 'color_type_space_v1',
       navigationModel: 'bottom_or_simple_nav',

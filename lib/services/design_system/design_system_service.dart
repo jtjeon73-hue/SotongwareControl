@@ -43,9 +43,7 @@ class DesignSystemService {
       }
       if (rule.artifact.isNotEmpty && rule.artifact != artifact) continue;
       if (rule.anyKeyword.isNotEmpty) {
-        final hit = rule.anyKeyword.any(
-          (k) => hay.contains(k.toLowerCase()),
-        );
+        final hit = rule.anyKeyword.any((k) => hay.contains(k.toLowerCase()));
         if (!hit) continue;
       }
       final profile = catalog.byCode(rule.recommend) ?? catalog.defaultProfile;
@@ -56,10 +54,7 @@ class DesignSystemService {
     }
     final code = fallback?.recommend ?? catalog.defaultProfile.profileCode;
     final profile = catalog.byCode(code) ?? catalog.defaultProfile;
-    return DesignSelection.fromProfile(
-      profile,
-      designSource: 'ai_recommended',
-    );
+    return DesignSelection.fromProfile(profile, designSource: 'ai_recommended');
   }
 
   String reasonFor({

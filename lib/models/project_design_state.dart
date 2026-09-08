@@ -177,7 +177,8 @@ class ProjectDesignState {
   /// SotongWare Design System v1 selection (studio).
   String designProfileCode;
   String designProfileId;
-  String designSource; // ai_recommended | user_selected | inherited | revision_change
+  String
+  designSource; // ai_recommended | user_selected | inherited | revision_change
   String designProfileVersion;
   String designSystemVersion;
 
@@ -680,8 +681,7 @@ class ProjectDesignState {
       mainPainPoint: '${json['mainPainPoint'] ?? ''}',
       digitalSkillLevel: '${json['digitalSkillLevel'] ?? ''}',
       designProfileCode: '${json['designProfileCode'] ?? 'A'}',
-      designProfileId:
-          '${json['designProfileId'] ?? 'ds_profile_a_standard'}',
+      designProfileId: '${json['designProfileId'] ?? 'ds_profile_a_standard'}',
       designSource: '${json['designSource'] ?? 'ai_recommended'}',
       designProfileVersion: '${json['designProfileVersion'] ?? '1.0.0'}',
       designSystemVersion: '${json['designSystemVersion'] ?? '1.0.0'}',

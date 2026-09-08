@@ -1221,7 +1221,9 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
               _emit(next);
             },
             onSelectCode: (code) {
-              final p = _designCatalog!.byCode(code) ?? _designCatalog!.defaultProfile;
+              final p =
+                  _designCatalog!.byCode(code) ??
+                  _designCatalog!.defaultProfile;
               final next = _state.copy()
                 ..designProfileCode = p.profileCode
                 ..designProfileId = p.profileId

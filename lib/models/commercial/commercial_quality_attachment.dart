@@ -106,8 +106,8 @@ class CommercialQualityAttachment {
       contentProfile: CommercialContentQualityProfile.fromJson(
         asMap(json['commercialContentQualityProfile']),
       ),
-      designSelection: (json['designProfileCode'] != null ||
-              json['designProfileId'] != null)
+      designSelection:
+          (json['designProfileCode'] != null || json['designProfileId'] != null)
           ? DesignSelection(
               designSystemVersion:
                   '${json['designSystemVersion'] ?? DesignSystemCatalog.kVersion}',

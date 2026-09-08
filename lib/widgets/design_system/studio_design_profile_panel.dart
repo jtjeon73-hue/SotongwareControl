@@ -26,16 +26,15 @@ class StudioDesignProfilePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected =
-        catalog.byCode(selectedCode) ?? catalog.defaultProfile;
+    final selected = catalog.byCode(selectedCode) ?? catalog.defaultProfile;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '디자인 방향',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 6),
         Text(
@@ -75,9 +74,7 @@ class StudioDesignProfilePanel extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Color(
-                int.parse(
-                  selected.primaryColor.replaceFirst('#', '0xFF'),
-                ),
+                int.parse(selected.primaryColor.replaceFirst('#', '0xFF')),
               ).withValues(alpha: 0.35),
             ),
           ),
@@ -107,9 +104,7 @@ class StudioDesignProfilePanel extends StatelessWidget {
                         width: 22,
                         height: 22,
                         decoration: BoxDecoration(
-                          color: Color(
-                            int.parse(c.replaceFirst('#', '0xFF')),
-                          ),
+                          color: Color(int.parse(c.replaceFirst('#', '0xFF'))),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: Colors.black12),
                         ),

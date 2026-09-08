@@ -37,10 +37,7 @@ class DesignSystemCatalog {
 
   DesignProfile get defaultProfile =>
       byCode(brandCore.defaultProfileCode) ??
-      profiles.firstWhere(
-        (p) => p.isDefault,
-        orElse: () => profiles.first,
-      );
+      profiles.firstWhere((p) => p.isDefault, orElse: () => profiles.first);
 
   factory DesignSystemCatalog.fromJson(Map<String, dynamic> json) {
     final profilesRaw = json['profiles'];
@@ -56,7 +53,9 @@ class DesignSystemCatalog {
       profiles: profilesRaw is List
           ? profilesRaw
                 .whereType<Map>()
-                .map((e) => DesignProfile.fromJson(Map<String, dynamic>.from(e)))
+                .map(
+                  (e) => DesignProfile.fromJson(Map<String, dynamic>.from(e)),
+                )
                 .toList()
           : const [],
       tracks: _stringList(json['tracks']),
@@ -168,7 +167,8 @@ class DesignProfile {
       isDefault: json['isDefault'] == true,
       isActive: json['isActive'] != false,
       version: '${json['version'] ?? '1.0.0'}',
-      legacyDesignDirection: '${json['legacyDesignDirection'] ?? 'clarity_first'}',
+      legacyDesignDirection:
+          '${json['legacyDesignDirection'] ?? 'clarity_first'}',
       revisionDirectionHint:
           '${json['revisionDirectionHint'] ?? 'keep_current_partial_edit'}',
       primaryColor: '${brand['primary'] ?? '#0F766E'}',
