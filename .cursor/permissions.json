@@ -3,13 +3,15 @@
     "allow_instructions": [
       "Prefer scripts/cursor_safe helpers over complex inline Python/PowerShell for verification.",
       "Allow workspace Write/Edit/Create for normal source files inside Sotong24Work and SotongwareControl without Run prompts.",
-      "Allow safe in-repo Copy-Item / Move-Item / Rename-Item / New-Item inside Sotong24Work or SotongwareControl.",
-      "Allow read-only PowerShell inspection verbs and pipelines (Get-*, Test-Path, Select-*, Measure-*, Where-*, Sort-*, Write-Host/Output).",
-      "Allow git read commands including status/diff/log/show/rev-parse/rev-list/ls-files/ls-tree/describe/merge-base and compound read-only chains.",
+      "Allow safe in-repo Copy-Item / Move-Item / Rename-Item / New-Item inside Sotong24Work or SotongwareControl (explicit Work↔Control hook/config sync).",
+      "Allow read-only PowerShell inspection verbs and pipelines (Get-*, Test-Path, Select-*, Measure-*, Where-*, ForEach-*, Sort-*, Write-Host/Output) including Get-NetTCPConnection and Get-Process.",
+      "Allow git read commands including status/diff/log/show/rev-parse/rev-list/ls-files/ls-tree/describe/merge-base, git -C <allowed-root>, and compound read-only chains with Select-Object.",
       "Allow explicit git add of related files and git commit. Keep git add . / -A gated.",
-      "Allow Flutter/Dart analyze, test, format, pub get, and local builds.",
+      "Allow Flutter/Dart analyze, test (multi-file), format, pub get, devices, doctor, and local builds; allow analyze+test compounds.",
+      "Allow MSBuild/dotnet builds including full-path MSBuild.exe under Visual Studio (Release x64).",
+      "Allow controlled Stop-Process/Start-Process only for Sotong24Work_1st local Release verify — never broad process kill.",
       "Allow only trusted python under scripts/cursor_safe/* and scripts/test_*.py / verify_*.py / test_unattended_ops_*.py after path containment. Never broad-allow Shell(python).",
-      "Allow HTTP GET/HEAD verification (Invoke-WebRequest/curl) for allowlisted hosts. Never auto POST/PUT/PATCH/DELETE / --data / -d / -F."
+      "Allow HTTP GET/HEAD verification (Invoke-WebRequest/curl) for allowlisted hosts including localhost. Never auto POST/PUT/PATCH/DELETE / --data / -d / -F."
     ],
     "block_instructions": [
       "Every production deploy or firebase deploy or scripts/deploy_control.ps1 execution must go through approval first.",
@@ -19,7 +21,8 @@
       "Never auto-approve Write outside Sotong24Work/SotongwareControl (SotongwareWeb stays gated).",
       "Never auto-approve secret/credential/env/key/pem edits.",
       "Never auto-approve python -c / python -m / arbitrary scripts/*.py / HTTP write / redirect to secrets.",
-      "Do not broad-allow Shell(powershell)/Shell(*)/Shell(python)/Shell(python3)/Shell(py)."
+      "Do not broad-allow Shell(powershell)/Shell(*)/Shell(python)/Shell(python3)/Shell(py).",
+      "failClosed=true — UNKNOWN must ask, never auto-allow."
     ]
   }
 }

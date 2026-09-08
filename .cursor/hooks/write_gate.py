@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-POLICY_VERSION = "phase4.1-hardening"
+POLICY_VERSION = "phase4.2-realworld"
 
 SECRET_RE = re.compile(
     r"("

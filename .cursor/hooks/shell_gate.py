@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Deterministic shell gate — Unattended Ops Phase 4.1 (SECURITY HARDENING).
+"""Deterministic shell gate — Unattended Ops Phase 4.2 (real-world SAFE matrix).
 
-SAFE → allow (no Run prompt from this hook)
-USER_* / DESTRUCTIVE / SECRET / PRODUCTION → ask or deny
-fail-closed: malformed / exception / empty critical path → ask
-Compound / pipe / redirect: worst-segment risk wins.
+Phase 4.1 security kept fail-closed. Phase 4.2 adds only log-proven SAFE gaps:
+Get-NetTCPConnection, full-path MSBuild.exe, controlled Sotong24Work process restart.
 """
 
 from __future__ import annotations
@@ -16,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-POLICY_VERSION = "phase4.1-hardening"
+POLICY_VERSION = "phase4.2-realworld"
 
 ALLOWED_ROOT_NAMES = (
     "Sotong24Work",
@@ -76,6 +74,8 @@ SAFE_PS_VERBS = {
     "split-path",
     "resolve-path",
     "get-process",
+    "get-nettcpconnection",
+    "get-netudpendpoint",
     "get-ciminstance",
     "get-date",
     "get-location",
@@ -753,7 +753,10 @@ def _classify_segment(seg: str) -> tuple[str, str, str, str]:
         (r"^(npm\s+(test|run\s+(test|lint|build|typecheck)|ci|install)\b)", "SAFE_TEST"),
         (r"^(npx\s+\S+)", "SAFE_TEST"),
         (r"^(pytest\b)", "SAFE_TEST"),
-        (r"^(cmake\b|ctest\b|msbuild\b|dotnet\b)", "SAFE_BUILD"),
+        # Bare msbuild / dotnet / cmake
+        (r"^(cmake\b|ctest\b|msbuild(\.exe)?\b|dotnet\b)", "SAFE_BUILD"),
+        # Full-path MSBuild.exe (VS install) with optional PowerShell call operator
+        (r"^(&\s*)?(\"[^\"]*\\msbuild\.exe\"|'[^']*\\msbuild\.exe'|[a-z]:\\[^\s\"']*\\msbuild\.exe)(\s|$)", "SAFE_BUILD"),
         (r"^(rg\b|dir\b|ls\b|where(\.exe)?\b|type\b|cat\b|findstr\b)", "SAFE_READ"),
         # echo without redirect already handled; bare echo is SAFE_READ
         (r"^echo\b", "SAFE_READ"),
@@ -761,6 +764,29 @@ def _classify_segment(seg: str) -> tuple[str, str, str, str]:
     for pat, category in build_safe:
         if re.search(pat, stripped_low.strip()):
             return "allow", category, "SAFE", "safe_dev_command"
+
+    # Controlled local Work process restart (log-proven SAFE during Release verify).
+    # Only Sotong24Work_1st by name — never broad Stop-Process / taskkill.
+    if re.search(r"\bstop-process\b", stripped_low):
+        if re.search(r"-name\s+['\"]?sotong24work(_1st)?['\"]?\b", stripped_low) and not re.search(
+            r"\b(remove-item|rmdir|\brm\s+|firebase|git\s+push)\b", stripped_low
+        ):
+            return "allow", "SAFE_PROC", "SAFE", "work_process_stop"
+        return "ask", "USER_DESTRUCTIVE", "DESTRUCTIVE", "stop_process_unscoped"
+    if re.search(r"\bstart-process\b", stripped_low):
+        if "sotong24work_1st.exe" in stripped_low.replace("/", "\\"):
+            toks = _extract_path_tokens(text)
+            for tok in toks:
+                if tok.lower().endswith("sotong24work_1st.exe"):
+                    cls = _classify_target_path(tok)
+                    if cls and cls[0] == "allow":
+                        return "allow", "SAFE_PROC", "SAFE", "work_process_start"
+                    if cls:
+                        return cls
+            # relative / bare exe name under Release cwd
+            if re.search(r"sotong24work_1st\.exe", stripped_low):
+                return "allow", "SAFE_PROC", "SAFE", "work_process_start_rel"
+        return "ask", "USER_DESTRUCTIVE", "DESTRUCTIVE", "start_process_unscoped"
 
     if _is_readonly_powershell(text):
         return "allow", "SAFE_READ", "SAFE", "powershell_readonly"
