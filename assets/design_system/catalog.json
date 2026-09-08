@@ -1,6 +1,6 @@
 {
-  "designSystemVersion": "1.1.0",
-  "updatedAt": "2026-09-08T03:00:00Z",
+  "designSystemVersion": "1.2.0",
+  "updatedAt": "2026-09-08T16:00:00Z",
   "brandCore": {
     "publicName": "SotongWare",
     "personality": [
@@ -89,7 +89,7 @@
       ],
       "isDefault": true,
       "isActive": true,
-      "version": "1.1.0",
+      "version": "1.2.0",
       "legacyDesignDirection": "clarity_first",
       "revisionDirectionHint": "keep_current_partial_edit",
       "brand": {
@@ -280,24 +280,28 @@
             "proof",
             "cta"
           ],
-          "nav": "top_sticky"
+          "nav": "top_sticky",
+          "visualPattern": "A_channel_site_hero"
         },
         "app": {
           "shell": "bottom_nav",
           "home": "status_cards",
-          "forms": "single_column"
+          "forms": "single_column",
+          "visualPattern": "A_mobile_shell_task_cards"
         },
         "ebook": {
           "cover": "balanced_title",
           "chapter": "serif_optional_body",
-          "callout": "left_accent"
+          "callout": "left_accent",
+          "visualPattern": "A_cover_chapter_reading"
         },
         "knowledge_education": {
           "hero": "course_path",
           "sections": [
             "modules",
             "faq"
-          ]
+          ],
+          "visualPattern": "A_course_path_progress"
         },
         "marketing": {
           "hero": "offer_first",
@@ -305,13 +309,15 @@
             "benefits",
             "social_proof",
             "cta"
-          ]
+          ],
+          "visualPattern": "A_hero_hook_social_proof"
         },
         "contents": {
           "shorts": {
             "framing": "safe_caption_band",
             "motion": "snappy"
-          }
+          },
+          "visualPattern": "A_thumbnail_caption_episode"
         }
       },
       "preview": {
@@ -331,7 +337,9 @@
             "문의"
           ],
           "cta": "상담 신청",
-          "layout": "split"
+          "layout": "split",
+          "layoutVariant": "split_standard",
+          "structureHint": "2-column hero + standard cards + solid CTA"
         },
         "appMock": {
           "title": "현황",
@@ -345,7 +353,8 @@
             "가동",
             "대기",
             "경고"
-          ]
+          ],
+          "shellHint": "balanced task cards"
         },
         "ebookMock": {
           "title": "현장 자동화 입문",
@@ -368,7 +377,8 @@
       "heroPattern": "split",
       "navPattern": "top_sticky",
       "cardPattern": "balanced_modules",
-      "typoMood": "clean_sans"
+      "typoMood": "clean_sans",
+      "thumbLayout": "balanced_two_column"
     },
     {
       "profileId": "ds_profile_b_premium_technology",
@@ -386,7 +396,7 @@
       ],
       "isDefault": false,
       "isActive": true,
-      "version": "1.1.0",
+      "version": "1.2.0",
       "legacyDesignDirection": "premium_industrial",
       "revisionDirectionHint": "more_professional_industrial",
       "brand": {
@@ -577,37 +587,43 @@
             "architecture",
             "cta"
           ],
-          "nav": "technical_top"
+          "nav": "technical_top",
+          "visualPattern": "B_channel_site_hero"
         },
         "app": {
           "shell": "side_rail",
           "home": "ops_dashboard",
-          "forms": "dense_validated"
+          "forms": "dense_validated",
+          "visualPattern": "B_mobile_shell_task_cards"
         },
         "ebook": {
           "cover": "industrial_mark",
           "chapter": "mono_headers",
-          "callout": "spec_box"
+          "callout": "spec_box",
+          "visualPattern": "B_cover_chapter_reading"
         },
         "knowledge_education": {
           "hero": "curriculum_map",
           "sections": [
             "modules",
             "lab"
-          ]
+          ],
+          "visualPattern": "B_course_path_progress"
         },
         "marketing": {
           "hero": "capability_claim",
           "sections": [
             "proof_metrics",
             "cta"
-          ]
+          ],
+          "visualPattern": "B_hero_hook_social_proof"
         },
         "contents": {
           "shorts": {
             "framing": "tech_lower_third",
             "motion": "precision_cuts"
-          }
+          },
+          "visualPattern": "B_thumbnail_caption_episode"
         }
       },
       "preview": {
@@ -627,7 +643,9 @@
             "Specs"
           ],
           "cta": "기술 제안 요청",
-          "layout": "diagram"
+          "layout": "diagram",
+          "layoutVariant": "dark_instrumentation",
+          "structureHint": "command/monitor panel + metrics + outline CTA"
         },
         "appMock": {
           "title": "CONTROL",
@@ -641,7 +659,8 @@
             "CPU",
             "I/O",
             "Latency"
-          ]
+          ],
+          "shellHint": "diagnostic metrics strip"
         },
         "ebookMock": {
           "title": "제어 시스템 설계 노트",
@@ -664,7 +683,8 @@
       "heroPattern": "full_bleed_diagram",
       "navPattern": "rail_technical",
       "cardPattern": "panel_metrics",
-      "typoMood": "technical_tight"
+      "typoMood": "technical_tight",
+      "thumbLayout": "command_monitor_grid"
     },
     {
       "profileId": "ds_profile_c_friendly_modern",
@@ -682,7 +702,7 @@
       ],
       "isDefault": false,
       "isActive": true,
-      "version": "1.1.0",
+      "version": "1.2.0",
       "legacyDesignDirection": "friendly_modern",
       "revisionDirectionHint": "more_friendly_service",
       "brand": {
@@ -873,37 +893,43 @@
             "stories",
             "cta"
           ],
-          "nav": "rounded_top"
+          "nav": "rounded_top",
+          "visualPattern": "C_channel_site_hero"
         },
         "app": {
           "shell": "bottom_friendly",
           "home": "guided_cards",
-          "forms": "large_labels"
+          "forms": "large_labels",
+          "visualPattern": "C_mobile_shell_task_cards"
         },
         "ebook": {
           "cover": "warm_photo",
           "chapter": "large_body",
-          "callout": "tip_bubble"
+          "callout": "tip_bubble",
+          "visualPattern": "C_cover_chapter_reading"
         },
         "knowledge_education": {
           "hero": "learning_path",
           "sections": [
             "lessons",
             "quiz"
-          ]
+          ],
+          "visualPattern": "C_course_path_progress"
         },
         "marketing": {
           "hero": "benefit_first",
           "sections": [
             "testimonials",
             "cta"
-          ]
+          ],
+          "visualPattern": "C_hero_hook_social_proof"
         },
         "contents": {
           "shorts": {
             "framing": "caption_friendly",
             "motion": "bounce_light"
-          }
+          },
+          "visualPattern": "C_thumbnail_caption_episode"
         }
       },
       "preview": {
@@ -923,7 +949,9 @@
             "도움말"
           ],
           "cta": "무료로 시작",
-          "layout": "friendly"
+          "layout": "friendly",
+          "layoutVariant": "soft_onboarding",
+          "structureHint": "large soft cards + onboarding path + friendly CTA"
         },
         "appMock": {
           "title": "오늘 할 일",
@@ -937,7 +965,8 @@
             "1단계",
             "2단계",
             "완료"
-          ]
+          ],
+          "shellHint": "large help cards"
         },
         "ebookMock": {
           "title": "초보도 이해하는 현장 통신",
@@ -960,7 +989,8 @@
       "heroPattern": "friendly_illustration",
       "navPattern": "pill_tabs",
       "cardPattern": "soft_rounded",
-      "typoMood": "friendly_readable"
+      "typoMood": "friendly_readable",
+      "thumbLayout": "friendly_large_cards"
     },
     {
       "profileId": "ds_profile_d_minimal_professional",
@@ -978,7 +1008,7 @@
       ],
       "isDefault": false,
       "isActive": true,
-      "version": "1.1.0",
+      "version": "1.2.0",
       "legacyDesignDirection": "minimal_professional",
       "revisionDirectionHint": "more_premium",
       "brand": {
@@ -1169,37 +1199,43 @@
             "services",
             "contact"
           ],
-          "nav": "hairline"
+          "nav": "hairline",
+          "visualPattern": "D_channel_site_hero"
         },
         "app": {
           "shell": "minimal_top",
           "home": "list_first",
-          "forms": "editorial"
+          "forms": "editorial",
+          "visualPattern": "D_mobile_shell_task_cards"
         },
         "ebook": {
           "cover": "title_dominant",
           "chapter": "longform",
-          "callout": "margin_note"
+          "callout": "margin_note",
+          "visualPattern": "D_cover_chapter_reading"
         },
         "knowledge_education": {
           "hero": "essay_lead",
           "sections": [
             "outline",
             "reading"
-          ]
+          ],
+          "visualPattern": "D_course_path_progress"
         },
         "marketing": {
           "hero": "quiet_claim",
           "sections": [
             "proof",
             "contact"
-          ]
+          ],
+          "visualPattern": "D_hero_hook_social_proof"
         },
         "contents": {
           "shorts": {
             "framing": "quiet_caption",
             "motion": "still_cuts"
-          }
+          },
+          "visualPattern": "D_thumbnail_caption_episode"
         }
       },
       "preview": {
@@ -1219,7 +1255,9 @@
             "Contact"
           ],
           "cta": "문의하기",
-          "layout": "editorial"
+          "layout": "editorial",
+          "layoutVariant": "editorial_hero",
+          "structureHint": "large type + whitespace + restrained CTA"
         },
         "appMock": {
           "title": "Notes",
@@ -1230,7 +1268,8 @@
           "cards": [
             "Brief",
             "Decision"
-          ]
+          ],
+          "shellHint": "minimal list"
         },
         "ebookMock": {
           "title": "운영 원칙",
@@ -1253,7 +1292,8 @@
       "heroPattern": "editorial_whitespace",
       "navPattern": "minimal_text",
       "cardPattern": "hairline_blocks",
-      "typoMood": "editorial_display"
+      "typoMood": "editorial_display",
+      "thumbLayout": "editorial_whitespace"
     },
     {
       "profileId": "ds_profile_e_dynamic_content",
@@ -1271,7 +1311,7 @@
       ],
       "isDefault": false,
       "isActive": true,
-      "version": "1.1.0",
+      "version": "1.2.0",
       "legacyDesignDirection": "dynamic_content",
       "revisionDirectionHint": "more_modern_tech",
       "brand": {
@@ -1462,37 +1502,43 @@
             "campaigns",
             "cta"
           ],
-          "nav": "overlay"
+          "nav": "overlay",
+          "visualPattern": "E_channel_site_hero"
         },
         "app": {
           "shell": "media_tabs",
           "home": "feed",
-          "forms": "quick_compose"
+          "forms": "quick_compose",
+          "visualPattern": "E_mobile_shell_task_cards"
         },
         "ebook": {
           "cover": "poster",
           "chapter": "visual_breaks",
-          "callout": "quote_card"
+          "callout": "quote_card",
+          "visualPattern": "E_cover_chapter_reading"
         },
         "knowledge_education": {
           "hero": "trailer",
           "sections": [
             "clips",
             "modules"
-          ]
+          ],
+          "visualPattern": "E_course_path_progress"
         },
         "marketing": {
           "hero": "campaign_reel",
           "sections": [
             "offers",
             "cta"
-          ]
+          ],
+          "visualPattern": "E_hero_hook_social_proof"
         },
         "contents": {
           "shorts": {
             "framing": "safe_zone_9_16",
             "motion": "hook_first_3s"
-          }
+          },
+          "visualPattern": "E_thumbnail_caption_episode"
         }
       },
       "preview": {
@@ -1512,7 +1558,9 @@
             "Join"
           ],
           "cta": "지금 보기",
-          "layout": "media"
+          "layout": "media",
+          "layoutVariant": "media_carousel",
+          "structureHint": "media/reel grid + bold hierarchy + strong CTA"
         },
         "appMock": {
           "title": "Feed",
@@ -1525,7 +1573,8 @@
             "EP.01",
             "EP.02",
             "LIVE"
-          ]
+          ],
+          "shellHint": "media tiles"
         },
         "ebookMock": {
           "title": "콘텐츠 제작 플레이북",
@@ -1548,7 +1597,8 @@
       "heroPattern": "full_bleed_media",
       "navPattern": "overlay",
       "cardPattern": "media_first",
-      "typoMood": "bold_display"
+      "typoMood": "bold_display",
+      "thumbLayout": "media_first_reels"
     }
   ],
   "designChangeContract": {
@@ -1677,7 +1727,8 @@
         "status cards",
         "single-column forms"
       ],
-      "summary": "작업과 상태가 먼저 보이는 셸"
+      "summary": "작업과 상태가 먼저 보이는 셸",
+      "mockFocus": "mobile shell · task/state · notifications"
     },
     "site": {
       "label": "사이트",
@@ -1687,7 +1738,8 @@
         "section spacing",
         "sticky nav"
       ],
-      "summary": "히어로→증거→행동의 설득 리듬"
+      "summary": "히어로→증거→행동의 설득 리듬",
+      "mockFocus": "monitoring/dashboard or marketing hero by profile"
     },
     "ebook": {
       "label": "전자책",
@@ -1697,7 +1749,8 @@
         "reading rhythm",
         "callout"
       ],
-      "summary": "표지·장 시작·본문 리듬"
+      "summary": "표지·장 시작·본문 리듬",
+      "mockFocus": "cover · chapter · reading hierarchy"
     },
     "knowledge_education": {
       "label": "지식/교육",
@@ -1707,7 +1760,8 @@
         "trust-friendly",
         "progress"
       ],
-      "summary": "학습 경로와 신뢰 중심"
+      "summary": "학습 경로와 신뢰 중심",
+      "mockFocus": "course path · lesson · FAQ"
     },
     "marketing": {
       "label": "마케팅",
@@ -1717,7 +1771,8 @@
         "social proof",
         "CTA"
       ],
-      "summary": "훅·오퍼·전환 중심"
+      "summary": "훅·오퍼·전환 중심",
+      "mockFocus": "hero · social proof · inquiry CTA"
     },
     "contents": {
       "label": "콘텐츠",
@@ -1727,7 +1782,8 @@
         "episode",
         "highlight"
       ],
-      "summary": "썸네일·캡션·하이라이트"
+      "summary": "썸네일·캡션·하이라이트",
+      "mockFocus": "thumbnail · caption · reel/episode"
     }
   },
   "sharedVisualSystem": {
@@ -1805,6 +1861,182 @@
       "site": "hero → offer → proof → CTA",
       "ebook": "cover hierarchy / chapter opener / reading rhythm",
       "contents": "thumbnail hook / caption / highlight"
+    }
+  },
+  "visualRevision": "1.2",
+  "visualTheme": {
+    "headline": "산업기술 + 디지털 사업장 + 자동화 + 신뢰 + 현대적 고급감",
+    "iconLanguage": "sotong_custom_outline",
+    "heroLanguage": "isometric_digital_workplace",
+    "engine": "svg_css_layered",
+    "motion": "reduced_motion_first"
+  },
+  "iconSystem": {
+    "version": "1.2.0",
+    "gridPx": 24,
+    "scales": [
+      16,
+      20,
+      24,
+      32
+    ],
+    "strokeWidth": 1.75,
+    "cornerRadius": 2,
+    "style": "outline_with_selective_accent_fill",
+    "motifs": [
+      "node",
+      "signal",
+      "flow",
+      "control",
+      "monitor",
+      "module",
+      "plc",
+      "sensor",
+      "vision",
+      "mes",
+      "network",
+      "app",
+      "ebook",
+      "site",
+      "content",
+      "automation",
+      "alert",
+      "review",
+      "deploy"
+    ],
+    "principles": [
+      "same stroke/grid/corner system",
+      "industrial precision, not cartoon",
+      "identifiable at 16px",
+      "light and dark capable",
+      "shared across app/web/ebook/content"
+    ],
+    "previewStrip": [
+      "node",
+      "signal",
+      "flow",
+      "control",
+      "monitor",
+      "module",
+      "plc",
+      "sensor",
+      "vision",
+      "mes",
+      "network",
+      "app"
+    ]
+  },
+  "isometricHeroLanguage": {
+    "version": "1.2.0",
+    "title": "Digital Workplace",
+    "subtitle": "PLC · Sensor · Vision · MES · Control · App · Site · Content",
+    "nodes": [
+      {
+        "id": "plc",
+        "label": "PLC",
+        "role": "field"
+      },
+      {
+        "id": "sensor",
+        "label": "Sensor",
+        "role": "field"
+      },
+      {
+        "id": "vision",
+        "label": "Vision",
+        "role": "field"
+      },
+      {
+        "id": "machine",
+        "label": "Machine",
+        "role": "field"
+      },
+      {
+        "id": "mes",
+        "label": "MES",
+        "role": "data"
+      },
+      {
+        "id": "desktop",
+        "label": "Control",
+        "role": "ops"
+      },
+      {
+        "id": "mobile",
+        "label": "App",
+        "role": "ops"
+      },
+      {
+        "id": "site",
+        "label": "Site",
+        "role": "channel"
+      },
+      {
+        "id": "ebook",
+        "label": "eBook",
+        "role": "channel"
+      },
+      {
+        "id": "content",
+        "label": "Content",
+        "role": "channel"
+      },
+      {
+        "id": "cloud",
+        "label": "Network",
+        "role": "cloud"
+      }
+    ],
+    "flows": [
+      [
+        "sensor",
+        "plc"
+      ],
+      [
+        "vision",
+        "plc"
+      ],
+      [
+        "plc",
+        "mes"
+      ],
+      [
+        "machine",
+        "mes"
+      ],
+      [
+        "mes",
+        "desktop"
+      ],
+      [
+        "mes",
+        "cloud"
+      ],
+      [
+        "desktop",
+        "mobile"
+      ],
+      [
+        "cloud",
+        "site"
+      ],
+      [
+        "cloud",
+        "ebook"
+      ],
+      [
+        "cloud",
+        "content"
+      ]
+    ],
+    "render": {
+      "primary": "svg_isometric",
+      "fallback": "static_layered_cards",
+      "avoid": [
+        "always_on_webgl",
+        "continuous_3d_loop"
+      ],
+      "prefersReducedMotion": true
     }
   }
 }

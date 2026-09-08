@@ -23,7 +23,7 @@ void main() {
   });
 
   test('catalog has unique A~E profiles and brand core', () {
-    expect(catalog.designSystemVersion, '1.1.0');
+    expect(catalog.designSystemVersion, '1.2.0');
     expect(catalog.brandCore.publicName, 'SotongWare');
     expect(catalog.brandCore.visualMotifs, contains('node'));
     expect(catalog.brandCore.visualMotifs, contains('flow'));
@@ -93,8 +93,8 @@ void main() {
       uniqueValue: '산업 맞춤 구성',
       designProfileCode: 'B',
       designProfileId: 'ds_profile_b_premium_technology',
-      designProfileVersion: '1.1.0',
-      designSystemVersion: '1.1.0',
+      designProfileVersion: '1.2.0',
+      designSystemVersion: '1.2.0',
       designSource: 'user_selected',
       siteSubtype: 'corporate_site',
       productionSelections: {
@@ -119,7 +119,7 @@ void main() {
     final fields = attachment!.toInstructionJsonFields();
     expect(fields['designProfileCode'], 'B');
     expect(fields['designProfileId'], 'ds_profile_b_premium_technology');
-    expect(fields['designSystemVersion'], '1.1.0');
+    expect(fields['designSystemVersion'], '1.2.0');
     expect(fields['designSource'], 'user_selected');
     expect(fields['designDirection'], 'premium_industrial');
 
@@ -139,7 +139,7 @@ void main() {
       reviewDecision: 'design_change_requested',
       selectedDesignDirection: 'more_premium',
       designProfileCode: 'D',
-      designSystemVersion: '1.1.0',
+      designSystemVersion: '1.2.0',
       reviewedRevision: 'r3',
       reviewComment: 'B→D 디자인만 변경',
     );

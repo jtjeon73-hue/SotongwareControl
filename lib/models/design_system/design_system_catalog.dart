@@ -25,7 +25,7 @@ class DesignSystemCatalog {
   final Map<String, dynamic> designQualityProfile;
 
   static const kAssetPath = 'assets/design_system/catalog.json';
-  static const kVersion = '1.1.0';
+  static const kVersion = '1.2.0';
 
   DesignProfile? byCode(String code) {
     final c = code.trim().toUpperCase();
