@@ -77,11 +77,12 @@ class DesignSystemService {
     return '선택한 디자인 프로필을 적용합니다.';
   }
 
-  /// Hook for future r1 auto-upgrade — no infinite loop in v1.
+  /// Hook for future r1 auto-upgrade — no infinite loop in v1.1.
   DesignQualityReport buildPreReviewHook({
     required String recommendedDesignProfileCode,
   }) {
     return DesignQualityReport(
+      designSystemVersion: DesignSystemCatalog.kVersion,
       recommendedDesignProfileCode: recommendedDesignProfileCode,
       score: 0,
       preReviewQualityGate: false,
@@ -89,8 +90,17 @@ class DesignSystemService {
         DesignQualityIssue(
           dimension: 'brand_fit',
           severity: 'info',
-          message: 'v1 hook only — automatic r1 upgrade loop is disabled',
-          recommendation: 'Use user review + design_change_requested path',
+          message:
+              'preReviewQualityGate foundation ready — automatic r1 upgrade loop remains disabled',
+          recommendation:
+              'Apply recommendedDesignProfile early; use design_change_requested for post-result changes',
+        ),
+        DesignQualityIssue(
+          dimension: 'visual_system',
+          severity: 'info',
+          message:
+              'Prefer profile structural cues (hero/nav/card/cta/density) over color-only swaps',
+          recommendation: 'Select A~E by mood + layout, not swatches alone',
         ),
       ],
     );

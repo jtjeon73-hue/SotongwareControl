@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/design_system/design_system_catalog.dart';
 import '../models/sotong24_remote_models.dart';
+import '../services/design_system/design_system_service.dart';
 import '../theme/control_theme.dart';
+import 'design_system/design_profile_option_card.dart';
 import 'site_mobile_preview_dialog.dart';
 
 /// Structured STEP15 site review decision payload for STEP16 revision.
@@ -13,7 +16,7 @@ class SiteReviewDecisionPayload {
     required this.reviewComment,
     this.selectedDesignDirection = '',
     this.designProfileCode = '',
-    this.designSystemVersion = '1.0.0',
+    this.designSystemVersion = DesignSystemCatalog.kVersion,
     this.reviewedRevision = 'r1',
   });
 
@@ -289,47 +292,93 @@ Future<SiteReviewDecisionPayload?> showSiteDesignChangeDialog(
     selectedCode = selectedCode == 'A' ? 'B' : 'A';
   }
   final comment = TextEditingController();
+  DesignSystemCatalog? catalog;
+  try {
+    catalog = await DesignSystemService.instance.loadCatalog();
+  } catch (_) {
+    catalog = null;
+  }
   try {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
+            final active = catalog?.byCode(selectedCode);
             return AlertDialog(
               title: const Text('디자인 변경'),
               content: SizedBox(
-                width: 440,
+                width: 520,
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        currentProfileCode.trim().isEmpty
-                            ? '현재 디자인을 Design System 프로필로 변경합니다. 기존 revision은 보존됩니다.'
-                            : '현재 디자인: $currentProfileCode\n변경 시 기능·내용은 보존하고 시각 스타일만 새 revision으로 적용합니다.',
-                        style: const TextStyle(fontSize: 13, height: 1.35),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFEFF),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF99F6E4)),
+                        ),
+                        child: Text(
+                          currentProfileCode.trim().isEmpty
+                              ? '기능·내용·히스토리는 보존하고, 디자인 프로필만 새 revision으로 변경합니다.'
+                              : '현재 디자인: $currentProfileCode\n기능·내용·히스토리 보존 + 디자인만 변경합니다. 기존 revision은 덮어쓰지 않습니다.',
+                          style: const TextStyle(fontSize: 13, height: 1.4),
+                        ),
                       ),
                       const SizedBox(height: 12),
-                      for (final opt in kDesignSystemProfileOptions)
-                        RadioListTile<String>(
-                          dense: true,
-                          value: opt.$1,
-                          // ignore: deprecated_member_use
-                          groupValue: selectedCode,
-                          title: Text(
-                            opt.$2,
-                            style: const TextStyle(fontSize: 14),
+                      if (catalog != null)
+                        ...catalog.profiles.where((p) => p.isActive).map((p) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: DesignProfileOptionCard(
+                              profile: p,
+                              selected: selectedCode == p.profileCode,
+                              compact: true,
+                              badge: currentProfileCode.trim().toUpperCase() ==
+                                      p.profileCode
+                                  ? '현재'
+                                  : null,
+                              onTap: () =>
+                                  setLocal(() => selectedCode = p.profileCode),
+                            ),
+                          );
+                        })
+                      else
+                        for (final opt in kDesignSystemProfileOptions)
+                          RadioListTile<String>(
+                            dense: true,
+                            value: opt.$1,
+                            // ignore: deprecated_member_use
+                            groupValue: selectedCode,
+                            title: Text(
+                              opt.$2,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            subtitle: Text(
+                              'legacy: ${opt.$3}',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                            // ignore: deprecated_member_use
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setLocal(() => selectedCode = v);
+                            },
                           ),
-                          subtitle: Text(
-                            'legacy: ${opt.$3}',
-                            style: const TextStyle(fontSize: 11),
+                      if (active != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '변경 미리보기: ${active.visualMood.isEmpty ? active.profileDescription : active.visualMood}'
+                          '\n히어로 ${active.heroPattern} · 밀도 ${active.densityLabel} · CTA ${active.ctaTone}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: ControlColors.textSecondary,
+                            height: 1.4,
                           ),
-                          // ignore: deprecated_member_use
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setLocal(() => selectedCode = v);
-                          },
                         ),
+                        const SizedBox(height: 10),
+                      ],
                       TextField(
                         controller: comment,
                         minLines: 3,
@@ -364,14 +413,16 @@ Future<SiteReviewDecisionPayload?> showSiteDesignChangeDialog(
       (o) => o.$1 == selectedCode,
       orElse: () => kDesignSystemProfileOptions.first,
     );
+    final profile = catalog?.byCode(selectedCode);
     return SiteReviewDecisionPayload(
       reviewDecision: 'design_change_requested',
-      selectedDesignDirection: opt.$3,
+      selectedDesignDirection: profile?.revisionDirectionHint ?? opt.$3,
       designProfileCode: opt.$1,
-      designSystemVersion: '1.0.0',
+      designSystemVersion:
+          catalog?.designSystemVersion ?? DesignSystemCatalog.kVersion,
       reviewedRevision: reviewedRevision,
       reviewComment: comment.text.trim().isEmpty
-          ? '디자인 프로필 ${opt.$1} 변경 요청 (기능·내용 보존)'
+          ? '디자인 프로필 ${opt.$1} 변경 요청 (기능·내용·히스토리 보존, 디자인만 변경)'
           : comment.text.trim(),
     );
   } finally {

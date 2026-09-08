@@ -25,7 +25,7 @@ class DesignSystemCatalog {
   final Map<String, dynamic> designQualityProfile;
 
   static const kAssetPath = 'assets/design_system/catalog.json';
-  static const kVersion = '1.0.0';
+  static const kVersion = '1.1.0';
 
   DesignProfile? byCode(String code) {
     final c = code.trim().toUpperCase();
@@ -91,12 +91,22 @@ class DesignBrandCore {
     required this.personality,
     required this.nonNegotiables,
     required this.defaultProfileCode,
+    this.visualMotifs = const [],
+    this.keywords = const [],
+    this.motifDescription = '',
+    this.doList = const [],
+    this.dontList = const [],
   });
 
   final String publicName;
   final List<String> personality;
   final List<String> nonNegotiables;
   final String defaultProfileCode;
+  final List<String> visualMotifs;
+  final List<String> keywords;
+  final String motifDescription;
+  final List<String> doList;
+  final List<String> dontList;
 
   factory DesignBrandCore.fromJson(Map<String, dynamic> json) {
     return DesignBrandCore(
@@ -104,6 +114,11 @@ class DesignBrandCore {
       personality: DesignSystemCatalog._stringList(json['personality']),
       nonNegotiables: DesignSystemCatalog._stringList(json['nonNegotiables']),
       defaultProfileCode: '${json['defaultProfileCode'] ?? 'A'}',
+      visualMotifs: DesignSystemCatalog._stringList(json['visualMotifs']),
+      keywords: DesignSystemCatalog._stringList(json['keywords']),
+      motifDescription: '${json['motifDescription'] ?? ''}',
+      doList: DesignSystemCatalog._stringList(json['do']),
+      dontList: DesignSystemCatalog._stringList(json['dont']),
     );
   }
 }
@@ -127,6 +142,14 @@ class DesignProfile {
     required this.heroLabel,
     required this.contentDensity,
     required this.trackAdaptation,
+    this.visualMood = '',
+    this.moodKeywords = const [],
+    this.densityLabel = '',
+    this.ctaTone = '',
+    this.heroPattern = '',
+    this.navPattern = '',
+    this.cardPattern = '',
+    this.typoMood = '',
   });
 
   final String profileId;
@@ -146,6 +169,14 @@ class DesignProfile {
   final String heroLabel;
   final String contentDensity;
   final Map<String, dynamic> trackAdaptation;
+  final String visualMood;
+  final List<String> moodKeywords;
+  final String densityLabel;
+  final String ctaTone;
+  final String heroPattern;
+  final String navPattern;
+  final String cardPattern;
+  final String typoMood;
 
   factory DesignProfile.fromJson(Map<String, dynamic> json) {
     final brand = json['brand'] is Map
@@ -179,6 +210,14 @@ class DesignProfile {
       trackAdaptation: json['trackAdaptation'] is Map
           ? Map<String, dynamic>.from(json['trackAdaptation'] as Map)
           : const {},
+      visualMood: '${json['visualMood'] ?? ''}',
+      moodKeywords: DesignSystemCatalog._stringList(json['moodKeywords']),
+      densityLabel: '${json['densityLabel'] ?? ''}',
+      ctaTone: '${json['ctaTone'] ?? ''}',
+      heroPattern: '${json['heroPattern'] ?? ''}',
+      navPattern: '${json['navPattern'] ?? ''}',
+      cardPattern: '${json['cardPattern'] ?? ''}',
+      typoMood: '${json['typoMood'] ?? ''}',
     );
   }
 }
