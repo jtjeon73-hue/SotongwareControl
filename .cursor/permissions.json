@@ -8,8 +8,8 @@
       "Allow git read commands including status/diff/log/show/rev-parse/rev-list/ls-files/ls-tree/describe/merge-base, git -C <allowed-root>, and compound read-only chains with Select-Object.",
       "Allow explicit git add of related files and git commit. Keep git add . / -A gated.",
       "Allow Flutter/Dart analyze, test (multi-file), format, pub get, devices, doctor, and local builds; allow analyze+test compounds.",
-      "Allow MSBuild/dotnet builds including full-path MSBuild.exe under Visual Studio (Release x64).",
-      "Allow controlled Stop-Process/Start-Process only for Sotong24Work_1st local Release verify — never broad process kill.",
+      "Allow MSBuild only for trusted VS/Build Tools MSBuild.exe + Sotong24Work_1st.vcxproj + Configuration=Release + Platform=x64; bare/Temp/fake MSBuild paths ask.",
+      "Allow Stop-Process/Start-Process only for exact name Sotong24Work_1st or approved x64\\Release\\Sotong24Work_1st.exe — no wildcard, multi-name, array, or other exe.",
       "Allow only trusted python under scripts/cursor_safe/* and scripts/test_*.py / verify_*.py / test_unattended_ops_*.py after path containment. Never broad-allow Shell(python).",
       "Allow HTTP GET/HEAD verification (Invoke-WebRequest/curl) for allowlisted hosts including localhost. Never auto POST/PUT/PATCH/DELETE / --data / -d / -F."
     ],

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Deterministic shell gate — Unattended Ops Phase 4.2 (real-world SAFE matrix).
+"""Deterministic shell gate — Unattended Ops Phase 4.2.1 (MSBuild/Process scope harden).
 
-Phase 4.1 security kept fail-closed. Phase 4.2 adds only log-proven SAFE gaps:
-Get-NetTCPConnection, full-path MSBuild.exe, controlled Sotong24Work process restart.
+Phase 4.1 security kept fail-closed. Phase 4.2 SAFE gaps retained with Codex
+audit hardenings: trusted MSBuild path + Work Release x64 only; exact
+Sotong24Work_1st process scope only (no wildcard/multi-name).
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-POLICY_VERSION = "phase4.2-realworld"
+POLICY_VERSION = "phase4.2.1-build-proc-scope"
 
 ALLOWED_ROOT_NAMES = (
     "Sotong24Work",
@@ -133,6 +134,10 @@ _CAT_RANK = {
     "USER_HTTP_WRITE": 88,
     "USER_PUSH_APPROVAL": 85,
     "USER_DESTRUCTIVE": 80,
+    "USER_UNTRUSTED_BUILD_TOOL": 78,
+    "USER_OUTSIDE_BUILD_TARGET": 77,
+    "USER_NON_RELEASE_BUILD": 76,
+    "USER_PROCESS_SCOPE": 75,
     "USER_OUTSIDE_ROOT": 70,
     "USER_INLINE_PYTHON": 60,
     "UNKNOWN": 50,
@@ -209,6 +214,14 @@ def _reason_ko(category: str, risk: str, permission: str) -> str:
         return "외부 공개/스토어 배포 승인이 필요합니다."
     if category == "USER_INLINE_PYTHON":
         return "임의 Python(-c/-m/비신뢰 스크립트) 실행 승인이 필요합니다."
+    if category == "USER_UNTRUSTED_BUILD_TOOL":
+        return "신뢰되지 않은 MSBuild/빌드 도구 경로 — 승인이 필요합니다."
+    if category == "USER_OUTSIDE_BUILD_TARGET":
+        return "승인되지 않은 빌드 프로젝트 경로 — 승인이 필요합니다."
+    if category == "USER_NON_RELEASE_BUILD":
+        return "Release/x64 외 구성 빌드는 승인이 필요합니다."
+    if category == "USER_PROCESS_SCOPE":
+        return "승인된 Work 프로세스 범위를 벗어난 process 명령 — 승인이 필요합니다."
     return f"Cursor 승인 대기 ({category}/{risk})"
 
 
@@ -361,7 +374,9 @@ def _split_segments(command: str) -> list[str]:
 
 
 def _strip_leading_assignments(seg: str) -> str:
-    s = seg.strip().lstrip("&")
+    s = (seg or "").strip()
+    if s.startswith("&"):
+        s = s[1:].lstrip()
     while True:
         m = re.match(r"^(\$[a-z_][\w:-]*\s*=\s*[^;|]+)\s+(.*)$", s, re.I | re.S)
         if not m:
@@ -684,6 +699,178 @@ def _worse(
     return a
 
 
+_APPROVED_WORK_VCPROJ = "sotong24work_1st.vcxproj"
+_APPROVED_WORK_PROC = "sotong24work_1st"
+_APPROVED_WORK_EXE = "sotong24work_1st.exe"
+_TRUSTED_MSBUILD_MARKERS = (
+    "\\program files\\microsoft visual studio\\",
+    "\\program files (x86)\\microsoft visual studio\\",
+)
+
+
+def _path_norm_str(path: Path | str) -> str:
+    return str(path).lower().replace("/", "\\")
+
+
+def _is_trusted_msbuild_exe(exe_raw: str) -> bool:
+    """Only VS / Build Tools install trees; filename alone is never enough."""
+    raw = (exe_raw or "").strip().strip("'\"")
+    if not raw:
+        return False
+    low = _path_norm_str(raw)
+    if not low.endswith("\\msbuild.exe") and Path(low).name != "msbuild.exe":
+        return False
+    if Path(low).name != "msbuild.exe":
+        return False
+    resolved = _resolve_path(raw)
+    candidates = [low]
+    if resolved is not None:
+        candidates.append(_path_norm_str(resolved))
+    for cand in candidates:
+        if Path(cand).name != "msbuild.exe":
+            continue
+        if any(marker in cand for marker in _TRUSTED_MSBUILD_MARKERS):
+            return True
+    return False
+
+
+def _classify_msbuild(seg: str) -> tuple[str, str, str, str] | None:
+    """Trusted MSBuild + approved Work Release/x64 project only."""
+    stripped = _strip_leading_assignments(seg).strip()
+    m = re.match(
+        r"^(?:&\s*)?"
+        r'(?:"([^"]*[/\\]msbuild\.exe)"|'
+        r"'([^']*[/\\]msbuild\.exe)'|"
+        r"([a-zA-Z]:\\[^\s\"']*[/\\]msbuild\.exe)|"
+        r"(msbuild(?:\.exe)?))"
+        r"(?:\s|$|(?=\s))(.*)$",
+        stripped,
+        re.I | re.S,
+    )
+    if not m:
+        return None
+
+    exe = (m.group(1) or m.group(2) or m.group(3) or m.group(4) or "").strip()
+    rest = m.group(5) or ""
+    exe_low = exe.lower().replace("/", "\\")
+
+    # Bare PATH msbuild — not a verified VS install path.
+    if exe_low in ("msbuild", "msbuild.exe"):
+        return "ask", "USER_UNTRUSTED_BUILD_TOOL", "UNKNOWN", "bare_msbuild"
+    if not _is_trusted_msbuild_exe(exe):
+        return "ask", "USER_UNTRUSTED_BUILD_TOOL", "UNKNOWN", "untrusted_msbuild"
+
+    proj_matches = re.findall(
+        r'(?:"([^"]+\.(?:vcxproj|sln))"|\'([^\']+\.(?:vcxproj|sln))\'|'
+        r"([^\s\"'|&;]+\.(?:vcxproj|sln)))",
+        rest,
+        re.I,
+    )
+    projects = [(a or b or c).strip() for a, b, c in proj_matches if (a or b or c)]
+    if not projects:
+        return "ask", "USER_OUTSIDE_BUILD_TARGET", "UNKNOWN", "msbuild_no_project"
+    if len(projects) != 1:
+        return "ask", "USER_OUTSIDE_BUILD_TARGET", "UNKNOWN", "msbuild_multi_project"
+
+    proj = projects[0]
+    proj_name = Path(proj.strip("\"'")).name.lower()
+    if proj_name != _APPROVED_WORK_VCPROJ:
+        return "ask", "USER_OUTSIDE_BUILD_TARGET", "UNKNOWN", "msbuild_unapproved_project"
+
+    if re.match(r"^[a-zA-Z]:\\", proj) or proj.startswith("\\\\") or ".." in Path(proj).parts:
+        resolved = _resolve_path(proj)
+        if resolved is None or not _is_under_allowed_root(resolved):
+            return "ask", "USER_OUTSIDE_BUILD_TARGET", "UNKNOWN", "msbuild_project_outside"
+        if resolved.name.lower() != _APPROVED_WORK_VCPROJ:
+            return "ask", "USER_OUTSIDE_BUILD_TARGET", "UNKNOWN", "msbuild_project_name"
+
+    cfg_m = re.search(r"/p:Configuration\s*=\s*([^\s/;]+)", rest, re.I)
+    plat_m = re.search(r"/p:Platform\s*=\s*([^\s/;]+)", rest, re.I)
+    cfg = (cfg_m.group(1) if cfg_m else "").strip("'\"")
+    plat = (plat_m.group(1) if plat_m else "").strip("'\"")
+    if cfg.lower() != "release" or plat.lower() != "x64":
+        return "ask", "USER_NON_RELEASE_BUILD", "UNKNOWN", "msbuild_non_release_x64"
+
+    return "allow", "SAFE_BUILD", "SAFE", "trusted_msbuild_work_release_x64"
+
+
+def _extract_ps_name_arg(text: str) -> str | None:
+    """Return raw -Name argument text, or None if missing/ambiguous."""
+    m = re.search(
+        r"-name\s+"
+        r"(?:@\(|"
+        r"\(|"
+        r"'([^']*)'|"
+        r'"([^"]*)"|'
+        r"([^\s;|&]+))",
+        text or "",
+        re.I,
+    )
+    if not m:
+        return None
+    full = m.group(0)
+    if re.search(r"-name\s+(@|\()", full, re.I):
+        return "__ARRAY__"
+    return (m.group(1) or m.group(2) or m.group(3) or "").strip()
+
+
+def _is_exact_approved_work_proc_name(name: str) -> bool:
+    n = (name or "").strip().strip("'\"")
+    if not n:
+        return False
+    if any(ch in n for ch in ("*", "?", ",", ";", "@", "(", ")", "[", "]", "{", "}", " ")):
+        return False
+    return n.lower() == _APPROVED_WORK_PROC
+
+
+def _classify_work_process(seg: str) -> tuple[str, str, str, str] | None:
+    """Exact Sotong24Work_1st process scope only (no wildcard / multi-name)."""
+    stripped = _strip_leading_assignments(seg)
+    stripped_low = _norm(stripped)
+
+    if re.search(r"\bstop-process\b", stripped_low):
+        if re.search(r"-id\b", stripped_low) and not re.search(r"-name\b", stripped_low):
+            return "ask", "USER_PROCESS_SCOPE", "DESTRUCTIVE", "stop_process_pid"
+        name = _extract_ps_name_arg(stripped)
+        if name is None or name == "__ARRAY__" or not _is_exact_approved_work_proc_name(name):
+            return "ask", "USER_PROCESS_SCOPE", "DESTRUCTIVE", "stop_process_scope"
+        return "allow", "SAFE_PROC", "SAFE", "work_process_stop"
+
+    if re.search(r"\bstart-process\b", stripped_low):
+        toks = _extract_path_tokens(stripped)
+        exe_toks = [t for t in toks if t.lower().replace("/", "\\").endswith("\\" + _APPROVED_WORK_EXE)
+                    or Path(t).name.lower() == _APPROVED_WORK_EXE]
+        if not exe_toks and _APPROVED_WORK_EXE in stripped_low.replace("/", "\\"):
+            # bare/relative name without path separators beyond relative
+            m = re.search(
+                r'(?:"([^"]*sotong24work_1st\.exe)"|\'([^\']*sotong24work_1st\.exe)\'|'
+                r"([^\s\"']*sotong24work_1st\.exe))",
+                stripped,
+                re.I,
+            )
+            if m:
+                exe_toks = [(m.group(1) or m.group(2) or m.group(3) or "").strip()]
+        if len(exe_toks) != 1:
+            return "ask", "USER_PROCESS_SCOPE", "DESTRUCTIVE", "start_process_scope"
+        exe = exe_toks[0]
+        if Path(exe).name.lower() != _APPROVED_WORK_EXE:
+            return "ask", "USER_PROCESS_SCOPE", "DESTRUCTIVE", "start_process_wrong_exe"
+        resolved = _resolve_path(exe)
+        check_paths = [_path_norm_str(exe)]
+        if resolved is not None:
+            check_paths.append(_path_norm_str(resolved))
+            if not _is_under_allowed_root(resolved):
+                return "ask", "USER_PROCESS_SCOPE", "OUTSIDE_WORKSPACE", "start_process_outside"
+            if resolved.name.lower() != _APPROVED_WORK_EXE:
+                return "ask", "USER_PROCESS_SCOPE", "DESTRUCTIVE", "start_process_name"
+        ok_release = any("\\x64\\release\\" in p for p in check_paths)
+        if not ok_release:
+            return "ask", "USER_PROCESS_SCOPE", "DESTRUCTIVE", "start_process_non_release"
+        return "allow", "SAFE_PROC", "SAFE", "work_process_start"
+
+    return None
+
+
 def _classify_segment(seg: str) -> tuple[str, str, str, str]:
     text = (seg or "").strip()
     if not text or text.startswith("#"):
@@ -730,6 +917,14 @@ def _classify_segment(seg: str) -> tuple[str, str, str, str]:
     if py:
         return py
 
+    msbuild = _classify_msbuild(text)
+    if msbuild:
+        return msbuild
+
+    proc = _classify_work_process(text)
+    if proc:
+        return proc
+
     if re.search(r"\b(copy-item|move-item|rename-item|new-item)\b", low):
         if "sotongwareweb" in low:
             return "ask", "USER_OUTSIDE_ROOT", "OUTSIDE_WORKSPACE", "web_write"
@@ -753,10 +948,8 @@ def _classify_segment(seg: str) -> tuple[str, str, str, str]:
         (r"^(npm\s+(test|run\s+(test|lint|build|typecheck)|ci|install)\b)", "SAFE_TEST"),
         (r"^(npx\s+\S+)", "SAFE_TEST"),
         (r"^(pytest\b)", "SAFE_TEST"),
-        # Bare msbuild / dotnet / cmake
-        (r"^(cmake\b|ctest\b|msbuild(\.exe)?\b|dotnet\b)", "SAFE_BUILD"),
-        # Full-path MSBuild.exe (VS install) with optional PowerShell call operator
-        (r"^(&\s*)?(\"[^\"]*\\msbuild\.exe\"|'[^']*\\msbuild\.exe'|[a-z]:\\[^\s\"']*\\msbuild\.exe)(\s|$)", "SAFE_BUILD"),
+        # cmake/dotnet only — MSBuild handled by _classify_msbuild (trusted path + Release/x64)
+        (r"^(cmake\b|ctest\b|dotnet\b)", "SAFE_BUILD"),
         (r"^(rg\b|dir\b|ls\b|where(\.exe)?\b|type\b|cat\b|findstr\b)", "SAFE_READ"),
         # echo without redirect already handled; bare echo is SAFE_READ
         (r"^echo\b", "SAFE_READ"),
@@ -764,29 +957,6 @@ def _classify_segment(seg: str) -> tuple[str, str, str, str]:
     for pat, category in build_safe:
         if re.search(pat, stripped_low.strip()):
             return "allow", category, "SAFE", "safe_dev_command"
-
-    # Controlled local Work process restart (log-proven SAFE during Release verify).
-    # Only Sotong24Work_1st by name — never broad Stop-Process / taskkill.
-    if re.search(r"\bstop-process\b", stripped_low):
-        if re.search(r"-name\s+['\"]?sotong24work(_1st)?['\"]?\b", stripped_low) and not re.search(
-            r"\b(remove-item|rmdir|\brm\s+|firebase|git\s+push)\b", stripped_low
-        ):
-            return "allow", "SAFE_PROC", "SAFE", "work_process_stop"
-        return "ask", "USER_DESTRUCTIVE", "DESTRUCTIVE", "stop_process_unscoped"
-    if re.search(r"\bstart-process\b", stripped_low):
-        if "sotong24work_1st.exe" in stripped_low.replace("/", "\\"):
-            toks = _extract_path_tokens(text)
-            for tok in toks:
-                if tok.lower().endswith("sotong24work_1st.exe"):
-                    cls = _classify_target_path(tok)
-                    if cls and cls[0] == "allow":
-                        return "allow", "SAFE_PROC", "SAFE", "work_process_start"
-                    if cls:
-                        return cls
-            # relative / bare exe name under Release cwd
-            if re.search(r"sotong24work_1st\.exe", stripped_low):
-                return "allow", "SAFE_PROC", "SAFE", "work_process_start_rel"
-        return "ask", "USER_DESTRUCTIVE", "DESTRUCTIVE", "start_process_unscoped"
 
     if _is_readonly_powershell(text):
         return "allow", "SAFE_READ", "SAFE", "powershell_readonly"
