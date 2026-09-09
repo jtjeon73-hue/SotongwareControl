@@ -115,7 +115,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                     resolvedCoverUrl,
                     height: 160,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Text(
+                    errorBuilder: (context, error, stackTrace) => const Text(
                       '표지 이미지를 불러오지 못했습니다.',
                       style: TextStyle(
                         fontSize: 12,

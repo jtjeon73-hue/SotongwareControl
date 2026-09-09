@@ -188,7 +188,8 @@ class EbookR1PackageManifest {
     int? critical = _asInt(pkg['criticalCount']);
     int? major = _asInt(pkg['majorCount']);
     int? refine = _asInt(pkg['refineCount']);
-    dynamic qualityReportRaw = pkg['qualityReport'] ?? pkg['qualityReportArtifact'];
+    dynamic qualityReportRaw =
+        pkg['qualityReport'] ?? pkg['qualityReportArtifact'];
 
     if (qualityRaw is Map) {
       final q = Map<String, dynamic>.from(qualityRaw);

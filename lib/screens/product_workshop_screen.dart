@@ -1083,8 +1083,9 @@ class _Sotong24RemoteDetailScreenState
                 const SizedBox(height: 6),
                 Builder(
                   builder: (context) {
-                    final ebookManifest =
-                        _tryParseEbookManifest(ebookReviewStage);
+                    final ebookManifest = _tryParseEbookManifest(
+                      ebookReviewStage,
+                    );
                     final coverPreview = (ebookManifest?.coverUrl ?? '').trim();
                     return EbookPackageUserReviewPanel(
                       project: project,
@@ -1109,9 +1110,7 @@ class _Sotong24RemoteDetailScreenState
                         if (!mounted) return;
                         setState(() => _busy = false);
                         messenger.showSnackBar(
-                          SnackBar(
-                            content: Text(err ?? '보류했습니다. 패키지는 보존됩니다.'),
-                          ),
+                          SnackBar(content: Text(err ?? '보류했습니다. 패키지는 보존됩니다.')),
                         );
                       },
                       onDownloadPdf: () => _downloadEbookArtifact(
@@ -1303,22 +1302,19 @@ class _Sotong24RemoteDetailScreenState
       final directUrl = (manifest?.qualityReportUrl ?? '').trim();
       if (Sotong24RemoteStage.isOpenableHttpUrl(directUrl)) {
         await pdf_platform.openAttachmentUrl(directUrl);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('품질 보고서를 열었습니다.')),
-        );
+        messenger.showSnackBar(const SnackBar(content: Text('품질 보고서를 열었습니다.')));
         return;
       }
 
       final path = (manifest?.qualityReportPath ?? '').trim();
       if (Sotong24RemoteStage.isOpenableHttpUrl(path)) {
         await pdf_platform.openAttachmentUrl(path);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('품질 보고서를 열었습니다.')),
-        );
+        messenger.showSnackBar(const SnackBar(content: Text('품질 보고서를 열었습니다.')));
         return;
       }
 
-      final fileName = manifest?.resolveQualityReportFileName() ??
+      final fileName =
+          manifest?.resolveQualityReportFileName() ??
           'pre_review_quality_report.json';
       final grant = await RemoteControlApi().createArtifactDownloadGrant(
         projectId: project.projectId,
