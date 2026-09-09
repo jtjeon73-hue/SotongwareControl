@@ -211,4 +211,35 @@ void main() {
     expect(fromStructured.score, 91);
     expect(fromStructured.refineCount, 1);
   });
+
+  test('manifest path enables manifest UX + incomplete blocks review', () {
+    final complete = EbookR1PackageManifest.fromEbookReviewPackage({
+      'revision': 'r1',
+      'title': 'complete',
+      'pdfArtifact': {'path': 'publish/current/book.pdf'},
+      'epubArtifact': {'path': 'publish/current/book.epub'},
+      'coverArtifact': {'path': 'publish/revisions/r1/cover/cover.png'},
+      'quality': {
+        'path': 'publish/revisions/r1/pre_review_quality_report.json',
+        'score': 95,
+      },
+      'manifestArtifact': {
+        'path': 'publish/revisions/r1/package_manifest.json',
+      },
+    });
+    expect(complete.hasManifest, isTrue);
+    expect(complete.resolveManifestFileName(), 'package_manifest.json');
+    expect(complete.reviewActionsEnabled, isTrue);
+
+    final incomplete = EbookR1PackageManifest.fromEbookReviewPackage({
+      'revision': 'r1',
+      'title': 'incomplete',
+      'pdfArtifact': {'path': 'publish/current/book.pdf'},
+      'epubArtifact': {'path': 'publish/current/book.epub'},
+    });
+    expect(incomplete.reviewActionsEnabled, isFalse);
+    expect(incomplete.hasCover, isFalse);
+    expect(incomplete.hasQualityReport, isFalse);
+    expect(incomplete.hasManifest, isFalse);
+  });
 }

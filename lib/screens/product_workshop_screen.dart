@@ -1132,6 +1132,9 @@ class _Sotong24RemoteDetailScreenState
                               ebookReviewStage,
                             )
                           : null,
+                      onOpenManifest: ebookManifest?.hasManifest == true
+                          ? () => _openEbookManifest(project, ebookReviewStage)
+                          : null,
                     );
                   },
                 ),
@@ -1278,6 +1281,36 @@ class _Sotong24RemoteDetailScreenState
 
     // No fabricated path fallback for complete-r1 (Codex blocker).
     return null;
+  }
+
+  Future<void> _openEbookManifest(
+    Sotong24RemoteProject project,
+    Sotong24RemoteStage stage,
+  ) async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final manifest = _tryParseEbookManifest(stage);
+      final fileName =
+          manifest?.resolveManifestFileName() ?? 'package_manifest.json';
+      final grant = await RemoteControlApi().createArtifactDownloadGrant(
+        projectId: project.projectId,
+        stageId: stage.stageId,
+        revision: stage.revision > 0 ? stage.revision : 1,
+        fileName: fileName,
+        artifactFileName: fileName,
+      );
+      if (!mounted) return;
+      await pdf_platform.openAttachmentUrl(grant.downloadUrl);
+      messenger.showSnackBar(
+        SnackBar(content: Text('${grant.fileName} 다운로드를 시작했습니다.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('manifest 열기 실패: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _openEbookQualityReport(

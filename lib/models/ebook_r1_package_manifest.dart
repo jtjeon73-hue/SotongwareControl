@@ -26,6 +26,7 @@ class EbookR1PackageManifest {
     this.immutablePath = '',
     this.coverUrl = '',
     this.qualityReportUrl = '',
+    this.manifestPath = '',
   });
 
   final String revision;
@@ -39,6 +40,7 @@ class EbookR1PackageManifest {
   final String coverUrl;
   final String qualityReportPath;
   final String qualityReportUrl;
+  final String manifestPath;
   final int pdfBytes;
   final int epubBytes;
   final int? score;
@@ -58,6 +60,14 @@ class EbookR1PackageManifest {
   bool get hasToc => tocSummary.isNotEmpty;
   bool get hasQualityReport =>
       qualityReportPath.isNotEmpty || qualityReportUrl.isNotEmpty;
+  bool get hasManifest =>
+      manifestPath.isNotEmpty || immutablePath.contains('package_manifest');
+  bool get reviewActionsEnabled =>
+      hasDownloadablePdf &&
+      hasDownloadableEpub &&
+      hasCover &&
+      hasQualityReport &&
+      hasManifest;
 
   static String _artifactPath(dynamic raw, String fallback) {
     if (raw == null) return fallback;
@@ -132,6 +142,7 @@ class EbookR1PackageManifest {
     final epubRaw = artifacts['epub'];
     final coverRaw = artifacts['cover'];
     final qualityRaw = artifacts['qualityReport'];
+    final manifestRaw = artifacts['manifest'];
     final pdfFallback = 'publish/current/book.pdf';
     final epubFallback = 'publish/current/book.epub';
     return EbookR1PackageManifest(
@@ -144,11 +155,14 @@ class EbookR1PackageManifest {
       epubPath: _artifactPath(epubRaw, epubFallback),
       coverPath: _artifactPath(coverRaw, ''),
       coverUrl: _artifactUrl(coverRaw),
-      qualityReportPath: _artifactPath(
-        qualityRaw,
-        'output/pre_review_quality_report.json',
-      ),
+      qualityReportPath: _artifactPath(qualityRaw, ''),
       qualityReportUrl: _artifactUrl(qualityRaw),
+      manifestPath: _artifactPath(
+        manifestRaw,
+        '${json['immutablePath'] ?? ''}'.contains('package_manifest')
+            ? '${json['immutablePath']}'
+            : '',
+      ),
       pdfBytes: _artifactSize(
         pdfRaw,
         (sizes['pdf'] is num)
@@ -230,6 +244,7 @@ class EbookR1PackageManifest {
       coverUrl: _artifactUrl(coverRaw),
       qualityReportPath: _artifactPath(qualityReportRaw, ''),
       qualityReportUrl: _artifactUrl(qualityReportRaw),
+      manifestPath: _artifactPath(manifestRaw, ''),
       pdfBytes: _artifactSize(pdfRaw, 0),
       epubBytes: _artifactSize(epubRaw, 0),
       score: score,
@@ -270,5 +285,12 @@ class EbookR1PackageManifest {
     final parts = qualityReportPath.split('/');
     final name = parts.isNotEmpty ? parts.last.trim() : '';
     return name.isNotEmpty ? name : 'pre_review_quality_report.json';
+  }
+
+  String resolveManifestFileName() {
+    if (manifestPath.isEmpty) return 'package_manifest.json';
+    final parts = manifestPath.split(RegExp(r'[/\\]'));
+    final name = parts.isNotEmpty ? parts.last.trim() : '';
+    return name.isNotEmpty ? name : 'package_manifest.json';
   }
 }

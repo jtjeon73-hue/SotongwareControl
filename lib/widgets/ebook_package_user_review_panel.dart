@@ -21,6 +21,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     this.onDownloadEpub,
     this.onPreviewPdf,
     this.onOpenQualityReport,
+    this.onOpenManifest,
   });
 
   final Sotong24RemoteProject project;
@@ -35,6 +36,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
   final VoidCallback? onDownloadEpub;
   final VoidCallback? onPreviewPdf;
   final VoidCallback? onOpenQualityReport;
+  final VoidCallback? onOpenManifest;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +55,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final refine = m?.refineCount;
     final pass = score != null && score >= 90 && critical == 0 && major == 0;
     final author = (m?.author ?? '').trim();
+    final reviewEnabled = m?.reviewActionsEnabled == true;
     final coverFileName = () {
       final path = (m?.coverPath ?? '').trim();
       if (path.isEmpty) return '';
@@ -212,21 +215,35 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                     onPressed: busy ? null : onOpenQualityReport,
                     child: const Text('품질 보고서 보기'),
                   ),
+                if (onOpenManifest != null)
+                  OutlinedButton(
+                    onPressed: busy ? null : onOpenManifest,
+                    child: const Text('manifest 보기'),
+                  ),
               ],
             ),
+            if (!reviewEnabled) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'artifact 등록이 완료되지 않아 검토 승인 액션이 비활성입니다. (cover/PDF/EPUB/quality/manifest)',
+                style: TextStyle(color: Colors.redAccent, fontSize: 12),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: FilledButton(
-                    onPressed: busy ? null : onApprove,
+                    onPressed: (busy || !reviewEnabled) ? null : onApprove,
                     child: const Text('승인'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: busy ? null : onChangesRequested,
+                    onPressed: (busy || !reviewEnabled)
+                        ? null
+                        : onChangesRequested,
                     child: const Text('보완 요청'),
                   ),
                 ),
@@ -387,10 +404,7 @@ class _EbookCoverGrantPreviewState extends State<_EbookCoverGrantPreview> {
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) => const Text(
             '표지 이미지를 불러오지 못했습니다.',
-            style: TextStyle(
-              fontSize: 12,
-              color: ControlColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: ControlColors.textSecondary),
           ),
         ),
       ),
