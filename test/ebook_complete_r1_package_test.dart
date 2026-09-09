@@ -248,15 +248,15 @@ void main() {
 
   test('v2 ebookReviewPackage requires remoteReady/grantReady for review', () {
     Map<String, dynamic> art(String path, {bool ready = true}) => {
-          'path': path,
-          'fileName': path.split('/').last,
-          'size': 10,
-          'sha256': 'abc',
-          'remoteStatus': ready ? 'grantReady' : 'error',
-          'remoteReady': ready,
-          'grantReady': ready,
-          'remoteUrl': ready ? 'https://example.com/$path' : '',
-        };
+      'path': path,
+      'fileName': path.split('/').last,
+      'size': 10,
+      'sha256': 'abc',
+      'remoteStatus': ready ? 'grantReady' : 'error',
+      'remoteReady': ready,
+      'grantReady': ready,
+      'remoteUrl': ready ? 'https://example.com/$path' : '',
+    };
     final ready = EbookR1PackageManifest.fromEbookReviewPackage({
       'schemaVersion': 'ebookReviewPackage/v2',
       'contractVersion': 2,
@@ -266,7 +266,9 @@ void main() {
       'cover': art('publish/revisions/r1/cover/cover.png'),
       'pdf': art('publish/revisions/r1/book.pdf'),
       'epub': art('publish/revisions/r1/book.epub'),
-      'qualityReport': art('publish/revisions/r1/pre_review_quality_report.json'),
+      'qualityReport': art(
+        'publish/revisions/r1/pre_review_quality_report.json',
+      ),
       'manifest': art('publish/revisions/r1/package_manifest.json'),
       'quality': {'score': 95, 'criticalCount': 0, 'majorCount': 0},
       'toc': ['1'],
@@ -284,7 +286,9 @@ void main() {
       'cover': art('publish/revisions/r1/cover/cover.png', ready: false),
       'pdf': art('publish/revisions/r1/book.pdf'),
       'epub': art('publish/revisions/r1/book.epub'),
-      'qualityReport': art('publish/revisions/r1/pre_review_quality_report.json'),
+      'qualityReport': art(
+        'publish/revisions/r1/pre_review_quality_report.json',
+      ),
       'manifest': art('publish/revisions/r1/package_manifest.json'),
       'quality': {'score': 95},
     });

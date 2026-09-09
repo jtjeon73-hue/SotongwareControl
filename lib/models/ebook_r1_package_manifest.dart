@@ -175,7 +175,8 @@ class EbookR1PackageManifest {
     final pdfFallback = 'publish/current/book.pdf';
     final epubFallback = 'publish/current/book.epub';
     final schema = '${json['schemaVersion'] ?? ''}';
-    final isV2 = schema.contains('ebookReviewPackage/v2') ||
+    final isV2 =
+        schema.contains('ebookReviewPackage/v2') ||
         json['contractVersion'] == 2;
     return EbookR1PackageManifest(
       revision: '${json['revision'] ?? 'r1'}',
@@ -207,17 +208,21 @@ class EbookR1PackageManifest {
             ? (sizes['epub'] as num).toInt()
             : int.tryParse('${sizes['epub'] ?? ''}') ?? 0,
       ),
-      score: _asInt(json['qualityScore']) ??
+      score:
+          _asInt(json['qualityScore']) ??
           _asInt((json['quality'] is Map) ? json['quality']['score'] : null),
-      criticalCount: _asInt(json['criticalCount']) ??
+      criticalCount:
+          _asInt(json['criticalCount']) ??
           _asInt(
             (json['quality'] is Map) ? json['quality']['criticalCount'] : null,
           ),
-      majorCount: _asInt(json['majorCount']) ??
+      majorCount:
+          _asInt(json['majorCount']) ??
           _asInt(
             (json['quality'] is Map) ? json['quality']['majorCount'] : null,
           ),
-      refineCount: _asInt(json['refineCount']) ??
+      refineCount:
+          _asInt(json['refineCount']) ??
           _asInt(
             (json['quality'] is Map) ? json['quality']['refineCount'] : null,
           ),
@@ -228,12 +233,14 @@ class EbookR1PackageManifest {
       tocSummary: toc,
       immutablePath: '${json['immutablePath'] ?? ''}',
       schemaIsV2: isV2,
-      remoteReady: _artifactReadyFlag(pdfRaw, 'remoteReady') &&
+      remoteReady:
+          _artifactReadyFlag(pdfRaw, 'remoteReady') &&
           _artifactReadyFlag(epubRaw, 'remoteReady') &&
           _artifactReadyFlag(coverRaw, 'remoteReady') &&
           _artifactReadyFlag(qualityRaw, 'remoteReady') &&
           _artifactReadyFlag(manifestRaw, 'remoteReady'),
-      grantReady: _artifactReadyFlag(pdfRaw, 'grantReady') &&
+      grantReady:
+          _artifactReadyFlag(pdfRaw, 'grantReady') &&
           _artifactReadyFlag(epubRaw, 'grantReady') &&
           _artifactReadyFlag(coverRaw, 'grantReady') &&
           _artifactReadyFlag(qualityRaw, 'grantReady') &&
@@ -243,8 +250,8 @@ class EbookR1PackageManifest {
       deliveryStatusMessage: json['reviewReady'] == true
           ? ''
           : ((json['holdReason'] ?? '').toString().isNotEmpty
-              ? '결과물 전달 준비 실패/재시도 필요'
-              : '결과물 전달 준비 중'),
+                ? '결과물 전달 준비 실패/재시도 필요'
+                : '결과물 전달 준비 중'),
     );
   }
 
@@ -253,8 +260,8 @@ class EbookR1PackageManifest {
     Map<String, dynamic> pkg,
   ) {
     final schema = '${pkg['schemaVersion'] ?? ''}';
-    final isV2 = schema.contains('ebookReviewPackage/v2') ||
-        pkg['contractVersion'] == 2;
+    final isV2 =
+        schema.contains('ebookReviewPackage/v2') || pkg['contractVersion'] == 2;
 
     // v2: top-level cover/pdf/epub/qualityReport/manifest. Legacy: *Artifact / nested quality.path.
     final coverRaw = isV2
@@ -297,9 +304,7 @@ class EbookR1PackageManifest {
       }
     } else if (qualityRaw is num) {
       score ??= qualityRaw.toInt();
-    } else if (!isV2 &&
-        qualityRaw is String &&
-        qualityRaw.trim().isNotEmpty) {
+    } else if (!isV2 && qualityRaw is String && qualityRaw.trim().isNotEmpty) {
       qualityReportRaw ??= qualityRaw;
     }
 
@@ -309,12 +314,14 @@ class EbookR1PackageManifest {
       '${pkg['immutablePath'] ?? ''}'.trim(),
     );
 
-    final remoteReady = _artifactReadyFlag(coverRaw, 'remoteReady') &&
+    final remoteReady =
+        _artifactReadyFlag(coverRaw, 'remoteReady') &&
         _artifactReadyFlag(pdfRaw, 'remoteReady') &&
         _artifactReadyFlag(epubRaw, 'remoteReady') &&
         _artifactReadyFlag(qualityReportRaw, 'remoteReady') &&
         _artifactReadyFlag(manifestRaw, 'remoteReady');
-    final grantReady = _artifactReadyFlag(coverRaw, 'grantReady') &&
+    final grantReady =
+        _artifactReadyFlag(coverRaw, 'grantReady') &&
         _artifactReadyFlag(pdfRaw, 'grantReady') &&
         _artifactReadyFlag(epubRaw, 'grantReady') &&
         _artifactReadyFlag(qualityReportRaw, 'grantReady') &&
@@ -354,9 +361,7 @@ class EbookR1PackageManifest {
       holdReason: hold,
       deliveryStatusMessage: (!isV2 || reviewReady)
           ? ''
-          : (hold.isNotEmpty
-              ? '결과물 전달 준비 실패/재시도 필요'
-              : '결과물 전달 준비 중'),
+          : (hold.isNotEmpty ? '결과물 전달 준비 실패/재시도 필요' : '결과물 전달 준비 중'),
     );
   }
 
