@@ -263,6 +263,8 @@ void main() {
       'revision': 'r1',
       'title': 'v2 ready',
       'reviewReady': true,
+      'deliveryStatus': 'ready',
+      'manifestSHA256': 'abc',
       'cover': art('publish/revisions/r1/cover/cover.png'),
       'pdf': art('publish/revisions/r1/book.pdf'),
       'epub': art('publish/revisions/r1/book.epub'),
@@ -275,6 +277,49 @@ void main() {
     });
     expect(ready.schemaIsV2, isTrue);
     expect(ready.reviewActionsEnabled, isTrue);
+    expect(ready.reviewActionsEnabledForStage(1), isTrue);
+    expect(ready.reviewActionsEnabledForStage(2), isFalse);
+
+    final staleR1 = EbookR1PackageManifest.fromEbookReviewPackage({
+      'schemaVersion': 'ebookReviewPackage/v2',
+      'contractVersion': 2,
+      'revision': 'r1',
+      'title': 'stale r1',
+      'reviewReady': true,
+      'deliveryStatus': 'ready',
+      'manifestSHA256': 'abc',
+      'cover': art('publish/revisions/r1/cover/cover.png'),
+      'pdf': art('publish/revisions/r1/book.pdf'),
+      'epub': art('publish/revisions/r1/book.epub'),
+      'qualityReport': art(
+        'publish/revisions/r1/pre_review_quality_report.json',
+      ),
+      'manifest': art('publish/revisions/r1/package_manifest.json'),
+      'quality': {'score': 95},
+    });
+    expect(staleR1.reviewActionsEnabledForStage(2), isFalse);
+
+    final noSha = EbookR1PackageManifest.fromEbookReviewPackage({
+      'schemaVersion': 'ebookReviewPackage/v2',
+      'contractVersion': 2,
+      'revision': 'r1',
+      'title': 'no sha',
+      'reviewReady': true,
+      'cover': art('publish/revisions/r1/cover/cover.png'),
+      'pdf': art('publish/revisions/r1/book.pdf'),
+      'epub': art('publish/revisions/r1/book.epub'),
+      'qualityReport': art(
+        'publish/revisions/r1/pre_review_quality_report.json',
+      ),
+      'manifest': {
+        'path': 'publish/revisions/r1/package_manifest.json',
+        'remoteReady': true,
+        'grantReady': true,
+        'remoteUrl': 'https://example.com/m',
+      },
+      'quality': {'score': 95},
+    });
+    expect(noSha.reviewActionsEnabled, isFalse);
 
     final hold = EbookR1PackageManifest.fromEbookReviewPackage({
       'schemaVersion': 'ebookReviewPackage/v2',
@@ -314,7 +359,10 @@ void main() {
     expect(m.hasDownloadableEpub, isTrue);
     expect(m.hasQualityReport, isTrue);
     expect(m.hasManifest, isTrue);
-    expect(m.revision, isNotEmpty);
+		expect(m.revision, isNotEmpty);
+    expect(m.manifestSHA256, isNotEmpty);
     expect(m.reviewActionsEnabled, isTrue);
+    expect(m.reviewActionsEnabledForStage(2), isTrue);
+    expect(m.reviewActionsEnabledForStage(1), isFalse);
   });
 }

@@ -55,7 +55,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final refine = m?.refineCount;
     final pass = score != null && score >= 90 && critical == 0 && major == 0;
     final author = (m?.author ?? '').trim();
-    final reviewEnabled = m?.reviewActionsEnabled == true;
+    final reviewEnabled = m?.reviewActionsEnabledForStage(stage.revision) == true;
     final deliveryMsg = (m?.deliveryStatusMessage ?? '').trim();
     final coverFileName = () {
       final path = (m?.coverPath ?? '').trim();

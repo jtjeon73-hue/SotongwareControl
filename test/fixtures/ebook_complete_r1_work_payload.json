@@ -1,202 +1,204 @@
 {
-  "artifacts": {
-    "cover": {
-      "fileName": "cover.png",
-      "grantType": "artifact_download",
-      "height": 1200,
-      "path": "publish/revisions/r2/cover/cover.png",
-      "sha256": "6c84ad3618f794ae6b7d45e5a71313763cc8245359283d751839bba46b5e4c6a",
-      "size": 103535,
-      "width": 800
-    },
-    "epub": {
-      "fileName": "book.epub",
-      "grantType": "artifact_download",
-      "path": "publish/revisions/r2/book.epub",
-      "sha256": "9e9b27d2166b9bc5a5d413c2a1c582a14d6a3366f3c24ddf9beffb4b69398470",
-      "size": 22273
-    },
-    "manifest": {
-      "fileName": "package_manifest.json",
-      "grantType": "artifact_download",
-      "path": "publish/revisions/r2/package_manifest.json"
-    },
-    "manuscript": {
-      "chapterCount": 3,
-      "fileCount": 4,
-      "manuscriptTreeSHA256": "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
-      "path": "publish/revisions/r2/manuscript/",
-      "sha256": "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
-      "size": 21384,
-      "totalSize": 21384
-    },
-    "pdf": {
-      "fileName": "book.pdf",
-      "grantType": "artifact_download",
-      "pageCount": 13,
-      "path": "publish/revisions/r2/book.pdf",
-      "sha256": "85f7fd4c3693df919319a804d1c9a44f927be338c9d31818b68df821e2149534",
-      "size": 84580
-    },
-    "qualityReport": {
-      "fileName": "pre_review_quality_report.json",
-      "grantType": "artifact_download",
-      "path": "publish/revisions/r2/pre_review_quality_report.json",
-      "sha256": "d22f991a57eb067455b0f8322493050c2c03b62ed6d8739ee3cae9eba0c5518f",
-      "size": 2808
-    }
-  },
-  "author": "SotongWare",
-  "chapterCount": 3,
-  "contractVersion": 2,
-  "cover": {
-    "artifactId": "wi_plan_ebook_r1_selftest|package_user_review|r2|cover.png",
-    "fileName": "cover.png",
-    "grantReady": true,
-    "grantType": "artifact_download",
-    "path": "publish/revisions/r2/cover/cover.png",
-    "remoteReady": true,
-    "remoteStatus": "grantReady",
-    "remoteUrl": "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/cover.png",
-    "sha256": "6c84ad3618f794ae6b7d45e5a71313763cc8245359283d751839bba46b5e4c6a",
-    "size": 103535,
-    "uploadStatus": "uploaded"
-  },
-  "criticalCount": 0,
-  "epub": {
-    "artifactId": "wi_plan_ebook_r1_selftest|package_user_review|r2|book.epub",
-    "fileName": "book.epub",
-    "grantReady": true,
-    "grantType": "artifact_download",
-    "path": "publish/revisions/r2/book.epub",
-    "remoteReady": true,
-    "remoteStatus": "grantReady",
-    "remoteUrl": "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/book.epub",
-    "sha256": "9e9b27d2166b9bc5a5d413c2a1c582a14d6a3366f3c24ddf9beffb4b69398470",
-    "size": 22273,
-    "uploadStatus": "uploaded"
-  },
-  "fileSizes": {
-    "epub": 22273,
-    "pdf": 84580
-  },
-  "frozen": true,
-  "frozenAt": "2026-09-09T23:21:12",
-  "generatedAt": "2026-09-09T23:21:09",
-  "immutablePath": "publish/revisions/r2",
-  "instructionId": "wi_plan_ebook_r1_selftest",
-  "internalRefineCount": 0,
-  "language": "ko",
-  "majorCount": 0,
-  "manifest": {
-    "artifactId": "wi_plan_ebook_r1_selftest|package_user_review|r2|package_manifest.json",
-    "fileName": "package_manifest.json",
-    "grantReady": true,
-    "grantType": "artifact_download",
-    "path": "publish/revisions/r2/package_manifest.json",
-    "remoteReady": true,
-    "remoteStatus": "grantReady",
-    "remoteUrl": "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/package_manifest.json",
-    "sha256": "f8681fec4b3d1ec59227e2ab895be18394602a2f157c86506ba7ec1a55ea2755",
-    "size": 4904,
-    "uploadStatus": "uploaded"
-  },
-  "manuscript": {
-    "chapterCount": 3,
-    "fileCount": 4,
-    "manuscriptTreeSHA256": "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
-    "path": "publish/revisions/r2/manuscript/",
-    "sha256": "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
-    "size": 21384,
-    "totalSize": 21384
-  },
-  "manuscriptFileCount": 4,
-  "manuscriptTotalSize": 21384,
-  "manuscriptTreeSHA256": "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
-  "pageCount": 13,
-  "pdf": {
-    "artifactId": "wi_plan_ebook_r1_selftest|package_user_review|r2|book.pdf",
-    "fileName": "book.pdf",
-    "grantReady": true,
-    "grantType": "artifact_download",
-    "path": "publish/revisions/r2/book.pdf",
-    "remoteReady": true,
-    "remoteStatus": "grantReady",
-    "remoteUrl": "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/book.pdf",
-    "sha256": "85f7fd4c3693df919319a804d1c9a44f927be338c9d31818b68df821e2149534",
-    "size": 84580,
-    "uploadStatus": "uploaded"
-  },
-  "projectId": "wi_plan_ebook_r1_selftest",
-  "projectName": "ebook_r1_selftest",
-  "promoteToUserR1": true,
-  "quality": {
-    "criticalCount": 0,
-    "evaluatedAt": "2026-09-09T14:21:09Z",
-    "majorCount": 0,
-    "refineCount": 0,
-    "reportPath": "publish/revisions/r2/pre_review_quality_report.json",
-    "reportSHA256": "d22f991a57eb067455b0f8322493050c2c03b62ed6d8739ee3cae9eba0c5518f",
-    "score": 100
-  },
-  "qualityReport": {
-    "artifactId": "wi_plan_ebook_r1_selftest|package_user_review|r2|pre_review_quality_report.json",
-    "fileName": "pre_review_quality_report.json",
-    "grantReady": true,
-    "grantType": "artifact_download",
-    "path": "publish/revisions/r2/pre_review_quality_report.json",
-    "remoteReady": true,
-    "remoteStatus": "grantReady",
-    "remoteUrl": "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/pre_review_quality_report.json",
-    "sha256": "d22f991a57eb067455b0f8322493050c2c03b62ed6d8739ee3cae9eba0c5518f",
-    "size": 2808,
-    "uploadStatus": "uploaded"
-  },
-  "qualityScore": 100,
-  "refineCount": 0,
-  "reviewReady": true,
-  "revision": "r2",
-  "revisionCandidate": "r2",
-  "schemaVersion": "ebookReviewPackage/v2",
-  "stageId": "format_build",
-  "stagingToken": "r2_4161C8D2DB6D4C668EBB4041AC88EF2F",
-  "structure": {
-    "chapterCount": 3,
-    "toc": [
-      "# 목차",
-      "1. 시작하기 chapter",
-      "2. 본문과 체크리스트",
-      "3. 마무리"
-    ]
-  },
-  "subtitle": "",
-  "targetAudience": "초보 독자",
-  "title": "SelfTest Ebook",
-  "toc": [
-    "# 목차",
-    "1. 시작하기 chapter",
-    "2. 본문과 체크리스트",
-    "3. 마무리"
-  ],
-  "tocSummary": [
-    "# 목차",
-    "1. 시작하기 chapter",
-    "2. 본문과 체크리스트",
-    "3. 마무리"
-  ],
-  "validatedAt": "2026-09-09T23:21:12",
-  "validation": {
-    "checks": [
-      "pdf",
-      "epub",
-      "cover",
-      "manuscript",
-      "quality",
-      "manifest"
-    ],
-    "step14Pass": true,
-    "step14Passed": true,
-    "validatedAt": "2026-09-09T23:21:12",
-    "validatorVersion": "ebook-complete-r1-v4"
-  }
+    "artifacts":  {
+                      "cover":  {
+                                    "fileName":  "cover.png",
+                                    "grantType":  "artifact_download",
+                                    "height":  1200,
+                                    "path":  "publish/revisions/r2/cover/cover.png",
+                                    "sha256":  "6c84ad3618f794ae6b7d45e5a71313763cc8245359283d751839bba46b5e4c6a",
+                                    "size":  103535,
+                                    "width":  800
+                                },
+                      "epub":  {
+                                   "fileName":  "book.epub",
+                                   "grantType":  "artifact_download",
+                                   "path":  "publish/revisions/r2/book.epub",
+                                   "sha256":  "d647ca99d2fb23c209c8701cd288f85f6df24a4bcd96d8aae9688524d6a4ed6b",
+                                   "size":  22273
+                               },
+                      "manifest":  {
+                                       "fileName":  "package_manifest.json",
+                                       "grantType":  "artifact_download",
+                                       "path":  "publish/revisions/r2/package_manifest.json"
+                                   },
+                      "manuscript":  {
+                                         "chapterCount":  3,
+                                         "fileCount":  4,
+                                         "manuscriptTreeSHA256":  "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
+                                         "path":  "publish/revisions/r2/manuscript/",
+                                         "sha256":  "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
+                                         "size":  21384,
+                                         "totalSize":  21384
+                                     },
+                      "pdf":  {
+                                  "fileName":  "book.pdf",
+                                  "grantType":  "artifact_download",
+                                  "pageCount":  13,
+                                  "path":  "publish/revisions/r2/book.pdf",
+                                  "sha256":  "d5a3bd2660912a61589f7add4f7fb9e63c8b6a544e70eea4ec5812dee858db8b",
+                                  "size":  84653
+                              },
+                      "qualityReport":  {
+                                            "fileName":  "pre_review_quality_report.json",
+                                            "grantType":  "artifact_download",
+                                            "path":  "publish/revisions/r2/pre_review_quality_report.json",
+                                            "sha256":  "9f185e2d2bc8aa42dc4f0cd806799ce7e501d3692fa3c56f8ce609b7ff0bdc45",
+                                            "size":  2808
+                                        }
+                  },
+    "author":  "SotongWare",
+    "chapterCount":  3,
+    "contractVersion":  2,
+    "cover":  {
+                  "artifactId":  "wi_plan_ebook_r1_selftest|package_user_review|r2|cover.png",
+                  "fileName":  "cover.png",
+                  "grantReady":  true,
+                  "grantType":  "artifact_download",
+                  "path":  "publish/revisions/r2/cover/cover.png",
+                  "remoteReady":  true,
+                  "remoteStatus":  "grantReady",
+                  "remoteUrl":  "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/cover.png",
+                  "sha256":  "6c84ad3618f794ae6b7d45e5a71313763cc8245359283d751839bba46b5e4c6a",
+                  "size":  103535,
+                  "uploadStatus":  "uploaded"
+              },
+    "criticalCount":  0,
+    "epub":  {
+                 "artifactId":  "wi_plan_ebook_r1_selftest|package_user_review|r2|book.epub",
+                 "fileName":  "book.epub",
+                 "grantReady":  true,
+                 "grantType":  "artifact_download",
+                 "path":  "publish/revisions/r2/book.epub",
+                 "remoteReady":  true,
+                 "remoteStatus":  "grantReady",
+                 "remoteUrl":  "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/book.epub",
+                 "sha256":  "d647ca99d2fb23c209c8701cd288f85f6df24a4bcd96d8aae9688524d6a4ed6b",
+                 "size":  22273,
+                 "uploadStatus":  "uploaded"
+             },
+    "fileSizes":  {
+                      "epub":  22273,
+                      "pdf":  84653
+                  },
+    "frozen":  true,
+    "frozenAt":  "2026-09-09T23:30:55",
+    "generatedAt":  "2026-09-09T23:30:52",
+    "immutablePath":  "publish/revisions/r2",
+    "instructionId":  "wi_plan_ebook_r1_selftest",
+    "internalRefineCount":  0,
+    "language":  "ko",
+    "majorCount":  0,
+    "manifest":  {
+                     "artifactId":  "wi_plan_ebook_r1_selftest|package_user_review|r2|package_manifest.json",
+                     "fileName":  "package_manifest.json",
+                     "grantReady":  true,
+                     "grantType":  "artifact_download",
+                     "path":  "publish/revisions/r2/package_manifest.json",
+                     "remoteReady":  true,
+                     "remoteStatus":  "grantReady",
+                     "remoteUrl":  "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/package_manifest.json",
+                     "sha256":  "f00e93ebdd2990082b0f2b37efcae25ba7abaa304f901e825e5498c0eaaa922e",
+                     "size":  4904,
+                     "uploadStatus":  "uploaded"
+                 },
+    "manuscript":  {
+                       "chapterCount":  3,
+                       "fileCount":  4,
+                       "manuscriptTreeSHA256":  "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
+                       "path":  "publish/revisions/r2/manuscript/",
+                       "sha256":  "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
+                       "size":  21384,
+                       "totalSize":  21384
+                   },
+    "manuscriptFileCount":  4,
+    "manuscriptTotalSize":  21384,
+    "manuscriptTreeSHA256":  "ab92fbcb5e8d4db23871bf80ec1927b79f452d885e8210963e2e932a24b621f4",
+    "pageCount":  13,
+    "pdf":  {
+                "artifactId":  "wi_plan_ebook_r1_selftest|package_user_review|r2|book.pdf",
+                "fileName":  "book.pdf",
+                "grantReady":  true,
+                "grantType":  "artifact_download",
+                "path":  "publish/revisions/r2/book.pdf",
+                "remoteReady":  true,
+                "remoteStatus":  "grantReady",
+                "remoteUrl":  "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/book.pdf",
+                "sha256":  "d5a3bd2660912a61589f7add4f7fb9e63c8b6a544e70eea4ec5812dee858db8b",
+                "size":  84653,
+                "uploadStatus":  "uploaded"
+            },
+    "projectId":  "wi_plan_ebook_r1_selftest",
+    "projectName":  "ebook_r1_selftest",
+    "promoteToUserR1":  true,
+    "quality":  {
+                    "criticalCount":  0,
+                    "evaluatedAt":  "2026-09-09T14:30:52Z",
+                    "majorCount":  0,
+                    "refineCount":  0,
+                    "reportPath":  "publish/revisions/r2/pre_review_quality_report.json",
+                    "reportSHA256":  "9f185e2d2bc8aa42dc4f0cd806799ce7e501d3692fa3c56f8ce609b7ff0bdc45",
+                    "score":  100
+                },
+    "qualityReport":  {
+                          "artifactId":  "wi_plan_ebook_r1_selftest|package_user_review|r2|pre_review_quality_report.json",
+                          "fileName":  "pre_review_quality_report.json",
+                          "grantReady":  true,
+                          "grantType":  "artifact_download",
+                          "path":  "publish/revisions/r2/pre_review_quality_report.json",
+                          "remoteReady":  true,
+                          "remoteStatus":  "grantReady",
+                          "remoteUrl":  "https://storage.googleapis.com/sotongware-control-test-artifacts/sotong24/artifacts/prod/wi_plan_ebook_r1_selftest/package_user_review/r2/pre_review_quality_report.json",
+                          "sha256":  "9f185e2d2bc8aa42dc4f0cd806799ce7e501d3692fa3c56f8ce609b7ff0bdc45",
+                          "size":  2808,
+                          "uploadStatus":  "uploaded"
+                      },
+    "qualityScore":  100,
+    "refineCount":  0,
+    "reviewReady":  true,
+    "revision":  "r2",
+    "revisionCandidate":  "r2",
+    "schemaVersion":  "ebookReviewPackage/v2",
+    "stageId":  "format_build",
+    "stagingToken":  "r2_B4B7307075A049EEA8BB224C35B88EED",
+    "structure":  {
+                      "chapterCount":  3,
+                      "toc":  [
+                                  "# 목차",
+                                  "1. 시작하기 chapter",
+                                  "2. 본문과 체크리스트",
+                                  "3. 마무리"
+                              ]
+                  },
+    "subtitle":  "",
+    "targetAudience":  "초보 독자",
+    "title":  "SelfTest Ebook",
+    "toc":  [
+                "# 목차",
+                "1. 시작하기 chapter",
+                "2. 본문과 체크리스트",
+                "3. 마무리"
+            ],
+    "tocSummary":  [
+                       "# 목차",
+                       "1. 시작하기 chapter",
+                       "2. 본문과 체크리스트",
+                       "3. 마무리"
+                   ],
+    "validatedAt":  "2026-09-09T23:30:55",
+    "validation":  {
+                       "checks":  [
+                                      "pdf",
+                                      "epub",
+                                      "cover",
+                                      "manuscript",
+                                      "quality",
+                                      "manifest"
+                                  ],
+                       "step14Pass":  true,
+                       "step14Passed":  true,
+                       "validatedAt":  "2026-09-09T23:30:55",
+                       "validatorVersion":  "ebook-complete-r1-v4"
+                   },
+    "manifestSHA256":  "f00e93ebdd2990082b0f2b37efcae25ba7abaa304f901e825e5498c0eaaa922e",
+    "deliveryStatus":  "ready"
 }

@@ -33,6 +33,8 @@ class EbookR1PackageManifest {
     this.reviewReadyFlag = false,
     this.holdReason = '',
     this.deliveryStatusMessage = '',
+    this.manifestSHA256 = '',
+    this.deliveryStatus = '',
   });
 
   final String revision;
@@ -65,6 +67,8 @@ class EbookR1PackageManifest {
   final bool reviewReadyFlag;
   final String holdReason;
   final String deliveryStatusMessage;
+  final String manifestSHA256;
+  final String deliveryStatus;
 
   bool get hasDownloadablePdf => pdfPath.isNotEmpty;
   bool get hasDownloadableEpub => epubPath.isNotEmpty;
@@ -82,13 +86,39 @@ class EbookR1PackageManifest {
       hasQualityReport &&
       hasManifest;
 
+  static String normalizeRevisionLabel(String raw) {
+    final s = raw.trim().toLowerCase();
+    if (s.isEmpty) return '';
+    if (s.startsWith('r') && s.length > 1) return s;
+    final n = int.tryParse(s);
+    if (n != null && n > 0) return 'r$n';
+    return s;
+  }
+
+  bool matchesStageRevision(int stageRevision) {
+    final expect = normalizeRevisionLabel(
+      'r${stageRevision > 0 ? stageRevision : 1}',
+    );
+    final got = normalizeRevisionLabel(revision);
+    return got.isNotEmpty && got == expect;
+  }
+
   bool get reviewActionsEnabled {
     if (!artifactsStructurallyPresent) return false;
     if (holdReason.isNotEmpty && !reviewReadyFlag) return false;
     if (schemaIsV2) {
-      return reviewReadyFlag && remoteReady && grantReady;
+      if (!(reviewReadyFlag && remoteReady && grantReady)) return false;
+      if (manifestSHA256.trim().isEmpty) return false;
+      if (deliveryStatus.isNotEmpty && deliveryStatus != 'ready') return false;
+      return true;
     }
     return true;
+  }
+
+  /// Approve/revise only when package revision matches current stage review revision.
+  bool reviewActionsEnabledForStage(int stageRevision) {
+    if (!reviewActionsEnabled) return false;
+    return matchesStageRevision(stageRevision);
   }
 
   static String _artifactPath(dynamic raw, String fallback) {
@@ -252,6 +282,12 @@ class EbookR1PackageManifest {
           : ((json['holdReason'] ?? '').toString().isNotEmpty
                 ? '결과물 전달 준비 실패/재시도 필요'
                 : '결과물 전달 준비 중'),
+      manifestSHA256: () {
+        final top = '${json['manifestSHA256'] ?? ''}'.trim();
+        if (top.isNotEmpty) return top;
+        return _artifactSha(manifestRaw);
+      }(),
+      deliveryStatus: '${json['deliveryStatus'] ?? ''}'.trim(),
     );
   }
 
@@ -362,6 +398,12 @@ class EbookR1PackageManifest {
       deliveryStatusMessage: (!isV2 || reviewReady)
           ? ''
           : (hold.isNotEmpty ? '결과물 전달 준비 실패/재시도 필요' : '결과물 전달 준비 중'),
+      manifestSHA256: () {
+        final top = '${pkg['manifestSHA256'] ?? ''}'.trim();
+        if (top.isNotEmpty) return top;
+        return _artifactSha(manifestRaw);
+      }(),
+      deliveryStatus: '${pkg['deliveryStatus'] ?? ''}'.trim(),
     );
   }
 
