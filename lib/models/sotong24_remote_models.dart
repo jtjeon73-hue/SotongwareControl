@@ -1,4 +1,3 @@
-import '../services/business_planning_service.dart';
 import 'artifact_type.dart';
 import 'commercial/production_review_status_envelope.dart';
 import 'instruction_contract.dart';
@@ -1009,7 +1008,27 @@ class Sotong24RemoteDemoCatalog {
     final heartbeat = clock
         .subtract(const Duration(seconds: 40))
         .toIso8601String();
-    final titles = BusinessPlanningService.standardWorkflowTitles;
+    // Inline demo titles — avoid importing BusinessPlanningService (Flutter compile hang).
+    const titles = <(String, String)>[
+      ('idea_clarify', '아이디어 정리'),
+      ('problem_validate', '고객 문제 검증'),
+      ('materials_prep', '자료 준비'),
+      ('planning', '기획'),
+      ('project_setup', '프로젝트 생성 또는 불러오기'),
+      ('prompt_generate', 'AI/Cursor 작업 프롬프트 생성'),
+      ('draft', '초안 제작'),
+      ('build_test', '실행 및 기능 검사'),
+      ('user_review', '사용자 확인'),
+      ('revise', '보완 수정'),
+      ('quality', '품질 검사'),
+      ('publish_prep', '등록 준비'),
+      ('deploy', '배포'),
+      ('promo', '홍보자료 제작'),
+      ('launch', '출시자료 준비'),
+      ('measure', '출시 후 운영·측정 설계'),
+      ('iterate', '개선 백로그 점검'),
+      ('maintain', '최종 패키지 검증'),
+    ];
     final stages = <Sotong24RemoteStage>[
       for (var i = 0; i < titles.length; i++)
         Sotong24RemoteStage(

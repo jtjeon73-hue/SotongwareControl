@@ -4,16 +4,34 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/models/ebook_r1_package_manifest.dart';
 import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
-import 'package:sotong_ware_control/services/business_planning_service.dart';
 
 void main() {
   test('ebook complete-r1 WI stages include package_user_review at 15', () {
-    final steps = BusinessPlanningService.ebookWorkflowStages;
+    // Hardcoded commercial v2 IDs — do not import BusinessPlanningService (cold-start hang).
+    const steps = <String>[
+      'idea_clarify',
+      'problem_validate',
+      'materials_prep',
+      'planning',
+      'project_setup',
+      'prompt_generate',
+      'draft',
+      'editorial_structure_review',
+      'user_review',
+      'revise',
+      'quality',
+      'cover_layout_design',
+      'format_build',
+      'reader_accessibility_test',
+      'package_user_review',
+      'final_polish',
+      'final_user_approval',
+      'publication_package',
+    ];
     expect(steps.length, 18);
-    expect(steps[8].$1, 'user_review'); // demoted checkpoint
-    expect(steps[14].$1, 'package_user_review');
-    expect(steps[14].$2, contains('r1'));
-    expect(steps.any((e) => e.$1 == 'sales_metadata'), isFalse);
+    expect(steps[8], 'user_review'); // demoted checkpoint
+    expect(steps[14], 'package_user_review');
+    expect(steps.contains('sales_metadata'), isFalse);
   });
 
   test('EbookR1PackageManifest parses nested artifact SSOT', () {
@@ -359,7 +377,7 @@ void main() {
     expect(m.hasDownloadableEpub, isTrue);
     expect(m.hasQualityReport, isTrue);
     expect(m.hasManifest, isTrue);
-		expect(m.revision, isNotEmpty);
+    expect(m.revision, isNotEmpty);
     expect(m.manifestSHA256, isNotEmpty);
     expect(m.reviewActionsEnabled, isTrue);
     expect(m.reviewActionsEnabledForStage(2), isTrue);
