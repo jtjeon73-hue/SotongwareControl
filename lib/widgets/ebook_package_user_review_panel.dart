@@ -47,8 +47,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final score = m?.score;
     final critical = m?.criticalCount ?? 0;
     final major = m?.majorCount ?? 0;
-    final pass =
-        score != null && score >= 90 && critical == 0 && major == 0;
+    final pass = score != null && score >= 90 && critical == 0 && major == 0;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -65,9 +64,9 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
           children: [
             Text(
               '완성형 전자책 $revision',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
             Text(
@@ -124,10 +123,26 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                 ),
               if (hasEpub)
                 Text(
-                  'EPUB · book.epub'
-                  '${(m?.epubBytes ?? 0) > 0 ? ' · ${_fmtBytes(m!.epubBytes)}' : ''}',
+                  'EPUB · ${m?.resolveEpubFileName() ?? 'book.epub'}'
+                  '${(m?.epubBytes ?? 0) > 0 ? ' · ${_fmtBytes(m!.epubBytes)}' : ''}'
+                  '${(m?.epubSha256 ?? '').isNotEmpty ? ' · sha256 ${(m!.epubSha256.length > 12) ? '${m.epubSha256.substring(0, 12)}…' : m.epubSha256}' : ''}',
                 ),
               if (m?.hasCover == true) Text('Cover · ${m!.coverPath}'),
+              if (m?.frozen == true)
+                Text(
+                  'immutable · ${m!.immutablePath.isNotEmpty ? m.immutablePath : m.revision}',
+                  style: const TextStyle(fontSize: 12, color: ControlColors.textSecondary),
+                ),
+              if (m?.hasToc == true) ...[
+                const SizedBox(height: 8),
+                const Text('목차', style: TextStyle(fontWeight: FontWeight.w700)),
+                ...m!.tocSummary.take(8).map(
+                      (line) => Text(
+                        line,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+              ],
             ],
             const SizedBox(height: 12),
             Wrap(

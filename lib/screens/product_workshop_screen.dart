@@ -18,6 +18,9 @@ import '../services/sotong24_workshop_presentation.dart';
 import '../services/production_review_status_repository.dart';
 import '../services/production_review_workshop_merge.dart';
 import '../services/pdf_download_service.dart';
+import '../services/pdf_download_platform_stub.dart'
+    if (dart.library.js_interop) '../services/pdf_download_platform_web.dart'
+    as pdf_platform;
 import 'pdf_preview_screen.dart';
 import '../theme/control_theme.dart';
 import '../widgets/revision_request_dialog.dart';
@@ -1113,7 +1116,8 @@ class _Sotong24RemoteDetailScreenState
                     ebookReviewStage,
                     'book.epub',
                   ),
-                  onPreviewPdf: () => _previewEbookPdf(project, ebookReviewStage),
+                  onPreviewPdf: () =>
+                      _previewEbookPdf(project, ebookReviewStage),
                 ),
                 const SizedBox(height: 8),
                 _ResultPanel(stage: ebookReviewStage, project: project),
@@ -1278,15 +1282,17 @@ class _Sotong24RemoteDetailScreenState
           artifactFileName: 'book.epub',
         );
         if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              grant.downloadUrl.isEmpty
-                  ? 'EPUB 다운로드 URL을 받지 못했습니다.'
-                  : 'EPUB 다운로드 준비됨 · ${grant.fileName}',
-            ),
-          ),
-        );
+        final uri = Uri.tryParse(grant.downloadUrl.trim());
+        if (uri == null || grant.downloadUrl.trim().isEmpty) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('EPUB 다운로드 URL을 받지 못했습니다.')),
+          );
+        } else {
+          await pdf_platform.openAttachmentUrl(grant.downloadUrl);
+          messenger.showSnackBar(
+            SnackBar(content: Text('${grant.fileName} 다운로드를 시작했습니다.')),
+          );
+        }
       } else {
         final result = await const ArtifactPdfDownloadService().downloadPdf(
           projectId: project.projectId,

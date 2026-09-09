@@ -12,7 +12,7 @@ void main() {
     expect(steps.any((e) => e.$1 == 'sales_metadata'), isFalse);
   });
 
-  test('EbookR1PackageManifest parses SSOT paths', () {
+  test('EbookR1PackageManifest parses nested artifact SSOT', () {
     const raw = '''
 {
   "revision": "r1",
@@ -23,11 +23,15 @@ void main() {
   "qualityScore": 92,
   "criticalCount": 0,
   "majorCount": 0,
+  "frozen": true,
+  "promoteToUserR1": true,
+  "immutablePath": "publish/revisions/r1",
+  "tocSummary": ["1. 시작", "2. 본문"],
   "artifacts": {
-    "pdf": "publish/book.pdf",
-    "epub": "publish/book.epub",
-    "cover": "assets/cover/cover.png",
-    "qualityReport": "output/pre_review_quality_report.json"
+    "pdf": {"path": "publish/current/book.pdf", "size": 12000, "sha256": "abc123def456"},
+    "epub": {"path": "publish/current/book.epub", "size": 8000, "sha256": "epubsha"},
+    "cover": {"path": "assets/cover/cover.png", "size": 100, "sha256": "c"},
+    "qualityReport": {"path": "output/pre_review_quality_report.json", "size": 1, "sha256": "q"}
   },
   "fileSizes": {"pdf": 12000, "epub": 8000}
 }
@@ -38,7 +42,30 @@ void main() {
     expect(m.hasDownloadablePdf, isTrue);
     expect(m.hasDownloadableEpub, isTrue);
     expect(m.hasCover, isTrue);
+    expect(m.hasToc, isTrue);
+    expect(m.frozen, isTrue);
     expect(m.score, 92);
+    expect(m.pdfPath, 'publish/current/book.pdf');
+    expect(m.pdfSha256, 'abc123def456');
     expect(m.resolvePdfFileName(), 'book.pdf');
+    expect(m.resolveEpubFileName(), 'book.epub');
+  });
+
+  test('EbookR1PackageManifest still accepts legacy string artifact paths', () {
+    const raw = '''
+{
+  "revision": "r1",
+  "title": "legacy",
+  "artifacts": {
+    "pdf": "publish/book.pdf",
+    "epub": "publish/book.epub",
+    "cover": "assets/cover/cover.png"
+  }
+}
+''';
+    final m = EbookR1PackageManifest.fromJsonString(raw);
+    expect(m.pdfPath, 'publish/book.pdf');
+    expect(m.epubPath, 'publish/book.epub');
+    expect(m.hasCover, isTrue);
   });
 }
