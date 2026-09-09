@@ -1276,18 +1276,7 @@ class _Sotong24RemoteDetailScreenState
       } catch (_) {}
     }
 
-    // Legacy openable result: minimal paths so download/preview still work.
-    // Do not invent fabricated defaults when package is missing and scrape fails.
-    if (stage.hasOpenableResult) {
-      return EbookR1PackageManifest(
-        revision: stage.revision > 0 ? 'r${stage.revision}' : 'r1',
-        title: '',
-        pdfPath: 'publish/book.pdf',
-        epubPath: 'publish/book.epub',
-        coverPath: '',
-        qualityReportPath: 'output/pre_review_quality_report.json',
-      );
-    }
+    // No fabricated path fallback for complete-r1 (Codex blocker).
     return null;
   }
 

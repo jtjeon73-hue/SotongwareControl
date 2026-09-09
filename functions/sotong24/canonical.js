@@ -56,6 +56,40 @@ const EBOOK_STAGE_BY_ID = new Map(
   EBOOK_STAGE_CONTRACTS.map((stage) => [stage.id, stage])
 );
 
+// Commercial ebook v2 complete-r1 stages (Flutter ebookWorkflowStages).
+// Registered as aliases for artifact download / relay validation without
+// replacing legacy 18-step EBOOK_STAGE_CONTRACTS order.
+const EBOOK_V2_STAGE_ALIASES = [
+  ["editorial_structure_review", "편집·구조 검토", 8],
+  ["cover_layout_design", "표지·레이아웃", 12],
+  ["format_build", "PDF/EPUB 빌드", 13],
+  ["reader_accessibility_test", "가독·접근성 검사", 14],
+  ["package_user_review", "완성형 r1 사용자 검토", 15],
+  ["sales_metadata", "완성형 r1 사용자 검토(레거시 별칭)", 15],
+  ["final_polish", "최종 폴리시", 16],
+  ["final_user_approval", "최종 사용자 승인", 17],
+  ["publication_package", "출시 준비 패키지", 18],
+];
+for (const [id, name, order] of EBOOK_V2_STAGE_ALIASES) {
+  if (!EBOOK_STAGE_BY_ID.has(id)) {
+    EBOOK_STAGE_BY_ID.set(id, {
+      id,
+      name,
+      order,
+      applicableByDefault: true,
+      aiDocumentStage: true,
+      approvalTypicallyRequired: id === "package_user_review"
+        || id === "sales_metadata"
+        || id === "final_user_approval",
+      artifactKind: "canonical_artifact",
+      criteriaEvaluator: "canonical_artifact",
+      terminal: id === "publication_package",
+      productionBoundary: id === "publication_package",
+      v2Alias: true,
+    });
+  }
+}
+
 // Android-first app production. Stage 18 is an installable-APK/pre-launch
 // boundary and never means Play Store submission or external publication.
 const APP_STAGE_CONTRACTS = [

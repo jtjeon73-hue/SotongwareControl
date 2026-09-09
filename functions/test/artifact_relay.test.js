@@ -804,8 +804,28 @@ describe("artifact attachment download", () => {
       /path_traversal/
     );
     assert.throws(
-      () => parseArtifactDownloadRequest({ ...body, fileName: "cover.png" }),
+      () => parseArtifactDownloadRequest({ ...body, fileName: "notes.txt" }),
       /download_file_not_allowed/
+    );
+    assert.throws(
+      () => parseArtifactDownloadRequest({ ...body, fileName: "evil.exe" }),
+      /download_file_not_allowed|extension_not_allowed|sanitize/
+    );
+    // complete-r1 allowlist: cover/epub/json/book.pdf accepted at parse time
+    assert.equal(
+      parseArtifactDownloadRequest({ ...body, fileName: "cover.png" }).fileName,
+      "cover.png"
+    );
+    assert.equal(
+      parseArtifactDownloadRequest({ ...body, fileName: "book.epub" }).contentType,
+      "application/epub+zip"
+    );
+    assert.equal(
+      parseArtifactDownloadRequest({
+        ...body,
+        fileName: "pre_review_quality_report.json",
+      }).contentType,
+      "application/json"
     );
     const parsed = parseArtifactDownloadRequest(body);
     await assert.rejects(

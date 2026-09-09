@@ -27,9 +27,11 @@ const ALLOWED_EXTENSIONS = new Set([
   ".md",
   ".txt",
   ".pdf",
+  ".epub",
   ".png",
   ".jpg",
   ".jpeg",
+  ".json",
   ".apk",
 ]);
 const ALLOWED_CONTENT_TYPES = new Set([
@@ -38,6 +40,8 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "text/plain",
   "text/plain; charset=utf-8",
   "application/pdf",
+  "application/epub+zip",
+  "application/json",
   "image/png",
   "image/jpeg",
   "application/vnd.android.package-archive",
@@ -561,17 +565,50 @@ function parseArtifactDownloadRequest(body) {
     required: true,
   });
   const fileName = sanitizeFileName(body.fileName);
-  const expectedFile = productType === "app" ? `app-release_r${revision}.apk` : "final_ebook.pdf";
+  const ebookAllowed = new Set([
+    "final_ebook.pdf",
+    "book.pdf",
+    "book.epub",
+    "package_manifest.json",
+    "pre_review_quality_report.json",
+    "cover.png",
+    "cover.jpg",
+    "cover.jpeg",
+  ]);
+  // Allow cover_* / any image basename under ebook complete-r1 when extension is image.
+  const ext = (() => {
+    const i = fileName.lastIndexOf(".");
+    return i >= 0 ? fileName.slice(i).toLowerCase() : "";
+  })();
+  const ebookImageOk = productType === "ebook" && [".png", ".jpg", ".jpeg"].includes(ext);
+  const expectedFile =
+    productType === "app" ? `app-release_r${revision}.apk` : null;
   if (productType === "app") {
     const validAppApkStage = (stageId === "app_android_release" && revision === 1) ||
       (stageId === "app_production_complete" && revision >= 2);
     if (!validAppApkStage) {
       reject("invalid_artifact", "apk_stage_revision_not_allowed", 403);
     }
+    if (fileName !== expectedFile) {
+      reject("invalid_artifact", "download_file_not_allowed", 403);
+    }
+  } else if (productType === "ebook") {
+    if (!ebookAllowed.has(fileName) && !ebookImageOk) {
+      reject("invalid_artifact", "download_file_not_allowed", 403);
+    }
   }
-  if (fileName !== expectedFile) {
-    reject("invalid_artifact", "download_file_not_allowed", 403);
-  }
+  const contentType =
+    productType === "app"
+      ? "application/vnd.android.package-archive"
+      : ext === ".epub"
+        ? "application/epub+zip"
+        : ext === ".json"
+          ? "application/json"
+          : ext === ".png"
+            ? "image/png"
+            : ext === ".jpg" || ext === ".jpeg"
+              ? "image/jpeg"
+              : "application/pdf";
   const storagePath = buildArtifactStoragePath({
     instructionId: projectId,
     stageId,
@@ -589,12 +626,10 @@ function parseArtifactDownloadRequest(body) {
     downloadFileName: sanitizeDownloadFileName(
       body.downloadFileName,
       revision,
-      productType === "app" ? ".apk" : ".pdf"
+      productType === "app" ? ".apk" : ext || ".pdf"
     ),
     storagePath,
-    contentType: productType === "app"
-      ? "application/vnd.android.package-archive"
-      : "application/pdf",
+    contentType,
   };
 }
 
