@@ -56,6 +56,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final pass = score != null && score >= 90 && critical == 0 && major == 0;
     final author = (m?.author ?? '').trim();
     final reviewEnabled = m?.reviewActionsEnabled == true;
+    final deliveryMsg = (m?.deliveryStatusMessage ?? '').trim();
     final coverFileName = () {
       final path = (m?.coverPath ?? '').trim();
       if (path.isEmpty) return '';
@@ -90,6 +91,16 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                 fontWeight: FontWeight.w600,
               ),
             ),
+            if (deliveryMsg.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                deliveryMsg,
+                style: const TextStyle(
+                  color: Colors.orangeAccent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             if ((m?.subtitle ?? '').trim().isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(

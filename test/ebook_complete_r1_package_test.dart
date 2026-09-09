@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/models/ebook_r1_package_manifest.dart';
 import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
@@ -241,5 +244,73 @@ void main() {
     expect(incomplete.hasCover, isFalse);
     expect(incomplete.hasQualityReport, isFalse);
     expect(incomplete.hasManifest, isFalse);
+  });
+
+  test('v2 ebookReviewPackage requires remoteReady/grantReady for review', () {
+    Map<String, dynamic> art(String path, {bool ready = true}) => {
+          'path': path,
+          'fileName': path.split('/').last,
+          'size': 10,
+          'sha256': 'abc',
+          'remoteStatus': ready ? 'grantReady' : 'error',
+          'remoteReady': ready,
+          'grantReady': ready,
+          'remoteUrl': ready ? 'https://example.com/$path' : '',
+        };
+    final ready = EbookR1PackageManifest.fromEbookReviewPackage({
+      'schemaVersion': 'ebookReviewPackage/v2',
+      'contractVersion': 2,
+      'revision': 'r1',
+      'title': 'v2 ready',
+      'reviewReady': true,
+      'cover': art('publish/revisions/r1/cover/cover.png'),
+      'pdf': art('publish/revisions/r1/book.pdf'),
+      'epub': art('publish/revisions/r1/book.epub'),
+      'qualityReport': art('publish/revisions/r1/pre_review_quality_report.json'),
+      'manifest': art('publish/revisions/r1/package_manifest.json'),
+      'quality': {'score': 95, 'criticalCount': 0, 'majorCount': 0},
+      'toc': ['1'],
+    });
+    expect(ready.schemaIsV2, isTrue);
+    expect(ready.reviewActionsEnabled, isTrue);
+
+    final hold = EbookR1PackageManifest.fromEbookReviewPackage({
+      'schemaVersion': 'ebookReviewPackage/v2',
+      'contractVersion': 2,
+      'revision': 'r1',
+      'title': 'v2 hold',
+      'reviewReady': false,
+      'holdReason': 'artifact_delivery_hold',
+      'cover': art('publish/revisions/r1/cover/cover.png', ready: false),
+      'pdf': art('publish/revisions/r1/book.pdf'),
+      'epub': art('publish/revisions/r1/book.epub'),
+      'qualityReport': art('publish/revisions/r1/pre_review_quality_report.json'),
+      'manifest': art('publish/revisions/r1/package_manifest.json'),
+      'quality': {'score': 95},
+    });
+    expect(hold.reviewActionsEnabled, isFalse);
+    expect(hold.deliveryStatusMessage, contains('전달'));
+  });
+
+  test('Work exported fixture parses as Control ebookReviewPackage v2', () {
+    final fixture = File('test/fixtures/ebook_complete_r1_work_payload.json');
+    // Fixture is produced by Work --ebook-r1-selftest case W.
+    // Until first export exists in CI workspace, skip without hanging.
+    if (!fixture.existsSync()) {
+      // ignore: avoid_print
+      print('SKIP: Work fixture not yet exported at ${fixture.path}');
+      return;
+    }
+    final pkg = jsonDecode(fixture.readAsStringSync()) as Map<String, dynamic>;
+    final m = EbookR1PackageManifest.fromEbookReviewPackage(pkg);
+    expect(pkg['schemaVersion'], 'ebookReviewPackage/v2');
+    expect(m.schemaIsV2, isTrue);
+    expect(m.hasCover, isTrue);
+    expect(m.hasDownloadablePdf, isTrue);
+    expect(m.hasDownloadableEpub, isTrue);
+    expect(m.hasQualityReport, isTrue);
+    expect(m.hasManifest, isTrue);
+    expect(m.revision, isNotEmpty);
+    expect(m.reviewActionsEnabled, isTrue);
   });
 }

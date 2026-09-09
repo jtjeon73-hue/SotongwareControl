@@ -27,6 +27,12 @@ class EbookR1PackageManifest {
     this.coverUrl = '',
     this.qualityReportUrl = '',
     this.manifestPath = '',
+    this.schemaIsV2 = false,
+    this.remoteReady = false,
+    this.grantReady = false,
+    this.reviewReadyFlag = false,
+    this.holdReason = '',
+    this.deliveryStatusMessage = '',
   });
 
   final String revision;
@@ -53,6 +59,12 @@ class EbookR1PackageManifest {
   final String epubSha256;
   final List<String> tocSummary;
   final String immutablePath;
+  final bool schemaIsV2;
+  final bool remoteReady;
+  final bool grantReady;
+  final bool reviewReadyFlag;
+  final String holdReason;
+  final String deliveryStatusMessage;
 
   bool get hasDownloadablePdf => pdfPath.isNotEmpty;
   bool get hasDownloadableEpub => epubPath.isNotEmpty;
@@ -62,12 +74,22 @@ class EbookR1PackageManifest {
       qualityReportPath.isNotEmpty || qualityReportUrl.isNotEmpty;
   bool get hasManifest =>
       manifestPath.isNotEmpty || immutablePath.contains('package_manifest');
-  bool get reviewActionsEnabled =>
+
+  bool get artifactsStructurallyPresent =>
       hasDownloadablePdf &&
       hasDownloadableEpub &&
       hasCover &&
       hasQualityReport &&
       hasManifest;
+
+  bool get reviewActionsEnabled {
+    if (!artifactsStructurallyPresent) return false;
+    if (holdReason.isNotEmpty && !reviewReadyFlag) return false;
+    if (schemaIsV2) {
+      return reviewReadyFlag && remoteReady && grantReady;
+    }
+    return true;
+  }
 
   static String _artifactPath(dynamic raw, String fallback) {
     if (raw == null) return fallback;
@@ -84,7 +106,9 @@ class EbookR1PackageManifest {
 
   static String _artifactUrl(dynamic raw) {
     if (raw is Map) {
-      final url = '${raw['url'] ?? raw['downloadUrl'] ?? ''}'.trim();
+      final url =
+          '${raw['url'] ?? raw['downloadUrl'] ?? raw['remoteUrl'] ?? ''}'
+              .trim();
       return url;
     }
     if (raw is String) {
@@ -102,6 +126,11 @@ class EbookR1PackageManifest {
   static String _artifactSha(dynamic raw) {
     if (raw is Map) return '${raw['sha256'] ?? ''}'.trim();
     return '';
+  }
+
+  static bool _artifactReadyFlag(dynamic raw, String key) {
+    if (raw is Map) return raw[key] == true;
+    return false;
   }
 
   static int? _asInt(dynamic value) {
@@ -138,13 +167,16 @@ class EbookR1PackageManifest {
         ? Map<String, dynamic>.from(json['fileSizes'] as Map)
         : <String, dynamic>{};
     final toc = _parseToc(json['tocSummary'] ?? json['toc']);
-    final pdfRaw = artifacts['pdf'];
-    final epubRaw = artifacts['epub'];
-    final coverRaw = artifacts['cover'];
-    final qualityRaw = artifacts['qualityReport'];
-    final manifestRaw = artifacts['manifest'];
+    final pdfRaw = artifacts['pdf'] ?? json['pdf'];
+    final epubRaw = artifacts['epub'] ?? json['epub'];
+    final coverRaw = artifacts['cover'] ?? json['cover'];
+    final qualityRaw = artifacts['qualityReport'] ?? json['qualityReport'];
+    final manifestRaw = artifacts['manifest'] ?? json['manifest'];
     final pdfFallback = 'publish/current/book.pdf';
     final epubFallback = 'publish/current/book.epub';
+    final schema = '${json['schemaVersion'] ?? ''}';
+    final isV2 = schema.contains('ebookReviewPackage/v2') ||
+        json['contractVersion'] == 2;
     return EbookR1PackageManifest(
       revision: '${json['revision'] ?? 'r1'}',
       title: '${json['title'] ?? ''}',
@@ -175,16 +207,44 @@ class EbookR1PackageManifest {
             ? (sizes['epub'] as num).toInt()
             : int.tryParse('${sizes['epub'] ?? ''}') ?? 0,
       ),
-      score: _asInt(json['qualityScore']),
-      criticalCount: _asInt(json['criticalCount']),
-      majorCount: _asInt(json['majorCount']),
-      refineCount: _asInt(json['refineCount']),
+      score: _asInt(json['qualityScore']) ??
+          _asInt((json['quality'] is Map) ? json['quality']['score'] : null),
+      criticalCount: _asInt(json['criticalCount']) ??
+          _asInt(
+            (json['quality'] is Map) ? json['quality']['criticalCount'] : null,
+          ),
+      majorCount: _asInt(json['majorCount']) ??
+          _asInt(
+            (json['quality'] is Map) ? json['quality']['majorCount'] : null,
+          ),
+      refineCount: _asInt(json['refineCount']) ??
+          _asInt(
+            (json['quality'] is Map) ? json['quality']['refineCount'] : null,
+          ),
       generatedAt: '${json['generatedAt'] ?? json['validatedAt'] ?? ''}',
       frozen: json['frozen'] == true || json['promoteToUserR1'] == true,
       pdfSha256: _artifactSha(pdfRaw),
       epubSha256: _artifactSha(epubRaw),
       tocSummary: toc,
       immutablePath: '${json['immutablePath'] ?? ''}',
+      schemaIsV2: isV2,
+      remoteReady: _artifactReadyFlag(pdfRaw, 'remoteReady') &&
+          _artifactReadyFlag(epubRaw, 'remoteReady') &&
+          _artifactReadyFlag(coverRaw, 'remoteReady') &&
+          _artifactReadyFlag(qualityRaw, 'remoteReady') &&
+          _artifactReadyFlag(manifestRaw, 'remoteReady'),
+      grantReady: _artifactReadyFlag(pdfRaw, 'grantReady') &&
+          _artifactReadyFlag(epubRaw, 'grantReady') &&
+          _artifactReadyFlag(coverRaw, 'grantReady') &&
+          _artifactReadyFlag(qualityRaw, 'grantReady') &&
+          _artifactReadyFlag(manifestRaw, 'grantReady'),
+      reviewReadyFlag: json['reviewReady'] == true,
+      holdReason: '${json['holdReason'] ?? ''}',
+      deliveryStatusMessage: json['reviewReady'] == true
+          ? ''
+          : ((json['holdReason'] ?? '').toString().isNotEmpty
+              ? '결과물 전달 준비 실패/재시도 필요'
+              : '결과물 전달 준비 중'),
     );
   }
 
@@ -192,10 +252,23 @@ class EbookR1PackageManifest {
   factory EbookR1PackageManifest.fromEbookReviewPackage(
     Map<String, dynamic> pkg,
   ) {
-    final coverRaw = pkg['coverArtifact'] ?? pkg['cover'];
-    final pdfRaw = pkg['pdfArtifact'] ?? pkg['pdf'];
-    final epubRaw = pkg['epubArtifact'] ?? pkg['epub'];
-    final manifestRaw = pkg['manifestArtifact'] ?? pkg['manifest'];
+    final schema = '${pkg['schemaVersion'] ?? ''}';
+    final isV2 = schema.contains('ebookReviewPackage/v2') ||
+        pkg['contractVersion'] == 2;
+
+    // v2: top-level cover/pdf/epub/qualityReport/manifest. Legacy: *Artifact / nested quality.path.
+    final coverRaw = isV2
+        ? (pkg['cover'] ?? pkg['coverArtifact'])
+        : (pkg['coverArtifact'] ?? pkg['cover']);
+    final pdfRaw = isV2
+        ? (pkg['pdf'] ?? pkg['pdfArtifact'])
+        : (pkg['pdfArtifact'] ?? pkg['pdf']);
+    final epubRaw = isV2
+        ? (pkg['epub'] ?? pkg['epubArtifact'])
+        : (pkg['epubArtifact'] ?? pkg['epub']);
+    final manifestRaw = isV2
+        ? (pkg['manifest'] ?? pkg['manifestArtifact'])
+        : (pkg['manifestArtifact'] ?? pkg['manifest']);
     final qualityRaw = pkg['quality'];
 
     int? score = _asInt(pkg['qualityScore']);
@@ -211,18 +284,22 @@ class EbookR1PackageManifest {
       critical ??= _asInt(q['criticalCount'] ?? q['critical']);
       major ??= _asInt(q['majorCount'] ?? q['major']);
       refine ??= _asInt(q['refineCount'] ?? q['refines']);
-      qualityReportRaw ??=
-          q['report'] ??
-          q['artifact'] ??
-          q['qualityReport'] ??
-          ((q.containsKey('path') ||
-                  q.containsKey('url') ||
-                  q.containsKey('downloadUrl'))
-              ? q
-              : null);
+      if (!isV2) {
+        qualityReportRaw ??=
+            q['report'] ??
+            q['artifact'] ??
+            q['qualityReport'] ??
+            ((q.containsKey('path') ||
+                    q.containsKey('url') ||
+                    q.containsKey('downloadUrl'))
+                ? q
+                : null);
+      }
     } else if (qualityRaw is num) {
       score ??= qualityRaw.toInt();
-    } else if (qualityRaw is String && qualityRaw.trim().isNotEmpty) {
+    } else if (!isV2 &&
+        qualityRaw is String &&
+        qualityRaw.trim().isNotEmpty) {
       qualityReportRaw ??= qualityRaw;
     }
 
@@ -231,6 +308,19 @@ class EbookR1PackageManifest {
       manifestRaw,
       '${pkg['immutablePath'] ?? ''}'.trim(),
     );
+
+    final remoteReady = _artifactReadyFlag(coverRaw, 'remoteReady') &&
+        _artifactReadyFlag(pdfRaw, 'remoteReady') &&
+        _artifactReadyFlag(epubRaw, 'remoteReady') &&
+        _artifactReadyFlag(qualityReportRaw, 'remoteReady') &&
+        _artifactReadyFlag(manifestRaw, 'remoteReady');
+    final grantReady = _artifactReadyFlag(coverRaw, 'grantReady') &&
+        _artifactReadyFlag(pdfRaw, 'grantReady') &&
+        _artifactReadyFlag(epubRaw, 'grantReady') &&
+        _artifactReadyFlag(qualityReportRaw, 'grantReady') &&
+        _artifactReadyFlag(manifestRaw, 'grantReady');
+    final reviewReady = pkg['reviewReady'] == true;
+    final hold = '${pkg['holdReason'] ?? ''}'.trim();
 
     return EbookR1PackageManifest(
       revision: '${pkg['revision'] ?? 'r1'}',
@@ -257,6 +347,16 @@ class EbookR1PackageManifest {
       epubSha256: _artifactSha(epubRaw),
       tocSummary: toc,
       immutablePath: immutable,
+      schemaIsV2: isV2,
+      remoteReady: isV2 ? remoteReady : true,
+      grantReady: isV2 ? grantReady : true,
+      reviewReadyFlag: isV2 ? reviewReady : true,
+      holdReason: hold,
+      deliveryStatusMessage: (!isV2 || reviewReady)
+          ? ''
+          : (hold.isNotEmpty
+              ? '결과물 전달 준비 실패/재시도 필요'
+              : '결과물 전달 준비 중'),
     );
   }
 
