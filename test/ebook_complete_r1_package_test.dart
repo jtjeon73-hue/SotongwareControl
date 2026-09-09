@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/models/ebook_r1_package_manifest.dart';
+import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/services/business_planning_service.dart';
 
 void main() {
@@ -67,5 +68,138 @@ void main() {
     expect(m.pdfPath, 'publish/book.pdf');
     expect(m.epubPath, 'publish/book.epub');
     expect(m.hasCover, isTrue);
+  });
+
+  test('fromEbookReviewPackage maps structured fields + coverUrl/toc/quality', () {
+    final m = EbookR1PackageManifest.fromEbookReviewPackage({
+      'revision': 'r1',
+      'title': '구조화 패키지',
+      'subtitle': '부제',
+      'author': '홍길동',
+      'validatedAt': '2026-09-09T12:00:00Z',
+      'frozen': true,
+      'toc': ['서문', '1장', '2장'],
+      'coverArtifact': {
+        'path': 'assets/cover/cover.png',
+        'url': 'https://cdn.example/cover.png',
+        'sha256': 'coversha',
+        'size': 2048,
+      },
+      'pdfArtifact': {
+        'path': 'publish/current/book.pdf',
+        'size': 9000,
+        'sha256': 'pdfsha',
+      },
+      'epubArtifact': 'publish/current/book.epub',
+      'quality': {
+        'score': 95,
+        'criticalCount': 0,
+        'majorCount': 0,
+        'refineCount': 2,
+        'path': 'output/pre_review_quality_report.json',
+        'downloadUrl': 'https://cdn.example/quality.json',
+      },
+      'manifestArtifact': {'path': 'publish/revisions/r1/package_manifest.json'},
+    });
+
+    expect(m.revision, 'r1');
+    expect(m.title, '구조화 패키지');
+    expect(m.author, '홍길동');
+    expect(m.generatedAt, '2026-09-09T12:00:00Z');
+    expect(m.coverUrl, 'https://cdn.example/cover.png');
+    expect(m.coverPath, 'assets/cover/cover.png');
+    expect(m.pdfPath, 'publish/current/book.pdf');
+    expect(m.epubPath, 'publish/current/book.epub');
+    expect(m.hasToc, isTrue);
+    expect(m.tocSummary, ['서문', '1장', '2장']);
+    expect(m.score, 95);
+    expect(m.refineCount, 2);
+    expect(m.qualityReportPath, 'output/pre_review_quality_report.json');
+    expect(m.qualityReportUrl, 'https://cdn.example/quality.json');
+    expect(m.hasQualityReport, isTrue);
+    expect(m.frozen, isTrue);
+    expect(m.immutablePath, 'publish/revisions/r1/package_manifest.json');
+  });
+
+  test('Sotong24RemoteStage parses ebookReviewPackage (top-level and nested)', () {
+    final top = Sotong24RemoteStage.fromMap({
+      'stageId': 'package_user_review',
+      'stageNumber': 15,
+      'stageName': '완성형 검토',
+      'status': 'awaiting_approval',
+      'ebookReviewPackage': {
+        'title': 'top',
+        'pdfArtifact': {'path': 'publish/current/book.pdf'},
+      },
+    });
+    expect(top.ebookReviewPackage?['title'], 'top');
+
+    final nestedResult = Sotong24RemoteStage.fromMap({
+      'stageId': 'package_user_review',
+      'stageNumber': 15,
+      'stageName': '완성형 검토',
+      'status': 'awaiting_approval',
+      'result': {
+        'ebookReviewPackage': {
+          'title': 'from-result',
+          'cover': {'downloadUrl': 'https://cdn.example/c.png'},
+        },
+      },
+    });
+    expect(nestedResult.ebookReviewPackage?['title'], 'from-result');
+
+    final nestedPackage = Sotong24RemoteStage.fromMap({
+      'stageId': 'package_user_review',
+      'stageNumber': 15,
+      'stageName': '완성형 검토',
+      'status': 'awaiting_approval',
+      'result': {
+        'package': {
+          'title': 'result-package',
+          'tocSummary': ['A'],
+        },
+      },
+    });
+    expect(nestedPackage.ebookReviewPackage?['title'], 'result-package');
+  });
+
+  test('structured ebookReviewPackage is preferred over summary scrape', () {
+    final stage = Sotong24RemoteStage.fromMap({
+      'stageId': 'package_user_review',
+      'stageNumber': 15,
+      'stageName': '완성형 검토',
+      'status': 'awaiting_approval',
+      'summary':
+          '{"revision":"r0","title":"scraped-legacy","artifacts":{"pdf":"publish/old.pdf"}}',
+      'ebookReviewPackage': {
+        'revision': 'r1',
+        'title': 'structured-ssot',
+        'pdfArtifact': {'path': 'publish/current/book.pdf'},
+        'toc': ['구조화 목차'],
+        'quality': {'score': 91, 'refineCount': 1},
+        'coverArtifact': {
+          'url': 'https://cdn.example/cover-ssot.png',
+          'path': 'assets/cover/cover.png',
+        },
+      },
+    });
+
+    final structured = stage.ebookReviewPackage!;
+    final fromStructured =
+        EbookR1PackageManifest.fromEbookReviewPackage(structured);
+    final scraped = EbookR1PackageManifest.fromJsonString(
+      stage.summary.substring(
+        stage.summary.indexOf('{'),
+        stage.summary.lastIndexOf('}') + 1,
+      ),
+    );
+
+    expect(fromStructured.title, 'structured-ssot');
+    expect(scraped.title, 'scraped-legacy');
+    expect(fromStructured.title, isNot(scraped.title));
+    expect(fromStructured.coverUrl, 'https://cdn.example/cover-ssot.png');
+    expect(fromStructured.tocSummary, ['구조화 목차']);
+    expect(fromStructured.score, 91);
+    expect(fromStructured.refineCount, 1);
   });
 }

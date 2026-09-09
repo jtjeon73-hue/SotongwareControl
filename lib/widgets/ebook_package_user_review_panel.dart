@@ -15,6 +15,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     required this.onChangesRequested,
     required this.onHold,
     this.manifest,
+    this.coverUrl,
     this.onDownloadPdf,
     this.onDownloadEpub,
     this.onPreviewPdf,
@@ -28,6 +29,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
   final VoidCallback onChangesRequested;
   final VoidCallback onHold;
   final EbookR1PackageManifest? manifest;
+  final String? coverUrl;
   final VoidCallback? onDownloadPdf;
   final VoidCallback? onDownloadEpub;
   final VoidCallback? onPreviewPdf;
@@ -47,7 +49,10 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final score = m?.score;
     final critical = m?.criticalCount ?? 0;
     final major = m?.majorCount ?? 0;
+    final refine = m?.refineCount;
     final pass = score != null && score >= 90 && critical == 0 && major == 0;
+    final resolvedCoverUrl = (coverUrl ?? m?.coverUrl ?? '').trim();
+    final author = (m?.author ?? '').trim();
 
     return Card(
       margin: EdgeInsets.zero,
@@ -83,11 +88,51 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                 style: const TextStyle(color: ControlColors.textSecondary),
               ),
             ],
+            if (author.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                '저자 · $author',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: ControlColors.textSecondary,
+                ),
+              ),
+            ],
             if ((m?.generatedAt ?? '').isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(
                 '제작 완료: ${m!.generatedAt}',
                 style: const TextStyle(fontSize: 12),
+              ),
+            ],
+            if (resolvedCoverUrl.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    resolvedCoverUrl,
+                    height: 160,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Text(
+                      '표지 이미지를 불러오지 못했습니다.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: ControlColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ] else if (m?.hasCover == true) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Cover · ${m!.coverPath}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textSecondary,
+                ),
               ),
             ],
             const SizedBox(height: 12),
@@ -97,6 +142,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
               children: [
                 _chip('revision $revision'),
                 if (score != null) _chip('품질 $score'),
+                if (refine != null) _chip('refine $refine'),
                 _chip('critical $critical'),
                 _chip('major $major'),
                 _chip(pass ? 'PASS' : 'CHECK'),
@@ -127,20 +173,22 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                   '${(m?.epubBytes ?? 0) > 0 ? ' · ${_fmtBytes(m!.epubBytes)}' : ''}'
                   '${(m?.epubSha256 ?? '').isNotEmpty ? ' · sha256 ${(m!.epubSha256.length > 12) ? '${m.epubSha256.substring(0, 12)}…' : m.epubSha256}' : ''}',
                 ),
-              if (m?.hasCover == true) Text('Cover · ${m!.coverPath}'),
               if (m?.frozen == true)
                 Text(
                   'immutable · ${m!.immutablePath.isNotEmpty ? m.immutablePath : m.revision}',
-                  style: const TextStyle(fontSize: 12, color: ControlColors.textSecondary),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: ControlColors.textSecondary,
+                  ),
                 ),
               if (m?.hasToc == true) ...[
                 const SizedBox(height: 8),
                 const Text('목차', style: TextStyle(fontWeight: FontWeight.w700)),
-                ...m!.tocSummary.take(8).map(
-                      (line) => Text(
-                        line,
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                ...m!.tocSummary
+                    .take(8)
+                    .map(
+                      (line) =>
+                          Text(line, style: const TextStyle(fontSize: 12)),
                     ),
               ],
             ],

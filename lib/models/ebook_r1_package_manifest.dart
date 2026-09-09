@@ -10,33 +10,41 @@ class EbookR1PackageManifest {
     required this.coverPath,
     required this.qualityReportPath,
     this.subtitle = '',
+    this.author = '',
     this.language = 'ko',
     this.pdfBytes = 0,
     this.epubBytes = 0,
     this.score,
     this.criticalCount,
     this.majorCount,
+    this.refineCount,
     this.generatedAt = '',
     this.frozen = false,
     this.pdfSha256 = '',
     this.epubSha256 = '',
     this.tocSummary = const [],
     this.immutablePath = '',
+    this.coverUrl = '',
+    this.qualityReportUrl = '',
   });
 
   final String revision;
   final String title;
   final String subtitle;
+  final String author;
   final String language;
   final String pdfPath;
   final String epubPath;
   final String coverPath;
+  final String coverUrl;
   final String qualityReportPath;
+  final String qualityReportUrl;
   final int pdfBytes;
   final int epubBytes;
   final int? score;
   final int? criticalCount;
   final int? majorCount;
+  final int? refineCount;
   final String generatedAt;
   final bool frozen;
   final String pdfSha256;
@@ -46,17 +54,34 @@ class EbookR1PackageManifest {
 
   bool get hasDownloadablePdf => pdfPath.isNotEmpty;
   bool get hasDownloadableEpub => epubPath.isNotEmpty;
-  bool get hasCover => coverPath.isNotEmpty;
+  bool get hasCover => coverPath.isNotEmpty || coverUrl.isNotEmpty;
   bool get hasToc => tocSummary.isNotEmpty;
+  bool get hasQualityReport =>
+      qualityReportPath.isNotEmpty || qualityReportUrl.isNotEmpty;
 
   static String _artifactPath(dynamic raw, String fallback) {
     if (raw == null) return fallback;
-    if (raw is String) return raw;
+    if (raw is String) {
+      final s = raw.trim();
+      return s.isNotEmpty ? s : fallback;
+    }
     if (raw is Map) {
       final path = '${raw['path'] ?? ''}'.trim();
       return path.isNotEmpty ? path : fallback;
     }
     return fallback;
+  }
+
+  static String _artifactUrl(dynamic raw) {
+    if (raw is Map) {
+      final url = '${raw['url'] ?? raw['downloadUrl'] ?? ''}'.trim();
+      return url;
+    }
+    if (raw is String) {
+      final s = raw.trim();
+      if (s.startsWith('http://') || s.startsWith('https://')) return s;
+    }
+    return '';
   }
 
   static int _artifactSize(dynamic raw, int fallback) {
@@ -69,6 +94,32 @@ class EbookR1PackageManifest {
     return '';
   }
 
+  static int? _asInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse('${value ?? ''}');
+  }
+
+  static List<String> _parseToc(dynamic tocRaw) {
+    final toc = <String>[];
+    if (tocRaw is List) {
+      for (final e in tocRaw) {
+        if (e is Map) {
+          final title = '${e['title'] ?? e['label'] ?? e['text'] ?? ''}'.trim();
+          if (title.isNotEmpty) toc.add(title);
+          continue;
+        }
+        final s = '$e'.trim();
+        if (s.isNotEmpty) toc.add(s);
+      }
+    } else if (tocRaw is String && tocRaw.trim().isNotEmpty) {
+      for (final line in tocRaw.split(RegExp(r'[\n|;]'))) {
+        final s = line.trim();
+        if (s.isNotEmpty) toc.add(s);
+      }
+    }
+    return toc;
+  }
+
   factory EbookR1PackageManifest.fromJson(Map<String, dynamic> json) {
     final artifacts = (json['artifacts'] is Map)
         ? Map<String, dynamic>.from(json['artifacts'] as Map)
@@ -76,14 +127,7 @@ class EbookR1PackageManifest {
     final sizes = (json['fileSizes'] is Map)
         ? Map<String, dynamic>.from(json['fileSizes'] as Map)
         : <String, dynamic>{};
-    final tocRaw = json['tocSummary'];
-    final toc = <String>[];
-    if (tocRaw is List) {
-      for (final e in tocRaw) {
-        final s = '$e'.trim();
-        if (s.isNotEmpty) toc.add(s);
-      }
-    }
+    final toc = _parseToc(json['tocSummary'] ?? json['toc']);
     final pdfRaw = artifacts['pdf'];
     final epubRaw = artifacts['epub'];
     final coverRaw = artifacts['cover'];
@@ -94,14 +138,17 @@ class EbookR1PackageManifest {
       revision: '${json['revision'] ?? 'r1'}',
       title: '${json['title'] ?? ''}',
       subtitle: '${json['subtitle'] ?? ''}',
+      author: '${json['author'] ?? ''}',
       language: '${json['language'] ?? 'ko'}',
       pdfPath: _artifactPath(pdfRaw, pdfFallback),
       epubPath: _artifactPath(epubRaw, epubFallback),
       coverPath: _artifactPath(coverRaw, ''),
+      coverUrl: _artifactUrl(coverRaw),
       qualityReportPath: _artifactPath(
         qualityRaw,
         'output/pre_review_quality_report.json',
       ),
+      qualityReportUrl: _artifactUrl(qualityRaw),
       pdfBytes: _artifactSize(
         pdfRaw,
         (sizes['pdf'] is num)
@@ -114,21 +161,86 @@ class EbookR1PackageManifest {
             ? (sizes['epub'] as num).toInt()
             : int.tryParse('${sizes['epub'] ?? ''}') ?? 0,
       ),
-      score: json['qualityScore'] is num
-          ? (json['qualityScore'] as num).toInt()
-          : int.tryParse('${json['qualityScore'] ?? ''}'),
-      criticalCount: json['criticalCount'] is num
-          ? (json['criticalCount'] as num).toInt()
-          : int.tryParse('${json['criticalCount'] ?? ''}'),
-      majorCount: json['majorCount'] is num
-          ? (json['majorCount'] as num).toInt()
-          : int.tryParse('${json['majorCount'] ?? ''}'),
-      generatedAt: '${json['generatedAt'] ?? ''}',
+      score: _asInt(json['qualityScore']),
+      criticalCount: _asInt(json['criticalCount']),
+      majorCount: _asInt(json['majorCount']),
+      refineCount: _asInt(json['refineCount']),
+      generatedAt: '${json['generatedAt'] ?? json['validatedAt'] ?? ''}',
       frozen: json['frozen'] == true || json['promoteToUserR1'] == true,
       pdfSha256: _artifactSha(pdfRaw),
       epubSha256: _artifactSha(epubRaw),
       tocSummary: toc,
       immutablePath: '${json['immutablePath'] ?? ''}',
+    );
+  }
+
+  /// Structured `ebookReviewPackage` SSOT from remote stage (not summary scrape).
+  factory EbookR1PackageManifest.fromEbookReviewPackage(
+    Map<String, dynamic> pkg,
+  ) {
+    final coverRaw = pkg['coverArtifact'] ?? pkg['cover'];
+    final pdfRaw = pkg['pdfArtifact'] ?? pkg['pdf'];
+    final epubRaw = pkg['epubArtifact'] ?? pkg['epub'];
+    final manifestRaw = pkg['manifestArtifact'] ?? pkg['manifest'];
+    final qualityRaw = pkg['quality'];
+
+    int? score = _asInt(pkg['qualityScore']);
+    int? critical = _asInt(pkg['criticalCount']);
+    int? major = _asInt(pkg['majorCount']);
+    int? refine = _asInt(pkg['refineCount']);
+    dynamic qualityReportRaw = pkg['qualityReport'] ?? pkg['qualityReportArtifact'];
+
+    if (qualityRaw is Map) {
+      final q = Map<String, dynamic>.from(qualityRaw);
+      score ??= _asInt(q['score'] ?? q['qualityScore']);
+      critical ??= _asInt(q['criticalCount'] ?? q['critical']);
+      major ??= _asInt(q['majorCount'] ?? q['major']);
+      refine ??= _asInt(q['refineCount'] ?? q['refines']);
+      qualityReportRaw ??=
+          q['report'] ??
+          q['artifact'] ??
+          q['qualityReport'] ??
+          ((q.containsKey('path') ||
+                  q.containsKey('url') ||
+                  q.containsKey('downloadUrl'))
+              ? q
+              : null);
+    } else if (qualityRaw is num) {
+      score ??= qualityRaw.toInt();
+    } else if (qualityRaw is String && qualityRaw.trim().isNotEmpty) {
+      qualityReportRaw ??= qualityRaw;
+    }
+
+    final toc = _parseToc(pkg['toc'] ?? pkg['tocSummary']);
+    final immutable = _artifactPath(
+      manifestRaw,
+      '${pkg['immutablePath'] ?? ''}'.trim(),
+    );
+
+    return EbookR1PackageManifest(
+      revision: '${pkg['revision'] ?? 'r1'}',
+      title: '${pkg['title'] ?? ''}',
+      subtitle: '${pkg['subtitle'] ?? ''}',
+      author: '${pkg['author'] ?? ''}',
+      language: '${pkg['language'] ?? 'ko'}',
+      pdfPath: _artifactPath(pdfRaw, ''),
+      epubPath: _artifactPath(epubRaw, ''),
+      coverPath: _artifactPath(coverRaw, ''),
+      coverUrl: _artifactUrl(coverRaw),
+      qualityReportPath: _artifactPath(qualityReportRaw, ''),
+      qualityReportUrl: _artifactUrl(qualityReportRaw),
+      pdfBytes: _artifactSize(pdfRaw, 0),
+      epubBytes: _artifactSize(epubRaw, 0),
+      score: score,
+      criticalCount: critical,
+      majorCount: major,
+      refineCount: refine,
+      generatedAt: '${pkg['validatedAt'] ?? pkg['generatedAt'] ?? ''}',
+      frozen: pkg['frozen'] == true || pkg['promoteToUserR1'] == true,
+      pdfSha256: _artifactSha(pdfRaw),
+      epubSha256: _artifactSha(epubRaw),
+      tocSummary: toc,
+      immutablePath: immutable,
     );
   }
 
@@ -150,5 +262,12 @@ class EbookR1PackageManifest {
     return epubPath.split('/').isNotEmpty
         ? epubPath.split('/').last
         : 'book.epub';
+  }
+
+  String resolveQualityReportFileName() {
+    if (qualityReportPath.isEmpty) return 'pre_review_quality_report.json';
+    final parts = qualityReportPath.split('/');
+    final name = parts.isNotEmpty ? parts.last.trim() : '';
+    return name.isNotEmpty ? name : 'pre_review_quality_report.json';
   }
 }

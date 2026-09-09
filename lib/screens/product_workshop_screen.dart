@@ -1081,43 +1081,60 @@ class _Sotong24RemoteDetailScreenState
                   ),
                 ),
                 const SizedBox(height: 6),
-                EbookPackageUserReviewPanel(
-                  project: project,
-                  stage: ebookReviewStage,
-                  busy: _busy,
-                  manifest: _tryParseEbookManifest(ebookReviewStage),
-                  onApprove: () => _onApprove(project, ebookReviewStage),
-                  onChangesRequested: () =>
-                      _onRevision(project, ebookReviewStage),
-                  onHold: () async {
-                    setState(() => _busy = true);
-                    final messenger = ScaffoldMessenger.of(context);
-                    final err = await widget.repository.requestRevision(
-                      projectId: project.projectId,
-                      stageId: ebookReviewStage.stageId,
-                      requestId: _resolveRequestId(ebookReviewStage),
-                      message:
-                          '[reviewDecision=on_hold]\n[reviewedRevision=r${ebookReviewStage.revision > 0 ? ebookReviewStage.revision : 1}]\n전자책 완성형 패키지 보류',
-                      reviewDecision: 'on_hold',
-                    );
-                    if (!mounted) return;
-                    setState(() => _busy = false);
-                    messenger.showSnackBar(
-                      SnackBar(content: Text(err ?? '보류했습니다. 패키지는 보존됩니다.')),
+                Builder(
+                  builder: (context) {
+                    final ebookManifest =
+                        _tryParseEbookManifest(ebookReviewStage);
+                    final coverPreview = (ebookManifest?.coverUrl ?? '').trim();
+                    return EbookPackageUserReviewPanel(
+                      project: project,
+                      stage: ebookReviewStage,
+                      busy: _busy,
+                      manifest: ebookManifest,
+                      coverUrl: coverPreview.isNotEmpty ? coverPreview : null,
+                      onApprove: () => _onApprove(project, ebookReviewStage),
+                      onChangesRequested: () =>
+                          _onRevision(project, ebookReviewStage),
+                      onHold: () async {
+                        setState(() => _busy = true);
+                        final messenger = ScaffoldMessenger.of(context);
+                        final err = await widget.repository.requestRevision(
+                          projectId: project.projectId,
+                          stageId: ebookReviewStage.stageId,
+                          requestId: _resolveRequestId(ebookReviewStage),
+                          message:
+                              '[reviewDecision=on_hold]\n[reviewedRevision=r${ebookReviewStage.revision > 0 ? ebookReviewStage.revision : 1}]\n전자책 완성형 패키지 보류',
+                          reviewDecision: 'on_hold',
+                        );
+                        if (!mounted) return;
+                        setState(() => _busy = false);
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(err ?? '보류했습니다. 패키지는 보존됩니다.'),
+                          ),
+                        );
+                      },
+                      onDownloadPdf: () => _downloadEbookArtifact(
+                        project,
+                        ebookReviewStage,
+                        'book.pdf',
+                      ),
+                      onDownloadEpub: () => _downloadEbookArtifact(
+                        project,
+                        ebookReviewStage,
+                        'book.epub',
+                      ),
+                      onPreviewPdf: () =>
+                          _previewEbookPdf(project, ebookReviewStage),
+                      onOpenQualityReport:
+                          ebookManifest?.hasQualityReport == true
+                          ? () => _openEbookQualityReport(
+                              project,
+                              ebookReviewStage,
+                            )
+                          : null,
                     );
                   },
-                  onDownloadPdf: () => _downloadEbookArtifact(
-                    project,
-                    ebookReviewStage,
-                    'book.pdf',
-                  ),
-                  onDownloadEpub: () => _downloadEbookArtifact(
-                    project,
-                    ebookReviewStage,
-                    'book.epub',
-                  ),
-                  onPreviewPdf: () =>
-                      _previewEbookPdf(project, ebookReviewStage),
                 ),
                 const SizedBox(height: 8),
                 _ResultPanel(stage: ebookReviewStage, project: project),
@@ -1240,6 +1257,14 @@ class _Sotong24RemoteDetailScreenState
   }
 
   EbookR1PackageManifest? _tryParseEbookManifest(Sotong24RemoteStage stage) {
+    final structured = stage.ebookReviewPackage;
+    if (structured != null && structured.isNotEmpty) {
+      try {
+        return EbookR1PackageManifest.fromEbookReviewPackage(structured);
+      } catch (_) {}
+    }
+
+    // Legacy only: scrape summary/errorMessage JSON when structured package absent.
     final candidates = <String>[stage.summary, stage.errorMessage];
     for (final raw in candidates) {
       final start = raw.indexOf('{');
@@ -1251,7 +1276,9 @@ class _Sotong24RemoteDetailScreenState
         );
       } catch (_) {}
     }
-    // Minimal SSOT defaults so UI still offers download when result URL exists.
+
+    // Legacy openable result: minimal paths so download/preview still work.
+    // Do not invent fabricated defaults when package is missing and scrape fails.
     if (stage.hasOpenableResult) {
       return EbookR1PackageManifest(
         revision: stage.revision > 0 ? 'r${stage.revision}' : 'r1',
@@ -1263,6 +1290,54 @@ class _Sotong24RemoteDetailScreenState
       );
     }
     return null;
+  }
+
+  Future<void> _openEbookQualityReport(
+    Sotong24RemoteProject project,
+    Sotong24RemoteStage stage,
+  ) async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final manifest = _tryParseEbookManifest(stage);
+      final directUrl = (manifest?.qualityReportUrl ?? '').trim();
+      if (Sotong24RemoteStage.isOpenableHttpUrl(directUrl)) {
+        await pdf_platform.openAttachmentUrl(directUrl);
+        messenger.showSnackBar(
+          const SnackBar(content: Text('품질 보고서를 열었습니다.')),
+        );
+        return;
+      }
+
+      final path = (manifest?.qualityReportPath ?? '').trim();
+      if (Sotong24RemoteStage.isOpenableHttpUrl(path)) {
+        await pdf_platform.openAttachmentUrl(path);
+        messenger.showSnackBar(
+          const SnackBar(content: Text('품질 보고서를 열었습니다.')),
+        );
+        return;
+      }
+
+      final fileName = manifest?.resolveQualityReportFileName() ??
+          'pre_review_quality_report.json';
+      final grant = await RemoteControlApi().createArtifactDownloadGrant(
+        projectId: project.projectId,
+        stageId: stage.stageId,
+        revision: stage.revision > 0 ? stage.revision : 1,
+        fileName: fileName,
+        artifactFileName: fileName,
+      );
+      if (!mounted) return;
+      await pdf_platform.openAttachmentUrl(grant.downloadUrl);
+      messenger.showSnackBar(
+        SnackBar(content: Text('${grant.fileName} 다운로드를 시작했습니다.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('품질 보고서 열기 실패: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _downloadEbookArtifact(

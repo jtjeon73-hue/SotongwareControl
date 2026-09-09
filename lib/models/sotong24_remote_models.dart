@@ -166,6 +166,7 @@ class Sotong24RemoteStage {
     this.taskId = '',
     this.reviewDecision = '',
     this.selectedDesignDirection = '',
+    this.ebookReviewPackage,
   });
 
   final String stageId;
@@ -191,6 +192,9 @@ class Sotong24RemoteStage {
 
   /// Design direction id when reviewDecision=design_change_requested.
   final String selectedDesignDirection;
+
+  /// Structured complete-r1 package payload (SSOT). Prefer over summary scrape.
+  final Map<String, dynamic>? ebookReviewPackage;
 
   /// Agent/stage_sync가 보낸 최신 revision. 0이면 미보고.
   final int revision;
@@ -337,7 +341,35 @@ class Sotong24RemoteStage {
     if (reviewDecision.trim().isNotEmpty) 'reviewDecision': reviewDecision,
     if (selectedDesignDirection.trim().isNotEmpty)
       'selectedDesignDirection': selectedDesignDirection,
+    if (ebookReviewPackage != null) 'ebookReviewPackage': ebookReviewPackage,
   };
+
+  /// Prefer top-level `ebookReviewPackage`; also accept nested under result/package.
+  static Map<String, dynamic>? _readEbookReviewPackage(
+    Map<String, dynamic> map,
+  ) {
+    Map<String, dynamic>? asMap(dynamic value) {
+      if (value is Map) return Map<String, dynamic>.from(value);
+      return null;
+    }
+
+    final direct = asMap(map['ebookReviewPackage']);
+    if (direct != null) return direct;
+
+    final result = asMap(map['result']);
+    if (result != null) {
+      final nested =
+          asMap(result['ebookReviewPackage']) ?? asMap(result['package']);
+      if (nested != null) return nested;
+    }
+
+    final package = asMap(map['package']);
+    if (package != null) {
+      final nested = asMap(package['ebookReviewPackage']);
+      if (nested != null) return nested;
+    }
+    return null;
+  }
 
   factory Sotong24RemoteStage.fromMap(Map<String, dynamic> map, {String? id}) {
     final stageId = '${map['stageId'] ?? id ?? ''}'.trim();
@@ -383,6 +415,7 @@ class Sotong24RemoteStage {
       taskId: '${map['taskId'] ?? ''}',
       reviewDecision: '${map['reviewDecision'] ?? ''}',
       selectedDesignDirection: '${map['selectedDesignDirection'] ?? ''}',
+      ebookReviewPackage: _readEbookReviewPackage(map),
     );
   }
 
@@ -443,6 +476,7 @@ class Sotong24RemoteStage {
       reviewDecision: reviewDecision ?? this.reviewDecision,
       selectedDesignDirection:
           selectedDesignDirection ?? this.selectedDesignDirection,
+      ebookReviewPackage: ebookReviewPackage,
     );
   }
 }
