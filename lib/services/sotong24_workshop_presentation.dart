@@ -3,6 +3,7 @@ import '../models/commercial/production_review_status_envelope.dart';
 import '../models/remote_e2e_sample.dart';
 import '../models/sotong24_remote_models.dart';
 import 'production_review_status_presentation.dart';
+import 'site_subtype_contract.dart';
 
 class Sotong24FinalPdfArtifact {
   const Sotong24FinalPdfArtifact({
@@ -278,15 +279,22 @@ class Sotong24WorkshopPresentation {
     return '결과 버전 r$r';
   }
 
-  static String businessTypeLabel(String productType) {
-    switch (ArtifactType.normalize(productType)) {
-      case ArtifactType.site:
-        return '지식사이트';
-      case ArtifactType.promoSite:
-        return '마케팅사이트';
-      default:
-        return ArtifactType.labelKo(productType);
+  /// Prefer [contentSubtype] (knowledge_site / education_site / marketing_site…).
+  /// Never hard-label every `site` as 지식사이트.
+  static String businessTypeLabel(
+    String productType, {
+    String contentSubtype = '',
+  }) {
+    final pt = ArtifactType.normalize(productType);
+    if (pt == ArtifactType.site || pt == ArtifactType.promoSite) {
+      final sub = SiteSubtypeContract.normalizeOrEmpty(contentSubtype);
+      if (sub.isNotEmpty) return SiteSubtypeContract.labelKo(sub);
+      if (pt == ArtifactType.promoSite) {
+        return SiteSubtypeContract.labelKo(SiteSubtypeContract.marketingSite);
+      }
+      return ArtifactType.labelKo(pt);
     }
+    return ArtifactType.labelKo(productType);
   }
 
   /// Agent가 보고한 workDurationMs만 사용. 승인 대기·startedAt~completedAt 추정 금지.

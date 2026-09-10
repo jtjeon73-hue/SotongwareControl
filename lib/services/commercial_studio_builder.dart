@@ -258,6 +258,11 @@ class CommercialStudioBuilder {
       case 'site':
         final purpose = _sitePurpose(state);
         if (purpose.isEmpty) return null;
+        final knowledgeLike =
+            purpose == SiteSubtypeContract.knowledgeSite ||
+            purpose == SiteSubtypeContract.educationSite ||
+            purpose == SiteSubtypeContract.informationPortal;
+        final educationLike = purpose == SiteSubtypeContract.educationSite;
         return CommercialQualityAttachment(
           brief: brief,
           siteQualityContractVersion: 1,
@@ -266,28 +271,67 @@ class CommercialStudioBuilder {
             standard: standard,
             sitePurpose: purpose,
             siteSubtype: purpose,
-            requiredRoutes: const ['/', '/about', '/contact'],
+            requiredRoutes: knowledgeLike
+                ? (educationLike
+                      ? const [
+                          '/',
+                          '/courses',
+                          '/lessons',
+                          '/topics',
+                          '/search',
+                          '/about',
+                        ]
+                      : const [
+                          '/',
+                          '/topics',
+                          '/articles',
+                          '/search',
+                          '/about',
+                        ])
+                : const ['/', '/about', '/contact'],
             heroMessage: displayTitle,
-            primaryCtas: const ['문의하기', '자세히 보기'],
+            primaryCtas: knowledgeLike
+                ? (educationLike
+                      ? const ['학습 시작', '과정 탐색', '검색']
+                      : const ['주제 탐색', '검색', '자세히 보기'])
+                : const ['문의하기', '자세히 보기'],
             realOffering: outcome,
-            trustSignals: const ['실적', '연락처', '프로세스'],
-            authPaymentsNeed: 'none_unless_required',
+            trustSignals: knowledgeLike
+                ? const ['출처', '카테고리', '업데이트일', '정보 구조']
+                : const ['실적', '연락처', '프로세스'],
+            // Payment may be future; keep contract hook without requiring live billing.
+            authPaymentsNeed: knowledgeLike
+                ? 'future_member_or_subscription_ready'
+                : 'none_unless_required',
             responsiveBreakpoints: const ['360', '768', '1280'],
             designSystemBrand: 'sotongware_site_v1',
             stateUxRequired: const ['empty', 'loading', 'error'],
             seoRequirements: const ['title', 'meta', 'og'],
             performanceBudget: 'lcp_under_2_5s',
             securityPrivacyCookie: const ['https_only', 'cookie_notice'],
-            analyticsConversion: const ['contact_submit'],
+            analyticsConversion: knowledgeLike
+                ? const ['search_submit', 'topic_open']
+                : const ['contact_submit'],
             browserEvidenceRequirements: const [
               'viewport_screenshots',
               'route_crawl',
             ],
-            rejectCriteria: const [
-              'empty_cards',
-              'broken_routes',
-              'no_browser_evidence',
-            ],
+            rejectCriteria: knowledgeLike
+                ? const [
+                    'placeholder',
+                    'lorem_ipsum',
+                    'empty_cards',
+                    'empty_hero',
+                    'broken_routes',
+                    'broken_navigation',
+                    'missing_meta',
+                    'no_browser_evidence',
+                  ]
+                : const [
+                    'empty_cards',
+                    'broken_routes',
+                    'no_browser_evidence',
+                  ],
           ),
         );
       case 'content':

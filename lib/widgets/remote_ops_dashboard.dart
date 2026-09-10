@@ -324,6 +324,7 @@ class RemoteOpsDashboard extends StatelessWidget {
             currentWork.productTypeLabel.isNotEmpty
                 ? Sotong24WorkshopPresentation.businessTypeLabel(
                     currentWork.productType,
+                    contentSubtype: currentWork.contentSubtype,
                   )
                 : currentWork.productTypeLabel,
             style: const TextStyle(

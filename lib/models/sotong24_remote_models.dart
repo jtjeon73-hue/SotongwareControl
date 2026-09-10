@@ -1,6 +1,7 @@
 import 'artifact_type.dart';
 import 'commercial/production_review_status_envelope.dart';
 import 'instruction_contract.dart';
+import '../services/site_subtype_contract.dart';
 
 /// PC Sotong24Work ↔ 소통총관제 원격 관제 상태.
 class Sotong24PcLinkStatus {
@@ -631,8 +632,14 @@ class Sotong24RemoteProject {
 
   String get productTypeLabel {
     final base = ArtifactType.labelKo(productType);
-    if (productType == ArtifactType.contents && contentSubtype.isNotEmpty) {
+    final pt = ArtifactType.normalize(productType);
+    if (pt == ArtifactType.contents && contentSubtype.isNotEmpty) {
       return '$base · ${ContentSubtype.labelKo(contentSubtype)}';
+    }
+    if ((pt == ArtifactType.site || pt == ArtifactType.promoSite) &&
+        contentSubtype.isNotEmpty) {
+      final sub = SiteSubtypeContract.normalizeOrEmpty(contentSubtype);
+      if (sub.isNotEmpty) return '$base · ${SiteSubtypeContract.labelKo(sub)}';
     }
     return base;
   }
