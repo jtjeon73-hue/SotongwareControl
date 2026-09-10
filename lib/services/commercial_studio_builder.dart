@@ -316,22 +316,18 @@ class CommercialStudioBuilder {
               'viewport_screenshots',
               'route_crawl',
             ],
-            rejectCriteria: knowledgeLike
-                ? const [
-                    'placeholder',
-                    'lorem_ipsum',
-                    'empty_cards',
-                    'empty_hero',
-                    'broken_routes',
-                    'broken_navigation',
-                    'missing_meta',
-                    'no_browser_evidence',
-                  ]
-                : const [
-                    'empty_cards',
-                    'broken_routes',
-                    'no_browser_evidence',
-                  ],
+            // Marketing/corporate share commercial reject bar with knowledge:
+            // skeleton/placeholder must not be STEP15 review-ready.
+            rejectCriteria: const [
+              'placeholder',
+              'lorem_ipsum',
+              'empty_cards',
+              'empty_hero',
+              'broken_routes',
+              'broken_navigation',
+              'missing_meta',
+              'no_browser_evidence',
+            ],
           ),
         );
       case 'content':

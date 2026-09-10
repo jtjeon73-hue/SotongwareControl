@@ -269,7 +269,7 @@ class CommercialFixtures {
     ),
     sitePurpose: purpose,
     siteSubtype: purpose,
-    requiredRoutes: const ['/', '/services', '/contact'],
+    requiredRoutes: const ['/', '/about', '/contact'],
     heroMessage: '실무 경험 기반 제작 서비스',
     primaryCtas: const ['문의하기', '포트폴리오'],
     realOffering: '산업자동화·앱·콘텐츠 제작 서비스',
