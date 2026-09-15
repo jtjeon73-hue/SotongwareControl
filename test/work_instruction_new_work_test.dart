@@ -448,8 +448,7 @@ void main() {
 
     Future<void> enter(String label, String text) async {
       final field = find.byWidgetPredicate(
-        (w) =>
-            w is TextField && (w as TextField).decoration?.labelText == label,
+        (w) => w is TextField && w.decoration?.labelText == label,
       );
       expect(field, findsOneWidget, reason: label);
       await tester.ensureVisible(field);

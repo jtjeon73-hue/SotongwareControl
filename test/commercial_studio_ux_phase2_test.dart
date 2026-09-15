@@ -181,10 +181,7 @@ void main() {
       );
       expect(attachment, isNotNull);
       expect(attachment!.brief.manualOnlyMode, isTrue);
-      expect(
-        attachment.brief.structuredUserInputs['reasonsToPay'],
-        isNotEmpty,
-      );
+      expect(attachment.brief.structuredUserInputs['reasonsToPay'], isNotEmpty);
       expect(attachment.brief.aiAugmentedBrief, isEmpty);
     });
 
