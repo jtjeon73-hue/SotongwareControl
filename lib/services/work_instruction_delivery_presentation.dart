@@ -271,21 +271,49 @@ class WorkInstructionDeliveryPresentation {
     }
 
     if (!localCommercialValidated) {
+      // Contract/Agent READY면 버튼은 활성. 클릭 시 _transferToWork가
+      // 로컬 상용 검증을 먼저 수행하므로 validation을 우회하지 않는다.
+      // (manualOnly advanced UI에는 별도 「로컬 상용 검증」 버튼이 없음)
+      final canValidateThenSend =
+          agentView.canAttemptSend &&
+          (validation == null || validation.canTransfer);
       return DeliveryStep7View(
         agentStatus: agentView,
-        buttonState: DeliveryButtonState.blocked,
+        buttonState: canValidateThenSend
+            ? DeliveryButtonState.ready
+            : DeliveryButtonState.blocked,
         buttonLabel: '로컬 검증 후 보내기',
-        buttonEnabled: false,
+        buttonEnabled: canValidateThenSend,
         showSuccessPanel: false,
-        failure: const DeliveryFailureView(
-          kind: DeliveryFailureKind.validation,
-          title: '로컬 검증이 필요합니다',
-          body: '작업지시서 생성 후 「로컬 검증」을 통과해야 소통24워크로 보낼 수 있습니다.',
-          guidance: '최종 확인 단계의 로컬 검증 버튼을 눌러 주세요.',
-          primaryAction: DeliveryDiagnosticAction.validationReview,
-          allowRetry: false,
-        ),
-        validationLines: const ['최종 확정 → 작업지시서 생성 → 로컬 검증 → 보내기 순서를 지켜 주세요.'],
+        failure: canValidateThenSend
+            ? null
+            : DeliveryFailureView(
+                kind: !agentView.canAttemptSend
+                    ? (agentView.connectivity == AgentConnectivity.stale
+                          ? DeliveryFailureKind.heartbeatStale
+                          : DeliveryFailureKind.agentOffline)
+                    : DeliveryFailureKind.validation,
+                title: !agentView.canAttemptSend
+                    ? 'Agent 준비 필요'
+                    : '로컬 검증이 필요합니다',
+                body: !agentView.canAttemptSend
+                    ? agentView.readinessLine
+                    : '작업지시서 생성 후 「로컬 검증」을 통과해야 소통24워크로 보낼 수 있습니다.',
+                guidance: !agentView.canAttemptSend
+                    ? 'Agent 상태를 확인한 뒤 다시 시도해 주세요.'
+                    : '「로컬 검증 후 보내기」로 상용 계약을 확인하세요.',
+                primaryAction: !agentView.canAttemptSend
+                    ? DeliveryDiagnosticAction.recheckStatus
+                    : DeliveryDiagnosticAction.validationReview,
+                allowRetry: false,
+              ),
+        validationLines: canValidateThenSend
+            ? const <String>[
+                '보내기 전에 로컬 상용 검증이 한 번 더 실행됩니다.',
+              ]
+            : const [
+                '최종 확정 → 작업지시서 생성 → 로컬 검증 → 보내기 순서를 지켜 주세요.',
+              ],
       );
     }
 

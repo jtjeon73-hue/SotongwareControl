@@ -309,7 +309,7 @@ void main() {
   });
 
   group('finalize vs send separation', () {
-    test('send blocked until localCommercialValidated', () {
+    test('send blocked without agent even if not locally validated', () {
       final readyWithoutLocal = WorkInstructionDeliveryPresentation.resolve(
         plan: null,
         validation: null,
