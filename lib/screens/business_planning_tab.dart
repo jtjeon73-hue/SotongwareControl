@@ -302,11 +302,57 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     if (_inputModeQuick) {
       return _designEngine.toBusinessPlanInput(_designState);
     }
+    return _advancedBusinessPlanInput();
+  }
+
+  /// 직접 입력(advanced): 폼 값을 SSOT wizardSelections/fieldStatuses에 확정 반영.
+  /// AI 보완(quick) 경로는 변경하지 않는다.
+  BusinessPlanInput _advancedBusinessPlanInput() {
+    final topic = _topicCtrl.text;
+    final problem = _problemCtrl.text;
+    final target = _targetCtrl.text;
+    final outcome = _outcomeCtrl.text;
+    final wizardJson = Map<String, dynamic>.from(_wizardState.toJson());
+    wizardJson['mode'] = 'advanced';
+    wizardJson['topic'] = topic;
+    wizardJson['customerProblem'] = problem;
+    wizardJson['targetCustomer'] = target;
+    wizardJson['desiredOutcome'] = outcome;
+    if (_artifactType != ArtifactType.undecided) {
+      wizardJson['artifactType'] = _artifactType;
+    }
+    if (_contentSubtype.trim().isNotEmpty) {
+      wizardJson['contentSubtype'] = _contentSubtype;
+    }
+    // InstructionContractBuilder가 읽는 정식 fieldStatuses (userConfirmed만 pending=false)
+    wizardJson['fieldStatuses'] = {
+      'topic': topic.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'problem': problem.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'outcome': outcome.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'customer': target.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'planningConfirmed': true,
+    };
+    final custom = <String, dynamic>{
+      ...((wizardJson['customTexts'] is Map)
+          ? Map<String, dynamic>.from(wizardJson['customTexts'] as Map)
+          : const <String, dynamic>{}),
+      'manualOnlyMode': 'true',
+      'topicStatus': topic.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'problemStatus': problem.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'outcomeStatus': outcome.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'customerStatus': target.trim().isEmpty ? 'undecided' : 'userConfirmed',
+      'planningConfirmed': 'true',
+      'titleSource': 'manual',
+      if (topic.trim().isNotEmpty) 'displayTitle': topic.trim(),
+      if (topic.trim().isNotEmpty) 'workingTitle': topic.trim(),
+    };
+    wizardJson['customTexts'] = custom;
+
     return BusinessPlanInput(
-      topic: _topicCtrl.text,
-      customerProblem: _problemCtrl.text,
-      targetCustomer: _targetCtrl.text,
-      desiredOutcome: _outcomeCtrl.text,
+      topic: topic,
+      customerProblem: problem,
+      targetCustomer: target,
+      desiredOutcome: outcome,
       experienceSkills: _skillsCtrl.text,
       existingMaterials: _materialsCtrl.text,
       expectedScale: _scaleCtrl.text,
@@ -321,7 +367,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           : [_artifactType],
       artifactType: _artifactType,
       contentSubtype: _contentSubtype,
-      wizardSelections: _wizardState.toJson(),
+      wizardSelections: wizardJson,
       sentencesManuallyEdited: _wizardState.sentencesManuallyEdited,
     );
   }
@@ -345,14 +391,15 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
   }
 
   /// 직접 입력 폼 → design state 동기화 (TOP10 선택 없이 commercial brief 생성 가능).
+  /// 컨트롤러를 직접 읽어 circular dependency(_currentInput↔sync)를 피한다.
   void _syncAdvancedFormToDesignState() {
     if (_inputModeQuick) return;
-    final input = _currentInput;
-    final artifact = input.resolvedArtifactType;
-    final topic = input.topic.trim();
-    final problem = input.customerProblem.trim();
-    final target = input.targetCustomer.trim();
-    final outcome = input.desiredOutcome.trim();
+    final topic = _topicCtrl.text.trim();
+    final problem = _problemCtrl.text.trim();
+    final target = _targetCtrl.text.trim();
+    final outcome = _outcomeCtrl.text.trim();
+    final artifact = _artifactType;
+    final subtype = _contentSubtype.trim();
     final next = _designState.copy()
       ..manualOnlyMode = true
       ..creationMode = _designState.creationMode.isEmpty
@@ -363,9 +410,9 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       ..targetCustomer = target
       ..desiredOutcome = outcome
       ..artifactType = artifact == ArtifactType.undecided ? null : artifact
-      ..contentSubtype = input.contentSubtype.trim().isEmpty
+      ..contentSubtype = subtype.isEmpty
           ? null
-          : ContentSubtype.normalize(input.contentSubtype)
+          : ContentSubtype.normalize(subtype)
       ..displayTitle = _designState.displayTitle.trim().isNotEmpty
           ? _designState.displayTitle.trim()
           : topic
@@ -374,10 +421,19 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
           : topic
       ..titleSource = 'manual'
       ..planningConfirmed = true
-      ..topicStatus = DesignFieldStatus.userEdited
-      ..problemStatus = DesignFieldStatus.userEdited
-      ..outcomeStatus = DesignFieldStatus.userEdited
-      ..customerStatus = DesignFieldStatus.userEdited
+      // userConfirmed만 InstructionContract pending=false (userEdited는 pending)
+      ..topicStatus = topic.isEmpty
+          ? DesignFieldStatus.undecided
+          : DesignFieldStatus.userConfirmed
+      ..problemStatus = problem.isEmpty
+          ? DesignFieldStatus.undecided
+          : DesignFieldStatus.userConfirmed
+      ..outcomeStatus = outcome.isEmpty
+          ? DesignFieldStatus.undecided
+          : DesignFieldStatus.userConfirmed
+      ..customerStatus = target.isEmpty
+          ? DesignFieldStatus.undecided
+          : DesignFieldStatus.userConfirmed
       ..originalUserBriefConfirmed = true;
 
     final briefParts = <String>[
@@ -407,6 +463,8 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       next.userConfirmedAt = DateTime.now().toUtc().toIso8601String();
     }
     _designState = next;
+    // wizardSelections SSOT에도 fieldStatuses/customTexts가 들어가도록 동기화
+    _wizardState = next.toWizardState().copyWith(mode: 'advanced');
   }
 
   ContractValidationResult? get _contractValidation {

@@ -221,38 +221,83 @@ class InstructionContractBuilder {
     BusinessPlanInput input,
     ProjectDesignState? design,
   ) {
+    Map<String, DesignFieldStatus> resolved;
     final raw = input.wizardSelections?['fieldStatuses'];
     if (raw is Map) {
-      return {
+      resolved = {
         'topic': DesignFieldStatusX.parse('${raw['topic'] ?? ''}'),
         'problem': DesignFieldStatusX.parse('${raw['problem'] ?? ''}'),
         'outcome': DesignFieldStatusX.parse('${raw['outcome'] ?? ''}'),
         'customer': DesignFieldStatusX.parse('${raw['customer'] ?? ''}'),
       };
-    }
-    if (design != null) {
-      return {
+    } else if (design != null) {
+      resolved = {
         'topic': design.topicStatus,
         'problem': design.problemStatus,
         'outcome': design.outcomeStatus,
         'customer': design.customerStatus,
       };
+    } else {
+      // Legacy direct input without status → treat non-empty as confirmed
+      resolved = {
+        'topic': input.topic.trim().isEmpty
+            ? DesignFieldStatus.undecided
+            : DesignFieldStatus.userConfirmed,
+        'problem': input.customerProblem.trim().isEmpty
+            ? DesignFieldStatus.undecided
+            : DesignFieldStatus.userConfirmed,
+        'outcome': input.desiredOutcome.trim().isEmpty
+            ? DesignFieldStatus.undecided
+            : DesignFieldStatus.userConfirmed,
+        'customer': input.targetCustomer.trim().isEmpty
+            ? DesignFieldStatus.undecided
+            : DesignFieldStatus.userConfirmed,
+      };
     }
-    // Legacy direct input without status → treat non-empty as confirmed
-    return {
-      'topic': input.topic.trim().isEmpty
-          ? DesignFieldStatus.undecided
-          : DesignFieldStatus.userConfirmed,
-      'problem': input.customerProblem.trim().isEmpty
-          ? DesignFieldStatus.undecided
-          : DesignFieldStatus.userConfirmed,
-      'outcome': input.desiredOutcome.trim().isEmpty
-          ? DesignFieldStatus.undecided
-          : DesignFieldStatus.userConfirmed,
-      'customer': input.targetCustomer.trim().isEmpty
-          ? DesignFieldStatus.undecided
-          : DesignFieldStatus.userConfirmed,
-    };
+
+    // manualOnly / advanced 직접입력: 값이 있으면 SSOT에서 확정으로 승격
+    // (userEdited·undecided가 pending으로 남는 회귀 방지; AI 보완 경로는 변경 없음)
+    if (_isManualOnlyInput(input, design)) {
+      return {
+        'topic': _confirmIfPresent(resolved['topic']!, input.topic),
+        'problem': _confirmIfPresent(
+          resolved['problem']!,
+          input.customerProblem,
+        ),
+        'outcome': _confirmIfPresent(
+          resolved['outcome']!,
+          input.desiredOutcome,
+        ),
+        'customer': _confirmIfPresent(
+          resolved['customer']!,
+          input.targetCustomer,
+        ),
+      };
+    }
+    return resolved;
+  }
+
+  bool _isManualOnlyInput(
+    BusinessPlanInput input,
+    ProjectDesignState? design,
+  ) {
+    if (design?.manualOnlyMode == true) return true;
+    final custom = input.wizardSelections?['customTexts'];
+    if (custom is Map && '${custom['manualOnlyMode']}' == 'true') {
+      return true;
+    }
+    // 직접 입력 중심 UI = advanced mode
+    if ('${input.wizardSelections?['mode']}' == 'advanced') return true;
+    return false;
+  }
+
+  DesignFieldStatus _confirmIfPresent(
+    DesignFieldStatus status,
+    String value,
+  ) {
+    if (value.trim().isEmpty) return status;
+    if (status.isConfirmed) return status;
+    return DesignFieldStatus.userConfirmed;
   }
 
   CanonicalValue _canonicalFrom(String value, DesignFieldStatus status) {
