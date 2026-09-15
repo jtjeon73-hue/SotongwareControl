@@ -395,10 +395,7 @@ void main() {
       find.byKey(const Key('planning_artifact_ebook_selected')),
       findsNothing,
     );
-    expect(
-      find.byKey(const Key('planning_resume_draft_banner')),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('planning_resume_draft_banner')), findsNothing);
     expect(find.text('이전에 작성하던 작업'), findsNothing);
     expect(find.text('이어하기'), findsNothing);
     expect(find.byKey(const Key('planning_input_mode_card')), findsOneWidget);
@@ -422,6 +419,82 @@ void main() {
     await tester.tap(find.text('직접 입력 중심'));
     await tester.pumpAndSettle();
     expect(find.text('사업 주제 *'), findsOneWidget);
+  });
+
+  testWidgets('직접 입력 — 필수 4개+전자책이면 생성 버튼 활성, 누락 시 fail-closed', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(390, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: AiBusinessAnalysisScreen())),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('직접 입력 중심'));
+    await tester.tap(find.text('직접 입력 중심'));
+    await tester.pumpAndSettle();
+
+    final createBtn = find.byKey(
+      const Key('planning_advanced_create_instruction'),
+    );
+    expect(createBtn, findsOneWidget);
+    expect(tester.widget<FilledButton>(createBtn).onPressed, isNull);
+    expect(
+      find.byKey(const Key('planning_advanced_missing_hint')),
+      findsOneWidget,
+    );
+
+    Future<void> enter(String label, String text) async {
+      final field = find.byWidgetPredicate(
+        (w) =>
+            w is TextField && (w as TextField).decoration?.labelText == label,
+      );
+      expect(field, findsOneWidget, reason: label);
+      await tester.ensureVisible(field);
+      await tester.enterText(field, text);
+      await tester.pump();
+    }
+
+    await enter('사업 주제 *', '중장년 건강 습관');
+    await enter('고객 문제 *', '습관이 쉽게 무너진다');
+    await enter('대상 고객 *', '40~60대 직장인');
+    await enter('원하는 결과 *', '2주 루틴 정착');
+    await tester.pumpAndSettle();
+
+    // artifact not selected yet → still disabled
+    expect(tester.widget<FilledButton>(createBtn).onPressed, isNull);
+
+    final ebookChip = find.ancestor(
+      of: find.text('전자책'),
+      matching: find.byType(FilterChip),
+    );
+    await tester.ensureVisible(ebookChip.first);
+    await tester.tap(ebookChip.first);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<FilledButton>(createBtn).onPressed, isNotNull);
+    expect(
+      find.byKey(const Key('planning_advanced_missing_hint')),
+      findsNothing,
+    );
+
+    await tester.ensureVisible(createBtn);
+    await tester.tap(createBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('작업지시 생성 완료'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('상세 제작 설정 (선택)'));
+    await tester.tap(find.text('상세 제작 설정 (선택)'));
+    await tester.pumpAndSettle();
+
+    final review = find.widgetWithText(OutlinedButton, '확인 항목 보기');
+    expect(review, findsOneWidget);
+    expect(tester.widget<OutlinedButton>(review).onPressed, isNotNull);
+    final advanced = find.widgetWithText(OutlinedButton, '작업지시 원문/고급');
+    expect(tester.widget<OutlinedButton>(advanced).onPressed, isNotNull);
   });
 
   testWidgets('미전송 draft 재진입 — STEP1 새 작업 유지', (tester) async {

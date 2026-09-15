@@ -70,9 +70,9 @@ class CommercialStudioBuilder {
     if (original.isEmpty && !state.manualOnlyMode) return null;
 
     final seedMeta = _selectedSeedMeta(state);
-    final reasons = state.reasonsToPay.isNotEmpty
-        ? state.reasonsToPay
-        : (seedMeta?.reasonsToPay ?? const <String>[]);
+    var reasons = state.reasonsToPay.isNotEmpty
+        ? List<String>.from(state.reasonsToPay)
+        : List<String>.from(seedMeta?.reasonsToPay ?? const <String>[]);
     final uniqueValue = state.uniqueValue.trim().isNotEmpty
         ? state.uniqueValue.trim()
         : (seedMeta?.uniqueValue ?? input.desiredOutcome.trim());
@@ -84,6 +84,14 @@ class CommercialStudioBuilder {
         : (seedMeta?.promisedOutcome ?? '');
 
     if (problem.isEmpty || outcome.isEmpty) return null;
+    // 직접 입력(manualOnly): TOP10/추천 컨셉 없이도 결과·고유가치로 reasons 보완
+    if (reasons.isEmpty && state.manualOnlyMode) {
+      if (uniqueValue.isNotEmpty) {
+        reasons = [uniqueValue];
+      } else if (outcome.isNotEmpty) {
+        reasons = [outcome];
+      }
+    }
     if (reasons.isEmpty) return null;
 
     final structured = <String, dynamic>{

@@ -159,6 +159,57 @@ void main() {
       expect(attachment.brief.aiAugmentedBrief, isEmpty);
     });
 
+    test('manualOnlyMode without TOP10 concept still builds from 4 fields', () {
+      final state = ProjectDesignState(
+        artifactType: ArtifactType.ebook,
+        topic: '중장년 수면 루틴',
+        customerProblem: '수면이 불규칙하다',
+        targetCustomer: '40~60대 직장인',
+        desiredOutcome: '2주 내 수면 루틴 정착',
+        displayTitle: '중장년 수면 루틴',
+        manualOnlyMode: true,
+        planningConfirmed: true,
+        selectedConceptIds: const [],
+        reasonsToPay: const [],
+        uniqueValue: '',
+      );
+      final attachment = const CommercialStudioBuilder().tryBuild(
+        state: state,
+        input: inputFrom(state),
+        instructionId: 'wi_manual_no_top10',
+        projectId: 'plan_manual_no_top10',
+      );
+      expect(attachment, isNotNull);
+      expect(attachment!.brief.manualOnlyMode, isTrue);
+      expect(
+        attachment.brief.structuredUserInputs['reasonsToPay'],
+        isNotEmpty,
+      );
+      expect(attachment.brief.aiAugmentedBrief, isEmpty);
+    });
+
+    test('non-manual without reasons/concept still fail-closed', () {
+      final state = ProjectDesignState(
+        artifactType: ArtifactType.ebook,
+        topic: '중장년 수면 루틴',
+        customerProblem: '수면이 불규칙하다',
+        targetCustomer: '40~60대 직장인',
+        desiredOutcome: '2주 내 수면 루틴 정착',
+        displayTitle: '중장년 수면 루틴',
+        manualOnlyMode: false,
+        selectedConceptIds: const [],
+        reasonsToPay: const [],
+        uniqueValue: '',
+      );
+      final attachment = const CommercialStudioBuilder().tryBuild(
+        state: state,
+        input: inputFrom(state),
+        instructionId: 'wi_ai_no_reasons',
+        projectId: 'plan_ai_no_reasons',
+      );
+      expect(attachment, isNull);
+    });
+
     test('revise_existing requires source + requestedChanges in canCreate', () {
       final incomplete = baseState(creationMode: 'revise_existing');
       expect(incomplete.canCreateInstruction, isFalse);

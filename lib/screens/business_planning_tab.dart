@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/business_planning.dart';
+import '../models/concept_candidate.dart';
 import '../models/dev_work_doc_status.dart';
 import '../models/idea_bank.dart';
 import '../models/planning_wizard_state.dart';
@@ -239,6 +240,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     void scheduleDraft() {
       _draftTimer?.cancel();
       _draftTimer = Timer(const Duration(milliseconds: 800), _persistDraft);
+      // 직접 입력 모드: 필수값 입력에 따라 생성 버튼 활성 상태를 즉시 반영
+      if (!_inputModeQuick && mounted) {
+        setState(() {});
+      }
     }
 
     for (final c in _allControllers) {
@@ -334,8 +339,74 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
       );
       if (sub == ContentSubtype.undecided) return false;
     }
+    // AI 보완 중심만 기획 확정 필요. 직접 입력은 필수 4필드+형태면 진행.
     if (_inputModeQuick && !_designState.planningConfirmed) return false;
     return true;
+  }
+
+  /// 직접 입력 폼 → design state 동기화 (TOP10 선택 없이 commercial brief 생성 가능).
+  void _syncAdvancedFormToDesignState() {
+    if (_inputModeQuick) return;
+    final input = _currentInput;
+    final artifact = input.resolvedArtifactType;
+    final topic = input.topic.trim();
+    final problem = input.customerProblem.trim();
+    final target = input.targetCustomer.trim();
+    final outcome = input.desiredOutcome.trim();
+    final next = _designState.copy()
+      ..manualOnlyMode = true
+      ..creationMode = _designState.creationMode.isEmpty
+          ? 'new_product'
+          : _designState.creationMode
+      ..topic = topic
+      ..customerProblem = problem
+      ..targetCustomer = target
+      ..desiredOutcome = outcome
+      ..artifactType = artifact == ArtifactType.undecided ? null : artifact
+      ..contentSubtype = input.contentSubtype.trim().isEmpty
+          ? null
+          : ContentSubtype.normalize(input.contentSubtype)
+      ..displayTitle = _designState.displayTitle.trim().isNotEmpty
+          ? _designState.displayTitle.trim()
+          : topic
+      ..workingTitle = _designState.workingTitle.trim().isNotEmpty
+          ? _designState.workingTitle.trim()
+          : topic
+      ..titleSource = 'manual'
+      ..planningConfirmed = true
+      ..topicStatus = DesignFieldStatus.userEdited
+      ..problemStatus = DesignFieldStatus.userEdited
+      ..outcomeStatus = DesignFieldStatus.userEdited
+      ..customerStatus = DesignFieldStatus.userEdited
+      ..originalUserBriefConfirmed = true;
+
+    final briefParts = <String>[
+      if (topic.isNotEmpty) topic,
+      if (problem.isNotEmpty) problem,
+      if (outcome.isNotEmpty) outcome,
+      if (target.isNotEmpty) '대상: $target',
+    ];
+    if (next.originalUserBrief.trim().isEmpty) {
+      next.originalUserBrief = briefParts.join('\n');
+    }
+    if (next.uniqueValue.trim().isEmpty && outcome.isNotEmpty) {
+      next.uniqueValue = outcome;
+    }
+    if (next.reasonsToPay.isEmpty) {
+      next.reasonsToPay = [
+        if (outcome.isNotEmpty) outcome,
+        if (problem.isNotEmpty) '고객 문제 해결: $problem',
+      ];
+    }
+    if (next.selectedAudiences.isEmpty &&
+        next.customAudience.trim().isEmpty &&
+        target.isNotEmpty) {
+      next.customAudience = target;
+    }
+    if (next.userConfirmedAt.trim().isEmpty) {
+      next.userConfirmedAt = DateTime.now().toUtc().toIso8601String();
+    }
+    _designState = next;
   }
 
   ContractValidationResult? get _contractValidation {
@@ -990,6 +1061,7 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
     required bool appendPreviousToHistory,
     DevWorkDocSaveTarget saveTarget = DevWorkDocSaveTarget.folder,
   }) async {
+    _syncAdvancedFormToDesignState();
     if (!_canCreateInstruction) {
       _snack('주제·고객 문제·대상·결과·제작 형태를 먼저 완성하세요.');
       return;
@@ -2605,7 +2677,10 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         SwitchListTile(
           key: const Key('planning_ai_production_mode_switch'),
           contentPadding: EdgeInsets.zero,
-          title: Text(modeTitle, key: const Key('planning_ai_production_mode_label')),
+          title: Text(
+            modeTitle,
+            key: const Key('planning_ai_production_mode_label'),
+          ),
           subtitle: const Text(
             '검증을 통과한 제작 단계를 순서대로 진행합니다. 외부 등록·출시는 실행하지 않습니다.',
             style: TextStyle(fontSize: 12.5),
@@ -2779,6 +2854,61 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
                 _field(_extraRequestsCtrl, '추가 요청'),
                 _field(_notesCtrl, '메모', maxLines: 3),
               ],
+            ),
+            const SizedBox(height: 14),
+            if (!_canCreateInstruction) ...[
+              Text(
+                _currentInput.missingRequiredLabels.isEmpty
+                    ? '제작 형태를 선택하면 다음 단계로 진행할 수 있습니다.'
+                    : '필수 입력 누락: ${_currentInput.missingRequiredLabels.join(', ')}',
+                key: const Key('planning_advanced_missing_hint'),
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: ControlColors.accentWarm,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            FilledButton.icon(
+              key: const Key('planning_advanced_create_instruction'),
+              onPressed: _canCreateInstruction && _instruction == null
+                  ? () => _createOrPromptInstruction()
+                  : null,
+              icon: const Icon(Icons.playlist_add_check),
+              label: Text(_instruction == null ? '작업지시 생성 및 검토' : '작업지시 생성 완료'),
+            ),
+            if (_instruction != null && !_instructionMatchesCurrentInput) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const Key('planning_advanced_recreate_instruction'),
+                onPressed: _canCreateInstruction
+                    ? () => _recreateInstructionFromChanges()
+                    : null,
+                icon: const Icon(Icons.refresh),
+                label: const Text('변경 내용으로 다시 생성'),
+              ),
+            ],
+            if (_instruction != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                '작업지시가 준비되었습니다. 아래 「확인 항목 보기」「작업지시 원문/고급」에서 검토할 수 있습니다.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: ControlColors.teal,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
+            const Text(
+              '추천 제목(TOP10) 선택은 직접 입력 중심에서 필수가 아닙니다. '
+              '필수 4항목과 제작 형태만 채우면 진행합니다.',
+              style: TextStyle(
+                fontSize: 12,
+                color: ControlColors.textMuted,
+                height: 1.35,
+              ),
             ),
           ],
         ),
