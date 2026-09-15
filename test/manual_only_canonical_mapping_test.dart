@@ -9,6 +9,7 @@ import 'package:sotong_ware_control/services/commercial_studio_builder.dart';
 import 'package:sotong_ware_control/services/commercial_work_instruction_preflight.dart';
 import 'package:sotong_ware_control/services/instruction_contract_validator.dart';
 import 'package:sotong_ware_control/services/project_design_engine.dart';
+import 'package:sotong_ware_control/services/work_instruction_workshop_presentation.dart';
 
 /// manualOnly(직접 입력) ebook → SSOT canonical title/coreProblem/expectedOutcome
 /// 이 pending/empty로 남지 않는지 검증.
@@ -21,8 +22,7 @@ void main() {
       '검색·문서작성·일정관리·정보정리 등 일상과 업무에 '
       'AI를 실제로 활용하는 방법이 어렵다.';
   const targetCustomer = 'AI 초보 일반 성인, 직장인, 주부, 40~60대 중장년층';
-  const expectedOutcome =
-      '상용 수준 전자책 + PDF/EPUB + SotongWare Reader 등록을 고려한 결과';
+  const expectedOutcome = '상용 수준 전자책 + PDF/EPUB + SotongWare Reader 등록을 고려한 결과';
 
   final service = BusinessPlanningService();
   final engine = ProjectDesignEngine();
@@ -79,9 +79,7 @@ void main() {
 
   group('manualOnly ebook canonical SSOT mapping', () {
     test('undecided statuses still map non-empty values as non-pending', () {
-      final input = advancedManualInput(
-        status: DesignFieldStatus.undecided,
-      );
+      final input = advancedManualInput(status: DesignFieldStatus.undecided);
       final instruction = service.buildInstruction(
         planId: 'plan_manual_canon',
         input: input,
@@ -112,12 +110,15 @@ void main() {
         isTrue,
       );
       expect(def.targetCustomerDescription.value, contains('AI 초보'));
+
+      final spec = instruction.contract!.productionSpec;
+      expect(spec.undecidedKeys, isEmpty, reason: '${spec.undecidedKeys}');
+      expect(spec.spec.length, greaterThanOrEqualTo(2));
+      expect(spec.spec['outputFormat'], containsAll(['pdf', 'epub']));
     });
 
     test('userEdited statuses (pre-fix sync) map as non-pending', () {
-      final input = advancedManualInput(
-        status: DesignFieldStatus.userEdited,
-      );
+      final input = advancedManualInput(status: DesignFieldStatus.userEdited);
       final instruction = service.buildInstruction(
         planId: 'plan_manual_edited',
         input: input,
@@ -133,9 +134,7 @@ void main() {
     });
 
     test('payload JSON carries non-pending canonical fields', () {
-      final input = advancedManualInput(
-        stampUserConfirmed: true,
-      );
+      final input = advancedManualInput(stampUserConfirmed: true);
       final instruction = service.buildInstruction(
         planId: 'plan_manual_payload',
         input: input,
@@ -169,9 +168,7 @@ void main() {
     });
 
     test('InstructionContractValidator does not BLOCK canonical fields', () {
-      final input = advancedManualInput(
-        status: DesignFieldStatus.undecided,
-      );
+      final input = advancedManualInput(status: DesignFieldStatus.undecided);
       final instruction = service.buildInstruction(
         planId: 'plan_manual_val',
         input: input,
@@ -217,7 +214,9 @@ void main() {
         originalUserBriefConfirmed: true,
         userConfirmedAt: '2026-09-15T12:00:00Z',
       );
-      final input = engine.toBusinessPlanInput(state).copyWith(
+      final input = engine
+          .toBusinessPlanInput(state)
+          .copyWith(
             topic: title,
             customerProblem: coreProblem,
             targetCustomer: targetCustomer,
@@ -271,43 +270,140 @@ void main() {
         instruction.toJson(),
       );
       expect(pf.ok, isTrue, reason: '${pf.code} ${pf.issues}');
+
+      final spec = instruction.contract!.productionSpec;
+      expect(spec.undecidedKeys, isEmpty, reason: '${spec.undecidedKeys}');
+      expect(spec.spec['outputFormat'], containsAll(['pdf', 'epub']));
+      expect(spec.spec['pageRange'], isNot(equals('undecided')));
+      expect(spec.spec['difficulty'], isNotEmpty);
+      expect(spec.spec['writingStyle'], isNotEmpty);
+      expect(spec.spec['salesDirection'], isNotEmpty);
+
+      final briefProd =
+          attachment.brief.structuredUserInputs['productionSelections']
+              as Map?;
+      expect(briefProd, isNotNull);
+      expect(briefProd!['format'], containsAll(['pdf', 'epub']));
+      expect(briefProd['pages'], ['p50']);
+      expect(briefProd['level'], ['beginner']);
+      expect(attachment.ebookProfile.requiredFormats, containsAll(['pdf', 'epub']));
+      expect(attachment.ebookProfile.targetLengthBasis, '50페이지 내외');
+
+      final quality = WorkInstructionWorkshopPresentation.qualityHints(
+        instruction,
+      );
+      final qty = quality.firstWhere((h) => h.area == '분량·제작 조건');
+      expect(qty.status, '명확');
     });
 
-    test('AI 보완(quick) path still requires userConfirmed (no false promote)', () {
-      // manualOnly 아님 + undecided → pending 유지 (회귀 방지)
+    test('user production overrides are preserved (putIfAbsent)', () {
       final state = ProjectDesignState(
         artifactType: ArtifactType.ebook,
         topic: title,
         customerProblem: coreProblem,
         targetCustomer: targetCustomer,
         desiredOutcome: expectedOutcome,
-        manualOnlyMode: false,
-        planningConfirmed: false,
-        topicStatus: DesignFieldStatus.suggested,
-        problemStatus: DesignFieldStatus.suggested,
-        outcomeStatus: DesignFieldStatus.suggested,
-        customerStatus: DesignFieldStatus.suggested,
-        selectedAudiences: const ['age_40_60'],
-        reasonsToPay: const ['실습'],
-        uniqueValue: '체크리스트',
-        originalUserBrief: '브리프',
+        displayTitle: title,
+        manualOnlyMode: true,
+        planningConfirmed: true,
+        productionSelections: {
+          'pages': ['p100'],
+          'tone': ['friendly'],
+          'pricing': ['free'],
+        },
+        topicStatus: DesignFieldStatus.userConfirmed,
+        problemStatus: DesignFieldStatus.userConfirmed,
+        outcomeStatus: DesignFieldStatus.userConfirmed,
+        customerStatus: DesignFieldStatus.userConfirmed,
+        customAudience: targetCustomer,
         originalUserBriefConfirmed: true,
+        reasonsToPay: const ['override test'],
+        uniqueValue: 'override',
+        userConfirmedAt: '2026-09-15T12:00:00Z',
       );
-      final input = engine.toBusinessPlanInput(state);
-      expect('${input.wizardSelections?['mode']}', isNot(equals('advanced')));
+      final input = engine.toBusinessPlanInput(state).copyWith(
+            topic: title,
+            customerProblem: coreProblem,
+            targetCustomer: targetCustomer,
+            desiredOutcome: expectedOutcome,
+            artifactType: ArtifactType.ebook,
+            wizardSelections: {
+              ...?engine.toBusinessPlanInput(state).wizardSelections,
+              'mode': 'advanced',
+              'customTexts': {
+                'manualOnlyMode': 'true',
+              },
+            },
+          );
+      final attachment = const CommercialStudioBuilder().tryBuild(
+        state: state,
+        input: input,
+        instructionId: 'wi_override',
+        projectId: 'plan_override',
+      )!;
+      final prod =
+          attachment.brief.structuredUserInputs['productionSelections'] as Map;
+      expect(prod['pages'], ['p100']);
+      expect(prod['tone'], ['friendly']);
+      expect(prod['pricing'], ['free']);
+      // unset groups still defaulted
+      expect(prod['format'], containsAll(['pdf', 'epub']));
+      expect(prod['level'], ['beginner']);
+
       final instruction = service.buildInstruction(
-        planId: 'plan_ai_regress',
+        planId: 'plan_override',
         input: input,
         analysis: service.analyze(input),
-        instructionId: 'wi_ai_regress',
+        instructionId: 'wi_override',
         version: 1,
-        now: DateTime.utc(2026, 9, 15, 12),
+        commercialQuality: attachment,
       );
-      final def = instruction.contract!.projectDefinition;
-      // AI 제안 상태면 pending이어야 함 (confirmPlanning 전)
-      expect(def.title.pending, isTrue);
-      expect(def.coreProblem.pending, isTrue);
-      expect(def.expectedOutcome.pending, isTrue);
+      expect(instruction.contract!.productionSpec.spec['pageRange'], '100페이지 내외');
+      expect(
+        instruction.contract!.productionSpec.spec['writingStyle'],
+        '친절·쉬운 설명',
+      );
+      expect(instruction.contract!.productionSpec.undecidedKeys, isEmpty);
     });
+
+    test(
+      'AI 보완(quick) path still requires userConfirmed (no false promote)',
+      () {
+        // manualOnly 아님 + undecided → pending 유지 (회귀 방지)
+        final state = ProjectDesignState(
+          artifactType: ArtifactType.ebook,
+          topic: title,
+          customerProblem: coreProblem,
+          targetCustomer: targetCustomer,
+          desiredOutcome: expectedOutcome,
+          manualOnlyMode: false,
+          planningConfirmed: false,
+          topicStatus: DesignFieldStatus.suggested,
+          problemStatus: DesignFieldStatus.suggested,
+          outcomeStatus: DesignFieldStatus.suggested,
+          customerStatus: DesignFieldStatus.suggested,
+          selectedAudiences: const ['age_40_60'],
+          reasonsToPay: const ['실습'],
+          uniqueValue: '체크리스트',
+          originalUserBrief: '브리프',
+          originalUserBriefConfirmed: true,
+        );
+        final input = engine.toBusinessPlanInput(state);
+        expect('${input.wizardSelections?['mode']}', isNot(equals('advanced')));
+        final instruction = service.buildInstruction(
+          planId: 'plan_ai_regress',
+          input: input,
+          analysis: service.analyze(input),
+          instructionId: 'wi_ai_regress',
+          version: 1,
+          now: DateTime.utc(2026, 9, 15, 12),
+        );
+        final def = instruction.contract!.projectDefinition;
+        // AI 제안 상태면 pending이어야 함 (confirmPlanning 전)
+        expect(def.title.pending, isTrue);
+        expect(def.coreProblem.pending, isTrue);
+        expect(def.expectedOutcome.pending, isTrue);
+      },
+    );
   });
 }

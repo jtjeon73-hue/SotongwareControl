@@ -487,6 +487,80 @@ class ProjectDesignCatalog {
     }
   }
 
+  /// 상용 제작 기본값 — [productionGroupsFor] option id만 사용 (임의 문자열 금지).
+  /// manualOnly에서 사용자가 상세 옵션을 비워 둔 그룹만 채울 때 사용.
+  ///
+  /// ebook 첫 기준작 의도(카탈로그 매핑):
+  /// - level=beginner (AI 초보자)
+  /// - tone=practical (실전·체크리스트 / 단계별 실전)
+  /// - format=pdf+epub (Reader 등록 가능)
+  /// - pages=p50 (요약책 p30 회피, 기존 Contract E2E SSOT)
+  /// - ebook_structure=toc+tables_figures+ko_only
+  /// - pricing=low (실판매 전 cheap-validate / draft 정책)
+  static Map<String, List<String>> commercialDefaultProductionSelections(
+    String artifactType, {
+    String contentSubtype = '',
+    String businessKind = '',
+    String siteSubtype = '',
+  }) {
+    final artifact = ArtifactType.normalize(artifactType);
+    final proposed = <String, List<String>>{};
+    switch (artifact) {
+      case ArtifactType.ebook:
+        proposed.addAll({
+          'format': const ['pdf', 'epub'],
+          'pages': const ['p50'],
+          'tone': const ['practical'],
+          'ebook_structure': const ['toc', 'tables_figures', 'ko_only'],
+          'level': const ['beginner'],
+          'pricing': const ['low'],
+        });
+      default:
+        // 다른 artifact는 이번 범위 밖 — 빈 맵 (임의 하드코딩 금지)
+        break;
+    }
+
+    final groups = productionGroupsFor(
+      artifact,
+      contentSubtype: contentSubtype,
+      businessKind: businessKind,
+      siteSubtype: siteSubtype,
+    );
+    final validated = <String, List<String>>{};
+    for (final group in groups) {
+      final want = proposed[group.id];
+      if (want == null || want.isEmpty) continue;
+      final allowed = group.options.map((o) => o.id).toSet();
+      final filtered = want.where(allowed.contains).toList(growable: false);
+      if (filtered.isNotEmpty) {
+        validated[group.id] = filtered;
+      }
+    }
+    return validated;
+  }
+
+  /// 비어 있는 productionSelections 그룹만 상용 기본값으로 채움 (사용자 선택 존중).
+  static void mergeCommercialProductionDefaults(
+    Map<String, List<String>> selections, {
+    required String artifactType,
+    String contentSubtype = '',
+    String businessKind = '',
+    String siteSubtype = '',
+  }) {
+    final defaults = commercialDefaultProductionSelections(
+      artifactType,
+      contentSubtype: contentSubtype,
+      businessKind: businessKind,
+      siteSubtype: siteSubtype,
+    );
+    for (final e in defaults.entries) {
+      final cur = selections[e.key];
+      if (cur == null || cur.isEmpty) {
+        selections[e.key] = List<String>.from(e.value);
+      }
+    }
+  }
+
   /// Subtype-specific production inputs for contents (music | shorts | comic).
   static List<DesignOptionGroup> productionGroupsForContentSubtype(
     String contentSubtype,

@@ -11,6 +11,7 @@ import '../models/commercial/work_instruction_brief.dart';
 import '../models/project_design_state.dart';
 import '../data/concept_catalog.dart';
 import '../data/concept_commercial_catalog.dart';
+import '../data/project_design_catalog.dart';
 import 'content_subtype_contract.dart';
 import 'site_subtype_contract.dart';
 import '../models/design_system/design_system_catalog.dart';
@@ -57,6 +58,24 @@ class CommercialStudioBuilder {
           : input.resolvedArtifactType,
     );
     if (artifact == ArtifactType.undecided) return null;
+
+    // manualOnly: brief ↔ productionSpec이 동일 selections를 쓰도록
+    // 미지정 그룹만 catalog 상용 기본값으로 채움 (사용자 override 존중).
+    if (state.manualOnlyMode) {
+      final merged = state.copy();
+      final kind = () {
+        final sel = merged.productionSelections['business_kind'];
+        return (sel == null || sel.isEmpty) ? '' : sel.first;
+      }();
+      ProjectDesignCatalog.mergeCommercialProductionDefaults(
+        merged.productionSelections,
+        artifactType: artifact,
+        contentSubtype: merged.contentSubtype ?? '',
+        businessKind: kind,
+        siteSubtype: merged.siteSubtype ?? '',
+      );
+      state = merged;
+    }
 
     final displayTitle = sanitizeDisplayTitle(
       state.displayTitle.trim().isNotEmpty ? state.displayTitle : input.topic,
@@ -228,23 +247,46 @@ class CommercialStudioBuilder {
           designSelection: designSelection,
         );
       case 'ebook':
+        final formatSel =
+            state.productionSelections['format'] ?? const <String>[];
+        final pageSel = state.productionSelections['pages'] ?? const <String>[];
+        final pageLabel = ProjectDesignCatalog.productionGroupsFor(
+          ArtifactType.ebook,
+        )
+            .where((g) => g.id == 'pages')
+            .expand((g) => g.options)
+            .where((o) => pageSel.contains(o.id))
+            .map((o) => o.label)
+            .cast<String>()
+            .firstOrNull;
+        final levelSel =
+            state.productionSelections['level'] ?? const <String>[];
+        final readerLevel = levelSel.contains('beginner')
+            ? 'beginner_friendly'
+            : (levelSel.contains('advanced')
+                  ? 'advanced'
+                  : (levelSel.contains('intermediate')
+                        ? 'intermediate'
+                        : 'beginner_friendly'));
         return CommercialQualityAttachment(
           brief: brief,
           ebookQualityContractVersion: 1,
           designSelection: designSelection,
           ebookProfile: CommercialEbookQualityProfile(
             standard: standard,
-            readerLevel: 'beginner_friendly',
+            readerLevel: readerLevel,
             readerOutcome: outcome,
             paidValueVsFree: reasons.join(' · '),
             chapterOutline: const ['시작', '핵심 실습', '점검', '마무리'],
-            targetLengthBasis: '주제 맞춤 분량',
+            targetLengthBasis: pageLabel ?? '주제 맞춤 분량',
             practiceAssets: const ['checklist', 'template'],
             factCheckPolicy: '숫자·사실은 출처 필수',
             plagiarismCopyrightPolicy: '표절·무단전재 금지',
             editorialStyle: '친근한 구어체',
             coverInteriorDesign: '모바일 가독 표지·내지',
-            requiredFormats: const ['pdf', 'epub'],
+            requiredFormats: formatSel.isNotEmpty
+                ? List<String>.from(formatSel)
+                : const ['pdf', 'epub'],
             readabilityTargets: const ['phone', 'tablet'],
             previewSampleRequirements: const ['sample_chapter'],
             salesCopyRequirements: '독자 혜택·판매 문구',

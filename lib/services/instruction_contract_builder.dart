@@ -277,10 +277,7 @@ class InstructionContractBuilder {
     return resolved;
   }
 
-  bool _isManualOnlyInput(
-    BusinessPlanInput input,
-    ProjectDesignState? design,
-  ) {
+  bool _isManualOnlyInput(BusinessPlanInput input, ProjectDesignState? design) {
     if (design?.manualOnlyMode == true) return true;
     final custom = input.wizardSelections?['customTexts'];
     if (custom is Map && '${custom['manualOnlyMode']}' == 'true') {
@@ -291,10 +288,7 @@ class InstructionContractBuilder {
     return false;
   }
 
-  DesignFieldStatus _confirmIfPresent(
-    DesignFieldStatus status,
-    String value,
-  ) {
+  DesignFieldStatus _confirmIfPresent(DesignFieldStatus status, String value) {
     if (value.trim().isEmpty) return status;
     if (status.isConfirmed) return status;
     return DesignFieldStatus.userConfirmed;
@@ -383,7 +377,23 @@ class InstructionContractBuilder {
 
     Map<String, List<String>> selections = {};
     if (design != null) {
-      selections = design.productionSelections;
+      selections = {
+        for (final e in design.productionSelections.entries)
+          e.key: List<String>.from(e.value),
+      };
+    }
+    // manualOnly: 미지정 그룹만 상용 catalog 기본값으로 채움 (AI 보완 경로 비적용)
+    if (_isManualOnlyInput(input, design)) {
+      ProjectDesignCatalog.mergeCommercialProductionDefaults(
+        selections,
+        artifactType: artifact,
+        contentSubtype: contentSubtype,
+        businessKind: () {
+          final sel = selections['business_kind'];
+          return (sel == null || sel.isEmpty) ? '' : sel.first;
+        }(),
+        siteSubtype: design?.siteSubtype ?? '',
+      );
     }
 
     for (final group in groups) {

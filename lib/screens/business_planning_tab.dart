@@ -12,6 +12,7 @@ import '../models/idea_bank.dart';
 import '../models/planning_wizard_state.dart';
 import '../models/project_design_state.dart';
 import '../models/remote_agent_models.dart';
+import '../data/project_design_catalog.dart';
 import '../services/business_planning_service.dart';
 import '../services/business_planning_store.dart';
 import '../services/commercial_studio_builder.dart';
@@ -458,6 +459,20 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         next.customAudience.trim().isEmpty &&
         target.isNotEmpty) {
       next.customAudience = target;
+    }
+    // manualOnly: 미지정 제작 옵션만 상용 ebook 기본값으로 채움 (사용자 override 존중)
+    if (artifact != ArtifactType.undecided) {
+      final kind = () {
+        final sel = next.productionSelections['business_kind'];
+        return (sel == null || sel.isEmpty) ? '' : sel.first;
+      }();
+      ProjectDesignCatalog.mergeCommercialProductionDefaults(
+        next.productionSelections,
+        artifactType: artifact,
+        contentSubtype: next.contentSubtype ?? '',
+        businessKind: kind,
+        siteSubtype: next.siteSubtype ?? '',
+      );
     }
     if (next.userConfirmedAt.trim().isEmpty) {
       next.userConfirmedAt = DateTime.now().toUtc().toIso8601String();
