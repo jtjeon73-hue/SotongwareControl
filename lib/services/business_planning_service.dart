@@ -272,7 +272,6 @@ class BusinessPlanningService {
         ? ''
         : ContentSubtype.normalize(input.contentSubtype);
     final selected = input.normalizedDeliverables;
-    final recommended = analysis.recommendations.map((r) => r.type).toList();
     final sitePurpose = () {
       final fromProfile =
           commercialQuality?.siteProfile.sitePurpose.trim() ?? '';
@@ -281,6 +280,11 @@ class BusinessPlanningService {
           commercialQuality?.siteProfile.siteSubtype.trim() ?? '';
       return fromAttachment;
     }();
+    // Track identity SSOT: primary artifact + 사용자 명시 deliverable만.
+    // analyze() 추천(app/contents 등)은 후속 확장 아이디어일 뿐이며
+    // deliverableTypes/recommendedSequence에 섞으면 Work가 multi-track으로
+    // 오분류한다 (APP_WORKFLOW_CONTRACT_MISMATCH / CAQP / CCQP).
+    // 후속 트랙은 followUpTracks로만 유지한다.
     final types = <String>[
       artifact,
       if ((artifact == ArtifactType.site ||
@@ -289,10 +293,14 @@ class BusinessPlanningService {
           sitePurpose != artifact)
         sitePurpose,
       if (selected.isNotEmpty)
-        ...selected.where((t) => ArtifactType.normalize(t) != artifact),
-      ...recommended
-          .map(ArtifactType.normalize)
-          .where((t) => t != artifact && t != ArtifactType.undecided),
+        ...selected
+            .map(ArtifactType.normalize)
+            .where(
+              (t) =>
+                  t != artifact &&
+                  t != ArtifactType.undecided &&
+                  t.isNotEmpty,
+            ),
     ];
     // Deduplicate while preserving order; cap at 3.
     final seen = <String>{};
