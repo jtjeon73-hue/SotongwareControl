@@ -206,11 +206,22 @@ class ProjectDesignState {
   bool get canProceedFromAudience =>
       selectedAudiences.isNotEmpty || customAudience.trim().isNotEmpty;
 
-  bool get canProceedFromTopics =>
-      selectedConceptIds.isNotEmpty ||
-      selectedTopicIds.isNotEmpty ||
-      userAddedConcepts.isNotEmpty ||
-      designMemo.trim().isNotEmpty;
+  bool get canProceedFromTopics {
+    // TOP10/직접 입력 제목이 SSOT. 관련 컨셉·메모는 선택(AI 보완 가능).
+    if (topic.trim().isNotEmpty || displayTitle.trim().isNotEmpty) {
+      return true;
+    }
+    return selectedConceptIds.isNotEmpty ||
+        selectedTopicIds.isNotEmpty ||
+        userAddedConcepts.isNotEmpty ||
+        designMemo.trim().isNotEmpty;
+  }
+
+  /// 핵심 내용(STEP)에서 다음이 막힐 때 사용자용 한 줄 안내. 통과 시 빈 문자열.
+  String get topicsProceedBlockedReason {
+    if (canProceedFromTopics) return '';
+    return '추천 제목을 선택하거나 핵심 아이디어/작업 제목을 입력하세요.';
+  }
 
   bool get canCreateInstruction {
     if (!(hasArtifact &&

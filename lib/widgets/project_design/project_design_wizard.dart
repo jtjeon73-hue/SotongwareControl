@@ -256,7 +256,8 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
       case ProjectDesignStep.audience:
         return _state.canProceedFromAudience;
       case ProjectDesignStep.topics:
-        return _state.canProceedFromTopics;
+        // Controller와 state 불일치 시에도 입력된 제목이면 진행 가능.
+        return _state.canProceedFromTopics || _topicCtrl.text.trim().isNotEmpty;
       case ProjectDesignStep.details:
         return _topicCtrl.text.trim().isNotEmpty &&
             _problemCtrl.text.trim().isNotEmpty &&
@@ -269,6 +270,31 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
         return _state.canCreateInstruction;
       default:
         return false;
+    }
+  }
+
+  String _nextBlockedHint() {
+    switch (_state.step) {
+      case ProjectDesignStep.artifact:
+        return _state.canProceedFromArtifact ? '' : '사업 종류(결과물 유형)를 선택하세요.';
+      case ProjectDesignStep.audience:
+        return _state.canProceedFromAudience ? '' : '대상 고객을 한 명 이상 선택하세요.';
+      case ProjectDesignStep.topics:
+        if (_canGoNext()) return '';
+        return _state.topicsProceedBlockedReason.isNotEmpty
+            ? _state.topicsProceedBlockedReason
+            : '추천 제목을 선택하거나 핵심 아이디어/작업 제목을 입력하세요.';
+      case ProjectDesignStep.details:
+        if (_canGoNext()) return '';
+        final missing = <String>[];
+        if (_topicCtrl.text.trim().isEmpty) missing.add('핵심 아이디어');
+        if (_problemCtrl.text.trim().isEmpty) missing.add('고객 문제');
+        if (_outcomeCtrl.text.trim().isEmpty) missing.add('원하는 결과');
+        return missing.isEmpty ? '' : '${missing.join(' · ')}을(를) 입력하세요.';
+      case ProjectDesignStep.review:
+        return _state.planningConfirmed ? '' : '최종 확인에서 기획을 확정하세요.';
+      default:
+        return '';
     }
   }
 
@@ -1250,10 +1276,7 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
           ),
           subtitle: const Text(
             '기본값은 AI가 자동 설정합니다. 플랫폼·분량·기술·출력 형식 등을 직접 지정할 때만 펼쳐 사용하세요.',
-            style: TextStyle(
-              fontSize: 12,
-              color: ControlColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: ControlColors.textSecondary),
           ),
           children: [
             if (widget.approvalMode == 'auto')
@@ -1649,32 +1672,55 @@ class _ProjectDesignWizardState extends State<ProjectDesignWizard> {
   }
 
   Widget _buildNav() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    final canNext = _canGoNext();
+    final blockedHint = _nextBlockedHint();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextButton(
-          onPressed: () {
-            if (widget.onRequestNewWork != null) {
-              widget.onRequestNewWork!();
-              return;
-            }
-            _emit(ProjectDesignState());
-            _syncControllers();
-            _review = null;
-          },
-          child: const Text('취소'),
-        ),
-        OutlinedButton(
-          onPressed: _state.step > 0 ? _goBack : null,
-          child: const Text('이전'),
-        ),
-        if (_state.step < ProjectDesignStep.finalize)
-          FilledButton(
-            onPressed: _canGoNext() ? _goNext : null,
-            child: const Text('다음'),
+        if (!canNext &&
+            blockedHint.isNotEmpty &&
+            _state.step < ProjectDesignStep.finalize)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              blockedHint,
+              key: const Key('studio_next_blocked_hint'),
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: ControlColors.textSecondary,
+                height: 1.35,
+              ),
+            ),
           ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            TextButton(
+              onPressed: () {
+                if (widget.onRequestNewWork != null) {
+                  widget.onRequestNewWork!();
+                  return;
+                }
+                _emit(ProjectDesignState());
+                _syncControllers();
+                _review = null;
+              },
+              child: const Text('취소'),
+            ),
+            OutlinedButton(
+              onPressed: _state.step > 0 ? _goBack : null,
+              child: const Text('이전'),
+            ),
+            if (_state.step < ProjectDesignStep.finalize)
+              FilledButton(
+                key: const Key('studio_wizard_next'),
+                onPressed: canNext ? _goNext : null,
+                child: const Text('다음'),
+              ),
+          ],
+        ),
       ],
     );
   }
