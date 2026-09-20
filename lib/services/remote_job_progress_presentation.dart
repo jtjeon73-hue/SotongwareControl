@@ -77,8 +77,7 @@ class RemoteJobProgressPresentation {
     var nonTerminalBeyondCurrent = 0;
     for (final s in stages) {
       if (s.stageNumber <= currentNum) continue;
-      if (_activeOrInterrupted.contains(s.status) &&
-          s.status != 'ready') {
+      if (_activeOrInterrupted.contains(s.status) && s.status != 'ready') {
         nonTerminalBeyondCurrent++;
       }
     }
@@ -122,10 +121,7 @@ class RemoteJobProgressPresentation {
     return progressBarValue(job, stages) != null;
   }
 
-  static String progressCaption(
-    RemoteJobDoc job,
-    List<RemoteStageDoc> stages,
-  ) {
+  static String progressCaption(RemoteJobDoc job, List<RemoteStageDoc> stages) {
     if (hasProgressInconsistency(job, stages)) {
       return '전체 진행률 보고값 ${job.progress}% (상태 불일치 — 진단 필요)';
     }

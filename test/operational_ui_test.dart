@@ -315,7 +315,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.textContaining('노트북·Agent'), findsOneWidget);
+      expect(find.textContaining('Agent/Job'), findsOneWidget);
       expect(find.byKey(const Key('remote_ops_dashboard')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
