@@ -26,6 +26,7 @@ import '../widgets/operational_collapsible_section.dart';
 import '../widgets/ops_health_panel.dart';
 import '../widgets/production_review_status_card.dart';
 import '../services/ops_health_check.dart';
+import '../services/remote_job_progress_presentation.dart';
 import '../widgets/sidebar_navigation.dart';
 import '../theme/control_theme.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -283,8 +284,9 @@ class _RemoteControlScreenState extends State<RemoteControlScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              '노트북·Agent·AI 작업자의 운영 상태를 확인합니다. '
-                              '작업지시 최초 전송은 작업지시 제작소에서 진행하세요.',
+                              'Agent/Job/오류 진단용입니다. '
+                              '작업 작성·전송은 작업지시 제작소, '
+                              '승인·보완은 AI 제작공정에서 진행하세요.',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: ControlColors.textSecondary,
@@ -1338,9 +1340,19 @@ class _JobDetailPage extends StatelessWidget {
             stream: repo.watchStages(jobId),
             builder: (context, stageSnap) {
               final stages = stageSnap.data ?? const <RemoteStageDoc>[];
-              final pct = job.totalStages <= 0
-                  ? 0.0
-                  : (job.progress.clamp(0, 100) / 100.0);
+              final inconsistent =
+                  RemoteJobProgressPresentation.hasProgressInconsistency(
+                    job,
+                    stages,
+                  );
+              final banner = RemoteJobProgressPresentation.inconsistencyBanner(
+                job,
+                stages,
+              );
+              final barValue = RemoteJobProgressPresentation.progressBarValue(
+                job,
+                stages,
+              );
               return ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
@@ -1358,8 +1370,38 @@ class _JobDetailPage extends StatelessWidget {
                   if (jobCompletedDurationLabel(job) != null)
                     Text('소요시간: ${jobCompletedDurationLabel(job)}'),
                   const SizedBox(height: 8),
-                  LinearProgressIndicator(value: pct == 0 ? null : pct),
-                  Text('전체 진행률 ${job.progress}%'),
+                  if (banner != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade300),
+                      ),
+                      child: Text(
+                        banner,
+                        key: const Key('job_progress_inconsistency_banner'),
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (RemoteJobProgressPresentation.shouldShowProgressBar(
+                    job,
+                    stages,
+                  ))
+                    LinearProgressIndicator(value: barValue)
+                  else if (!inconsistent)
+                    const LinearProgressIndicator(value: 0),
+                  Text(
+                    RemoteJobProgressPresentation.progressCaption(job, stages),
+                  ),
                   const SizedBox(height: 12),
                   Theme(
                     data: Theme.of(
@@ -1387,7 +1429,8 @@ class _JobDetailPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '승인·보완은 AI 제작공정에서 진행합니다.',
+                    '승인·보완은 AI 제작공정에서 진행합니다. '
+                    '이 화면은 Agent/Job 오류 진단용입니다.',
                     style: TextStyle(
                       color: ControlColors.textMuted,
                       fontSize: 12,
@@ -1414,14 +1457,23 @@ class _JobDetailPage extends StatelessWidget {
                                 s.status == 'waiting_approval')
                           ? '🔵'
                           : '⚪';
+                      final staleHint =
+                          RemoteJobProgressPresentation.hasStageStatusConflict(
+                                job,
+                                stages,
+                              ) &&
+                              s.status == 'running' &&
+                              s.stageId != job.currentStage
+                          ? ' · 이전 단계 잔여 상태(진단 필요)'
+                          : '';
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           '$mark ${s.stageNumber.toString().padLeft(2, '0')} ${s.stageName.isEmpty ? s.stageId : s.stageName}',
                         ),
                         subtitle: s.summary.isEmpty
-                            ? Text(s.status)
-                            : Text('${s.status} · ${s.summary}'),
+                            ? Text('${s.status}$staleHint')
+                            : Text('${s.status} · ${s.summary}$staleHint'),
                       );
                     }),
                 ],

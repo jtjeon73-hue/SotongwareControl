@@ -160,20 +160,99 @@ class Sotong24WorkshopPresentation {
     return null;
   }
 
+  /// 활동 시각 SSOT (가짜 추정 금지). 없으면 null.
+  static DateTime? activityInstant(Sotong24RemoteProject project) {
+    for (final raw in [
+      project.lastActivityAt,
+      project.updatedAt,
+      project.lastHeartbeat,
+      project.startedAt,
+      project.createdAt,
+    ]) {
+      final parsed = DateTime.tryParse(raw.trim());
+      if (parsed != null) return parsed.toUtc();
+    }
+    return null;
+  }
+
+  static int compareByRecencyDesc(
+    Sotong24RemoteProject a,
+    Sotong24RemoteProject b,
+  ) {
+    final aa = activityInstant(a);
+    final bb = activityInstant(b);
+    if (aa == null && bb == null) {
+      return b.projectId.compareTo(a.projectId);
+    }
+    if (aa == null) return 1;
+    if (bb == null) return -1;
+    final byTime = bb.compareTo(aa);
+    if (byTime != 0) return byTime;
+    return b.projectId.compareTo(a.projectId);
+  }
+
+  /// 운영 프로젝트를 역할 버킷으로 분리 (숨김 아님, instructionId SSOT 유지).
+  static WorkshopOperationalBuckets partitionOperational(
+    Iterable<Sotong24RemoteProject> projects,
+  ) {
+    final active = <Sotong24RemoteProject>[];
+    final needsAttention = <Sotong24RemoteProject>[];
+    final recentCompleted = <Sotong24RemoteProject>[];
+    for (final p in operationalProjects(projects)) {
+      final st = p.userFacingStatus;
+      if (st == Sotong24WorkStatus.awaitingApproval) {
+        needsAttention.add(p);
+      } else if (st == Sotong24WorkStatus.completed) {
+        recentCompleted.add(p);
+      } else {
+        active.add(p);
+      }
+    }
+    active.sort(compareByRecencyDesc);
+    needsAttention.sort(compareByRecencyDesc);
+    recentCompleted.sort(compareByRecencyDesc);
+    return WorkshopOperationalBuckets(
+      activeOrRecent: active,
+      needsAttention: needsAttention,
+      recentCompleted: recentCompleted,
+    );
+  }
+
+  /// 상단 포커스: 실제 실행/오류/재시도 중을 승인대기보다 우선.
+  /// 오래된 awaitingApproval이 최근 전자책 Job를 가리지 않도록 한다.
   static Sotong24RemoteProject? defaultFocusProject(
     Iterable<Sotong24RemoteProject> projects,
   ) {
-    final real = operationalProjects(projects);
-    if (real.isEmpty) return null;
-    for (final p in real) {
-      if (p.userFacingStatus == Sotong24WorkStatus.awaitingApproval) {
-        return p;
-      }
+    final buckets = partitionOperational(projects);
+    if (buckets.activeOrRecent.isNotEmpty) return buckets.activeOrRecent.first;
+    if (buckets.needsAttention.isNotEmpty) return buckets.needsAttention.first;
+    if (buckets.recentCompleted.isNotEmpty) {
+      return buckets.recentCompleted.first;
     }
-    for (final p in real) {
-      if (p.userFacingStatus != Sotong24WorkStatus.completed) return p;
+    return null;
+  }
+
+  /// 상단 히어로 카드 역할 라벨.
+  static String focusHeroLabel(Sotong24RemoteProject project) {
+    switch (project.userFacingStatus) {
+      case Sotong24WorkStatus.awaitingApproval:
+        return '내 확인이 필요한 작업';
+      case Sotong24WorkStatus.completed:
+        return '최근 완료';
+      default:
+        return '현재 실행 중/최근 실행';
     }
-    return real.first;
+  }
+
+  static WorkshopFocusRole focusRole(Sotong24RemoteProject project) {
+    switch (project.userFacingStatus) {
+      case Sotong24WorkStatus.awaitingApproval:
+        return WorkshopFocusRole.needsAttention;
+      case Sotong24WorkStatus.completed:
+        return WorkshopFocusRole.recentCompleted;
+      default:
+        return WorkshopFocusRole.activeOrRecent;
+    }
   }
 
   /// `focusInstructionId`가 있으면 그 프로젝트만. 없으면 대시보드 기본 포커스.
@@ -463,6 +542,25 @@ class Sotong24WorkshopPresentation {
 }
 
 enum WorkshopTestKind { none, codex, cursor, e2e }
+
+enum WorkshopFocusRole { activeOrRecent, needsAttention, recentCompleted }
+
+class WorkshopOperationalBuckets {
+  const WorkshopOperationalBuckets({
+    required this.activeOrRecent,
+    required this.needsAttention,
+    required this.recentCompleted,
+  });
+
+  /// 실행·오류·재시도·보완 등 (승인대기·완료 제외).
+  final List<Sotong24RemoteProject> activeOrRecent;
+
+  /// 사용자 승인/확인 대기.
+  final List<Sotong24RemoteProject> needsAttention;
+
+  /// 완료된 제작.
+  final List<Sotong24RemoteProject> recentCompleted;
+}
 
 class WorkshopFocusResolution {
   const WorkshopFocusResolution({

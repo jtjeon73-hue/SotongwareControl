@@ -4,6 +4,7 @@ import 'package:sotong_ware_control/models/instruction_contract.dart';
 import 'package:sotong_ware_control/models/remote_agent_models.dart';
 import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
+import 'package:sotong_ware_control/services/production_review_status_repository.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
 import 'package:sotong_ware_control/services/remote_control_api.dart';
 import 'package:sotong_ware_control/services/sotong24_workshop_presentation.dart';
@@ -646,6 +647,18 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
 
+      final codexTest = project(
+        id: 'wi_test_remote_e2e_codex_1786877899287',
+        title: '[TEST] Codex 무인작업',
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        stageStatus: Sotong24WorkStatus.awaitingApproval,
+        stageApproval: ApprovalStatus.pending,
+        resultUrl:
+            'https://storage.googleapis.com/sotongware-control.appspot.com/x.md',
+      );
+      expect(Sotong24WorkshopPresentation.isTestProject(codexTest), isTrue);
+
       final repo = Sotong24RemoteRepository(
         forceMemory: true,
         memorySeed: [
@@ -655,35 +668,48 @@ void main() {
             status: Sotong24WorkStatus.inProgress,
             stageStatus: Sotong24WorkStatus.inProgress,
           ),
-          project(
-            id: 'wi_test_remote_e2e_codex_1786877899287',
-            title: '[TEST] Codex 무인작업',
-            status: Sotong24WorkStatus.awaitingApproval,
-            approvalStatus: ApprovalStatus.pending,
-            stageStatus: Sotong24WorkStatus.awaitingApproval,
-            stageApproval: ApprovalStatus.pending,
-            resultUrl:
-                'https://storage.googleapis.com/sotongware-control.appspot.com/x.md',
-          ),
+          codexTest,
         ],
       );
       addTearDown(repo.dispose);
+      final seeded = await repo.watchProjects().first;
+      expect(seeded.length, 2);
+      expect(
+        seeded.where(Sotong24WorkshopPresentation.isTestProject).length,
+        1,
+      );
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ProductWorkshopScreen(repository: repo)),
+          home: Scaffold(
+            body: ProductWorkshopScreen(
+              repository: repo,
+              productionReviewRepository: ProductionReviewStatusRepository(
+                forceMemory: true,
+              ),
+            ),
+          ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('진행 중'), findsWidgets);
+      expect(find.text('현재 실행 중/최근 실행'), findsWidgets);
+      // Collapsible TEST 섹션은 화면 하단 — 스크롤 후 확인.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('workshop_test_projects')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.byKey(const Key('workshop_test_projects')), findsOneWidget);
       expect(find.text('개발/테스트 작업 보기'), findsOneWidget);
       expect(find.text('50대 초보도 따라 하는 AI 전자책 첫 출간'), findsWidgets);
       expect(find.textContaining('wi_test_remote_e2e_codex_'), findsNothing);
 
-      await tester.ensureVisible(find.text('개발/테스트 작업 보기'));
       await tester.tap(find.text('개발/테스트 작업 보기'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('[TEST] Codex 무인작업'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
@@ -806,5 +832,131 @@ void main() {
         expect(captured, 'job_cancel_ui|wi_plan_cancel_ui|wi_plan_cancel_ui');
       },
     );
+  });
+
+  group('defaultFocus prefers active over stale awaitingApproval', () {
+    test('오래된 사이트 승인대기보다 최근 전자책 실행을 포커스', () {
+      final oldSite = Sotong24RemoteProject(
+        projectId: 'wi_plan_site_20260908',
+        title: 'SotongWare 산업자동화 소프트웨어 제작 서비스 사이트',
+        productType: 'site',
+        currentStage: 15,
+        totalStages: 18,
+        progress: 80,
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        updatedAt: '2026-09-08T10:00:00.000Z',
+        lastActivityAt: '2026-09-08T10:00:00.000Z',
+        stages: [
+          const Sotong24RemoteStage(
+            stageId: 'package_user_review',
+            stageNumber: 15,
+            stageName: '사용자 검토',
+            status: Sotong24WorkStatus.awaitingApproval,
+            approvalRequired: true,
+            criteriaMet: true,
+            approvalStatus: ApprovalStatus.pending,
+          ),
+        ],
+      );
+      final ebook = Sotong24RemoteProject(
+        projectId: 'wi_plan_ebook_20260916',
+        title: '하루 10분, 생활이 편해지는 AI 활용법',
+        productType: 'ebook',
+        currentStage: 13,
+        totalStages: 18,
+        progress: 0,
+        status: Sotong24WorkStatus.resultValidationFailed,
+        updatedAt: '2026-09-16T12:00:00.000Z',
+        lastActivityAt: '2026-09-16T12:00:00.000Z',
+        stages: [
+          const Sotong24RemoteStage(
+            stageId: 'format_build',
+            stageNumber: 13,
+            stageName: 'PDF/EPUB 빌드',
+            status: Sotong24WorkStatus.resultValidationFailed,
+          ),
+        ],
+      );
+
+      final focus = Sotong24WorkshopPresentation.defaultFocusProject([
+        oldSite,
+        ebook,
+      ]);
+      expect(focus?.projectId, 'wi_plan_ebook_20260916');
+      expect(
+        Sotong24WorkshopPresentation.focusHeroLabel(focus!),
+        '현재 실행 중/최근 실행',
+      );
+      expect(
+        Sotong24WorkshopPresentation.focusHeroLabel(oldSite),
+        '내 확인이 필요한 작업',
+      );
+
+      final buckets = Sotong24WorkshopPresentation.partitionOperational([
+        oldSite,
+        ebook,
+      ]);
+      expect(buckets.activeOrRecent.map((p) => p.projectId), [
+        'wi_plan_ebook_20260916',
+      ]);
+      expect(buckets.needsAttention.map((p) => p.projectId), [
+        'wi_plan_site_20260908',
+      ]);
+    });
+
+    test('active가 없으면 최근 awaitingApproval을 포커스', () {
+      final older = Sotong24RemoteProject(
+        projectId: 'wi_old_await',
+        title: '오래된 승인',
+        productType: 'ebook',
+        currentStage: 1,
+        totalStages: 18,
+        progress: 0,
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        lastActivityAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+        stages: const [
+          Sotong24RemoteStage(
+            stageId: 'idea_clarify',
+            stageNumber: 1,
+            stageName: '아이디어 정리',
+            status: Sotong24WorkStatus.awaitingApproval,
+            approvalRequired: true,
+            criteriaMet: true,
+            approvalStatus: ApprovalStatus.pending,
+          ),
+        ],
+      );
+      final newer = Sotong24RemoteProject(
+        projectId: 'wi_new_await',
+        title: '최근 승인',
+        productType: 'ebook',
+        currentStage: 1,
+        totalStages: 18,
+        progress: 0,
+        status: Sotong24WorkStatus.awaitingApproval,
+        approvalStatus: ApprovalStatus.pending,
+        lastActivityAt: '2026-09-10T00:00:00.000Z',
+        updatedAt: '2026-09-10T00:00:00.000Z',
+        stages: const [
+          Sotong24RemoteStage(
+            stageId: 'idea_clarify',
+            stageNumber: 1,
+            stageName: '아이디어 정리',
+            status: Sotong24WorkStatus.awaitingApproval,
+            approvalRequired: true,
+            criteriaMet: true,
+            approvalStatus: ApprovalStatus.pending,
+          ),
+        ],
+      );
+      final focus = Sotong24WorkshopPresentation.defaultFocusProject([
+        older,
+        newer,
+      ]);
+      expect(focus?.projectId, 'wi_new_await');
+    });
   });
 }

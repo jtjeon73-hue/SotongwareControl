@@ -240,25 +240,12 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
             final testWork = primary
                 .where(Sotong24WorkshopPresentation.isTestProject)
                 .toList();
-            final awaiting = realWork
-                .where(
-                  (p) =>
-                      p.userFacingStatus == Sotong24WorkStatus.awaitingApproval,
-                )
-                .toList();
-            final inProgress = realWork
-                .where(
-                  (p) =>
-                      p.userFacingStatus !=
-                          Sotong24WorkStatus.awaitingApproval &&
-                      p.userFacingStatus != Sotong24WorkStatus.completed,
-                )
-                .toList();
-            final completed = realWork
-                .where(
-                  (p) => p.userFacingStatus == Sotong24WorkStatus.completed,
-                )
-                .toList();
+            final buckets = Sotong24WorkshopPresentation.partitionOperational(
+              primary,
+            );
+            final awaiting = buckets.needsAttention;
+            final inProgress = buckets.activeOrRecent;
+            final completed = buckets.recentCompleted;
             final focusId = widget.focusInstructionId?.trim() ?? '';
             final focusing = focusId.isNotEmpty;
             final resolution = Sotong24WorkshopPresentation.resolveFocus(
@@ -296,7 +283,8 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  '전송된 작업의 진행 상태를 확인하고 승인·보완을 관리합니다.',
+                  '실제 제작 진행·승인·보완을 관리합니다. '
+                  '작업 작성·전송은 작업지시 제작소, Agent/Job 오류 진단은 노트북 원격관제에서 합니다.',
                   style: TextStyle(
                     color: ControlColors.textSecondary,
                     fontSize: 14,
@@ -347,9 +335,21 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                     !(realWork.isEmpty &&
                         testWork.isEmpty &&
                         incomplete.isEmpty)) ...[
-                  if (awaiting.isNotEmpty) ...[
+                  if (inProgress.isNotEmpty) ...[
                     const _SectionHeader(
-                      title: '승인 필요한 작업',
+                      title: '현재 실행 중/최근 실행',
+                      subtitle: 'AI가 작업 중이거나 오류·재시도·보완 상태입니다.',
+                    ),
+                    const SizedBox(height: 8),
+                    for (final p in inProgress) ...[
+                      _ProjectCard(project: p, onOpen: () => _openDetail(p)),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                  if (awaiting.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    const _SectionHeader(
+                      title: '내 확인이 필요한 작업',
                       subtitle: '결과를 확인하고 승인 또는 보완 요청을 진행하세요.',
                     ),
                     const SizedBox(height: 8),
@@ -358,22 +358,10 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                       const SizedBox(height: 10),
                     ],
                   ],
-                  if (inProgress.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    const _SectionHeader(
-                      title: '진행 중',
-                      subtitle: 'AI가 작업 중이거나 보완·오류 상태입니다.',
-                    ),
-                    const SizedBox(height: 8),
-                    for (final p in inProgress) ...[
-                      _ProjectCard(project: p, onOpen: () => _openDetail(p)),
-                      const SizedBox(height: 10),
-                    ],
-                  ],
                   if (completed.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     const _SectionHeader(
-                      title: '완료',
+                      title: '최근 완료',
                       subtitle: '제작이 끝난 작업입니다.',
                     ),
                     const SizedBox(height: 8),
@@ -2086,7 +2074,7 @@ class _CurrentWorkCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                '현재 제작',
+                Sotong24WorkshopPresentation.focusHeroLabel(project),
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -2104,6 +2092,14 @@ class _CurrentWorkCard extends StatelessWidget {
                 ),
               ],
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'instructionId: ${project.projectId}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: ControlColors.textMuted,
+            ),
           ),
           const SizedBox(height: 6),
           Text(

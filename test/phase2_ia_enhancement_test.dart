@@ -42,10 +42,7 @@ void main() {
   test('전자책 workflow는 commercial v2 18단계 ID와 호환', () {
     final wf = Sotong24WorkflowCatalog.ebook;
     expect(wf.totalStages, 18);
-    expect(
-      wf.totalStages,
-      BusinessPlanningService.ebookWorkflowStages.length,
-    );
+    expect(wf.totalStages, BusinessPlanningService.ebookWorkflowStages.length);
     for (var i = 0; i < wf.stages.length; i++) {
       expect(
         wf.stages[i].id,
@@ -149,7 +146,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('AI 제작공정'), findsWidgets);
     expect(find.textContaining('지금 할 일'), findsNothing); // 목록 화면
-    expect(find.textContaining('현재 제작'), findsOneWidget);
+    expect(find.textContaining('내 확인이 필요한 작업'), findsWidgets);
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(
