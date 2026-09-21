@@ -221,14 +221,15 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byKey(const Key('workshop_preparing_card')), findsOneWidget);
-      expect(find.text('AI 제작공정을 준비하고 있습니다.'), findsOneWidget);
-      expect(find.byKey(const Key('workshop_agent_received')), findsOneWidget);
-      expect(find.text('상태 재확인'), findsOneWidget);
+      expect(find.byKey(const Key('workshop_current_work_card')), findsOneWidget);
+      expect(find.text('현재 제작'), findsOneWidget);
+      expect(find.textContaining('제작공정 동기화 중'), findsOneWidget);
+      expect(find.text(newTitle), findsWidgets);
       expect(find.text(oldTitle), findsNothing);
-      expect(find.text(newTitle), findsNothing);
+      expect(find.byKey(const Key('workshop_preparing_card')), findsNothing);
     });
 
     testWidgets('B project 생성 후 정확한 project 열림 + A fallback 없음', (

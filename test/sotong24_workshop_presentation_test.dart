@@ -6,6 +6,7 @@ import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
 import 'package:sotong_ware_control/screens/product_workshop_screen.dart';
 import 'package:sotong_ware_control/services/production_review_status_repository.dart';
 import 'package:sotong_ware_control/services/sotong24_remote_repository.dart';
+import 'package:sotong_ware_control/services/remote_agent_repository.dart';
 import 'package:sotong_ware_control/services/remote_control_api.dart';
 import 'package:sotong_ware_control/services/sotong24_workshop_presentation.dart';
 import 'package:sotong_ware_control/widgets/pdf_download_button.dart';
@@ -672,6 +673,21 @@ void main() {
         ],
       );
       addTearDown(repo.dispose);
+      final agent = RemoteAgentRepository(
+        forceMemory: true,
+        memoryJobs: [
+          const RemoteJobDoc(
+            jobId: 'job_real_ebook',
+            ownerUid: 'owner',
+            title: '50대 초보도 따라 하는 AI 전자책 첫 출간',
+            type: 'ebook',
+            status: 'running',
+            assignedAgentId: 'agent_1',
+            instructionId: 'wi_plan_real',
+            currentStage: 'idea_clarify',
+          ),
+        ],
+      );
       final seeded = await repo.watchProjects().first;
       expect(seeded.length, 2);
       expect(
@@ -684,6 +700,7 @@ void main() {
           home: Scaffold(
             body: ProductWorkshopScreen(
               repository: repo,
+              agentRepository: agent,
               productionReviewRepository: ProductionReviewStatusRepository(
                 forceMemory: true,
               ),
@@ -695,19 +712,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('현재 실행 중/최근 실행'), findsWidgets);
-      // Collapsible TEST 섹션은 화면 하단 — 스크롤 후 확인.
+      expect(find.text('현재 제작'), findsWidgets);
+      expect(find.byKey(const Key('workshop_current_work_card')), findsOneWidget);
+      expect(find.text('50대 초보도 따라 하는 AI 전자책 첫 출간'), findsWidgets);
+      // Collapsible history 섹션은 화면 하단 — 스크롤 후 확인.
       await tester.scrollUntilVisible(
-        find.byKey(const Key('workshop_test_projects')),
+        find.byKey(const Key('workshop_history_section')),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.byKey(const Key('workshop_test_projects')), findsOneWidget);
-      expect(find.text('개발/테스트 작업 보기'), findsOneWidget);
-      expect(find.text('50대 초보도 따라 하는 AI 전자책 첫 출간'), findsWidgets);
+      expect(find.byKey(const Key('workshop_history_section')), findsOneWidget);
+      expect(find.text('이전 작업/진단 이력'), findsOneWidget);
       expect(find.textContaining('wi_test_remote_e2e_codex_'), findsNothing);
 
-      await tester.tap(find.text('개발/테스트 작업 보기'));
+      await tester.tap(find.text('이전 작업/진단 이력'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('[TEST] Codex 무인작업'), findsWidgets);
@@ -723,8 +741,8 @@ void main() {
         forceMemory: true,
         memorySeed: [
           project(
-            id: 'wi_test_remote_e2e_1',
-            title: '[TEST] 단계진행 E2E',
+            id: 'wi_plan_no_result_url',
+            title: '결과 URL 없는 전자책',
             status: Sotong24WorkStatus.awaitingApproval,
             stageStatus: Sotong24WorkStatus.awaitingApproval,
             stageApproval: ApprovalStatus.pending,
@@ -738,12 +756,12 @@ void main() {
           home: Scaffold(body: ProductWorkshopScreen(repository: repo)),
         ),
       );
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('개발/테스트 작업 보기'));
-      await tester.tap(find.text('개발/테스트 작업 보기'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('[TEST] 단계진행 E2E').last);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('내 확인이 필요한 작업'), findsOneWidget);
+      await tester.tap(find.text('결과 URL 없는 전자책').last);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('결과물 보기'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('결과 준비 중'),

@@ -92,10 +92,30 @@ void main() {
         ],
       );
       addTearDown(repo.dispose);
+      final agent = RemoteAgentRepository(
+        forceMemory: true,
+        memoryJobs: const [
+          RemoteJobDoc(
+            jobId: 'job_app_worker',
+            ownerUid: 'owner',
+            title: '전기 점검 체크 앱',
+            type: 'app',
+            status: 'running',
+            assignedAgentId: 'agent_1',
+            instructionId: 'wi_plan_app_worker',
+            currentStage: 'app_problem_validate',
+          ),
+        ],
+      );
 
       await tester.pumpWidget(
         MaterialApp(
-          home: Scaffold(body: ProductWorkshopScreen(repository: repo)),
+          home: Scaffold(
+            body: ProductWorkshopScreen(
+              repository: repo,
+              agentRepository: agent,
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -181,7 +201,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('개발/테스트 작업 보기'), findsOneWidget);
+      expect(find.text('이전 작업/진단 이력'), findsOneWidget);
       expect(find.text('[TEST] 전자책 원격제작 E2E'), findsNothing);
       expect(find.text('사업별 표준 제작 가이드'), findsNothing);
       expect(tester.takeException(), isNull);

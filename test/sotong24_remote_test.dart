@@ -451,7 +451,7 @@ void main() {
     expect(find.textContaining('실제 제작 진행·승인·보완'), findsOneWidget);
     expect(find.textContaining('내 확인이 필요한 작업'), findsWidgets);
     expect(find.textContaining('50대 초보도'), findsWidgets);
-    expect(find.text('승인 대기'), findsWidgets);
+    expect(find.textContaining('승인 대기'), findsWidgets);
     expect(find.text('상세보기'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
@@ -473,7 +473,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('작업 목록'), findsOneWidget);
+    expect(find.text('AI 제작공정'), findsOneWidget);
   });
 
   group('not_applicable stage contract', () {

@@ -55,7 +55,8 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final refine = m?.refineCount;
     final pass = score != null && score >= 90 && critical == 0 && major == 0;
     final author = (m?.author ?? '').trim();
-    final reviewEnabled = m?.reviewActionsEnabledForStage(stage.revision) == true;
+    final reviewEnabled =
+        m?.reviewActionsEnabledForStage(stage.revision) == true;
     final deliveryMsg = (m?.deliveryStatusMessage ?? '').trim();
     final coverFileName = () {
       final path = (m?.coverPath ?? '').trim();
@@ -209,7 +210,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                 if (onPreviewPdf != null)
                   OutlinedButton(
                     onPressed: busy ? null : onPreviewPdf,
-                    child: const Text('PDF 미리보기'),
+                    child: const Text('전자책 결과물 보기'),
                   ),
                 if (onDownloadPdf != null)
                   OutlinedButton(
