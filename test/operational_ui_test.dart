@@ -225,14 +225,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('remote_ops_dashboard')), findsOneWidget);
-      expect(find.textContaining('수집 준비 중'), findsWidgets);
+      expect(find.text('소통24워크 상태'), findsOneWidget);
+      expect(find.text('현재 작업'), findsOneWidget);
+      expect(find.text('시스템 상태 · 오류'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('개발/진단 도구'),
         400,
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('상태 재확인'), findsOneWidget);
+      expect(find.text('이전 작업 / 진단 이력'), findsOneWidget);
       expect(find.text('샘플 작업지시서 E2E 테스트'), findsNothing);
+      expect(find.text('지금 확인할 결과물'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -278,12 +282,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('온라인'), findsOneWidget);
-      expect(find.text('정상'), findsOneWidget);
-      expect(find.text('대기'), findsOneWidget);
-      expect(find.text('현재 진행 중인 작업이 없습니다.'), findsOneWidget);
+      expect(find.text('정상 동작 중'), findsOneWidget);
+      expect(find.text('현재 실행 중인 작업이 없습니다.'), findsOneWidget);
       expect(find.textContaining('50대 초보도'), findsNothing);
       expect(find.textContaining('13단계'), findsNothing);
-      expect(find.text('0건'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
@@ -291,6 +293,7 @@ void main() {
       final staleHb = DateTime.now().toUtc().subtract(
         const Duration(minutes: 5),
       );
+      var opened = false;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -307,6 +310,7 @@ void main() {
               ],
               workshops: const [],
               onRefresh: () {},
+              onOpenDiagnostics: () => opened = true,
             ),
           ),
         ),
@@ -315,7 +319,10 @@ void main() {
 
       expect(find.text('오프라인'), findsWidgets);
       expect(find.text('응답 없음'), findsOneWidget);
-      expect(find.textContaining('Agent 연결이 끊겼습니다'), findsOneWidget);
+      expect(find.text('시스템 상태 · 오류'), findsOneWidget);
+      expect(find.text('진단정보 보기'), findsOneWidget);
+      await tester.tap(find.text('진단정보 보기'));
+      expect(opened, isTrue);
     });
 
     testWidgets('로그인 셸 기본 화면 = 노트북 원격관제', (tester) async {
@@ -338,7 +345,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.textContaining('Agent/Job'), findsOneWidget);
+      expect(find.textContaining('상태 확인 전용'), findsOneWidget);
       expect(find.byKey(const Key('remote_ops_dashboard')), findsOneWidget);
       expect(tester.takeException(), isNull);
     });

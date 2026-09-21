@@ -373,15 +373,17 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.dragUntilVisible(
-        find.text('작업 내역 자세히'),
+        find.text('이전 작업 / 진단 이력'),
         find.byType(ListView).first,
         const Offset(0, -120),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('작업 내역 자세히'));
+      await tester.tap(find.text('이전 작업 / 진단 이력'));
       await tester.pumpAndSettle();
+      // running job은 현재 작업으로 표시되고 이력에서는 제외
       expect(find.textContaining('50대'), findsWidgets);
-      expect(find.textContaining('상태:'), findsWidgets);
+      expect(find.text('현재 작업'), findsOneWidget);
+      expect(find.text('종료 상태:'), findsNothing);
     });
 
     testWidgets('pairing sheet creates code', (tester) async {

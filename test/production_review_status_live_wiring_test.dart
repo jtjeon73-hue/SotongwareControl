@@ -144,91 +144,58 @@ void main() {
     });
   });
 
-  group('RemoteOpsDashboard envelope-only', () {
-    testWidgets('shows R1 card in 지금 확인할 결과물 without project', (tester) async {
+  group('RemoteOpsDashboard status-only', () {
+    testWidgets('결과물/승인 카드 없이 상태 요약만 표시', (tester) async {
       for (final size in const [
         Size(1440, 900),
         Size(768, 1024),
         Size(390, 844),
       ]) {
-        for (final scale in [1.0, 1.3, 1.5]) {
-          tester.view.physicalSize = size;
-          tester.view.devicePixelRatio = 1;
-          addTearDown(() {
-            tester.view.resetPhysicalSize();
-            tester.view.resetDevicePixelRatio();
-          });
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
 
-          await tester.pumpWidget(
-            MediaQuery(
-              data: MediaQueryData(
-                size: size,
-                textScaler: TextScaler.linear(scale),
-              ),
-              child: MaterialApp(
-                home: Scaffold(
-                  body: SingleChildScrollView(
-                    child: RemoteOpsDashboard(
-                      agents: const [],
-                      workshops: const [],
-                      onRefresh: () {},
-                      productionReview: envelope,
-                      reviewAwaiting: [envelope],
-                    ),
+        await tester.pumpWidget(
+          MediaQuery(
+            data: MediaQueryData(size: size),
+            child: MaterialApp(
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: RemoteOpsDashboard(
+                    agents: [
+                      RemoteAgentDoc(
+                        agentId: 'a1',
+                        ownerUid: 'u',
+                        deviceName: '노트북',
+                        state: 'idle',
+                        enabled: true,
+                        lastHeartbeatAt: DateTime.now(),
+                      ),
+                    ],
+                    workshops: const [],
+                    onRefresh: () {},
                   ),
                 ),
               ),
             ),
-          );
-          await tester.pumpAndSettle();
-
-          expect(find.text('지금 확인할 결과물'), findsOneWidget);
-          expect(find.textContaining('기술검증 완료'), findsWidgets);
-          expect(find.textContaining('사용자 보완요청'), findsWidgets);
-          expect(find.textContaining('R2 준비 대기'), findsWidgets);
-          expect(
-            find.byKey(const Key('production_review_status_card')),
-            findsWidgets,
-          );
-          // Dashboard uses compact:true; review download widget must still mount.
-          expect(find.byType(ReviewApkDownloadButton), findsWidgets);
-          expect(tester.takeException(), isNull);
-          expect(find.textContaining('OVERFLOWED'), findsNothing);
-        }
-      }
-    });
-
-    testWidgets('baseline empty review is not treated as new alert', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: RemoteOpsDashboard(
-                agents: [
-                  RemoteAgentDoc(
-                    agentId: 'a1',
-                    ownerUid: 'u',
-                    deviceName: '노트북',
-                    state: 'idle',
-                    enabled: true,
-                    lastHeartbeatAt: DateTime.now(),
-                  ),
-                ],
-                workshops: const [],
-                onRefresh: () {},
-              ),
-            ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.textContaining('새 알림이 아닙니다'), findsOneWidget);
-      expect(
-        find.byKey(const Key('production_review_status_card')),
-        findsNothing,
-      );
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('소통24워크 상태'), findsOneWidget);
+        expect(find.text('현재 작업'), findsOneWidget);
+        expect(find.text('정상 동작 중'), findsOneWidget);
+        expect(find.text('지금 확인할 결과물'), findsNothing);
+        expect(
+          find.byKey(const Key('production_review_status_card')),
+          findsNothing,
+        );
+        expect(find.byType(ReviewApkDownloadButton), findsNothing);
+        expect(tester.takeException(), isNull);
+      }
     });
   });
 
@@ -300,20 +267,15 @@ void main() {
     });
   });
 
-  group('RemoteControlScreen live wiring', () {
-    testWidgets('shows envelope-only card on dashboard stream', (tester) async {
+  group('RemoteControlScreen status-only', () {
+    testWidgets('메인에 production review 카드 없음', (tester) async {
       tester.view.physicalSize = const Size(1440, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
 
       final agents = RemoteAgentRepository(forceMemory: true);
       final workshop = Sotong24RemoteRepository(forceMemory: true);
-      final review = ProductionReviewStatusRepository(
-        forceMemory: true,
-        memorySeed: [envelope],
-      );
       addTearDown(workshop.dispose);
-      addTearDown(review.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -321,20 +283,19 @@ void main() {
             body: RemoteControlScreen(
               repository: agents,
               workshopRepository: workshop,
-              productionReviewRepository: review,
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('지금 확인할 결과물'), findsOneWidget);
+      expect(find.text('지금 확인할 결과물'), findsNothing);
       expect(
         find.byKey(const Key('production_review_status_card')),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.textContaining('STEP16 미시작'), findsWidgets);
-      expect(find.textContaining('R2 준비 대기'), findsWidgets);
+      expect(find.text('소통24워크 상태'), findsOneWidget);
+      expect(find.text('이전 작업 / 진단 이력'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

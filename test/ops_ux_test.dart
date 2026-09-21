@@ -115,7 +115,7 @@ void main() {
     expect(dest, ControlDestination.aiBusinessAnalysis);
   });
 
-  testWidgets('현재 작업에서 AI 제작공정 바로가기', (tester) async {
+  testWidgets('현재 작업은 상태만 표시하고 AI 제작공정 CTA 없음', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -123,7 +123,30 @@ void main() {
     ControlDestination? dest;
     final agentRepo = RemoteAgentRepository(
       forceMemory: true,
-      memoryAgents: [liveAgent()],
+      memoryAgents: [
+        RemoteAgentDoc(
+          agentId: 'agent_1',
+          ownerUid: 'uid',
+          deviceName: 'LAPTOP-TEST',
+          state: 'running',
+          enabled: true,
+          currentJobId: 'job_ebook_live',
+          lastHeartbeatAt: now.subtract(const Duration(seconds: 5)),
+        ),
+      ],
+      memoryJobs: [
+        RemoteJobDoc(
+          jobId: 'job_ebook_live',
+          ownerUid: 'uid',
+          instructionId: 'wi_live_ops',
+          title: '50대 AI 활용 입문',
+          type: 'ebook',
+          status: 'running',
+          assignedAgentId: 'agent_1',
+          currentStage: 'draft',
+          updatedAt: now,
+        ),
+      ],
     );
     final workshop = Sotong24RemoteRepository(
       forceMemory: true,
@@ -150,16 +173,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('50대 AI 활용 입문'), findsOneWidget);
-    expect(find.text('AI 제작공정에서 계속 보기'), findsOneWidget);
-    await tester.dragUntilVisible(
-      find.text('AI 제작공정에서 계속 보기'),
-      find.byType(ListView).first,
-      const Offset(0, -120),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('AI 제작공정에서 계속 보기'));
-    expect(dest, ControlDestination.productWorkshop);
+    expect(find.text('50대 AI 활용 입문'), findsWidgets);
+    expect(find.text('현재 작업'), findsOneWidget);
+    expect(find.text('AI 제작공정에서 계속 보기'), findsNothing);
+    expect(find.text('지금 확인할 결과물'), findsNothing);
+    expect(find.textContaining('APK'), findsNothing);
+    expect(find.textContaining('PDF'), findsNothing);
+    expect(dest, isNull);
   });
 
   testWidgets('진단 결과 정상/확인 필요/문제 표시와 GPT 메모', (tester) async {
@@ -172,8 +192,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('문제 있음'), findsWidgets);
-    expect(find.text('Agent 연결 테스트'), findsWidgets);
+    expect(find.text('시스템 상태 · 오류'), findsOneWidget);
+    expect(find.text('진단정보 보기'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('개발/진단 도구'),
@@ -186,6 +206,7 @@ void main() {
     expect(find.byType(OpsHealthPanel), findsOneWidget);
     expect(find.text('정상'), findsWidgets);
     expect(find.text('문제 있음'), findsWidgets);
+    expect(find.text('Agent 연결 테스트'), findsWidgets);
     expect(find.text('GPT에 알려줄 문제 해결 메모 복사'), findsOneWidget);
     expect(find.text('전체 자동 점검'), findsOneWidget);
   });
@@ -203,8 +224,10 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('시스템 정상 · 별도 테스트 필요 없음'), findsOneWidget);
-    expect(find.text('현재 진행 중인 작업이 없습니다.'), findsOneWidget);
+    expect(find.text('정상 동작 중'), findsOneWidget);
+    expect(find.text('현재 실행 중인 작업이 없습니다.'), findsOneWidget);
+    expect(find.text('지금 확인할 결과물'), findsNothing);
+    expect(find.text('AI 제작공정에서 계속 보기'), findsNothing);
   });
 
   testWidgets('모바일 390px overflow 없음', (tester) async {
