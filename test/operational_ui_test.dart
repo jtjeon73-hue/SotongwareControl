@@ -120,8 +120,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('현재 작업자: Codex'), findsOneWidget);
+      expect(find.text('현재 제작'), findsOneWidget);
+      expect(find.textContaining('전기 점검 체크 앱'), findsWidgets);
       expect(find.textContaining('2단계'), findsWidgets);
+      // 작업자 라벨은 상세/모니터링에 두고 히어로에는 제목·단계·상태만 노출
+      expect(find.textContaining('현재 작업자:'), findsNothing);
     });
 
     testWidgets('표준제작 가이드 홈·카테고리', (tester) async {

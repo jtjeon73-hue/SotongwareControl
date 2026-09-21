@@ -2,7 +2,7 @@ import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import 'sotong24_workshop_presentation.dart';
 
-/// AI 제작공정 대시보드: Remote Job을 현재 작업 1차 SSOT로 사용.
+/// AI 제작공정 대시보드: Agent.currentJobId → live Remote Job 순 SSOT.
 class WorkshopCurrentWorkSelection {
   WorkshopCurrentWorkSelection._();
 
@@ -12,6 +12,8 @@ class WorkshopCurrentWorkSelection {
     'failed',
     'result_validation_failed',
     'approved',
+    'archived',
+    'stale',
   };
 
   static const _awaitingJobStatuses = {
@@ -65,6 +67,27 @@ class WorkshopCurrentWorkSelection {
   static bool isActiveExecutionJob(RemoteJobDoc job) =>
       _activeExecutionStatuses.contains(job.status);
 
+  /// 승인/사용자검토/보류 project는 Job이 stale running이어도 현재 제작 제외.
+  static bool isUserAttentionProject(Sotong24RemoteProject? project) {
+    if (project == null) return false;
+    if (project.userFacingStatus == Sotong24WorkStatus.awaitingApproval) {
+      return true;
+    }
+    final stage = project.currentStageDoc;
+    if (stage?.isOnHold == true) return true;
+    return false;
+  }
+
+  static bool isExcludedFromCurrentProduction({
+    required RemoteJobDoc job,
+    Sotong24RemoteProject? project,
+  }) {
+    if (isTerminalJob(job)) return true;
+    if (isAwaitingJob(job)) return true;
+    if (isUserAttentionProject(project)) return true;
+    return false;
+  }
+
   static DateTime? jobActivity(RemoteJobDoc job) =>
       job.updatedAt ?? job.startedAt ?? job.createdAt;
 
@@ -82,8 +105,66 @@ class WorkshopCurrentWorkSelection {
     return b.jobId.compareTo(a.jobId);
   }
 
-  static RemoteJobDoc? pickCurrentExecutionJob(Iterable<RemoteJobDoc> jobs) {
-    final candidates = jobs.where(isActiveExecutionJob).toList()
+  /// online·enabled Agent 중 가장 최근 heartbeat의 currentJobId.
+  static String? pickOnlineAgentCurrentJobId(
+    Iterable<RemoteAgentDoc> agents, {
+    DateTime? now,
+  }) {
+    final candidates =
+        agents.where((a) {
+          if (!a.enabled) return false;
+          if (a.currentJobId.trim().isEmpty) return false;
+          if (!a.isOnline(now: now)) return false;
+          return true;
+        }).toList()
+          ..sort((a, b) {
+            final ah = a.lastHeartbeatAt;
+            final bh = b.lastHeartbeatAt;
+            if (ah == null && bh == null) {
+              return b.agentId.compareTo(a.agentId);
+            }
+            if (ah == null) return 1;
+            if (bh == null) return -1;
+            final byHb = bh.compareTo(ah);
+            if (byHb != 0) return byHb;
+            return b.agentId.compareTo(a.agentId);
+          });
+    if (candidates.isEmpty) return null;
+    return candidates.first.currentJobId.trim();
+  }
+
+  /// 1) Agent.currentJobId 일치 Job  2) 없으면 live non-terminal fallback.
+  /// updatedAt만 최근인 stale job이 Agent 점유 Job보다 우선하지 않는다.
+  static RemoteJobDoc? pickCurrentExecutionJob(
+    Iterable<RemoteJobDoc> jobs, {
+    Iterable<RemoteAgentDoc> agents = const [],
+    Iterable<Sotong24RemoteProject> projects = const [],
+    DateTime? now,
+  }) {
+    final byId = <String, RemoteJobDoc>{
+      for (final j in jobs)
+        if (j.jobId.trim().isNotEmpty) j.jobId.trim(): j,
+    };
+
+    final occupiedId = pickOnlineAgentCurrentJobId(agents, now: now);
+    if (occupiedId != null && occupiedId.isNotEmpty) {
+      final occupied = byId[occupiedId];
+      if (occupied != null) {
+        final project = projectForJob(projects, occupied);
+        if (!isExcludedFromCurrentProduction(
+          job: occupied,
+          project: project,
+        )) {
+          return occupied;
+        }
+      }
+    }
+
+    final candidates = jobs.where((job) {
+      if (!isActiveExecutionJob(job)) return false;
+      final project = projectForJob(projects, job);
+      return !isExcludedFromCurrentProduction(job: job, project: project);
+    }).toList()
       ..sort(compareJobsByCurrentDesc);
     return candidates.isEmpty ? null : candidates.first;
   }
@@ -101,7 +182,9 @@ class WorkshopCurrentWorkSelection {
   static WorkshopDashboardModel build({
     required Iterable<Sotong24RemoteProject> projects,
     required Iterable<RemoteJobDoc> jobs,
+    Iterable<RemoteAgentDoc> agents = const [],
     String? focusInstructionId,
+    DateTime? now,
   }) {
     final focusId = focusInstructionId?.trim() ?? '';
     final operational = Sotong24WorkshopPresentation.operationalProjects(
@@ -153,19 +236,28 @@ class WorkshopCurrentWorkSelection {
       );
     }
 
-    final currentJob = pickCurrentExecutionJob(jobs);
+    final currentJob = pickCurrentExecutionJob(
+      jobs,
+      agents: agents,
+      projects: projects,
+      now: now,
+    );
     WorkshopCurrentWorkItem? current;
     String? currentInstructionId;
     if (currentJob != null) {
       final project = projectForJob(operational, currentJob);
+      // operational에 없어도 전체 projects에서 merge 시도
+      final merged = project ?? projectForJob(projects, currentJob);
+      final eligibleProject =
+          isUserAttentionProject(merged) ? null : merged;
       current = WorkshopCurrentWorkItem.fromJob(
         job: currentJob,
-        project: project,
-        syncing: project == null,
+        project: eligibleProject,
+        syncing: eligibleProject == null,
       );
       currentInstructionId = currentJob.instructionId.trim().isNotEmpty
           ? currentJob.instructionId.trim()
-          : (project?.projectId.trim() ?? '');
+          : (eligibleProject?.projectId.trim() ?? '');
     }
 
     final needsAttention = <Sotong24RemoteProject>[];
@@ -177,20 +269,19 @@ class WorkshopCurrentWorkSelection {
       if (currentInstructionId != null &&
           currentInstructionId.isNotEmpty &&
           id == currentInstructionId) {
-        continue; // 현재 제작 카드에 이미 표시
+        continue;
       }
       final st = p.userFacingStatus;
-      if (st == Sotong24WorkStatus.awaitingApproval) {
+      if (st == Sotong24WorkStatus.awaitingApproval ||
+          isUserAttentionProject(p)) {
         needsAttention.add(p);
       } else if (st == Sotong24WorkStatus.completed) {
         completed.add(p);
       } else {
-        // 과거 active/error 등 — 현재 작업을 가리지 않도록 이력으로
         history.add(p);
       }
     }
 
-    // Job만 있고 awaiting인 경우 → 확인 필요 섹션용 synthetic은 project 우선.
     for (final job in jobs) {
       if (!isAwaitingJob(job)) continue;
       final iid = job.instructionId.trim();
@@ -209,7 +300,6 @@ class WorkshopCurrentWorkSelection {
     completed.sort(Sotong24WorkshopPresentation.compareByRecencyDesc);
     history.sort(Sotong24WorkshopPresentation.compareByRecencyDesc);
 
-    // 테스트·불완전·터미널 job 대응 프로젝트도 이력에 합침 (중복 제외).
     for (final p in [...testProjects, ...incomplete]) {
       if (history.any((h) => h.projectId == p.projectId)) continue;
       if (needsAttention.any((h) => h.projectId == p.projectId)) continue;
@@ -217,8 +307,6 @@ class WorkshopCurrentWorkSelection {
       history.add(p);
     }
 
-    // Job 기준 실패/취소 등 — project 없으면 이력 placeholder로 남기지 않고
-    // project가 있으면 이미 history/completed에 포함됐을 수 있음.
     return WorkshopDashboardModel(
       waitingForExactFocus: false,
       current: current,
@@ -278,7 +366,11 @@ class WorkshopCurrentWorkItem {
     required Sotong24RemoteProject? project,
     required bool syncing,
   }) {
-    return WorkshopCurrentWorkItem(job: job, project: project, syncing: syncing);
+    return WorkshopCurrentWorkItem(
+      job: job,
+      project: project,
+      syncing: syncing,
+    );
   }
 
   String get instructionId {

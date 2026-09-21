@@ -240,130 +240,139 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
             final focusing = focusId.isNotEmpty;
             final uid = _safeOwnerUid();
 
-            return StreamBuilder<List<RemoteJobDoc>>(
-              stream: _agentRepo.watchJobs(ownerUid: uid),
-              builder: (context, jobSnap) {
-                final jobs = jobSnap.data ?? _remoteJobs;
-                final dash = WorkshopCurrentWorkSelection.build(
-                  projects: projects,
-                  jobs: jobs,
-                  focusInstructionId: widget.focusInstructionId,
-                );
-                final current = dash.current;
-                final awaiting = dash.needsAttention;
-                final completed = dash.completed;
-                final history = dash.history;
-                final waiting = dash.waitingForExactFocus;
-                if (focusing &&
-                    current?.project != null &&
-                    _openedFocusForId != focusId) {
-                  final opened = current!.project!;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted) return;
-                    if (_openedFocusForId == focusId) return;
-                    _openedFocusForId = focusId;
-                    _openDetailWithStage(
-                      opened,
-                      focusStageId: widget.focusStageId,
-                      focusApk: widget.focusApk,
+            return StreamBuilder<List<RemoteAgentDoc>>(
+              stream: _agentRepo.watchAgents(ownerUid: uid),
+              builder: (context, agentSnap) {
+                final agents = agentSnap.data ?? const <RemoteAgentDoc>[];
+                return StreamBuilder<List<RemoteJobDoc>>(
+                  stream: _agentRepo.watchJobs(ownerUid: uid),
+                  builder: (context, jobSnap) {
+                    final jobs = jobSnap.data ?? _remoteJobs;
+                    final dash = WorkshopCurrentWorkSelection.build(
+                      projects: projects,
+                      jobs: jobs,
+                      agents: agents,
+                      focusInstructionId: widget.focusInstructionId,
                     );
-                  });
-                }
-                final isEmpty = dash.isEmpty;
+                    final current = dash.current;
+                    final awaiting = dash.needsAttention;
+                    final completed = dash.completed;
+                    final history = dash.history;
+                    final waiting = dash.waitingForExactFocus;
+                    if (focusing &&
+                        current?.project != null &&
+                        _openedFocusForId != focusId) {
+                      final opened = current!.project!;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        if (_openedFocusForId == focusId) return;
+                        _openedFocusForId = focusId;
+                        _openDetailWithStage(
+                          opened,
+                          focusStageId: widget.focusStageId,
+                          focusApk: widget.focusApk,
+                        );
+                      });
+                    }
+                    final isEmpty = dash.isEmpty;
 
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  children: [
-                    Text(
-                      'AI 제작공정',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      '실제 제작 진행·승인·보완을 관리합니다. '
-                      '작업 작성·전송은 작업지시 제작소, Agent/Job 오류 진단은 노트북 원격관제에서 합니다.',
-                      style: TextStyle(
-                        color: ControlColors.textSecondary,
-                        fontSize: 14,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    if (waiting)
-                      _PreparingWorkshopCard(
-                        onRecheck: _recheckFromServer,
-                        recheckBusy: _recheckBusy,
-                        agentDeliveryConfirmed:
-                            focusId.isEmpty || _hasRemoteJobFor(focusId),
-                      )
-                    else if (current != null)
-                      _CurrentWorkCard(
-                        item: current,
-                        policy: _monitoringPolicy,
-                        onOpen: current.project == null
-                            ? null
-                            : () => _openDetail(current.project!),
-                      )
-                    else if (isEmpty)
-                      _EmptyWorkshopCard(onStartNewWork: widget.onStartNewWork)
-                    else
-                      const _InfoBanner(text: '진행 중인 제작 프로젝트가 없습니다.'),
-                    if (!focusing && !isEmpty) ...[
-                      if (awaiting.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const _SectionHeader(
-                          title: '내 확인이 필요한 작업',
-                          subtitle: '결과를 확인하고 승인 또는 보완 요청을 진행하세요.',
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      children: [
+                        Text(
+                          'AI 제작공정',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
-                        const SizedBox(height: 8),
-                        for (final p in awaiting) ...[
-                          _ProjectCard(
-                            project: p,
-                            onOpen: () => _openDetail(p),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '실제 제작 진행·승인·보완을 관리합니다. '
+                          '작업 작성·전송은 작업지시 제작소, Agent/Job 오류 진단은 노트북 원격관제에서 합니다.',
+                          style: TextStyle(
+                            color: ControlColors.textSecondary,
+                            fontSize: 14,
+                            height: 1.35,
                           ),
-                          const SizedBox(height: 10),
-                        ],
-                      ],
-                      if (completed.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const _SectionHeader(
-                          title: '완료된 결과',
-                          subtitle: '최근 완료·등록 상태입니다.',
                         ),
-                        const SizedBox(height: 8),
-                        for (final p in completed) ...[
-                          _ProjectCard(
-                            project: p,
-                            onOpen: () => _openDetail(p),
-                            completedResult: true,
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                      ],
-                      if (history.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        OperationalCollapsibleSection(
-                          title: '이전 작업/진단 이력',
-                          subtitle: '실패·취소·stale·테스트·오래된 작업',
-                          sectionKey: const Key('workshop_history_section'),
-                          child: Column(
-                            children: [
-                              for (final p in history) ...[
-                                _ProjectCard(
-                                  project: p,
-                                  onOpen: () => _openDetail(p),
-                                  incomplete: p.isIncompleteListing,
-                                ),
-                                const SizedBox(height: 8),
-                              ],
+                        const SizedBox(height: 14),
+                        if (waiting)
+                          _PreparingWorkshopCard(
+                            onRecheck: _recheckFromServer,
+                            recheckBusy: _recheckBusy,
+                            agentDeliveryConfirmed:
+                                focusId.isEmpty || _hasRemoteJobFor(focusId),
+                          )
+                        else if (current != null)
+                          _CurrentWorkCard(
+                            item: current,
+                            onOpen: current.project == null
+                                ? null
+                                : () => _openDetail(current.project!),
+                          )
+                        else if (isEmpty)
+                          _EmptyWorkshopCard(
+                            onStartNewWork: widget.onStartNewWork,
+                          )
+                        else
+                          const _InfoBanner(text: '진행 중인 제작 프로젝트가 없습니다.'),
+                        if (!focusing && !isEmpty) ...[
+                          if (awaiting.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            const _SectionHeader(
+                              title: '내 확인이 필요한 작업',
+                              subtitle: '결과를 확인하고 승인 또는 보완 요청을 진행하세요.',
+                            ),
+                            const SizedBox(height: 8),
+                            for (final p in awaiting) ...[
+                              _ProjectCard(
+                                project: p,
+                                onOpen: () => _openDetail(p),
+                              ),
+                              const SizedBox(height: 10),
                             ],
-                          ),
-                        ),
+                          ],
+                          if (completed.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            const _SectionHeader(
+                              title: '완료된 결과',
+                              subtitle: '최근 완료·등록 상태입니다.',
+                            ),
+                            const SizedBox(height: 8),
+                            for (final p in completed) ...[
+                              _ProjectCard(
+                                project: p,
+                                onOpen: () => _openDetail(p),
+                                completedResult: true,
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                          ],
+                          if (history.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            OperationalCollapsibleSection(
+                              title: '이전 작업/진단 이력',
+                              subtitle: '실패·취소·stale·테스트·오래된 작업',
+                              sectionKey: const Key(
+                                'workshop_history_section',
+                              ),
+                              child: Column(
+                                children: [
+                                  for (final p in history) ...[
+                                    _ProjectCard(
+                                      project: p,
+                                      onOpen: () => _openDetail(p),
+                                      incomplete: p.isIncompleteListing,
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ],
-                    ],
-                  ],
+                    );
+                  },
                 );
               },
             );
@@ -2000,33 +2009,15 @@ class _FinalResultPanel extends StatelessWidget {
 }
 
 class _CurrentWorkCard extends StatelessWidget {
-  const _CurrentWorkCard({
-    required this.item,
-    required this.policy,
-    this.onOpen,
-  });
+  const _CurrentWorkCard({required this.item, this.onOpen});
 
   final WorkshopCurrentWorkItem item;
-  final Sotong24MonitoringPolicy policy;
   final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final project = item.project;
-    final currentStage = project?.currentStageDoc;
     final progress = item.progressBarPercent;
     final warning = item.warningLine;
-    final worker = project == null
-        ? (item.job?.assignedAgentId.trim().isNotEmpty == true
-              ? item.job!.assignedAgentId
-              : '-')
-        : _workerLabel(project, currentStage);
-    final showMonitoring =
-        project != null &&
-        currentStage != null &&
-        (currentStage.startedAt.isNotEmpty ||
-            currentStage.lastActivityAt.isNotEmpty ||
-            currentStage.activityState.isNotEmpty);
 
     return Container(
       key: const Key('workshop_current_work_card'),
@@ -2091,10 +2082,6 @@ class _CurrentWorkCard extends StatelessWidget {
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
           Text(
-            '현재 작업자: $worker',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          ),
-          Text(
             '마지막 갱신: ${_formatTime(item.lastUpdatedLine)}',
             style: const TextStyle(
               fontSize: 12,
@@ -2115,7 +2102,7 @@ class _CurrentWorkCard extends StatelessWidget {
           if (item.syncing) ...[
             const SizedBox(height: 8),
             const Text(
-              'Remote Job은 실행 중입니다. 제작공정 상세가 도착하면 이 카드가 확장됩니다.',
+              '제작공정 상세가 도착하면 이 카드가 확장됩니다.',
               style: TextStyle(
                 fontSize: 12,
                 color: ControlColors.textSecondary,
@@ -2123,25 +2110,8 @@ class _CurrentWorkCard extends StatelessWidget {
               ),
             ),
           ],
-          if (showMonitoring) ...[
-            const SizedBox(height: 8),
-            _StageMonitoringPanel(
-              project: project,
-              stage: currentStage,
-              policy: policy,
-              compact: true,
-            ),
-          ],
-          if (project != null &&
-              Sotong24WorkshopPresentation.revisionLine(project).isNotEmpty)
-            Text(
-              Sotong24WorkshopPresentation.revisionLine(project),
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
           Theme(
-            data: Theme.of(
-              context,
-            ).copyWith(dividerColor: Colors.transparent),
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: Material(
               color: Colors.transparent,
               child: ExpansionTile(
@@ -2164,9 +2134,9 @@ class _CurrentWorkCard extends StatelessWidget {
                     _Kv('job status', item.job!.status),
                   if (item.job?.currentStage.isNotEmpty == true)
                     _Kv('job stage', item.job!.currentStage),
-                  if (project != null) ...[
-                    _Kv('project status', project.status),
-                    _Kv('approvalStatus', project.approvalStatus),
+                  if (item.project != null) ...[
+                    _Kv('project status', item.project!.status),
+                    _Kv('approvalStatus', item.project!.approvalStatus),
                   ],
                 ],
               ),
@@ -2188,13 +2158,11 @@ class _StageMonitoringPanel extends StatelessWidget {
     required this.project,
     required this.stage,
     required this.policy,
-    this.compact = false,
   });
 
   final Sotong24RemoteProject project;
   final Sotong24RemoteStage stage;
   final Sotong24MonitoringPolicy policy;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -2221,7 +2189,7 @@ class _StageMonitoringPanel extends StatelessWidget {
     final expected = snapshot.expectedRange;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(compact ? 10 : 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: healthColor.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(10),
@@ -2361,15 +2329,15 @@ class _StageMonitoringPanel extends StatelessWidget {
               ),
             ),
           ],
-          if (!compact && stage.startedAt.isNotEmpty)
-            Text(
-              '시작 ${_formatTime(stage.startedAt)}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: ControlColors.textMuted,
+            if (stage.startedAt.isNotEmpty)
+              Text(
+                '시작 ${_formatTime(stage.startedAt)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textMuted,
+                ),
               ),
-            ),
-          if (!compact && expected != null)
+            if (expected != null)
             Text(
               '최근 통계 ${Sotong24StageMonitoring.compactDuration(expected.min)}~${Sotong24StageMonitoring.compactDuration(expected.max)} · 표본 ${expected.sampleCount}건',
               style: const TextStyle(
@@ -2573,9 +2541,7 @@ class _ProjectCard extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: onOpen,
-                  child: Text(
-                    completedResult && hasResult ? '결과물 보기' : '상세보기',
-                  ),
+                  child: Text(completedResult && hasResult ? '결과물 보기' : '상세보기'),
                 ),
               ),
             ],
