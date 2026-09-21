@@ -548,8 +548,15 @@ void main() {
 
   group('coverage report artifact', () {
     test('writes coverage numbers for audit/manifest consumers', () {
-      final outDir = Directory('test/support/commercial_coverage');
-      outDir.createSync(recursive: true);
+      // Write outside the repo so flutter test does not dirty tracked fixtures.
+      final outDir = Directory.systemTemp.createTempSync(
+        'commercial_coverage_',
+      );
+      addTearDown(() {
+        if (outDir.existsSync()) {
+          outDir.deleteSync(recursive: true);
+        }
+      });
       final provider = const LocalConceptRecommendationProvider();
       final perArtifact = <String, int>{};
       for (final a in artifacts) {

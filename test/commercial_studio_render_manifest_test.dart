@@ -232,8 +232,13 @@ void main() {
     expect(failIssue.userMessageKo, contains('지불할 이유'));
     expect(failIssue.studioStepHint, contains('STEP 4'));
 
-    final dir = Directory('test/support/studio_render_manifest');
-    dir.createSync(recursive: true);
+    // Write outside the repo so flutter test does not dirty tracked fixtures.
+    final dir = Directory.systemTemp.createTempSync('studio_render_manifest_');
+    addTearDown(() {
+      if (dir.existsSync()) {
+        dir.deleteSync(recursive: true);
+      }
+    });
     final file = File('${dir.path}/render_manifest.json');
     final payload = {
       'generatedAt': '2026-09-04T12:40:00+09:00',
