@@ -59,4 +59,19 @@ if ($porcelain) {
 }
 Write-Host "clean worktree confirmed PASS"
 
+Write-Host "== 6) dirty tree fail-closed (temp marker) =="
+$marker = Join-Path $Root "tmp_dirty_marker.txt"
+Set-Content -Path $marker -Value "dirty-test"
+try {
+  $dirtyOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -PlanOnly 2>&1 | Out-String
+  $dirtyCode = $LASTEXITCODE
+  Assert-True ($dirtyCode -ne 0) "dirty tree must non-zero exit"
+  Assert-True ($dirtyOut -match "dirty working tree") "dirty tree error message"
+  Write-Host "dirty fail-closed PASS"
+} finally {
+  if (Test-Path $marker) { Remove-Item $marker -Force }
+}
+Assert-True (-not (Test-Path $marker)) "marker removed"
+Assert-True (-not (git status --porcelain)) "worktree clean after dirty test"
+
 Write-Host "ALL validate_deploy_control_plan checks PASS"
