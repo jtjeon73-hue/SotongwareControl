@@ -184,7 +184,7 @@ const sampleProject = {
   projectId: "wi_plan_1785905165067",
   title: "테스트 전자책",
   productType: "ebook",
-  currentStage: "launch",
+  currentStage: "package_user_review",
   totalStages: 18,
   progress: 75,
   status: "awaiting_approval",
@@ -194,8 +194,10 @@ const sampleProject = {
 };
 
 describe("canonical ebook stages", () => {
-  it("has 18 ids including launch at 15", () => {
+  it("has 18 commercial v2 ids with package_user_review at 15", () => {
     assert.equal(EBOOK_STAGE_IDS.length, 18);
+    assert.equal(EBOOK_STAGE_BY_ID.get("package_user_review").order, 15);
+    // Legacy alias retained.
     assert.equal(EBOOK_STAGE_BY_ID.get("launch").order, 15);
   });
 });
@@ -207,7 +209,7 @@ describe("allowlist / validation", () => {
     const p = pickProjectAllowlist(sampleProject, { serverNowIso });
     assert.equal(p.projectId, sampleProject.projectId);
     assert.equal(p.currentStage, 15);
-    assert.equal(p.currentStageId, "launch");
+    assert.equal(p.currentStageId, "package_user_review");
     assert.equal(p.progress, 75);
     assert.equal(p.isDemo, false);
     assert.equal(p.lastHeartbeat, serverNowIso);
@@ -562,7 +564,7 @@ describe("relay HTTP handler", () => {
     assert.equal(doc.progress, 75);
     assert.equal(doc.status, "awaiting_approval");
     assert.equal(doc.approvalStatus, "pending");
-    assert.equal(doc.currentStageId, "launch");
+    assert.equal(doc.currentStageId, "package_user_review");
   });
 
   it("stage_sync upserts stage and is idempotent", async () => {
@@ -772,19 +774,32 @@ describe("relay HTTP handler", () => {
 
   it("full_sync accepts not_applicable stages and stores the status", async () => {
     const db = createMockDb();
-    const stages = EBOOK_STAGE_IDS.map((id, i) => ({
-      stageId: id,
-      stageNumber: i + 1,
-      status:
-        id === "build_test" || id === "deploy"
-          ? "not_applicable"
-          : i + 1 < 15
+    const stages = [
+      ...EBOOK_STAGE_IDS.map((id, i) => ({
+        stageId: id,
+        stageNumber: i + 1,
+        status:
+          i + 1 < 15
             ? "completed"
             : i + 1 === 15
               ? "in_progress"
               : "ready",
-      criteriaMet: i + 1 < 15 && id !== "build_test" && id !== "deploy",
-    }));
+        criteriaMet: i + 1 < 15,
+      })),
+      // Legacy v1 stages may still appear as not_applicable on old WI.
+      {
+        stageId: "build_test",
+        stageNumber: 8,
+        status: "not_applicable",
+        criteriaMet: false,
+      },
+      {
+        stageId: "deploy",
+        stageNumber: 13,
+        status: "not_applicable",
+        criteriaMet: false,
+      },
+    ];
     const res = await call(
       {
         operation: "full_sync",

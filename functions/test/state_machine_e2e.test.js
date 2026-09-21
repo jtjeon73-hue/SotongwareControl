@@ -34,13 +34,17 @@ describe("canonical ebook 18-stage state machine", () => {
   });
 
   it("treats STEP 18 as AI production boundary, not external publish", () => {
-    const publishPrep = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "publish_prep");
-    const deploy = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "deploy");
-    assert.equal(publishPrep.order, 12);
-    assert.equal(publishPrep.aiDocumentStage, true);
-    assert.equal(publishPrep.productionBoundary, false);
-    assert.equal(deploy.aiDocumentStage, false);
-    assert.equal(deploy.productionBoundary, false);
+    const cover = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "cover_layout_design");
+    const formatBuild = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "format_build");
+    const packageReview = EBOOK_STAGE_CONTRACTS.find((stage) => stage.id === "package_user_review");
+    assert.equal(cover.order, 12);
+    assert.equal(cover.aiDocumentStage, true);
+    assert.equal(cover.productionBoundary, false);
+    assert.equal(formatBuild.order, 13);
+    assert.equal(packageReview.order, 15);
+    assert.equal(packageReview.approvalTypicallyRequired, true);
+    assert.equal(EBOOK_STAGE_BY_ID.get("publication_package").productionBoundary, true);
+    // Legacy alias still mapped for old WI.
     assert.equal(EBOOK_STAGE_BY_ID.get("maintain").productionBoundary, true);
   });
 
@@ -68,10 +72,10 @@ describe("canonical ebook 18-stage state machine", () => {
     const applicable = EBOOK_STAGE_CONTRACTS.filter((stage) => stage.applicableByDefault);
     assert.deepEqual(transitions, applicable.map((stage) => stage.id));
     assert.equal(state.stages.length, 18);
-    assert.equal(state.stages.filter((stage) => stage.status === "completed").length, 16);
-    assert.equal(state.stages.filter((stage) => stage.status === "not_applicable").length, 2);
-    assert.equal(state.requests.size, 16);
-    assert.equal(state.workflowReceipts.size, 16);
+    assert.equal(state.stages.filter((stage) => stage.status === "completed").length, 18);
+    assert.equal(state.stages.filter((stage) => stage.status === "not_applicable").length, 0);
+    assert.equal(state.requests.size, 18);
+    assert.equal(state.workflowReceipts.size, 18);
     assert.equal(state.status, "completed");
   });
 
@@ -83,7 +87,7 @@ describe("canonical ebook 18-stage state machine", () => {
       reportValidatedResult(state);
     }
     assert.equal(state.requests.size, 0);
-    assert.equal(visited.length, 16);
+    assert.equal(visited.length, 18);
     assert.equal(state.status, "completed");
   });
 

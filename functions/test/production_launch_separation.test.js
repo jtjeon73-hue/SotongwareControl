@@ -19,7 +19,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 test("stage18 completion becomes prelaunch review, never launched", () => {
   const out = alignProjectWithCurrentStage(
     { currentStage: 18, status: "in_progress", launchStatus: "not_started" },
-    [{ stageId: "maintain", stageNumber: 18, status: "completed", approvalStatus: "not_required" }]
+    [{ stageId: "publication_package", stageNumber: 18, status: "completed", approvalStatus: "not_required" }]
   );
   assert.equal(out.status, "prelaunch_review");
   assert.equal(out.productionStatus, "prelaunch_review");
@@ -28,13 +28,15 @@ test("stage18 completion becomes prelaunch review, never launched", () => {
   assert.equal(out.externalPublished, false);
 });
 
-test("production boundary is stage18 and stages15-18 are internal AI documents", () => {
-  assert.equal(EBOOK_STAGE_BY_ID.get("publish_prep").productionBoundary, false);
+test("production boundary is stage18 and STEP15 is mandatory user gate", () => {
+  assert.equal(EBOOK_STAGE_BY_ID.get("cover_layout_design").productionBoundary, false);
+  assert.equal(EBOOK_STAGE_BY_ID.get("package_user_review").approvalTypicallyRequired, true);
+  assert.equal(EBOOK_STAGE_BY_ID.get("publication_package").productionBoundary, true);
+  // Legacy alias retained for old WI.
   assert.equal(EBOOK_STAGE_BY_ID.get("maintain").productionBoundary, true);
-  for (const id of ["launch", "measure", "iterate", "maintain"]) {
+  for (const id of ["format_build", "reader_accessibility_test", "final_polish"]) {
     assert.equal(EBOOK_STAGE_BY_ID.get(id).aiDocumentStage, true);
   }
-  assert.equal(EBOOK_STAGE_BY_ID.get("launch").approvalTypicallyRequired, false);
 });
 
 test("new production and launch statuses are relay-allowlisted", () => {

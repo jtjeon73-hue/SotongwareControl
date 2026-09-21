@@ -7,7 +7,7 @@
  */
 
 const crypto = require("crypto");
-const { PRODUCT_TYPES, stageMapForProduct } = require("./canonical");
+const { PRODUCT_TYPES, stageMapForProduct, resolveEbookStageMeta } = require("./canonical");
 const { assertSafeId, reject } = require("./validate");
 
 const TEST_INSTRUCTION_PREFIX = "wi_test_remote_e2e_";
@@ -388,7 +388,7 @@ function parseArtifactUploadInit(body, { requireExplicitProd = true } = {}) {
     reject("invalid_argument", "productType invalid_enum");
   }
 
-  const stageId = assertSafeId(body.stageId, "stageId");
+  const stageIdRaw = assertSafeId(body.stageId, "stageId");
   // Canonical production types: stageId is authoritative.
   let stageNumber;
   const rawStageNumber = body.stageNumber;
@@ -399,9 +399,15 @@ function parseArtifactUploadInit(body, { requireExplicitProd = true } = {}) {
       required: true,
     });
   }
+  let stageId = stageIdRaw;
   if (productType === "ebook" || productType === "app") {
-    const meta = stageMapForProduct(productType).get(stageId);
-    if (!meta) reject("invalid_argument", `unknown_${productType}_stageId:${stageId}`);
+    const meta = productType === "ebook"
+      ? resolveEbookStageMeta(stageIdRaw)
+      : stageMapForProduct(productType).get(stageIdRaw);
+    if (!meta) reject("invalid_argument", `unknown_${productType}_stageId:${stageIdRaw}`);
+    stageId = meta.id === "sales_metadata" ? "package_user_review" : meta.id;
+    // Keep path stage folder as the requested id when it is a known alias key,
+    // but validate against canonical meta.order.
     if (stageNumber === undefined || stageNumber === 0) {
       stageNumber = meta.order;
     } else if (meta.order !== stageNumber) {
@@ -556,7 +562,10 @@ function parseArtifactDownloadRequest(body) {
   if (productType !== "ebook" && productType !== "app") {
     reject("invalid_argument", "download productType invalid_enum");
   }
-  if (!stageMapForProduct(productType).has(stageId)) {
+  const stageOk = productType === "ebook"
+    ? !!resolveEbookStageMeta(stageId)
+    : stageMapForProduct(productType).has(stageId);
+  if (!stageOk) {
     reject("invalid_argument", `unknown_${productType}_stageId:${stageId}`);
   }
   const revision = assertInt(body.revision, "revision", {

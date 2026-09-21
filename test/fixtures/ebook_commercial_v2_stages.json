@@ -1,0 +1,37 @@
+{
+  "contract": "Sotong24Work EbookProductionContractVersion::kStagesV2",
+  "flutterSource": "BusinessPlanningService.ebookWorkflowStages",
+  "controlSource": "functions/sotong24/canonical.js EBOOK_STAGE_CONTRACTS",
+  "stages": [
+    { "order": 1, "stageId": "idea_clarify", "displayName": "아이디어 정리", "artifactUpload": true, "approvalGate": false },
+    { "order": 2, "stageId": "problem_validate", "displayName": "고객 문제 검증", "artifactUpload": true, "approvalGate": false },
+    { "order": 3, "stageId": "materials_prep", "displayName": "자료 준비", "artifactUpload": true, "approvalGate": false },
+    { "order": 4, "stageId": "planning", "displayName": "기획", "artifactUpload": true, "approvalGate": false },
+    { "order": 5, "stageId": "project_setup", "displayName": "프로젝트 생성", "artifactUpload": true, "approvalGate": false },
+    { "order": 6, "stageId": "prompt_generate", "displayName": "작성 프롬프트 생성", "artifactUpload": true, "approvalGate": false },
+    { "order": 7, "stageId": "draft", "displayName": "원고 초안", "artifactUpload": true, "approvalGate": false },
+    { "order": 8, "stageId": "editorial_structure_review", "displayName": "편집·구조 검토", "artifactUpload": true, "approvalGate": false },
+    { "order": 9, "stageId": "user_review", "displayName": "편집 내부 체크포인트", "artifactUpload": true, "approvalGate": false },
+    { "order": 10, "stageId": "revise", "displayName": "보완 수정", "artifactUpload": true, "approvalGate": false },
+    { "order": 11, "stageId": "quality", "displayName": "품질 검사", "artifactUpload": true, "approvalGate": false },
+    { "order": 12, "stageId": "cover_layout_design", "displayName": "표지·레이아웃", "artifactUpload": true, "approvalGate": false },
+    { "order": 13, "stageId": "format_build", "displayName": "PDF/EPUB 빌드", "artifactUpload": true, "approvalGate": false },
+    { "order": 14, "stageId": "reader_accessibility_test", "displayName": "가독·접근성 검사", "artifactUpload": true, "approvalGate": false },
+    { "order": 15, "stageId": "package_user_review", "displayName": "완성형 r1 사용자 검토", "artifactUpload": true, "approvalGate": true },
+    { "order": 16, "stageId": "final_polish", "displayName": "최종 폴리시", "artifactUpload": true, "approvalGate": false },
+    { "order": 17, "stageId": "final_user_approval", "displayName": "최종 사용자 승인", "artifactUpload": true, "approvalGate": true },
+    { "order": 18, "stageId": "publication_package", "displayName": "출시 준비 패키지", "artifactUpload": true, "approvalGate": false }
+  ],
+  "legacyAliases": [
+    "build_test",
+    "publish_prep",
+    "deploy",
+    "promo",
+    "launch",
+    "measure",
+    "iterate",
+    "maintain",
+    "sales_metadata"
+  ],
+  "unknownMustReject": ["foo_bar_invalid", "final_policy", "release_package"]
+}

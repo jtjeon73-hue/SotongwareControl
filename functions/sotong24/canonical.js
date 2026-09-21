@@ -1,8 +1,9 @@
 "use strict";
 
 /**
- * 전자책 canonical 18단계 — Flutter BusinessPlanningService.standardWorkflowTitles 와 동일.
- * stageId / 순서 불일치 시 relay가 거부한다.
+ * 전자책 commercial v2 (Sotong24Work EbookProductionContractVersion::kStagesV2
+ * + Flutter BusinessPlanningService.ebookWorkflowStages) 가 1급 계약이다.
+ * 레거시 v1 stageId 는 alias map 으로만 유지한다 (fail-closed: 임의 ID 거부).
  */
 const PROBLEM_VALIDATE_EVIDENCE_CONTRACT = Object.freeze({
   minPublicSourceUrls: 5,
@@ -14,25 +15,30 @@ const PROBLEM_VALIDATE_EVIDENCE_CONTRACT = Object.freeze({
   signalIdSchemes: Object.freeze(["S", "PS"]),
 });
 
+/**
+ * Commercial ebook v2 — 18 stages.
+ * Columns: id, nameKo, applicableByDefault, aiDocumentStage,
+ *          approvalTypicallyRequired, artifactKind, criteriaEvaluator
+ */
 const EBOOK_STAGE_CONTRACTS = [
   ["idea_clarify", "아이디어 정리", true, true, false, "idea_summary", "idea_contract"],
   ["problem_validate", "고객 문제 검증", true, true, false, "problem_validation", "problem_contract"],
   ["materials_prep", "자료 준비", true, true, false, "materials_index", "materials_contract"],
-  ["planning", "기획", true, true, true, "ebook_plan", "planning_contract"],
-  ["project_setup", "프로젝트 생성 또는 불러오기", true, true, false, "project_scaffold_report", "canonical_artifact"],
-  ["prompt_generate", "AI/Cursor 작업 프롬프트 생성", true, true, false, "prompt_package", "canonical_artifact"],
-  ["draft", "초안 제작", true, true, false, "manuscript_draft", "canonical_artifact"],
-  ["build_test", "실행 및 기능 검사", false, true, false, "format_test_report", "canonical_artifact"],
-  ["user_review", "사용자 확인", true, true, true, "review_packet", "canonical_artifact"],
-  ["revise", "보완 수정", true, true, false, "revised_manuscript", "canonical_artifact"],
-  ["quality", "품질 검사", true, true, false, "quality_report", "canonical_artifact"],
-  ["publish_prep", "등록 준비", true, true, true, "publishing_package", "canonical_artifact"],
-  ["deploy", "배포", false, false, true, "deployment_record", "canonical_artifact"],
-  ["promo", "홍보자료 제작", true, true, false, "promotion_package", "canonical_artifact"],
-  ["launch", "출시자료 준비", true, true, false, "launch_preparation_package", "canonical_artifact"],
-  ["measure", "출시 후 운영·측정 설계", true, true, false, "measurement_plan", "canonical_artifact"],
-  ["iterate", "개선 백로그 점검", true, true, false, "improvement_backlog", "canonical_artifact"],
-  ["maintain", "최종 패키지 검증", true, true, false, "prelaunch_final_package", "canonical_artifact"],
+  ["planning", "기획", true, true, false, "ebook_plan", "planning_contract"],
+  ["project_setup", "프로젝트 생성", true, true, false, "project_scaffold_report", "ebook_project_setup_contract"],
+  ["prompt_generate", "작성 프롬프트 생성", true, true, false, "prompt_package", "writing_prompt_contract"],
+  ["draft", "원고 초안", true, true, false, "manuscript_draft", "manuscript_draft_contract"],
+  ["editorial_structure_review", "편집·구조 검토", true, true, false, "editorial_review_report", "editorial_structure_contract"],
+  ["user_review", "편집 내부 체크포인트", true, true, false, "editorial_checkpoint_packet", "ebook_editorial_checkpoint_contract"],
+  ["revise", "보완 수정", true, true, false, "revised_manuscript", "manuscript_revision_contract"],
+  ["quality", "품질 검사", true, true, false, "quality_report", "ebook_quality_contract"],
+  ["cover_layout_design", "표지·레이아웃", true, true, false, "design_package", "ebook_design_contract"],
+  ["format_build", "PDF/EPUB 빌드", true, true, false, "format_build_package", "ebook_format_build_contract"],
+  ["reader_accessibility_test", "가독·접근성 검사", true, true, false, "reader_test_report", "ebook_reader_test_contract"],
+  ["package_user_review", "완성형 r1 사용자 검토", true, true, true, "complete_r1_package", "ebook_package_user_review_contract"],
+  ["final_polish", "최종 폴리시", true, true, false, "final_polish_report", "ebook_final_polish_contract"],
+  ["final_user_approval", "최종 사용자 승인", true, true, true, "final_approval_record", "ebook_final_approval_contract"],
+  ["publication_package", "출시 준비 패키지", true, true, false, "publication_package", "ebook_publication_package_contract"],
 ].map((row, index) => ({
   id: row[0],
   name: row[1],
@@ -46,48 +52,76 @@ const EBOOK_STAGE_CONTRACTS = [
     ? PROBLEM_VALIDATE_EVIDENCE_CONTRACT
     : undefined,
   terminal: index === 17,
-  productionBoundary: row[0] === "maintain",
+  productionBoundary: row[0] === "publication_package",
+  commercialV2: true,
 }));
 
 const EBOOK_STAGES = EBOOK_STAGE_CONTRACTS.map((stage) => [stage.id, stage.name]);
-
 const EBOOK_STAGE_IDS = EBOOK_STAGES.map((s) => s[0]);
+const EBOOK_COMMERCIAL_V2_STAGE_IDS = Object.freeze([...EBOOK_STAGE_IDS]);
+
 const EBOOK_STAGE_BY_ID = new Map(
   EBOOK_STAGE_CONTRACTS.map((stage) => [stage.id, stage])
 );
 
-// Commercial ebook v2 complete-r1 stages (Flutter ebookWorkflowStages).
-// Registered as aliases for artifact download / relay validation without
-// replacing legacy 18-step EBOOK_STAGE_CONTRACTS order.
-const EBOOK_V2_STAGE_ALIASES = [
-  ["editorial_structure_review", "편집·구조 검토", 8],
-  ["cover_layout_design", "표지·레이아웃", 12],
-  ["format_build", "PDF/EPUB 빌드", 13],
-  ["reader_accessibility_test", "가독·접근성 검사", 14],
-  ["package_user_review", "완성형 r1 사용자 검토", 15],
-  ["sales_metadata", "완성형 r1 사용자 검토(레거시 별칭)", 15],
-  ["final_polish", "최종 폴리시", 16],
-  ["final_user_approval", "최종 사용자 승인", 17],
-  ["publication_package", "출시 준비 패키지", 18],
+/**
+ * Legacy v1 stageIds — still accepted by relay/artifact for old WI.
+ * Do not use as primary production order.
+ */
+const EBOOK_LEGACY_STAGE_ALIASES = [
+  ["build_test", "실행 및 기능 검사", 8, false, true, false, "format_test_report"],
+  ["publish_prep", "등록 준비", 12, true, true, true, "publishing_package"],
+  ["deploy", "배포", 13, false, false, true, "deployment_record"],
+  ["promo", "홍보자료 제작", 14, true, true, false, "promotion_package"],
+  ["launch", "출시자료 준비", 15, true, true, false, "launch_preparation_package"],
+  ["measure", "출시 후 운영·측정 설계", 16, true, true, false, "measurement_plan"],
+  ["iterate", "개선 백로그 점검", 17, true, true, false, "improvement_backlog"],
+  ["maintain", "최종 패키지 검증", 18, true, true, false, "prelaunch_final_package"],
 ];
-for (const [id, name, order] of EBOOK_V2_STAGE_ALIASES) {
+for (const [id, name, order, applicable, aiDoc, approval, kind] of EBOOK_LEGACY_STAGE_ALIASES) {
   if (!EBOOK_STAGE_BY_ID.has(id)) {
     EBOOK_STAGE_BY_ID.set(id, {
       id,
       name,
       order,
-      applicableByDefault: true,
-      aiDocumentStage: true,
-      approvalTypicallyRequired: id === "package_user_review"
-        || id === "sales_metadata"
-        || id === "final_user_approval",
-      artifactKind: "canonical_artifact",
+      applicableByDefault: applicable,
+      aiDocumentStage: aiDoc,
+      approvalTypicallyRequired: approval,
+      artifactKind: kind,
       criteriaEvaluator: "canonical_artifact",
-      terminal: id === "publication_package",
-      productionBoundary: id === "publication_package",
-      v2Alias: true,
+      terminal: id === "maintain",
+      productionBoundary: id === "maintain",
+      legacyAlias: true,
     });
   }
+}
+
+// Complete-r1 legacy name used in older WI / docs.
+if (!EBOOK_STAGE_BY_ID.has("sales_metadata")) {
+  const gate = EBOOK_STAGE_BY_ID.get("package_user_review");
+  EBOOK_STAGE_BY_ID.set("sales_metadata", {
+    ...gate,
+    id: "sales_metadata",
+    name: "완성형 r1 사용자 검토(레거시 별칭)",
+    legacyAlias: true,
+    aliasOf: "package_user_review",
+  });
+}
+
+/** Explicit normalize: known aliases → canonical commercial v2 id. */
+const EBOOK_STAGE_ALIAS_TO_CANONICAL = Object.freeze({
+  sales_metadata: "package_user_review",
+});
+
+function normalizeEbookStageId(stageId) {
+  const id = String(stageId || "").trim();
+  if (!id) return id;
+  return EBOOK_STAGE_ALIAS_TO_CANONICAL[id] || id;
+}
+
+function resolveEbookStageMeta(stageId) {
+  const normalized = normalizeEbookStageId(stageId);
+  return EBOOK_STAGE_BY_ID.get(normalized) || EBOOK_STAGE_BY_ID.get(stageId) || null;
 }
 
 // Android-first app production. Stage 18 is an installable-APK/pre-launch
@@ -191,7 +225,12 @@ module.exports = {
   EBOOK_STAGES,
   EBOOK_STAGE_CONTRACTS,
   EBOOK_STAGE_IDS,
+  EBOOK_COMMERCIAL_V2_STAGE_IDS,
   EBOOK_STAGE_BY_ID,
+  EBOOK_LEGACY_STAGE_ALIASES,
+  EBOOK_STAGE_ALIAS_TO_CANONICAL,
+  normalizeEbookStageId,
+  resolveEbookStageMeta,
   APP_STAGES,
   APP_STAGE_CONTRACTS,
   APP_STAGE_IDS,

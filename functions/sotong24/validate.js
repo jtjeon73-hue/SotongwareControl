@@ -2,6 +2,7 @@
 
 const {
   stageMapForProduct,
+  resolveEbookStageMeta,
   WORK_STATUS,
   APPROVAL_STATUS,
   PC_STATUS,
@@ -294,7 +295,9 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
   const revision = assertInt(input.revision, "revision", { min: 0 });
 
   if (productType === "ebook" || productType === "app") {
-    const meta = stageMapForProduct(productType).get(stageId);
+    const meta = productType === "ebook"
+      ? resolveEbookStageMeta(stageId)
+      : stageMapForProduct(productType).get(stageId);
     if (!meta) reject("invalid_argument", `unknown_${productType}_stageId:${stageId}`);
     if (meta.order !== stageNumber) {
       reject("invalid_argument", `${productType} stageNumber_mismatch_stageId`);
