@@ -24,6 +24,8 @@ class RemoteOpsDashboard extends StatelessWidget {
   final List<RemoteJobDoc> jobs;
   final VoidCallback onRefresh;
   final bool refreshing;
+
+  /// 하위 호환용. 진단 시트는 대시보드가 직접 표시한다.
   final VoidCallback? onOpenDiagnostics;
   final DateTime? now;
 
@@ -54,10 +56,18 @@ class RemoteOpsDashboard extends StatelessWidget {
     final workerRunning = _isWorkerRunning(primaryAgent, clock);
     final lastHb = primaryAgent?.lastHeartbeatAt;
     final version = _versionLabel(primaryAgent);
-    final systemTone = _systemTone(
+    final systemTone = systemToneFor(
       online: online,
       health: health,
       job: current?.job,
+      agent: primaryAgent,
+    );
+    final anomalyLabel = _anomalyLabel(
+      tone: systemTone,
+      health: health,
+      online: online,
+      stalled: current?.job?.status == 'stalled',
+      failed: current?.job?.status == 'failed',
       agent: primaryAgent,
     );
 
@@ -85,24 +95,20 @@ class RemoteOpsDashboard extends StatelessWidget {
             title: '소통24워크 상태',
             accent: online ? ControlColors.teal : ControlColors.accentRose,
             children: [
-              _kv('연결', online ? '온라인' : (primaryAgent == null ? '연결 없음' : '오프라인')),
+              _kv(
+                '연결',
+                online ? '온라인' : (primaryAgent == null ? '연결 없음' : '오프라인'),
+              ),
               _kv(
                 'Agent',
-                primaryAgent == null
-                    ? '미연결'
-                    : (online ? '연결됨' : '응답 없음'),
+                primaryAgent == null ? '미연결' : (online ? '연결됨' : '응답 없음'),
               ),
               _kv(
                 '마지막 heartbeat',
                 lastHb == null ? '—' : _relativeKo(lastHb.toLocal()),
               ),
               _kv('버전', version),
-              _kv(
-                '이상',
-                online && health.overall == OpsHealthLevel.ok
-                    ? '없음'
-                    : (health.suggestedCheck?.summary ?? '확인 필요'),
-              ),
+              _kv('이상', anomalyLabel),
             ],
           ),
           const SizedBox(height: 12),
@@ -150,10 +156,7 @@ class RemoteOpsDashboard extends StatelessWidget {
                     const SizedBox(height: 8),
                     _kv('현재 단계', current.stageLine),
                     _kv('진행 상태', current.statusLabel),
-                    _kv(
-                      'worker',
-                      workerRunning ? '실행 중' : '미실행',
-                    ),
+                    _kv('worker', workerRunning ? '실행 중' : '미실행'),
                     _kv(
                       '마지막 활동',
                       current.lastUpdatedLine.trim().isEmpty
@@ -177,7 +180,19 @@ class RemoteOpsDashboard extends StatelessWidget {
             tone: systemTone,
             health: health,
             stalled: current?.job?.status == 'stalled',
-            onOpenDiagnostics: onOpenDiagnostics,
+            failed: current?.job?.status == 'failed',
+            onOpenDiagnostics: () {
+              showRemoteStatusDiagnosticsSheet(
+                context,
+                agent: primaryAgent,
+                current: current,
+                workerRunning: workerRunning,
+                online: online,
+                tone: systemTone,
+                now: clock,
+              );
+              onOpenDiagnostics?.call();
+            },
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -194,6 +209,53 @@ class RemoteOpsDashboard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// 현재 상태만으로 시스템 톤을 판정한다. stale lastError는 오류로 보지 않는다.
+  @visibleForTesting
+  static RemoteOpsSystemTone systemToneFor({
+    required bool online,
+    required OpsHealthReport health,
+    required RemoteJobDoc? job,
+    required RemoteAgentDoc? agent,
+  }) {
+    if (!online || agent == null) return RemoteOpsSystemTone.error;
+    if (agent.state == 'error') return RemoteOpsSystemTone.error;
+    final jobStatus = job?.status.trim() ?? '';
+    if (jobStatus == 'stalled' || jobStatus == 'failed') {
+      return RemoteOpsSystemTone.error;
+    }
+    if (health.overall == OpsHealthLevel.problem) {
+      return RemoteOpsSystemTone.error;
+    }
+    if (health.overall == OpsHealthLevel.attention) {
+      return RemoteOpsSystemTone.warn;
+    }
+    return RemoteOpsSystemTone.ok;
+  }
+
+  static String _anomalyLabel({
+    required RemoteOpsSystemTone tone,
+    required OpsHealthReport health,
+    required bool online,
+    required bool stalled,
+    required bool failed,
+    required RemoteAgentDoc? agent,
+  }) {
+    switch (tone) {
+      case RemoteOpsSystemTone.ok:
+        return '없음';
+      case RemoteOpsSystemTone.warn:
+        return health.suggestedCheck?.summary ?? '확인 필요';
+      case RemoteOpsSystemTone.error:
+        if (!online) {
+          return health.suggestedCheck?.summary ?? '연결 오류';
+        }
+        if (agent?.state == 'error') return 'Agent 오류 상태';
+        if (stalled) return '작업 stalled';
+        if (failed) return '작업 실패';
+        return health.suggestedCheck?.summary ?? '오류';
+    }
   }
 
   static bool _isAgentExecuting(RemoteAgentDoc? agent, DateTime now) {
@@ -230,22 +292,6 @@ class RemoteOpsDashboard extends StatelessWidget {
     final v = agent.appVersion.trim();
     if (v.isEmpty) return '—';
     return v;
-  }
-
-  static _SystemTone _systemTone({
-    required bool online,
-    required OpsHealthReport health,
-    required RemoteJobDoc? job,
-    required RemoteAgentDoc? agent,
-  }) {
-    if (!online || agent == null) return _SystemTone.error;
-    if (job?.status == 'stalled') return _SystemTone.error;
-    if (health.overall == OpsHealthLevel.problem) return _SystemTone.error;
-    if (health.overall == OpsHealthLevel.attention) return _SystemTone.warn;
-    if (agent.state == 'error' || agent.lastError.trim().isNotEmpty) {
-      return _SystemTone.error;
-    }
-    return _SystemTone.ok;
   }
 
   static Widget _kv(String label, String value) {
@@ -291,7 +337,207 @@ class RemoteOpsDashboard extends StatelessWidget {
   }
 }
 
-enum _SystemTone { ok, warn, error }
+enum RemoteOpsSystemTone { ok, warn, error }
+
+/// 상태확인용 진단 시트 — 개발 도구 전체 대신 요약만 표시.
+Future<void> showRemoteStatusDiagnosticsSheet(
+  BuildContext context, {
+  required RemoteAgentDoc? agent,
+  required WorkshopCurrentWorkItem? current,
+  required bool workerRunning,
+  required bool online,
+  required RemoteOpsSystemTone tone,
+  DateTime? now,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (ctx) {
+      return _RemoteStatusDiagnosticsSheet(
+        agent: agent,
+        current: current,
+        workerRunning: workerRunning,
+        online: online,
+        tone: tone,
+        now: now ?? DateTime.now().toUtc(),
+      );
+    },
+  );
+}
+
+class _RemoteStatusDiagnosticsSheet extends StatelessWidget {
+  const _RemoteStatusDiagnosticsSheet({
+    required this.agent,
+    required this.current,
+    required this.workerRunning,
+    required this.online,
+    required this.tone,
+    required this.now,
+  });
+
+  final RemoteAgentDoc? agent;
+  final WorkshopCurrentWorkItem? current;
+  final bool workerRunning;
+  final bool online;
+  final RemoteOpsSystemTone tone;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final job = current?.job;
+    final lastError = agent?.lastError.trim() ?? '';
+    final activeError = agent?.state == 'error'
+        ? (lastError.isEmpty ? 'Agent가 오류 상태입니다.' : lastError)
+        : (job?.status == 'stalled'
+              ? '현재 작업이 stalled 상태입니다.'
+              : (job?.status == 'failed' ? '현재 작업이 실패했습니다.' : ''));
+    final toneLabel = switch (tone) {
+      RemoteOpsSystemTone.ok => '정상',
+      RemoteOpsSystemTone.warn => '주의',
+      RemoteOpsSystemTone.error => '오류',
+    };
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: SingleChildScrollView(
+          key: const Key('remote_status_diagnostics_sheet'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '진단정보',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '시스템 상태 · $toneLabel',
+                style: TextStyle(
+                  color: switch (tone) {
+                    RemoteOpsSystemTone.ok => ControlColors.teal,
+                    RemoteOpsSystemTone.warn => Colors.orange.shade800,
+                    RemoteOpsSystemTone.error => ControlColors.accentRose,
+                  },
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _diagKv(
+                'Agent 상태',
+                agent == null
+                    ? '미연결'
+                    : (online ? agent!.stateLabelKo : '오프라인 · ${agent!.stateLabelKo}'),
+              ),
+              _diagKv(
+                'heartbeat',
+                agent?.lastHeartbeatAt == null
+                    ? '—'
+                    : RemoteOpsDashboard._relativeKo(
+                        agent!.lastHeartbeatAt!.toLocal(),
+                      ),
+              ),
+              _diagKv(
+                '현재 작업',
+                current == null ? '없음' : current!.title,
+              ),
+              _diagKv(
+                '현재 단계',
+                current == null ? '—' : current!.stageLine,
+              ),
+              _diagKv('worker', workerRunning ? '실행 중' : '미실행'),
+              if (activeError.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _diagKv('현재 오류', activeError),
+              ],
+              if (lastError.isNotEmpty && agent?.state != 'error') ...[
+                const SizedBox(height: 8),
+                _diagKv('이전 오류 기록', lastError),
+              ],
+              const SizedBox(height: 12),
+              Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text(
+                    '고급 진단',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  children: [
+                    _diagKv(
+                      'Agent ID',
+                      agent == null || agent!.agentId.isEmpty
+                          ? '—'
+                          : agent!.agentId,
+                    ),
+                    _diagKv(
+                      'jobId',
+                      job == null || job.jobId.isEmpty ? '—' : job.jobId,
+                    ),
+                    _diagKv(
+                      'instructionId',
+                      () {
+                        final fromJob = job?.instructionId.trim() ?? '';
+                        if (fromJob.isNotEmpty) return fromJob;
+                        final fromProject =
+                            current?.project?.projectId.trim() ?? '';
+                        return fromProject.isEmpty ? '—' : fromProject;
+                      }(),
+                    ),
+                    _diagKv(
+                      'currentJobId',
+                      agent == null || agent!.currentJobId.trim().isEmpty
+                          ? '—'
+                          : agent!.currentJobId,
+                    ),
+                    _diagKv('내부 status', job?.status ?? agent?.state ?? '—'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('닫기'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _diagKv(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: ControlColors.textMuted,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
@@ -338,33 +584,37 @@ class _SystemStatusCard extends StatelessWidget {
     required this.tone,
     required this.health,
     required this.stalled,
+    required this.failed,
     this.onOpenDiagnostics,
   });
 
-  final _SystemTone tone;
+  final RemoteOpsSystemTone tone;
   final OpsHealthReport health;
   final bool stalled;
+  final bool failed;
   final VoidCallback? onOpenDiagnostics;
 
   @override
   Widget build(BuildContext context) {
     final color = switch (tone) {
-      _SystemTone.ok => ControlColors.teal,
-      _SystemTone.warn => Colors.orange.shade800,
-      _SystemTone.error => ControlColors.accentRose,
+      RemoteOpsSystemTone.ok => ControlColors.teal,
+      RemoteOpsSystemTone.warn => Colors.orange.shade800,
+      RemoteOpsSystemTone.error => ControlColors.accentRose,
     };
     final title = switch (tone) {
-      _SystemTone.ok => '정상',
-      _SystemTone.warn => '주의',
-      _SystemTone.error => '오류',
+      RemoteOpsSystemTone.ok => '정상',
+      RemoteOpsSystemTone.warn => '주의',
+      RemoteOpsSystemTone.error => '오류',
     };
     final body = switch (tone) {
-      _SystemTone.ok => '정상 동작 중',
-      _SystemTone.warn =>
+      RemoteOpsSystemTone.ok => '정상 동작 중',
+      RemoteOpsSystemTone.warn =>
         health.suggestedCheck?.summary ?? '확인이 필요합니다.',
-      _SystemTone.error => stalled
+      RemoteOpsSystemTone.error => stalled
           ? '작업이 stalled 상태입니다. worker/단계를 진단하세요.'
-          : (health.suggestedCheck?.summary ?? '시스템 오류가 있습니다.'),
+          : (failed
+                ? '현재 작업이 실패했습니다.'
+                : (health.suggestedCheck?.summary ?? '시스템 오류가 있습니다.')),
     };
 
     return Container(
@@ -391,9 +641,10 @@ class _SystemStatusCard extends StatelessWidget {
             body,
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
-          if (tone != _SystemTone.ok && onOpenDiagnostics != null) ...[
+          if (onOpenDiagnostics != null) ...[
             const SizedBox(height: 10),
             OutlinedButton(
+              key: const Key('remote_open_diagnostics_button'),
               onPressed: onOpenDiagnostics,
               child: const Text('진단정보 보기'),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sotong_ware_control/models/remote_agent_models.dart';
 import 'package:sotong_ware_control/models/sotong24_remote_models.dart';
+import 'package:sotong_ware_control/services/ops_health_check.dart';
 import 'package:sotong_ware_control/widgets/remote_ops_dashboard.dart';
 
 void main() {
@@ -12,6 +13,7 @@ void main() {
   RemoteAgentDoc agent({
     String state = 'idle',
     String currentJobId = '',
+    String lastError = '',
     DateTime? hb,
   }) {
     return RemoteAgentDoc(
@@ -22,6 +24,7 @@ void main() {
       enabled: true,
       appVersion: '2.4.1',
       currentJobId: currentJobId,
+      lastError: lastError,
       lastHeartbeatAt: hb ?? now.subtract(const Duration(seconds: 10)),
     );
   }
@@ -90,11 +93,7 @@ void main() {
         agents: [agent(state: 'running', currentJobId: 'job_91c66278e88042e0')],
         jobs: [
           job(),
-          job(
-            id: 'job_old_stale',
-            status: 'running',
-            title: '농작업 기록 앱',
-          ),
+          job(id: 'job_old_stale', status: 'running', title: '농작업 기록 앱'),
         ],
       ),
     );
@@ -119,10 +118,7 @@ void main() {
     await tester.pumpWidget(
       dash(
         agents: [
-          agent(
-            state: 'idle',
-            hb: now.subtract(const Duration(minutes: 5)),
-          ),
+          agent(state: 'idle', hb: now.subtract(const Duration(minutes: 5))),
         ],
       ),
     );
@@ -135,7 +131,8 @@ void main() {
     await tester.pumpWidget(dash(agents: [agent()]));
     await tester.pumpAndSettle();
     expect(find.text('정상 동작 중'), findsOneWidget);
-    expect(find.text('진단정보 보기'), findsNothing);
+    expect(find.text('시스템 상태 · 오류'), findsNothing);
+    expect(find.text('없음'), findsOneWidget);
   });
 
   testWidgets('7. 결과물/승인/APK/PDF UI 없음', (tester) async {
@@ -152,5 +149,127 @@ void main() {
     expect(find.text('사용자 승인'), findsNothing);
     expect(find.text('보완 요청'), findsNothing);
     expect(find.text('AI 제작공정에서 계속 보기'), findsNothing);
+  });
+
+  testWidgets('A1. online+running+stale lastError → 빨간 오류 아님', (tester) async {
+    final a = agent(
+      state: 'running',
+      currentJobId: 'job_91c66278e88042e0',
+      lastError: '과거 단계 실패 기록(stale)',
+    );
+    final health = OpsHealthCheck.evaluate(
+      agents: [a],
+      jobs: [job()],
+      now: now,
+    );
+    expect(
+      RemoteOpsDashboard.systemToneFor(
+        online: true,
+        health: health,
+        job: job(),
+        agent: a,
+      ),
+      RemoteOpsSystemTone.ok,
+    );
+
+    await tester.pumpWidget(
+      dash(agents: [a], jobs: [job()]),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('없음'), findsOneWidget);
+    expect(find.text('정상 동작 중'), findsOneWidget);
+    expect(find.text('시스템 상태 · 오류'), findsNothing);
+    expect(find.text('시스템 상태 · 정상'), findsOneWidget);
+  });
+
+  testWidgets('A2. agent.state=error → 빨간 오류', (tester) async {
+    await tester.pumpWidget(
+      dash(
+        agents: [
+          agent(
+            state: 'error',
+            currentJobId: 'job_91c66278e88042e0',
+            lastError: '현재 오류',
+          ),
+        ],
+        jobs: [job()],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('시스템 상태 · 오류'), findsOneWidget);
+    expect(find.text('Agent 오류 상태'), findsOneWidget);
+  });
+
+  testWidgets('A3. current Job stalled → 빨간 오류', (tester) async {
+    await tester.pumpWidget(
+      dash(
+        agents: [
+          agent(state: 'running', currentJobId: 'job_91c66278e88042e0'),
+        ],
+        jobs: [job(status: 'stalled')],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('시스템 상태 · 오류'), findsOneWidget);
+    expect(find.textContaining('stalled'), findsWidgets);
+  });
+
+  testWidgets('A4. heartbeat offline → 빨간 오류', (tester) async {
+    await tester.pumpWidget(
+      dash(
+        agents: [
+          agent(hb: now.subtract(const Duration(minutes: 10))),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('시스템 상태 · 오류'), findsOneWidget);
+    expect(find.text('오프라인'), findsWidgets);
+  });
+
+  testWidgets('A5. 상단 이상 없음과 시스템 정상 일치', (tester) async {
+    await tester.pumpWidget(
+      dash(
+        agents: [
+          agent(
+            state: 'running',
+            currentJobId: 'job_91c66278e88042e0',
+            lastError: 'old stale',
+          ),
+        ],
+        jobs: [job()],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('없음'), findsOneWidget);
+    expect(find.text('시스템 상태 · 정상'), findsOneWidget);
+    expect(find.text('정상 동작 중'), findsOneWidget);
+  });
+
+  testWidgets('B. 진단정보 보기 → 즉시 시트 표시 + 이전 오류 기록', (tester) async {
+    await tester.pumpWidget(
+      dash(
+        agents: [
+          agent(
+            state: 'running',
+            currentJobId: 'job_91c66278e88042e0',
+            lastError: '과거 실패 메시지',
+          ),
+        ],
+        jobs: [job()],
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('remote_open_diagnostics_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('remote_status_diagnostics_sheet')), findsOneWidget);
+    expect(find.text('진단정보'), findsOneWidget);
+    expect(find.text('50대 초보자가 AI로 첫 전자책을 만드는 방법'), findsWidgets);
+    expect(find.text('이전 오류 기록'), findsOneWidget);
+    expect(find.text('과거 실패 메시지'), findsOneWidget);
+    expect(find.text('고급 진단'), findsOneWidget);
+    // 고급 값은 접힌 상태라 기본 화면에 jobId 라벨만 접힘 타일에 있음
+    expect(find.text('job_91c66278e88042e0'), findsNothing);
   });
 }

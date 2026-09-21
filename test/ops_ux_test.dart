@@ -228,6 +228,8 @@ void main() {
     expect(find.text('현재 실행 중인 작업이 없습니다.'), findsOneWidget);
     expect(find.text('지금 확인할 결과물'), findsNothing);
     expect(find.text('AI 제작공정에서 계속 보기'), findsNothing);
+    expect(find.text('시스템 상태 · 오류'), findsNothing);
+    expect(find.byKey(const Key('remote_open_diagnostics_button')), findsOneWidget);
   });
 
   testWidgets('모바일 390px overflow 없음', (tester) async {
