@@ -8,8 +8,8 @@
 # 기본: Hosting only (기존 안전 경로)
 # -IncludeRelay: Hosting + functions:sotong24Relay 만 (전체 functions 금지)
 # -PlanOnly: preflight + 배포 대상 계획만 출력 (실제 build/deploy 안 함)
-# format: dart format --output=none --set-exit-if-changed . (비파괴; 실패 시 abort)
-# firebase deploy 직전 Final clean check 필수 (dirty면 publish 금지)
+# formatting: repo-wide dart format는 운영 deploy 필수 gate가 아님 (CI/개발 품질 작업)
+# mutating `dart format .` 금지 — firebase 직전 Final clean check 필수 (dirty면 publish 금지)
 #
 # 필수: tool\deploy_control.local.ps1 (gitignore) — PlanOnly가 아닐 때
 #   $AdminEmail = "..."
@@ -219,12 +219,6 @@ Write-Host "== flutter clean =="
 flutter clean
 Write-Host "== flutter pub get =="
 flutter pub get
-Write-Host "== dart format check-only (non-mutating) =="
-dart format --output=none --set-exit-if-changed .
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "dart format check failed — abort (source left unmodified)"
-  exit $LASTEXITCODE
-}
 Write-Host "== flutter analyze =="
 flutter analyze
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -50,8 +50,10 @@ Assert-True ($src -match 'RelayFunctionName = "sotong24Relay"') "relay name"
 Assert-True ($src -match 'Assert-CleanWorktree') "dirty tree gate"
 Assert-True ($src -match 'hosting,functions:sotong24Relay') "allowlisted only join"
 Assert-True ($src -notmatch 'firebase deploy --only functions\b(?!:sotong24Relay)') "no bare functions deploy"
-Assert-True ($src -match 'dart format --output=none --set-exit-if-changed') "format check-only"
-Assert-True ($src -notmatch '(?m)^\s*dart format \.\s*$') "must not mutate via dart format ."
+Assert-True ($src -notmatch '(?m)^\s*dart format\b') "no dart format gate in release script"
+Assert-True ($src -match '(?m)^\s*flutter analyze\s*$') "analyze retained"
+Assert-True ($src -match '(?m)^\s*flutter test\s*$') "test retained"
+Assert-True ($src -match "flutter @buildArgs") "build retained"
 Assert-True ($src -match 'Final clean check \(pre-firebase\)') "final clean guard present"
 # Final clean must appear before firebase invoke
 $finalIdx = $src.IndexOf('Final clean check (pre-firebase)')
@@ -86,24 +88,10 @@ try {
 Assert-True (-not (Test-Path $marker)) "marker removed"
 Assert-True (-not (git status --porcelain)) "worktree clean after dirty test"
 
-Write-Host "== 7) dart format check-only is non-mutating =="
-$tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("sotong_fmt_check_" + [guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -Path $tmpDir | Out-Null
-try {
-  $bad = Join-Path $tmpDir "bad.dart"
-  # Intentionally unformatted
-  Set-Content -Path $bad -Value 'void main(){print( "x" );}' -NoNewline
-  $before = (Get-FileHash -LiteralPath $bad -Algorithm SHA256).Hash
-  $fmt = Start-Process -FilePath "dart" -ArgumentList @(
-    "format", "--output=none", "--set-exit-if-changed", $bad
-  ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $tmpDir "out.txt") -RedirectStandardError (Join-Path $tmpDir "err.txt")
-  $after = (Get-FileHash -LiteralPath $bad -Algorithm SHA256).Hash
-  Assert-True ($fmt.ExitCode -ne 0) "unformatted fixture must fail check-only"
-  Assert-True ($before -eq $after) "check-only must not rewrite fixture"
-  Write-Host "format check-only non-mutating PASS"
-} finally {
-  if (Test-Path $tmpDir) { Remove-Item -LiteralPath $tmpDir -Recurse -Force }
-}
+Write-Host "== 7) repo-wide format is not a release gate =="
+Assert-True ($src -notmatch 'set-exit-if-changed') "check-only format gate removed"
+Assert-True ($src -notmatch '(?m)^\s*dart format \.\s*$') "mutating dart format . absent"
+Write-Host "format-not-a-gate PASS"
 
 Write-Host "== 8) final clean gate blocks publish when dirty (logic harness) =="
 # Replicate Assert-CleanWorktree final-pre-deploy: dirty => non-zero, no firebase.
