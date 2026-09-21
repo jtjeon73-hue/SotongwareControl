@@ -46,17 +46,14 @@ function Get-DeployOnlyTargets {
 function Assert-CleanWorktree {
   $porcelain = git status --porcelain 2>$null
   if ($LASTEXITCODE -ne 0) {
-    Write-Error "git status failed — abort deploy"
+    Write-Host "git status failed — abort"
+    exit 2
   }
   $lines = @($porcelain | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
   if ($lines.Count -gt 0) {
-    Write-Error @"
-dirty working tree — abort deploy
-
-운영 배포는 clean worktree에서만 허용합니다.
-현재 dirty 항목 $($lines.Count)건. stash/reset/clean으로 WIP를 지우지 말고
-별도 clean worktree(origin/main)에서 배포하세요.
-"@
+    Write-Host "dirty working tree — abort deploy"
+    Write-Host "운영 배포는 clean worktree에서만 허용합니다. dirty=$($lines.Count)"
+    exit 2
   }
 }
 

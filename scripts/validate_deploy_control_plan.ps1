@@ -63,13 +63,18 @@ Write-Host "== 6) dirty tree fail-closed (temp marker) =="
 $marker = Join-Path $Root "tmp_dirty_marker.txt"
 Set-Content -Path $marker -Value "dirty-test"
 try {
-  $dirtyOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -PlanOnly 2>&1 | Out-String
-  $dirtyCode = $LASTEXITCODE
-  Assert-True ($dirtyCode -ne 0) "dirty tree must non-zero exit"
+  $p = Start-Process -FilePath "powershell" -ArgumentList @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath, "-PlanOnly"
+  ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $Root "tmp_plan_out.txt") -RedirectStandardError (Join-Path $Root "tmp_plan_err.txt")
+  $dirtyOut = ((Get-Content (Join-Path $Root "tmp_plan_out.txt") -Raw -ErrorAction SilentlyContinue) + "`n" +
+    (Get-Content (Join-Path $Root "tmp_plan_err.txt") -Raw -ErrorAction SilentlyContinue))
+  Assert-True ($p.ExitCode -ne 0) "dirty tree must non-zero exit"
   Assert-True ($dirtyOut -match "dirty working tree") "dirty tree error message"
   Write-Host "dirty fail-closed PASS"
 } finally {
-  if (Test-Path $marker) { Remove-Item $marker -Force }
+  foreach ($f in @($marker, (Join-Path $Root "tmp_plan_out.txt"), (Join-Path $Root "tmp_plan_err.txt"))) {
+    if (Test-Path $f) { Remove-Item $f -Force }
+  }
 }
 Assert-True (-not (Test-Path $marker)) "marker removed"
 Assert-True (-not (git status --porcelain)) "worktree clean after dirty test"
