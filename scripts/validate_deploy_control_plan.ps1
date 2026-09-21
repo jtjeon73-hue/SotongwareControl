@@ -50,6 +50,13 @@ Assert-True ($src -match 'RelayFunctionName = "sotong24Relay"') "relay name"
 Assert-True ($src -match 'Assert-CleanWorktree') "dirty tree gate"
 Assert-True ($src -match 'hosting,functions:sotong24Relay') "allowlisted only join"
 Assert-True ($src -notmatch 'firebase deploy --only functions\b(?!:sotong24Relay)') "no bare functions deploy"
+Assert-True ($src -match 'dart format --output=none --set-exit-if-changed') "format check-only"
+Assert-True ($src -notmatch '(?m)^\s*dart format \.\s*$') "must not mutate via dart format ."
+Assert-True ($src -match 'Final clean check \(pre-firebase\)') "final clean guard present"
+# Final clean must appear before firebase invoke
+$finalIdx = $src.IndexOf('Final clean check (pre-firebase)')
+$fbIdx = $src.IndexOf('& firebase @deployArgs')
+Assert-True ($finalIdx -ge 0 -and $fbIdx -gt $finalIdx) "final clean before firebase deploy"
 Write-Host "fail-closed source PASS"
 
 Write-Host "== 5) dirty tree gate (simulation via porcelain check function) =="
@@ -59,7 +66,7 @@ if ($porcelain) {
 }
 Write-Host "clean worktree confirmed PASS"
 
-Write-Host "== 6) dirty tree fail-closed (temp marker) =="
+Write-Host "== 6) dirty tree fail-closed (temp marker / initial preflight) =="
 $marker = Join-Path $Root "tmp_dirty_marker.txt"
 Set-Content -Path $marker -Value "dirty-test"
 try {
@@ -78,5 +85,70 @@ try {
 }
 Assert-True (-not (Test-Path $marker)) "marker removed"
 Assert-True (-not (git status --porcelain)) "worktree clean after dirty test"
+
+Write-Host "== 7) dart format check-only is non-mutating =="
+$tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("sotong_fmt_check_" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path $tmpDir | Out-Null
+try {
+  $bad = Join-Path $tmpDir "bad.dart"
+  # Intentionally unformatted
+  Set-Content -Path $bad -Value 'void main(){print( "x" );}' -NoNewline
+  $before = (Get-FileHash -LiteralPath $bad -Algorithm SHA256).Hash
+  $fmt = Start-Process -FilePath "dart" -ArgumentList @(
+    "format", "--output=none", "--set-exit-if-changed", $bad
+  ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $tmpDir "out.txt") -RedirectStandardError (Join-Path $tmpDir "err.txt")
+  $after = (Get-FileHash -LiteralPath $bad -Algorithm SHA256).Hash
+  Assert-True ($fmt.ExitCode -ne 0) "unformatted fixture must fail check-only"
+  Assert-True ($before -eq $after) "check-only must not rewrite fixture"
+  Write-Host "format check-only non-mutating PASS"
+} finally {
+  if (Test-Path $tmpDir) { Remove-Item -LiteralPath $tmpDir -Recurse -Force }
+}
+
+Write-Host "== 8) final clean gate blocks publish when dirty (logic harness) =="
+# Replicate Assert-CleanWorktree final-pre-deploy: dirty => non-zero, no firebase.
+$finalMarker = Join-Path $Root "tmp_final_dirty_marker.txt"
+Set-Content -Path $finalMarker -Value "simulate-post-validation-dirty"
+try {
+  $harness = @'
+$ErrorActionPreference = "Stop"
+Set-Location $env:SOTONG_VALIDATE_ROOT
+function Assert-CleanWorktree {
+  param([string]$Phase = "preflight")
+  $porcelain = git status --porcelain 2>$null
+  if ($LASTEXITCODE -ne 0) { Write-Host "git status failed"; exit 2 }
+  $lines = @($porcelain | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  if ($lines.Count -gt 0) {
+    Write-Host "dirty working tree — abort deploy ($Phase)"
+    Write-Host "changed files (diagnose only; no auto restore/reset/clean):"
+    $lines | ForEach-Object { Write-Host "  $_" }
+    exit 2
+  }
+}
+Write-Host "== Final clean check (pre-firebase) =="
+Assert-CleanWorktree -Phase "final-pre-deploy"
+Write-Host "REACHED_FIREBASE_DEPLOY"
+exit 0
+'@
+  $harnessPath = Join-Path $Root "tmp_final_clean_harness.ps1"
+  Set-Content -Path $harnessPath -Value $harness -Encoding UTF8
+  $env:SOTONG_VALIDATE_ROOT = $Root
+  $hout = & powershell -NoProfile -ExecutionPolicy Bypass -File $harnessPath 2>&1 | Out-String
+  $hcode = $LASTEXITCODE
+  Assert-True ($hcode -ne 0) "final clean must non-zero when dirty"
+  Assert-True ($hout -match "final-pre-deploy") "final phase label"
+  Assert-True ($hout -match "dirty working tree") "final dirty message"
+  Assert-True ($hout -notmatch "REACHED_FIREBASE_DEPLOY") "must not reach firebase after dirty final check"
+  Write-Host "final clean blocks publish PASS"
+} finally {
+  Remove-Item Env:SOTONG_VALIDATE_ROOT -ErrorAction SilentlyContinue
+  foreach ($f in @(
+    $finalMarker,
+    (Join-Path $Root "tmp_final_clean_harness.ps1")
+  )) {
+    if (Test-Path $f) { Remove-Item $f -Force }
+  }
+}
+Assert-True (-not (git status --porcelain)) "worktree clean after final-clean harness"
 
 Write-Host "ALL validate_deploy_control_plan checks PASS"
