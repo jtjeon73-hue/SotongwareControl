@@ -124,10 +124,15 @@ void main() {
     await tester.pump();
     expect(r2PrepareTaps, greaterThan(0));
 
-    final manifestDir = Directory(
-      'test/support/production_review_render_manifest',
+    // Write outside the repo so flutter test does not dirty tracked fixtures.
+    final manifestDir = Directory.systemTemp.createTempSync(
+      'production_review_render_manifest_',
     );
-    if (!manifestDir.existsSync()) manifestDir.createSync(recursive: true);
+    addTearDown(() {
+      if (manifestDir.existsSync()) {
+        manifestDir.deleteSync(recursive: true);
+      }
+    });
     final manifestFile = File('${manifestDir.path}/render_manifest.json');
     manifestFile.writeAsStringSync(
       const JsonEncoder.withIndent('  ').convert({
