@@ -2,11 +2,14 @@
 # 사용법:
 #   .\scripts\deploy_control.ps1
 #   .\scripts\deploy_control.ps1 -IncludeRelay
+#   .\scripts\deploy_control.ps1 -IncludeApi
 #   .\scripts\deploy_control.ps1 -PlanOnly
 #   .\scripts\deploy_control.ps1 -IncludeRelay -PlanOnly
+#   .\scripts\deploy_control.ps1 -IncludeApi -PlanOnly
 #
 # 기본: Hosting only (기존 안전 경로)
 # -IncludeRelay: Hosting + functions:sotong24Relay 만 (전체 functions 금지)
+# -IncludeApi: Hosting + functions:api 만 (전체 functions 금지; Relay와 동시 사용 금지)
 # -PlanOnly: preflight + 배포 대상 계획만 출력 (실제 build/deploy 안 함)
 # formatting: repo-wide dart format는 운영 deploy 필수 gate가 아님 (CI/개발 품질 작업)
 # mutating `dart format .` 금지 — firebase 직전 Final clean check 필수 (dirty면 publish 금지)
@@ -23,6 +26,7 @@
 [CmdletBinding()]
 param(
   [switch]$IncludeRelay,
+  [switch]$IncludeApi,
   [switch]$PlanOnly
 )
 
@@ -35,12 +39,27 @@ Set-Location $Root
 $RequiredFirebaseProject = "sotongware-control"
 $ForbiddenFirebaseProject = "sotongware"
 $RelayFunctionName = "sotong24Relay"
+$ApiFunctionName = "api"
 $ExpectedRelayOnlyTarget = "functions:sotong24Relay"
+$ExpectedApiOnlyTarget = "functions:api"
+$AllowedFunctionsTargets = @(
+  $ExpectedRelayOnlyTarget,
+  $ExpectedApiOnlyTarget
+)
 
 function Get-DeployOnlyTargets {
-  param([switch]$WithRelay)
+  param(
+    [switch]$WithRelay,
+    [switch]$WithApi
+  )
+  if ($WithRelay -and $WithApi) {
+    Write-Error "Refusing -IncludeRelay and -IncludeApi together — deploy one functions target per run"
+  }
   if ($WithRelay) {
     return @("hosting", $ExpectedRelayOnlyTarget)
+  }
+  if ($WithApi) {
+    return @("hosting", $ExpectedApiOnlyTarget)
   }
   return @("hosting")
 }
@@ -110,31 +129,47 @@ function Assert-FirebaseProject {
   }
 }
 
-function Assert-RelayFunctionContract {
+function Assert-NamedFunctionExport {
+  param(
+    [Parameter(Mandatory = $true)][string]$FunctionName,
+    [Parameter(Mandatory = $true)][string]$ExpectedTarget
+  )
   $indexJs = Join-Path $Root "functions\index.js"
   if (-not (Test-Path $indexJs)) {
-    Write-Error "functions/index.js missing — abort relay deploy"
+    Write-Error "functions/index.js missing — abort $FunctionName deploy"
   }
   $src = Get-Content $indexJs -Raw
-  if ($src -notmatch ("exports\." + [regex]::Escape($RelayFunctionName) + "\s*=")) {
-    Write-Error "Relay export '$RelayFunctionName' not found in functions/index.js — abort"
+  if ($src -notmatch ("exports\." + [regex]::Escape($FunctionName) + "\s*=")) {
+    Write-Error "Function export '$FunctionName' not found in functions/index.js — abort"
   }
-  if ($ExpectedRelayOnlyTarget -ne ("functions:" + $RelayFunctionName)) {
-    Write-Error "Internal relay target mismatch — abort"
+  if ($ExpectedTarget -ne ("functions:" + $FunctionName)) {
+    Write-Error "Internal functions target mismatch for '$FunctionName' — abort"
   }
+}
+
+function Assert-RelayFunctionContract {
+  Assert-NamedFunctionExport -FunctionName $RelayFunctionName -ExpectedTarget $ExpectedRelayOnlyTarget
+}
+
+function Assert-ApiFunctionContract {
+  Assert-NamedFunctionExport -FunctionName $ApiFunctionName -ExpectedTarget $ExpectedApiOnlyTarget
 }
 
 function Build-FirebaseDeployArgs {
   param([string[]]$OnlyTargets)
   foreach ($t in $OnlyTargets) {
     if ($t -eq "hosting") { continue }
-    if ($t -ne $ExpectedRelayOnlyTarget) {
+    if ($AllowedFunctionsTargets -notcontains $t) {
       Write-Error "Refusing non-allowlisted functions target: $t"
     }
   }
   $only = ($OnlyTargets -join ",")
-  if ($only -notmatch "^hosting$" -and $only -notmatch "^hosting,functions:sotong24Relay$") {
-    Write-Error "Deploy --only must be hosting or hosting,functions:sotong24Relay. Got: $only"
+  if (
+    $only -ne "hosting" -and
+    $only -ne "hosting,functions:sotong24Relay" -and
+    $only -ne "hosting,functions:api"
+  ) {
+    Write-Error "Deploy --only must be hosting, hosting,functions:sotong24Relay, or hosting,functions:api. Got: $only"
   }
   return @(
     "deploy",
@@ -154,9 +189,12 @@ Write-Host "== Firebase project check =="
 firebase use
 Assert-FirebaseProject
 
-$onlyTargets = Get-DeployOnlyTargets -WithRelay:$IncludeRelay
+$onlyTargets = Get-DeployOnlyTargets -WithRelay:$IncludeRelay -WithApi:$IncludeApi
 if ($IncludeRelay) {
   Assert-RelayFunctionContract
+}
+if ($IncludeApi) {
+  Assert-ApiFunctionContract
 }
 $deployArgs = Build-FirebaseDeployArgs -OnlyTargets $onlyTargets
 $onlyJoined = ($onlyTargets -join ",")
@@ -204,8 +242,8 @@ if (-not $HasFcmWebVapidKey) {
   Write-Warning "FCM Web VAPID 설정 없음 — Push 등록은 비활성화하고 outbox_only로 배포합니다."
 }
 
-if ($IncludeRelay) {
-  Write-Host "== functions tests (relay contract) =="
+if ($IncludeRelay -or $IncludeApi) {
+  Write-Host "== functions tests (deploy contract) =="
   Push-Location (Join-Path $Root "functions")
   try {
     node --test test/*.test.js
@@ -274,5 +312,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "Deploy finished: https://sotongware-control.web.app"
 if ($IncludeRelay) {
   Write-Host "Relay function: $RelayFunctionName (only)"
+}
+if ($IncludeApi) {
+  Write-Host "API function: $ApiFunctionName (only)"
 }
 Write-Host "Verify login with display id 'sotongware' in a secret window."

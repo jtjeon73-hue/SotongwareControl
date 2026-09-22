@@ -41,15 +41,34 @@ Assert-True ($relayOut -notmatch "functions:api") "Must not include api"
 Assert-True ($relayOut -notmatch "functions:study") "Must not include study*"
 Write-Host "IncludeRelay plan PASS"
 
+Write-Host "== 3b) IncludeApi PlanOnly =="
+$apiOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -IncludeApi -PlanOnly 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -eq 0) "IncludeApi PlanOnly exit 0"
+Assert-True ($apiOut -match "PLAN_ONLY_TARGETS=hosting,functions:api") "IncludeApi targets exact"
+Assert-True ($apiOut -notmatch "functions:sotong24Relay") "IncludeApi must not include relay"
+Assert-True ($apiOut -notmatch "functions:study") "Must not include study*"
+Write-Host "IncludeApi plan PASS"
+
+Write-Host "== 3c) IncludeRelay+IncludeApi fail-closed =="
+$bothOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -IncludeRelay -IncludeApi -PlanOnly 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -ne 0) "Relay+Api together must non-zero exit"
+Assert-True ($bothOut -match "Refusing -IncludeRelay and -IncludeApi together") "combined flags rejected"
+Write-Host "Relay+Api rejection PASS"
+
 Write-Host "== 4) fail-closed helpers (inline) =="
 # Dot-source is hard for param scripts; re-check source contracts instead.
 $src = Get-Content $scriptPath -Raw
 Assert-True ($src -match 'RequiredFirebaseProject = "sotongware-control"') "project constant"
 Assert-True ($src -match 'ForbiddenFirebaseProject = "sotongware"') "forbidden homepage"
 Assert-True ($src -match 'RelayFunctionName = "sotong24Relay"') "relay name"
+Assert-True ($src -match 'ApiFunctionName = "api"') "api name"
+Assert-True ($src -match 'ExpectedApiOnlyTarget = "functions:api"') "api target constant"
+Assert-True ($src -match 'Assert-ApiFunctionContract') "api export preflight"
 Assert-True ($src -match 'Assert-CleanWorktree') "dirty tree gate"
-Assert-True ($src -match 'hosting,functions:sotong24Relay') "allowlisted only join"
-Assert-True ($src -notmatch 'firebase deploy --only functions\b(?!:sotong24Relay)') "no bare functions deploy"
+Assert-True ($src -match 'hosting,functions:sotong24Relay') "allowlisted relay join"
+Assert-True ($src -match 'hosting,functions:api') "allowlisted api join"
+Assert-True ($src -match 'Refusing non-allowlisted functions target') "unknown functions target fail-closed"
+Assert-True ($src -notmatch 'firebase deploy --only functions\b(?!:)') "no bare functions deploy"
 Assert-True ($src -notmatch '(?m)^\s*dart format\b') "no dart format gate in release script"
 Assert-True ($src -match '(?m)^\s*flutter analyze\s*$') "analyze retained"
 Assert-True ($src -match '(?m)^\s*flutter test\s*$') "test retained"
