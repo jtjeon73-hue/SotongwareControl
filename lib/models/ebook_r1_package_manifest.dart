@@ -35,6 +35,19 @@ class EbookR1PackageManifest {
     this.deliveryStatusMessage = '',
     this.manifestSHA256 = '',
     this.deliveryStatus = '',
+    this.pdfRemoteUrl = '',
+    this.epubRemoteUrl = '',
+    this.manifestRemoteUrl = '',
+    this.coverGrantReady = false,
+    this.pdfGrantReady = false,
+    this.epubGrantReady = false,
+    this.qualityGrantReady = false,
+    this.manifestGrantReady = false,
+    this.coverRemoteReady = false,
+    this.pdfRemoteReady = false,
+    this.epubRemoteReady = false,
+    this.qualityRemoteReady = false,
+    this.manifestRemoteReady = false,
   });
 
   final String revision;
@@ -69,15 +82,31 @@ class EbookR1PackageManifest {
   final String deliveryStatusMessage;
   final String manifestSHA256;
   final String deliveryStatus;
+  final String pdfRemoteUrl;
+  final String epubRemoteUrl;
+  final String manifestRemoteUrl;
+  final bool coverGrantReady;
+  final bool pdfGrantReady;
+  final bool epubGrantReady;
+  final bool qualityGrantReady;
+  final bool manifestGrantReady;
+  final bool coverRemoteReady;
+  final bool pdfRemoteReady;
+  final bool epubRemoteReady;
+  final bool qualityRemoteReady;
+  final bool manifestRemoteReady;
 
-  bool get hasDownloadablePdf => pdfPath.isNotEmpty;
-  bool get hasDownloadableEpub => epubPath.isNotEmpty;
+  bool get hasDownloadablePdf => pdfPath.isNotEmpty || pdfRemoteUrl.isNotEmpty;
+  bool get hasDownloadableEpub =>
+      epubPath.isNotEmpty || epubRemoteUrl.isNotEmpty;
   bool get hasCover => coverPath.isNotEmpty || coverUrl.isNotEmpty;
   bool get hasToc => tocSummary.isNotEmpty;
   bool get hasQualityReport =>
       qualityReportPath.isNotEmpty || qualityReportUrl.isNotEmpty;
   bool get hasManifest =>
-      manifestPath.isNotEmpty || immutablePath.contains('package_manifest');
+      manifestPath.isNotEmpty ||
+      immutablePath.contains('package_manifest') ||
+      manifestRemoteUrl.isNotEmpty;
 
   bool get artifactsStructurallyPresent =>
       hasDownloadablePdf &&
@@ -85,6 +114,69 @@ class EbookR1PackageManifest {
       hasCover &&
       hasQualityReport &&
       hasManifest;
+
+  /// 자동 검사 결과 라벨. 판매 품질 보증이 아님.
+  String get autoCheckLabel {
+    final c = criticalCount ?? 0;
+    final m = majorCount ?? 0;
+    final s = score;
+    if (s != null && s >= 90 && c == 0 && m == 0) {
+      return '자동 검사 PASS (판매 보증 아님)';
+    }
+    return '자동 검사 CHECK (확인 필요)';
+  }
+
+  /// 사용자 검토 게이트 상태 (승인 버튼과 별개로 표시).
+  String get userReviewGateLabel {
+    if (reviewActionsEnabled) return '사용자 검토 준비 완료';
+    if (holdReason.isNotEmpty && !reviewReadyFlag) {
+      return '결과물 전달 보류 · 승인 불가';
+    }
+    if (!artifactsStructurallyPresent) return '결과물 등록 부족 · 승인 불가';
+    if (schemaIsV2 && !reviewReadyFlag) return '전달 준비 중 · 승인 불가';
+    return '검토 준비 미완 · 승인 불가';
+  }
+
+  /// 승인 비활성 사유를 항목별로 나열 (추측·단일 플래그 의존 금지).
+  List<String> get reviewReadinessGaps {
+    final gaps = <String>[];
+    if (!hasCover) gaps.add('표지 파일 없음');
+    if (!hasDownloadablePdf) gaps.add('PDF 파일 없음');
+    if (!hasDownloadableEpub) gaps.add('EPUB 파일 없음');
+    if (!hasQualityReport) gaps.add('품질 보고서 없음');
+    if (!hasManifest) gaps.add('manifest 없음');
+    if (!schemaIsV2) return gaps;
+    if (!reviewReadyFlag) gaps.add('reviewReady=false');
+    if (holdReason.isNotEmpty && !reviewReadyFlag) {
+      gaps.add('holdReason=$holdReason');
+    }
+    if (manifestSHA256.trim().isEmpty) gaps.add('manifestSHA256 없음');
+    if (deliveryStatus.isNotEmpty && deliveryStatus != 'ready') {
+      gaps.add('deliveryStatus=$deliveryStatus');
+    }
+    void flagGap(String label, bool remote, bool grant) {
+      if (!remote) gaps.add('$label remoteReady=false');
+      if (!grant) gaps.add('$label grantReady=false');
+    }
+
+    flagGap('표지', coverRemoteReady, coverGrantReady);
+    flagGap('PDF', pdfRemoteReady, pdfGrantReady);
+    flagGap('EPUB', epubRemoteReady, epubGrantReady);
+    flagGap('품질보고서', qualityRemoteReady, qualityGrantReady);
+    flagGap('manifest', manifestRemoteReady, manifestGrantReady);
+    return gaps;
+  }
+
+  List<String> reviewReadinessGapsForStage(int stageRevision) {
+    final gaps = List<String>.from(reviewReadinessGaps);
+    if (!matchesStageRevision(stageRevision)) {
+      final expect = normalizeRevisionLabel(
+        'r${stageRevision > 0 ? stageRevision : 1}',
+      );
+      gaps.add('revision 불일치(패키지=$revision, 단계=$expect)');
+    }
+    return gaps;
+  }
 
   static String normalizeRevisionLabel(String raw) {
     final s = raw.trim().toLowerCase();
@@ -288,6 +380,19 @@ class EbookR1PackageManifest {
         return _artifactSha(manifestRaw);
       }(),
       deliveryStatus: '${json['deliveryStatus'] ?? ''}'.trim(),
+      pdfRemoteUrl: _artifactUrl(pdfRaw),
+      epubRemoteUrl: _artifactUrl(epubRaw),
+      manifestRemoteUrl: _artifactUrl(manifestRaw),
+      coverGrantReady: _artifactReadyFlag(coverRaw, 'grantReady'),
+      pdfGrantReady: _artifactReadyFlag(pdfRaw, 'grantReady'),
+      epubGrantReady: _artifactReadyFlag(epubRaw, 'grantReady'),
+      qualityGrantReady: _artifactReadyFlag(qualityRaw, 'grantReady'),
+      manifestGrantReady: _artifactReadyFlag(manifestRaw, 'grantReady'),
+      coverRemoteReady: _artifactReadyFlag(coverRaw, 'remoteReady'),
+      pdfRemoteReady: _artifactReadyFlag(pdfRaw, 'remoteReady'),
+      epubRemoteReady: _artifactReadyFlag(epubRaw, 'remoteReady'),
+      qualityRemoteReady: _artifactReadyFlag(qualityRaw, 'remoteReady'),
+      manifestRemoteReady: _artifactReadyFlag(manifestRaw, 'remoteReady'),
     );
   }
 
@@ -404,6 +509,31 @@ class EbookR1PackageManifest {
         return _artifactSha(manifestRaw);
       }(),
       deliveryStatus: '${pkg['deliveryStatus'] ?? ''}'.trim(),
+      pdfRemoteUrl: _artifactUrl(pdfRaw),
+      epubRemoteUrl: _artifactUrl(epubRaw),
+      manifestRemoteUrl: _artifactUrl(manifestRaw),
+      coverGrantReady: isV2
+          ? _artifactReadyFlag(coverRaw, 'grantReady')
+          : true,
+      pdfGrantReady: isV2 ? _artifactReadyFlag(pdfRaw, 'grantReady') : true,
+      epubGrantReady: isV2 ? _artifactReadyFlag(epubRaw, 'grantReady') : true,
+      qualityGrantReady: isV2
+          ? _artifactReadyFlag(qualityReportRaw, 'grantReady')
+          : true,
+      manifestGrantReady: isV2
+          ? _artifactReadyFlag(manifestRaw, 'grantReady')
+          : true,
+      coverRemoteReady: isV2
+          ? _artifactReadyFlag(coverRaw, 'remoteReady')
+          : true,
+      pdfRemoteReady: isV2 ? _artifactReadyFlag(pdfRaw, 'remoteReady') : true,
+      epubRemoteReady: isV2 ? _artifactReadyFlag(epubRaw, 'remoteReady') : true,
+      qualityRemoteReady: isV2
+          ? _artifactReadyFlag(qualityReportRaw, 'remoteReady')
+          : true,
+      manifestRemoteReady: isV2
+          ? _artifactReadyFlag(manifestRaw, 'remoteReady')
+          : true,
     );
   }
 
@@ -425,6 +555,13 @@ class EbookR1PackageManifest {
     return epubPath.split('/').isNotEmpty
         ? epubPath.split('/').last
         : 'book.epub';
+  }
+
+  String resolveCoverFileName() {
+    if (coverPath.isEmpty) return 'cover.png';
+    final parts = coverPath.split(RegExp(r'[/\\]'));
+    final name = parts.isNotEmpty ? parts.last.trim() : '';
+    return name.isNotEmpty ? name : 'cover.png';
   }
 
   String resolveQualityReportFileName() {

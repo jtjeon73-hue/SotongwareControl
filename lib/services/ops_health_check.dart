@@ -310,7 +310,23 @@ class OpsHealthCheck {
         summary: '진행 중인 제작 작업이 없어 동기화 지연을 확인할 대상이 없습니다.',
       );
     }
-    final p = operational.first;
+    // 실행 중인 프로젝트만 동기화 지연을 본다. 사용자 검토 대기·완료는 제외.
+    final live = operational.where((p) {
+      final st = p.userFacingStatus;
+      if (st == Sotong24WorkStatus.awaitingApproval) return false;
+      if (st == Sotong24WorkStatus.completed) return false;
+      if (p.currentStageDoc?.isOnHold == true) return false;
+      return true;
+    }).toList();
+    if (live.isEmpty) {
+      return const OpsHealthCheckItem(
+        id: 'artifact',
+        title: '결과물 동기화 테스트',
+        level: OpsHealthLevel.ok,
+        summary: '실행 중 작업이 없고 사용자 검토/완료만 있어 동기화 지연 대상이 없습니다.',
+      );
+    }
+    final p = live.first;
     final raw = p.lastHeartbeat.trim().isNotEmpty
         ? p.lastHeartbeat
         : p.updatedAt;
@@ -320,25 +336,25 @@ class OpsHealthCheck {
         id: 'artifact',
         title: '결과물 동기화 테스트',
         level: OpsHealthLevel.attention,
-        summary: '결과물 동기화 시각을 읽지 못했습니다.',
+        summary: '실행 중 작업의 동기화 시각을 읽지 못했습니다.',
       );
     }
     final age = now.difference(ts.toUtc());
-    if (age.inMinutes >= 10 &&
-        p.userFacingStatus != Sotong24WorkStatus.awaitingApproval &&
-        p.userFacingStatus != Sotong24WorkStatus.completed) {
+    if (age.inMinutes > 30) {
       return OpsHealthCheckItem(
         id: 'artifact',
         title: '결과물 동기화 테스트',
         level: OpsHealthLevel.attention,
-        summary: '결과물 동기화가 지연되고 있습니다 (${age.inMinutes}분 전).',
+        summary:
+            '실행 중 「${Sotong24WorkshopPresentation.displayTitle(p)}」 동기화가 ${age.inMinutes}분 전입니다.',
       );
     }
-    return const OpsHealthCheckItem(
+    return OpsHealthCheckItem(
       id: 'artifact',
       title: '결과물 동기화 테스트',
       level: OpsHealthLevel.ok,
-      summary: '최근 제작 동기화가 확인됩니다.',
+      summary:
+          '실행 중 「${Sotong24WorkshopPresentation.displayTitle(p)}」 동기화가 최근입니다.',
     );
   }
 }

@@ -20,6 +20,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     this.onDownloadPdf,
     this.onDownloadEpub,
     this.onPreviewPdf,
+    this.onOpenCover,
     this.onOpenQualityReport,
     this.onOpenManifest,
   });
@@ -35,6 +36,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
   final VoidCallback? onDownloadPdf;
   final VoidCallback? onDownloadEpub;
   final VoidCallback? onPreviewPdf;
+  final VoidCallback? onOpenCover;
   final VoidCallback? onOpenQualityReport;
   final VoidCallback? onOpenManifest;
 
@@ -53,17 +55,16 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final critical = m?.criticalCount ?? 0;
     final major = m?.majorCount ?? 0;
     final refine = m?.refineCount;
-    final pass = score != null && score >= 90 && critical == 0 && major == 0;
     final author = (m?.author ?? '').trim();
     final reviewEnabled =
         m?.reviewActionsEnabledForStage(stage.revision) == true;
+    final readinessGaps =
+        m?.reviewReadinessGapsForStage(stage.revision) ??
+        const <String>['ebookReviewPackage 없음 — 결과물 등록 상태를 확인할 수 없습니다.'];
     final deliveryMsg = (m?.deliveryStatusMessage ?? '').trim();
-    final coverFileName = () {
-      final path = (m?.coverPath ?? '').trim();
-      if (path.isEmpty) return '';
-      final parts = path.split(RegExp(r'[/\\]'));
-      return parts.isNotEmpty ? parts.last.trim() : '';
-    }();
+    final coverFileName = m?.resolveCoverFileName() ?? '';
+    final autoCheck = m?.autoCheckLabel ?? '자동 검사 결과 없음';
+    final userGate = m?.userReviewGateLabel ?? '검토 패키지 미연결';
 
     return Card(
       margin: EdgeInsets.zero,
@@ -79,7 +80,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '완성형 전자책 $revision',
+              '완성형 전자책 $revision · 사용자 승인 필수',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -90,6 +91,15 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
               style: const TextStyle(
                 color: ControlColors.textSecondary,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              '이 단계는 기본 자동 승인 정책과 무관합니다. PDF·EPUB·표지를 확인한 뒤 승인하거나 보완을 요청하세요.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: ControlColors.textSecondary,
               ),
             ),
             if (deliveryMsg.isNotEmpty) ...[
@@ -134,7 +144,9 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                 stageId: stage.stageId,
                 revision: stage.revision > 0 ? stage.revision : 1,
                 directUrl: (coverUrl ?? m?.coverUrl ?? '').trim(),
-                coverFileName: coverFileName,
+                coverFileName: coverFileName.isNotEmpty
+                    ? coverFileName
+                    : 'cover.png',
               ),
             ],
             const SizedBox(height: 12),
@@ -143,12 +155,22 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
               runSpacing: 8,
               children: [
                 _chip('revision $revision'),
-                if (score != null) _chip('품질 $score'),
+                if (score != null) _chip('품질점수 $score'),
                 if (refine != null) _chip('refine $refine'),
                 _chip('critical $critical'),
                 _chip('major $major'),
-                _chip(pass ? 'PASS' : 'CHECK'),
+                _chip(autoCheck),
+                _chip(userGate),
               ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '자동 검사 PASS는 critical/major 기준 통과일 뿐이며 판매 품질을 보증하지 않습니다. 사용자 검토는 별도입니다.',
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.35,
+                color: ControlColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -175,6 +197,8 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                   '${(m?.epubBytes ?? 0) > 0 ? ' · ${_fmtBytes(m!.epubBytes)}' : ''}'
                   '${(m?.epubSha256 ?? '').isNotEmpty ? ' · sha256 ${(m!.epubSha256.length > 12) ? '${m.epubSha256.substring(0, 12)}…' : m.epubSha256}' : ''}',
                 ),
+              if ((m?.resolveCoverFileName() ?? '').isNotEmpty)
+                Text('표지 · ${m!.resolveCoverFileName()}'),
               if (m?.frozen == true)
                 Text(
                   'immutable · ${m!.immutablePath.isNotEmpty ? m.immutablePath : m.revision}',
@@ -210,7 +234,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                 if (onPreviewPdf != null)
                   OutlinedButton(
                     onPressed: busy ? null : onPreviewPdf,
-                    child: const Text('전자책 결과물 보기'),
+                    child: const Text('PDF 본문 보기'),
                   ),
                 if (onDownloadPdf != null)
                   OutlinedButton(
@@ -222,23 +246,38 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                     onPressed: busy ? null : onDownloadEpub,
                     child: const Text('EPUB 다운로드'),
                   ),
+                if (onOpenCover != null)
+                  OutlinedButton(
+                    onPressed: busy ? null : onOpenCover,
+                    child: const Text('표지 보기'),
+                  ),
                 if (onOpenQualityReport != null)
                   OutlinedButton(
                     onPressed: busy ? null : onOpenQualityReport,
-                    child: const Text('품질 보고서 보기'),
+                    child: const Text('품질 보고서'),
                   ),
                 if (onOpenManifest != null)
                   OutlinedButton(
                     onPressed: busy ? null : onOpenManifest,
-                    child: const Text('manifest 보기'),
+                    child: const Text('manifest'),
                   ),
               ],
             ),
             if (!reviewEnabled) ...[
               const SizedBox(height: 8),
+              Text(
+                readinessGaps.isEmpty
+                    ? 'artifact 등록이 완료되지 않아 검토 승인 액션이 비활성입니다.'
+                    : '검토 승인 비활성 · 부족/미준비: ${readinessGaps.join(', ')}',
+                style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
               const Text(
-                'artifact 등록이 완료되지 않아 검토 승인 액션이 비활성입니다. (cover/PDF/EPUB/quality/manifest)',
-                style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                '등록이 끝나면 승인·보완 요청이 활성화됩니다. 새로고침 후에도 같으면 결과물 전달 상태를 확인하세요.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: ControlColors.textSecondary,
+                ),
               ),
             ],
             const SizedBox(height: 12),
@@ -377,7 +416,7 @@ class _EbookCoverGrantPreviewState extends State<_EbookCoverGrantPreview> {
       setState(() {
         _loading = false;
         _url = null;
-        _error = '표지 다운로드 grant 실패: $e';
+        _error = '표지 다운로드 grant 실패. 표지 보기 버튼으로 다시 시도하세요.';
       });
     }
   }
@@ -415,7 +454,7 @@ class _EbookCoverGrantPreviewState extends State<_EbookCoverGrantPreview> {
           height: 160,
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) => const Text(
-            '표지 이미지를 불러오지 못했습니다.',
+            '표지 이미지를 불러오지 못했습니다. 표지 보기 버튼으로 다시 시도하세요.',
             style: TextStyle(fontSize: 12, color: ControlColors.textSecondary),
           ),
         ),
