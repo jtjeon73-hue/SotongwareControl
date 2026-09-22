@@ -439,5 +439,29 @@ void main() {
       );
       expect(picked?.jobId, 'job_91c66278e88042e0');
     });
+
+    test('updatedAt 없는 running Job도 Agent 없을 때 현재 제작 후보로 남긴다', () {
+      final undated = RemoteJobDoc(
+        jobId: 'job_undated',
+        ownerUid: 'owner',
+        title: '전기 점검 체크 앱',
+        type: 'app',
+        status: 'running',
+        assignedAgentId: 'agent_1',
+        instructionId: 'wi_plan_app_worker',
+        currentStage: 'app_problem_validate',
+      );
+      final picked = WorkshopCurrentWorkSelection.pickCurrentExecutionJob([
+        undated,
+      ], now: now);
+      expect(picked?.jobId, 'job_undated');
+      expect(
+        WorkshopCurrentWorkSelection.isFreshEnoughForCurrentProduction(
+          undated,
+          now: now,
+        ),
+        isTrue,
+      );
+    });
   });
 }
