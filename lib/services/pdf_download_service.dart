@@ -114,8 +114,10 @@ class ArtifactPdfDownloadService implements PdfDownloader {
         fileName: grant.fileName,
         sizeBytes: grant.sizeBytes,
       );
-    } catch (_) {
-      return PdfDownloadResult.failure('PDF 파일을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    } catch (e) {
+      return PdfDownloadResult.failure(
+        'PDF 다운로드 실패: $e · 로그인·네트워크·팝업 차단을 확인한 뒤 다시 시도해 주세요.',
+      );
     }
   }
 }

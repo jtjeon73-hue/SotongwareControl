@@ -102,7 +102,9 @@ void main() {
     expect(find.text('농작업 기록 앱'), findsNothing);
   });
 
-  testWidgets('4. worker 없음 → 미실행', (tester) async {
+  testWidgets('4. worker idle → 현재 실행 작업 없음 (stale Job 승격 금지)', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       dash(
         agents: [agent(state: 'idle', currentJobId: 'job_91c66278e88042e0')],
@@ -110,7 +112,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('미실행'), findsOneWidget);
+    expect(find.text('현재 실행 중인 작업이 없습니다.'), findsOneWidget);
+    expect(find.text('미실행'), findsNothing);
     expect(find.text('실행 중'), findsNothing);
   });
 

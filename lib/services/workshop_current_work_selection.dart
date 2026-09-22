@@ -106,15 +106,19 @@ class WorkshopCurrentWorkSelection {
   }
 
   /// online·enabled Agent 중 가장 최근 heartbeat의 currentJobId.
+  /// idle/offline Agent의 stale currentJobId는 현재 제작으로 쓰지 않는다.
   static String? pickOnlineAgentCurrentJobId(
     Iterable<RemoteAgentDoc> agents, {
     DateTime? now,
   }) {
+    final clock = now ?? DateTime.now().toUtc();
     final candidates =
         agents.where((a) {
           if (!a.enabled) return false;
           if (a.currentJobId.trim().isEmpty) return false;
-          if (!a.isOnline(now: now)) return false;
+          if (!a.isOnline(now: clock)) return false;
+          final state = a.state.trim().toLowerCase();
+          if (state == 'idle' || state == 'offline') return false;
           return true;
         }).toList()
           ..sort((a, b) {
@@ -133,20 +137,34 @@ class WorkshopCurrentWorkSelection {
     return candidates.first.currentJobId.trim();
   }
 
+  /// Fallback orphan job은 최근 활동만. wall-clock 기준 테스트는 now를 넘긴다.
+  static bool isFreshEnoughForCurrentProduction(
+    RemoteJobDoc job, {
+    DateTime? now,
+    Duration maxAge = const Duration(days: 14),
+  }) {
+    final clock = now ?? DateTime.now().toUtc();
+    final at = jobActivity(job);
+    if (at == null) return false;
+    final age = clock.difference(at.toUtc());
+    return !age.isNegative && age <= maxAge;
+  }
+
   /// 1) Agent.currentJobId 일치 Job  2) 없으면 live non-terminal fallback.
-  /// updatedAt만 최근인 stale job이 Agent 점유 Job보다 우선하지 않는다.
+  /// online이지만 idle인 Agent만 있을 때는 orphan running job을 현재 제작으로 올리지 않는다.
   static RemoteJobDoc? pickCurrentExecutionJob(
     Iterable<RemoteJobDoc> jobs, {
     Iterable<RemoteAgentDoc> agents = const [],
     Iterable<Sotong24RemoteProject> projects = const [],
     DateTime? now,
   }) {
+    final clock = now ?? DateTime.now().toUtc();
     final byId = <String, RemoteJobDoc>{
       for (final j in jobs)
         if (j.jobId.trim().isNotEmpty) j.jobId.trim(): j,
     };
 
-    final occupiedId = pickOnlineAgentCurrentJobId(agents, now: now);
+    final occupiedId = pickOnlineAgentCurrentJobId(agents, now: clock);
     if (occupiedId != null && occupiedId.isNotEmpty) {
       final occupied = byId[occupiedId];
       if (occupied != null) {
@@ -160,8 +178,24 @@ class WorkshopCurrentWorkSelection {
       }
     }
 
+    final agentList = agents.toList();
+    if (agentList.isNotEmpty) {
+      final online = agentList
+          .where((a) => a.enabled && a.isOnline(now: clock))
+          .toList();
+      final anyExecuting = online.any((a) {
+        final state = a.state.trim().toLowerCase();
+        return state.isNotEmpty && state != 'idle' && state != 'offline';
+      });
+      // PC는 연결됐지만 작업자가 쉬는 중이면, 과거 running 잔존 Job을 현재 제작으로 승격하지 않는다.
+      if (online.isNotEmpty && !anyExecuting) {
+        return null;
+      }
+    }
+
     final candidates = jobs.where((job) {
       if (!isActiveExecutionJob(job)) return false;
+      if (!isFreshEnoughForCurrentProduction(job, now: clock)) return false;
       final project = projectForJob(projects, job);
       return !isExcludedFromCurrentProduction(job: job, project: project);
     }).toList()

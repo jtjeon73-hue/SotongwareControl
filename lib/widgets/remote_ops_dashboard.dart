@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/remote_agent_models.dart';
 import '../models/sotong24_remote_models.dart';
 import '../services/ops_health_check.dart';
+import '../services/sotong24_workshop_presentation.dart';
 import '../services/workshop_current_work_selection.dart';
 import '../theme/control_theme.dart';
 
@@ -134,6 +135,43 @@ class RemoteOpsDashboard extends StatelessWidget {
                         color: ControlColors.textMuted,
                       ),
                     ),
+                    if (dash.needsAttention.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      const Text(
+                        '사용자 검토 대기',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        Sotong24WorkshopPresentation.displayTitle(
+                          dash.needsAttention.first,
+                        ),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${dash.needsAttention.first.productTypeLabel} · ${dash.needsAttention.first.userFacingStatusLabel}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: ControlColors.textSecondary,
+                        ),
+                      ),
+                      if (dash.needsAttention.length > 1)
+                        Text(
+                          '외 ${dash.needsAttention.length - 1}건은 AI 제작공정 「내 확인이 필요한 작업」에서 확인',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: ControlColors.textMuted,
+                          ),
+                        ),
+                    ],
                   ]
                 : [
                     Text(
@@ -168,6 +206,16 @@ class RemoteOpsDashboard extends StatelessWidget {
                       const Text(
                         '제작공정 동기화 중 — 상세는 곧 반영됩니다.',
                         style: TextStyle(
+                          fontSize: 12,
+                          color: ControlColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                    if (dash.needsAttention.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        '별도 사용자 검토 대기 ${dash.needsAttention.length}건 (현재 실행과 분리)',
+                        style: const TextStyle(
                           fontSize: 12,
                           color: ControlColors.textSecondary,
                         ),
