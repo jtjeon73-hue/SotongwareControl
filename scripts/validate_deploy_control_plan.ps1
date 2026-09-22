@@ -50,10 +50,23 @@ Assert-True ($apiOut -notmatch "functions:study") "Must not include study*"
 Write-Host "IncludeApi plan PASS"
 
 Write-Host "== 3c) IncludeRelay+IncludeApi fail-closed =="
-$bothOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -IncludeRelay -IncludeApi -PlanOnly 2>&1 | Out-String
-Assert-True ($LASTEXITCODE -ne 0) "Relay+Api together must non-zero exit"
-Assert-True ($bothOut -match "Refusing -IncludeRelay and -IncludeApi together") "combined flags rejected"
-Write-Host "Relay+Api rejection PASS"
+$bothOutPath = Join-Path $Root "tmp_both_flags_out.txt"
+$bothErrPath = Join-Path $Root "tmp_both_flags_err.txt"
+try {
+  $bothProc = Start-Process -FilePath "powershell" -ArgumentList @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath,
+    "-IncludeRelay", "-IncludeApi", "-PlanOnly"
+  ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $bothOutPath -RedirectStandardError $bothErrPath
+  $bothOut = ((Get-Content $bothOutPath -Raw -ErrorAction SilentlyContinue) + "`n" +
+    (Get-Content $bothErrPath -Raw -ErrorAction SilentlyContinue))
+  Assert-True ($bothProc.ExitCode -ne 0) "Relay+Api together must non-zero exit"
+  Assert-True ($bothOut -match "Refusing -IncludeRelay and -IncludeApi together") "combined flags rejected"
+  Write-Host "Relay+Api rejection PASS"
+} finally {
+  foreach ($f in @($bothOutPath, $bothErrPath)) {
+    if (Test-Path $f) { Remove-Item $f -Force }
+  }
+}
 
 Write-Host "== 4) fail-closed helpers (inline) =="
 # Dot-source is hard for param scripts; re-check source contracts instead.

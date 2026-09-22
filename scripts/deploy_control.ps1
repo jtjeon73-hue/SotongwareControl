@@ -53,7 +53,8 @@ function Get-DeployOnlyTargets {
     [switch]$WithApi
   )
   if ($WithRelay -and $WithApi) {
-    Write-Error "Refusing -IncludeRelay and -IncludeApi together — deploy one functions target per run"
+    Write-Host "Refusing -IncludeRelay and -IncludeApi together — deploy one functions target per run"
+    exit 2
   }
   if ($WithRelay) {
     return @("hosting", $ExpectedRelayOnlyTarget)
