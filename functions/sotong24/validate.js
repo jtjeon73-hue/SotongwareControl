@@ -263,6 +263,376 @@ function pickProjectAllowlist(input, { serverNowIso }) {
   return out;
 }
 
+/** Complete-r1 SSOT stages that may carry structured ebookReviewPackage. */
+const EBOOK_REVIEW_PACKAGE_STAGE_IDS = new Set([
+  "package_user_review",
+  "sales_metadata",
+]);
+const EBOOK_REVIEW_DELIVERY_STATUS = new Set([
+  "ready",
+  "hold",
+  "preparing",
+  "failed",
+  "uploading",
+]);
+const EBOOK_REVIEW_ARTIFACT_SLOTS = [
+  "cover",
+  "pdf",
+  "epub",
+  "manifest",
+  "qualityReport",
+];
+const MAX_EBOOK_REVIEW_PACKAGE = {
+  holdReason: 240,
+  revisionLabel: 16,
+  sha256: 64,
+  relPath: 260,
+  title: 200,
+  subtitle: 200,
+  author: 120,
+  language: 16,
+  fileName: 180,
+  artifactId: 220,
+  uploadStatus: 40,
+  grantType: 40,
+  remoteStatus: 40,
+  schemaVersion: 64,
+  generatedAt: 40,
+  tocItem: 200,
+  tocCount: 40,
+  serializedChars: 48000,
+};
+
+function assertRelativePublishPath(value, field) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") {
+    reject("invalid_argument", `${field} must_be_string`);
+  }
+  const s = value.trim();
+  if (!s) return undefined;
+  if (s.length > MAX_EBOOK_REVIEW_PACKAGE.relPath) {
+    reject("invalid_argument", `${field} too_long`);
+  }
+  if (/[\x00-\x1f\x7f]/.test(s) || s.includes("\\") || s.includes("..")) {
+    reject("invalid_argument", `${field} invalid_path`);
+  }
+  if (/^[a-zA-Z]:[\\/]/.test(s) || s.startsWith("/") || s.startsWith("//")) {
+    reject("invalid_argument", `${field} absolute_path_forbidden`);
+  }
+  if (!(s.startsWith("publish/") || s.startsWith("output/"))) {
+    reject("invalid_argument", `${field} path_prefix_forbidden`);
+  }
+  return s;
+}
+
+function assertSha256Hex(value, field) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") {
+    reject("invalid_argument", `${field} must_be_string`);
+  }
+  const s = value.trim().toLowerCase();
+  if (!s) return undefined;
+  if (s.length !== MAX_EBOOK_REVIEW_PACKAGE.sha256) {
+    reject("invalid_argument", `${field} invalid_sha256`);
+  }
+  if (!/^[0-9a-f]+$/.test(s)) {
+    reject("invalid_argument", `${field} invalid_sha256`);
+  }
+  return s;
+}
+
+function pickEbookReviewArtifactSlot(raw, slotName) {
+  if (raw === undefined || raw === null) return undefined;
+  if (!isPlainObject(raw)) {
+    reject("invalid_argument", `ebookReviewPackage.${slotName} must_be_object`);
+  }
+  const { sanitizeHttpsUrl } = require("./artifact");
+  const out = {};
+  const fileName = assertString(
+    raw.fileName,
+    `ebookReviewPackage.${slotName}.fileName`,
+    MAX_EBOOK_REVIEW_PACKAGE.fileName
+  );
+  if (fileName !== undefined) out.fileName = fileName;
+  const path = assertRelativePublishPath(
+    raw.path,
+    `ebookReviewPackage.${slotName}.path`
+  );
+  if (path !== undefined) out.path = path;
+  const sha256 = assertSha256Hex(
+    raw.sha256,
+    `ebookReviewPackage.${slotName}.sha256`
+  );
+  if (sha256 !== undefined) out.sha256 = sha256;
+  const size = assertInt(raw.size, `ebookReviewPackage.${slotName}.size`, {
+    min: 0,
+    max: 50 * 1024 * 1024,
+  });
+  if (size !== undefined) out.size = size;
+  const width = assertInt(raw.width, `ebookReviewPackage.${slotName}.width`, {
+    min: 1,
+    max: 20000,
+  });
+  if (width !== undefined) out.width = width;
+  const height = assertInt(raw.height, `ebookReviewPackage.${slotName}.height`, {
+    min: 1,
+    max: 20000,
+  });
+  if (height !== undefined) out.height = height;
+  const pageCount = assertInt(
+    raw.pageCount,
+    `ebookReviewPackage.${slotName}.pageCount`,
+    { min: 1, max: 5000 }
+  );
+  if (pageCount !== undefined) out.pageCount = pageCount;
+  for (const flag of ["grantReady", "remoteReady", "uploaded"]) {
+    const v = assertBool(raw[flag], `ebookReviewPackage.${slotName}.${flag}`);
+    if (v !== undefined) out[flag] = v;
+  }
+  const grantType = assertString(
+    raw.grantType,
+    `ebookReviewPackage.${slotName}.grantType`,
+    MAX_EBOOK_REVIEW_PACKAGE.grantType
+  );
+  if (grantType !== undefined) out.grantType = grantType;
+  const uploadStatus = assertString(
+    raw.uploadStatus,
+    `ebookReviewPackage.${slotName}.uploadStatus`,
+    MAX_EBOOK_REVIEW_PACKAGE.uploadStatus
+  );
+  if (uploadStatus !== undefined) out.uploadStatus = uploadStatus;
+  const remoteStatus = assertString(
+    raw.remoteStatus,
+    `ebookReviewPackage.${slotName}.remoteStatus`,
+    MAX_EBOOK_REVIEW_PACKAGE.remoteStatus
+  );
+  if (remoteStatus !== undefined) out.remoteStatus = remoteStatus;
+  const artifactId = assertString(
+    raw.artifactId,
+    `ebookReviewPackage.${slotName}.artifactId`,
+    MAX_EBOOK_REVIEW_PACKAGE.artifactId
+  );
+  if (artifactId !== undefined) {
+    if (artifactId.includes("..") || /[\x00-\x1f\x7f]/.test(artifactId)) {
+      reject(
+        "invalid_argument",
+        `ebookReviewPackage.${slotName}.artifactId invalid_chars`
+      );
+    }
+    out.artifactId = artifactId;
+  }
+  const remoteUrl = sanitizeHttpsUrl(
+    raw.remoteUrl,
+    `ebookReviewPackage.${slotName}.remoteUrl`,
+    { requireStorageHost: true }
+  );
+  if (remoteUrl !== undefined) out.remoteUrl = remoteUrl;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function pickEbookReviewQuality(raw) {
+  if (raw === undefined || raw === null) return undefined;
+  if (!isPlainObject(raw)) {
+    reject("invalid_argument", "ebookReviewPackage.quality must_be_object");
+  }
+  const out = {};
+  const score = assertInt(raw.score ?? raw.qualityScore, "ebookReviewPackage.quality.score", {
+    min: 0,
+    max: 100,
+  });
+  if (score !== undefined) out.score = score;
+  for (const key of ["criticalCount", "majorCount", "refineCount"]) {
+    const v = assertInt(raw[key], `ebookReviewPackage.quality.${key}`, {
+      min: 0,
+      max: 10000,
+    });
+    if (v !== undefined) out[key] = v;
+  }
+  const reportPath = assertRelativePublishPath(
+    raw.reportPath,
+    "ebookReviewPackage.quality.reportPath"
+  );
+  if (reportPath !== undefined) out.reportPath = reportPath;
+  const reportSHA256 = assertSha256Hex(
+    raw.reportSHA256,
+    "ebookReviewPackage.quality.reportSHA256"
+  );
+  if (reportSHA256 !== undefined) out.reportSHA256 = reportSHA256;
+  const evaluatedAt = assertIsoOptional(
+    raw.evaluatedAt,
+    "ebookReviewPackage.quality.evaluatedAt"
+  );
+  if (evaluatedAt !== undefined) out.evaluatedAt = evaluatedAt;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Allow only Control-needed complete-r1 SSOT fields.
+ * Drop manuscript/structure/stagingToken and other bulk/secret-adjacent keys.
+ * Present-but-invalid → fail-closed. Wrong product/stage → omit (ignore).
+ */
+function pickEbookReviewPackage(raw, { productType, stageId }) {
+  if (raw === undefined || raw === null) return undefined;
+  if (productType !== "ebook" || !EBOOK_REVIEW_PACKAGE_STAGE_IDS.has(stageId)) {
+    return undefined;
+  }
+  if (!isPlainObject(raw)) {
+    reject("invalid_argument", "ebookReviewPackage must_be_object");
+  }
+
+  const schemaVersion = assertString(
+    raw.schemaVersion,
+    "ebookReviewPackage.schemaVersion",
+    MAX_EBOOK_REVIEW_PACKAGE.schemaVersion
+  );
+  const contractVersion = assertInt(
+    raw.contractVersion,
+    "ebookReviewPackage.contractVersion",
+    { min: 1, max: 9 }
+  );
+  const schemaOk =
+    (typeof schemaVersion === "string" &&
+      schemaVersion.includes("ebookReviewPackage")) ||
+    contractVersion === 2;
+  if (!schemaOk) {
+    reject("invalid_argument", "ebookReviewPackage schema_unsupported");
+  }
+
+  const out = {};
+  if (schemaVersion !== undefined) out.schemaVersion = schemaVersion;
+  if (contractVersion !== undefined) out.contractVersion = contractVersion;
+
+  const reviewReady = assertBool(raw.reviewReady, "ebookReviewPackage.reviewReady");
+  if (reviewReady !== undefined) out.reviewReady = reviewReady;
+  const deliveryStatus = assertEnum(
+    raw.deliveryStatus,
+    "ebookReviewPackage.deliveryStatus",
+    EBOOK_REVIEW_DELIVERY_STATUS
+  );
+  if (deliveryStatus !== undefined) out.deliveryStatus = deliveryStatus;
+  const holdReason = assertString(
+    raw.holdReason,
+    "ebookReviewPackage.holdReason",
+    MAX_EBOOK_REVIEW_PACKAGE.holdReason
+  );
+  if (holdReason !== undefined) out.holdReason = holdReason;
+
+  const revisionLabel = assertString(
+    raw.revision,
+    "ebookReviewPackage.revision",
+    MAX_EBOOK_REVIEW_PACKAGE.revisionLabel
+  );
+  if (revisionLabel !== undefined) {
+    if (!/^r?[0-9]{1,3}$/i.test(revisionLabel.trim())) {
+      reject("invalid_argument", "ebookReviewPackage.revision invalid_format");
+    }
+    out.revision = revisionLabel.trim().toLowerCase().startsWith("r")
+      ? revisionLabel.trim().toLowerCase()
+      : `r${revisionLabel.trim()}`;
+  }
+
+  const manifestSHA256 = assertSha256Hex(
+    raw.manifestSHA256,
+    "ebookReviewPackage.manifestSHA256"
+  );
+  if (manifestSHA256 !== undefined) out.manifestSHA256 = manifestSHA256;
+
+  for (const key of ["title", "subtitle", "author", "language", "projectName"]) {
+    const max =
+      key === "author" || key === "language"
+        ? MAX_EBOOK_REVIEW_PACKAGE[key === "language" ? "language" : "author"]
+        : MAX_EBOOK_REVIEW_PACKAGE.title;
+    const v = assertString(raw[key], `ebookReviewPackage.${key}`, max);
+    if (v !== undefined) out[key] = v;
+  }
+  for (const idField of ["projectId", "instructionId"]) {
+    if (raw[idField] === undefined || raw[idField] === null || raw[idField] === "") {
+      continue;
+    }
+    out[idField] = assertSafeId(raw[idField], `ebookReviewPackage.${idField}`);
+  }
+  if (raw.stageId !== undefined && raw.stageId !== null && raw.stageId !== "") {
+    const pkgStage = assertSafeId(raw.stageId, "ebookReviewPackage.stageId");
+    // Keep review stages; format_build may appear as frozen provenance.
+    if (
+      EBOOK_REVIEW_PACKAGE_STAGE_IDS.has(pkgStage) ||
+      pkgStage === "format_build"
+    ) {
+      out.stageId = pkgStage;
+    }
+  }
+
+  for (const flag of ["frozen", "promoteToUserR1"]) {
+    const v = assertBool(raw[flag], `ebookReviewPackage.${flag}`);
+    if (v !== undefined) out[flag] = v;
+  }
+  for (const ts of ["generatedAt", "validatedAt", "frozenAt"]) {
+    const v = assertIsoOptional(raw[ts], `ebookReviewPackage.${ts}`);
+    if (v !== undefined) out[ts] = v;
+  }
+  for (const key of [
+    "qualityScore",
+    "criticalCount",
+    "majorCount",
+    "refineCount",
+    "pageCount",
+    "chapterCount",
+  ]) {
+    const v = assertInt(raw[key], `ebookReviewPackage.${key}`, {
+      min: 0,
+      max: key === "qualityScore" ? 100 : 100000,
+    });
+    if (v !== undefined) out[key] = v;
+  }
+
+  const immutablePath = assertRelativePublishPath(
+    raw.immutablePath,
+    "ebookReviewPackage.immutablePath"
+  );
+  if (immutablePath !== undefined) out.immutablePath = immutablePath;
+
+  if (isPlainObject(raw.fileSizes)) {
+    const fileSizes = {};
+    for (const k of ["pdf", "epub", "cover", "manifest"]) {
+      const v = assertInt(raw.fileSizes[k], `ebookReviewPackage.fileSizes.${k}`, {
+        min: 0,
+        max: 50 * 1024 * 1024,
+      });
+      if (v !== undefined) fileSizes[k] = v;
+    }
+    if (Object.keys(fileSizes).length > 0) out.fileSizes = fileSizes;
+  }
+
+  const quality = pickEbookReviewQuality(raw.quality);
+  if (quality !== undefined) out.quality = quality;
+
+  for (const slot of EBOOK_REVIEW_ARTIFACT_SLOTS) {
+    const artifact = pickEbookReviewArtifactSlot(raw[slot], slot);
+    if (artifact !== undefined) out[slot] = artifact;
+  }
+
+  // Optional short TOC labels only (no manuscript/structure dump).
+  const tocRaw = raw.tocSummary ?? raw.toc;
+  if (Array.isArray(tocRaw)) {
+    const tocSummary = [];
+    for (let i = 0; i < tocRaw.length && tocSummary.length < MAX_EBOOK_REVIEW_PACKAGE.tocCount; i++) {
+      const item = tocRaw[i];
+      if (typeof item !== "string") continue;
+      const s = item.trim();
+      if (!s || s.length > MAX_EBOOK_REVIEW_PACKAGE.tocItem) continue;
+      if (/[\x00-\x1f\x7f]/.test(s)) continue;
+      tocSummary.push(s);
+    }
+    if (tocSummary.length > 0) out.tocSummary = tocSummary;
+  }
+
+  const serialized = JSON.stringify(out);
+  if (serialized.length > MAX_EBOOK_REVIEW_PACKAGE.serializedChars) {
+    reject("invalid_argument", "ebookReviewPackage too_large");
+  }
+  return out;
+}
+
 function pickStageAllowlist(input, { productType, serverNowIso }) {
   if (!isPlainObject(input)) reject("invalid_argument", "stage required");
   const stageId = assertSafeId(input.stageId, "stageId");
@@ -336,6 +706,15 @@ function pickStageAllowlist(input, { productType, serverNowIso }) {
   if (completedAt !== undefined) out.completedAt = completedAt;
   if (workDurationMs !== undefined) out.workDurationMs = workDurationMs;
   if (revision !== undefined) out.revision = revision;
+
+  const ebookReviewPackage = pickEbookReviewPackage(input.ebookReviewPackage, {
+    productType,
+    stageId,
+  });
+  if (ebookReviewPackage !== undefined) {
+    out.ebookReviewPackage = ebookReviewPackage;
+  }
+
   if (
     (status === "completed" || status === "awaiting_approval") &&
     criteriaMet !== true
@@ -574,6 +953,7 @@ function sortRequestsNewestFirst(a, b) {
 module.exports = {
   pickProjectAllowlist,
   pickStageAllowlist,
+  pickEbookReviewPackage,
   pickRequestAllowlist,
   parseRequestPollInput,
   parseRequestAppliedInput,
@@ -583,6 +963,7 @@ module.exports = {
   reject,
   sortRequestsNewestFirst,
   MAX_STR,
+  EBOOK_REVIEW_PACKAGE_STAGE_IDS,
   REQUEST_TYPES,
   REQUEST_ACTIONABLE_STATUS,
   REQUEST_POLL_DEFAULT_LIMIT,

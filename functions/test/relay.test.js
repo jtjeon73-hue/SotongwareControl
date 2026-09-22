@@ -485,6 +485,186 @@ describe("allowlist / validation", () => {
       /must_be_int/
     );
   });
+
+  it("preserves sanitized ebookReviewPackage on package_user_review", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "package_user_review",
+        stageNumber: 15,
+        status: "awaiting_approval",
+        approvalRequired: true,
+        criteriaMet: true,
+        approvalStatus: "pending",
+        revision: 1,
+        ebookReviewPackage: {
+          schemaVersion: "ebookReviewPackage/v2",
+          contractVersion: 2,
+          reviewReady: true,
+          deliveryStatus: "ready",
+          revision: "r1",
+          manifestSHA256:
+            "47ed79f9319f64f7241f8801957fe35728487b6ce91b191d86c557a16aed533c",
+          title: "50대 초보자가 AI로 첫 전자책을 만드는 방법",
+          author: "SotongWare",
+          language: "ko",
+          frozen: true,
+          manuscript: { path: "publish/revisions/r1/manuscript/", secret: "DROP" },
+          structure: { toc: ["# huge", "should drop"] },
+          stagingToken: "SECRET_TOKEN",
+          pdf: {
+            fileName: "book.pdf",
+            path: "publish/revisions/r1/book.pdf",
+            sha256:
+              "ca2ecebe8667ccb67f5b6cd5515358781406b0ce65d157a01e3abc9adda28336",
+            size: 407548,
+            grantReady: true,
+            remoteReady: true,
+            uploaded: true,
+            remoteUrl:
+              "https://storage.googleapis.com/sotongware-control.firebasestorage.app/sotong24/artifacts/prod/wi_plan_1789914868666/package_user_review/r1/book.pdf",
+          },
+          epub: {
+            fileName: "book.epub",
+            path: "publish/revisions/r1/book.epub",
+            grantReady: true,
+            remoteReady: true,
+          },
+          cover: {
+            fileName: "cover_front.png",
+            path: "publish/revisions/r1/cover/cover_front.png",
+            grantReady: true,
+            remoteReady: true,
+          },
+          manifest: {
+            fileName: "package_manifest.json",
+            path: "publish/revisions/r1/package_manifest.json",
+            grantReady: true,
+            remoteReady: true,
+          },
+          qualityReport: {
+            fileName: "pre_review_quality_report.json",
+            path: "publish/revisions/r1/pre_review_quality_report.json",
+            grantReady: true,
+            remoteReady: true,
+          },
+          quality: { score: 100, criticalCount: 0, majorCount: 0, refineCount: 0 },
+        },
+      },
+      { productType: "ebook", serverNowIso }
+    );
+    assert.equal(s.stageId, "package_user_review");
+    assert.ok(s.ebookReviewPackage);
+    assert.equal(s.ebookReviewPackage.schemaVersion, "ebookReviewPackage/v2");
+    assert.equal(s.ebookReviewPackage.reviewReady, true);
+    assert.equal(s.ebookReviewPackage.deliveryStatus, "ready");
+    assert.equal(s.ebookReviewPackage.revision, "r1");
+    assert.equal(s.ebookReviewPackage.pdf.fileName, "book.pdf");
+    assert.ok(s.ebookReviewPackage.pdf.remoteUrl.startsWith("https://storage.googleapis.com/"));
+    assert.ok(!("manuscript" in s.ebookReviewPackage));
+    assert.ok(!("structure" in s.ebookReviewPackage));
+    assert.ok(!("stagingToken" in s.ebookReviewPackage));
+  });
+
+  it("rejects non-object ebookReviewPackage on review stage", () => {
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "package_user_review",
+            stageNumber: 15,
+            status: "in_progress",
+            ebookReviewPackage: "not-an-object",
+          },
+          { productType: "ebook", serverNowIso }
+        ),
+      /ebookReviewPackage must_be_object/
+    );
+  });
+
+  it("rejects ebookReviewPackage with non-storage remoteUrl", () => {
+    assert.throws(
+      () =>
+        pickStageAllowlist(
+          {
+            stageId: "package_user_review",
+            stageNumber: 15,
+            status: "in_progress",
+            ebookReviewPackage: {
+              schemaVersion: "ebookReviewPackage/v2",
+              contractVersion: 2,
+              reviewReady: false,
+              deliveryStatus: "hold",
+              pdf: {
+                fileName: "book.pdf",
+                path: "publish/revisions/r1/book.pdf",
+                remoteUrl: "https://evil.example/book.pdf",
+              },
+            },
+          },
+          { productType: "ebook", serverNowIso }
+        ),
+      /storage_host_required/
+    );
+  });
+
+  it("ignores ebookReviewPackage on non-review ebook stages", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "idea_clarify",
+        stageNumber: 1,
+        status: "in_progress",
+        ebookReviewPackage: {
+          schemaVersion: "ebookReviewPackage/v2",
+          contractVersion: 2,
+          reviewReady: true,
+          deliveryStatus: "ready",
+        },
+      },
+      { productType: "ebook", serverNowIso }
+    );
+    assert.ok(!("ebookReviewPackage" in s));
+  });
+
+  it("ignores ebookReviewPackage for non-ebook product types", () => {
+    const { stageMapForProduct } = require("../sotong24/canonical");
+    const appStages = [...stageMapForProduct("app").values()];
+    assert.ok(appStages.length > 0);
+    const first = appStages[0];
+    const s = pickStageAllowlist(
+      {
+        stageId: first.id,
+        stageNumber: first.order,
+        status: "in_progress",
+        ebookReviewPackage: {
+          schemaVersion: "ebookReviewPackage/v2",
+          contractVersion: 2,
+          reviewReady: true,
+          deliveryStatus: "ready",
+        },
+      },
+      { productType: "app", serverNowIso }
+    );
+    assert.ok(!("ebookReviewPackage" in s));
+  });
+
+  it("keeps legacy stage allowlist fields unchanged when package absent", () => {
+    const s = pickStageAllowlist(
+      {
+        stageId: "package_user_review",
+        stageNumber: 15,
+        status: "awaiting_approval",
+        approvalRequired: true,
+        criteriaMet: true,
+        approvalStatus: "pending",
+        summary: "검토 대기",
+        revision: 1,
+      },
+      { productType: "ebook", serverNowIso }
+    );
+    assert.equal(s.summary, "검토 대기");
+    assert.equal(s.revision, 1);
+    assert.ok(!("ebookReviewPackage" in s));
+  });
 });
 
 describe("relay HTTP handler", () => {
