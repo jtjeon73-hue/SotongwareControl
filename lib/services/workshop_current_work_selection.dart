@@ -138,6 +138,8 @@ class WorkshopCurrentWorkSelection {
   }
 
   /// Fallback orphan job은 최근 활동만. wall-clock 기준 테스트는 now를 넘긴다.
+  /// updatedAt/startedAt/createdAt이 모두 없는 active Job은 숨기지 않는다
+  /// (미러 동기화 직후·테스트 fixture). 오래된 시각이 있는 Job만 제외한다.
   static bool isFreshEnoughForCurrentProduction(
     RemoteJobDoc job, {
     DateTime? now,
@@ -145,7 +147,7 @@ class WorkshopCurrentWorkSelection {
   }) {
     final clock = now ?? DateTime.now().toUtc();
     final at = jobActivity(job);
-    if (at == null) return false;
+    if (at == null) return true;
     final age = clock.difference(at.toUtc());
     return !age.isNegative && age <= maxAge;
   }
