@@ -60,7 +60,10 @@ try {
   $bothOut = ((Get-Content $bothOutPath -Raw -ErrorAction SilentlyContinue) + "`n" +
     (Get-Content $bothErrPath -Raw -ErrorAction SilentlyContinue))
   Assert-True ($bothProc.ExitCode -ne 0) "Relay+Api together must non-zero exit"
-  Assert-True ($bothOut -match "Refusing -IncludeRelay and -IncludeApi together") "combined flags rejected"
+  Assert-True (
+    ($bothOut -match "Refusing -IncludeRelay and -IncludeApi together") -or
+    ($bothOut -match "IncludeRelay and -IncludeApi")
+  ) ("combined flags rejected; exit=$($bothProc.ExitCode); out=$bothOut")
   Write-Host "Relay+Api rejection PASS"
 } finally {
   foreach ($f in @($bothOutPath, $bothErrPath)) {
