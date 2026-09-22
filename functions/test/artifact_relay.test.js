@@ -6,6 +6,7 @@ const { handleRelayRequest, rateLimiter } = require("../sotong24/relay");
 const {
   sanitizeHttpsUrl,
   sanitizeFileName,
+  sanitizeDownloadFileName,
   buildArtifactStoragePath,
   parseArtifactUploadInit,
   parseArtifactDownloadRequest,
@@ -826,6 +827,51 @@ describe("artifact attachment download", () => {
         fileName: "pre_review_quality_report.json",
       }).contentType,
       "application/json"
+    );
+    // package_user_review EPUB: preserve .epub in downloadFileName + Disposition
+    {
+      const epubParsed = parseArtifactDownloadRequest({
+        ...body,
+        stageId: "package_user_review",
+        fileName: "book.epub",
+        downloadFileName: "ebook_r1.epub",
+      });
+      assert.equal(epubParsed.contentType, "application/epub+zip");
+      assert.equal(epubParsed.downloadFileName, "ebook_r1.epub");
+      assert.doesNotMatch(epubParsed.downloadFileName, /\.pdf$/i);
+      assert.doesNotMatch(epubParsed.downloadFileName, /\.epub\.epub$/i);
+      const epubDisp = buildAttachmentDisposition(epubParsed.downloadFileName, 1);
+      assert.match(epubDisp, /^attachment; filename="AI_ebook_final_r1\.epub"/);
+      assert.match(epubDisp, /filename\*=UTF-8''ebook_r1\.epub/);
+      assert.doesNotMatch(epubDisp, /\.epub\.pdf/i);
+      assert.doesNotMatch(epubDisp, /AI_ebook_final_r1\.pdf/);
+    }
+    // PDF regression: still forces .pdf disposition
+    {
+      const pdfParsed = parseArtifactDownloadRequest({
+        ...body,
+        fileName: "book.pdf",
+        downloadFileName: "ebook_r1.pdf",
+      });
+      assert.equal(pdfParsed.contentType, "application/pdf");
+      assert.equal(pdfParsed.downloadFileName, "ebook_r1.pdf");
+      const pdfDisp = buildAttachmentDisposition(pdfParsed.downloadFileName, 1);
+      assert.match(pdfDisp, /^attachment; filename="AI_ebook_final_r1\.pdf"/);
+      assert.match(pdfDisp, /filename\*=UTF-8''ebook_r1\.pdf/);
+    }
+    // Unknown extension input is fail-closed to .pdf (not trusted as-is)
+    assert.equal(
+      sanitizeDownloadFileName("payload.exe", 1, ".exe"),
+      "payload.exe.pdf"
+    );
+    // Header / path injection characters stripped
+    assert.equal(
+      sanitizeDownloadFileName('evil\r\nName: x.epub', 1, ".epub"),
+      "evil_Name_x.epub"
+    );
+    assert.throws(
+      () => parseArtifactDownloadRequest({ ...body, fileName: "../book.epub" }),
+      /path_traversal/
     );
     const parsed = parseArtifactDownloadRequest(body);
     await assert.rejects(

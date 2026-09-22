@@ -276,16 +276,45 @@ function sanitizeFileName(raw) {
   return name;
 }
 
+// Attachment download filenames: only these extensions may appear in
+// Content-Disposition. Unknown extensions fail closed to .pdf (ebook default).
+const DOWNLOAD_ATTACHMENT_EXTENSIONS = new Set([".pdf", ".epub", ".apk"]);
+
+function resolveDownloadAttachmentExtension(extension) {
+  const ext = String(extension || "").trim().toLowerCase();
+  if (DOWNLOAD_ATTACHMENT_EXTENSIONS.has(ext)) return ext;
+  return ".pdf";
+}
+
+function defaultDownloadAttachmentBase(revision, ext) {
+  if (ext === ".apk") return `SotongApp_r${revision}`;
+  return `AI_ebook_final_r${revision}`;
+}
+
 function sanitizeDownloadFileName(raw, revision = 1, extension = ".pdf") {
-  const ext = extension === ".apk" ? ".apk" : ".pdf";
+  const ext = resolveDownloadAttachmentExtension(extension);
   let name = String(raw || "").trim();
   name = name
     .replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, " ")
     .replace(/\s+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^[._ ]+|[._ ]+$/g, "");
-  if (!name) name = ext === ".apk" ? `SotongApp_r${revision}.apk` : `AI_ebook_final_r${revision}.pdf`;
-  if (!name.toLowerCase().endsWith(ext)) name += ext;
+  if (!name) name = `${defaultDownloadAttachmentBase(revision, ext)}${ext}`;
+  let lower = name.toLowerCase();
+  if (!lower.endsWith(ext)) {
+    // Replace a trailing known attachment extension instead of stacking
+    // (e.g. legacy ebook_r1.epub + forced .pdf → ebook_r1.pdf, not .epub.pdf).
+    for (const known of DOWNLOAD_ATTACHMENT_EXTENSIONS) {
+      if (lower.endsWith(known)) {
+        name = name.slice(0, -known.length);
+        break;
+      }
+    }
+    name = name.replace(/[._ ]+$/g, "");
+    if (!name) name = defaultDownloadAttachmentBase(revision, ext);
+    name += ext;
+    lower = name.toLowerCase();
+  }
   if (name.length > 120) {
     name = `${name.slice(0, 110).replace(/[._ ]+$/g, "")}${ext}`;
   }
@@ -293,9 +322,14 @@ function sanitizeDownloadFileName(raw, revision = 1, extension = ".pdf") {
 }
 
 function buildAttachmentDisposition(fileName, revision = 1) {
-  const ext = String(fileName || "").toLowerCase().endsWith(".apk") ? ".apk" : ".pdf";
+  const lower = String(fileName || "").toLowerCase();
+  const ext = lower.endsWith(".apk")
+    ? ".apk"
+    : lower.endsWith(".epub")
+      ? ".epub"
+      : ".pdf";
   const safe = sanitizeDownloadFileName(fileName, revision, ext);
-  const ascii = ext === ".apk" ? `SotongApp_r${revision}.apk` : `AI_ebook_final_r${revision}.pdf`;
+  const ascii = `${defaultDownloadAttachmentBase(revision, ext)}${ext}`;
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`;
 }
 
