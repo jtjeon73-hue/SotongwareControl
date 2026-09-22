@@ -50,8 +50,8 @@ Assert-True ($apiOut -notmatch "functions:study") "Must not include study*"
 Write-Host "IncludeApi plan PASS"
 
 Write-Host "== 3c) IncludeRelay+IncludeApi fail-closed =="
-$bothOutPath = Join-Path $Root "tmp_both_flags_out.txt"
-$bothErrPath = Join-Path $Root "tmp_both_flags_err.txt"
+$bothOutPath = Join-Path $env:TEMP "sotong_both_flags_out.txt"
+$bothErrPath = Join-Path $env:TEMP "sotong_both_flags_err.txt"
 try {
   $bothProc = Start-Process -FilePath "powershell" -ArgumentList @(
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath,
