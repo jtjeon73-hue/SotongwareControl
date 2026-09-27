@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
+import '../models/ebook_r1_package_manifest.dart';
 import '../models/instruction_contract.dart';
 import '../models/sotong24_remote_models.dart';
 import '../models/sotong24_monitoring.dart';
@@ -38,10 +39,19 @@ class Sotong24RemoteRepository {
                 requestId: s.activeRequestId,
                 projectId: p.projectId,
                 stageId: s.stageId,
-                requestType: 'approve',
-                status: ApprovalStatus.pending,
+                requestType:
+                    s.approvalStatus == ApprovalStatus.revisionRequested
+                    ? 'revision_request'
+                    : 'approve',
+                status:
+                    Sotong24RemoteApprovalGuard.isTerminalDecisionStatus(
+                      s.approvalStatus,
+                    )
+                    ? s.approvalStatus
+                    : ApprovalStatus.pending,
                 createdAt: s.updatedAt,
                 updatedAt: s.updatedAt,
+                revision: s.revision > 0 ? s.revision : 1,
               ),
         ],
     };
@@ -306,7 +316,14 @@ class Sotong24RemoteRepository {
     if (stage == null) return '해당 단계를 찾을 수 없습니다.';
 
     final existing = await _loadRequests(projectId);
-    final stageRev = stage.revision > 0 ? stage.revision : 1;
+    final package = EbookPackageReviewContract.tryParsePackage(
+      stage.ebookReviewPackage,
+    );
+    final stageRev = EbookPackageReviewContract.canonicalReviewRevision(
+      stageId: stage.stageId,
+      stageRevision: stage.revision,
+      package: package,
+    );
     for (final r in existing) {
       if (r.stageId != stageId) continue;
       if (r.status != ApprovalStatus.revisionRequested) continue;
@@ -678,22 +695,33 @@ class Sotong24RemoteRepository {
     if (stage == null) return '해당 단계를 찾을 수 없습니다.';
 
     final existing = await _loadRequests(projectId);
+    final package = EbookPackageReviewContract.tryParsePackage(
+      stage.ebookReviewPackage,
+    );
+    final reviewRev = EbookPackageReviewContract.canonicalReviewRevision(
+      stageId: stage.stageId,
+      stageRevision: stage.revision,
+      package: package,
+    );
+    final relevant = existing.where(
+      (r) =>
+          r.status == ApprovalStatus.pending ||
+          r.status == ApprovalStatus.approved ||
+          r.status == ApprovalStatus.revisionRequested,
+    );
     final resolvedId = Sotong24RemoteApprovalGuard.allocateRequestId(
       stage: stage,
-      existingRequests: existing,
+      existingRequests: relevant,
       preferred: requestId,
+      reviewRevision: reviewRev,
     );
 
     final error = _guard.validateSubmit(
       project: project,
       stageId: stageId,
       requestId: resolvedId,
-      existingRequests: existing.where(
-        (r) =>
-            r.status == ApprovalStatus.pending ||
-            r.status == ApprovalStatus.approved ||
-            r.status == ApprovalStatus.revisionRequested,
-      ),
+      existingRequests: relevant,
+      reviewRevision: reviewRev,
     );
     if (error != null) return error;
 
@@ -717,7 +745,7 @@ class Sotong24RemoteRepository {
       createdAt: now,
       updatedAt: now,
       processedAt: now,
-      revision: stage.revision > 0 ? stage.revision : 1,
+      revision: reviewRev,
       processed: true,
       approvalSource: explicitSource,
       approvalMode: explicitMode,

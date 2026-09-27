@@ -665,3 +665,70 @@ class EbookR1PackageManifest {
     return name.isNotEmpty ? name : 'package_manifest.json';
   }
 }
+
+/// commercial-v2 `package_user_review` revision/cycle contract shared by UI + submit.
+class EbookPackageReviewContract {
+  EbookPackageReviewContract._();
+
+  static bool isPackageUserReviewStage(String stageId) {
+    final id = stageId.trim();
+    return id == 'package_user_review' || id == 'sales_metadata';
+  }
+
+  static EbookR1PackageManifest? tryParsePackage(Map<String, dynamic>? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return EbookR1PackageManifest.fromEbookReviewPackage(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fail-closed trust for opening a new frozen review cycle.
+  static bool isTrustedFrozenReviewPackage(EbookR1PackageManifest package) {
+    if (!package.schemaIsV2) return false;
+    if (!package.frozen) return false;
+    if (package.revisionNumber <= 0) return false;
+    if (!package.frozenPathsMatchPackageRevision) return false;
+    if (!package.reviewActionsEnabled) return false;
+    return true;
+  }
+
+  /// Authoritative revision for STEP15 display/download/submit identity.
+  ///
+  /// Uses frozen package revision when v2 paths agree; still fail-closed when
+  /// stage is ahead of package. Readiness gates belong in validateSubmit /
+  /// [isNewFrozenReviewCycle], not in the revision number itself.
+  static int canonicalReviewRevision({
+    required String stageId,
+    required int stageRevision,
+    EbookR1PackageManifest? package,
+  }) {
+    final stageRev = stageRevision > 0 ? stageRevision : 1;
+    if (!isPackageUserReviewStage(stageId) || package == null) return stageRev;
+    if (!package.schemaIsV2 || package.revisionNumber <= 0) return stageRev;
+    if (!package.frozenPathsMatchPackageRevision) return stageRev;
+    final pkg = package.revisionNumber;
+    if (stageRev > pkg) return stageRev;
+    return pkg;
+  }
+
+  /// True when a newer frozen package supersedes a prior terminal decision.
+  static bool isNewFrozenReviewCycle({
+    required String stageId,
+    required bool awaitingApproval,
+    required bool approvalRequired,
+    required bool criteriaMet,
+    required int stageRevision,
+    required EbookR1PackageManifest? package,
+    required int latestTerminalRequestRevision,
+  }) {
+    if (!isPackageUserReviewStage(stageId)) return false;
+    if (!awaitingApproval || !approvalRequired || !criteriaMet) return false;
+    if (package == null || !isTrustedFrozenReviewPackage(package)) return false;
+    final stageRev = stageRevision > 0 ? stageRevision : 1;
+    final canonical = package.revisionNumber;
+    if (stageRev > canonical) return false;
+    return canonical > latestTerminalRequestRevision;
+  }
+}

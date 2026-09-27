@@ -1,5 +1,6 @@
 import 'artifact_type.dart';
 import 'commercial/production_review_status_envelope.dart';
+import 'ebook_r1_package_manifest.dart';
 import 'instruction_contract.dart';
 import '../services/site_subtype_contract.dart';
 
@@ -432,6 +433,8 @@ class Sotong24RemoteStage {
     String? reviewDecision,
     String? selectedDesignDirection,
     String? userAttention,
+    Map<String, dynamic>? ebookReviewPackage,
+    bool replaceEbookReviewPackage = false,
   }) {
     return Sotong24RemoteStage(
       stageId: stageId,
@@ -476,7 +479,9 @@ class Sotong24RemoteStage {
       reviewDecision: reviewDecision ?? this.reviewDecision,
       selectedDesignDirection:
           selectedDesignDirection ?? this.selectedDesignDirection,
-      ebookReviewPackage: ebookReviewPackage,
+      ebookReviewPackage: replaceEbookReviewPackage
+          ? ebookReviewPackage
+          : (ebookReviewPackage ?? this.ebookReviewPackage),
     );
   }
 }
@@ -885,16 +890,27 @@ class Sotong24RemoteApprovalGuard {
   ///
   /// - active/preferred 가 아직 없거나 pending(미처리)이면 재사용 (더블클릭·Agent 슬롯)
   /// - 같은 revision의 terminal id는 재사용해 guard가 중복 제출을 차단
-  /// - stage revision이 증가한 경우에만 새 id 발급 (보완 후 r2 재승인)
+  /// - review revision이 증가한 경우에만 새 id 발급 (보완 후 r2 재승인)
   static String allocateRequestId({
     required Sotong24RemoteStage stage,
     required Iterable<Sotong24RemoteRequest> existingRequests,
     String preferred = '',
     DateTime? now,
+    int? reviewRevision,
   }) {
     final hint = preferred.trim().isNotEmpty
         ? preferred.trim()
         : stage.activeRequestId.trim();
+    final package = EbookPackageReviewContract.tryParsePackage(
+      stage.ebookReviewPackage,
+    );
+    final canonical =
+        reviewRevision ??
+        EbookPackageReviewContract.canonicalReviewRevision(
+          stageId: stage.stageId,
+          stageRevision: stage.revision,
+          package: package,
+        );
 
     if (hint.isNotEmpty) {
       Sotong24RemoteRequest? found;
@@ -904,21 +920,52 @@ class Sotong24RemoteApprovalGuard {
           break;
         }
       }
-      final alreadyDecided =
-          found != null && isTerminalDecisionStatus(found.status);
-      final stageRevision = stage.revision > 0 ? stage.revision : 1;
+      final stageRev = stage.revision > 0 ? stage.revision : 1;
       final requestRevision = found != null && found.revision > 0
           ? found.revision
-          : 1;
-      final sameRevision = requestRevision == stageRevision;
-      if (!alreadyDecided) {
+          : stageRev;
+      final alreadyDecided =
+          found != null && isTerminalDecisionStatus(found.status);
+      final sameRevision = requestRevision == canonical;
+      // Stage still shows a prior terminal decision while a newer canonical
+      // package revision is ready — never reuse that activeRequestId slot,
+      // even if the request doc is missing or inconsistently pending.
+      final stalePriorCycleSlot =
+          isTerminalDecisionStatus(stage.approvalStatus) &&
+          canonical > stageRev &&
+          (found == null ||
+              alreadyDecided && !sameRevision ||
+              found.status == ApprovalStatus.pending && !sameRevision);
+      if (stalePriorCycleSlot) {
+        // mint below
+      } else if (!alreadyDecided) {
+        return hint;
+      } else if (sameRevision) {
         return hint;
       }
-      if (sameRevision) return hint;
     }
 
     final stamp = (now ?? DateTime.now().toUtc()).microsecondsSinceEpoch;
     return 'req_${stage.stageId}_$stamp';
+  }
+
+  static int latestTerminalRequestRevision({
+    required String stageId,
+    required int stageRevision,
+    required String stageApprovalStatus,
+    required Iterable<Sotong24RemoteRequest> existingRequests,
+  }) {
+    var latest = 0;
+    for (final r in existingRequests) {
+      if (r.stageId != stageId) continue;
+      if (!isTerminalDecisionStatus(r.status)) continue;
+      final rv = r.revision > 0 ? r.revision : 1;
+      if (rv > latest) latest = rv;
+    }
+    if (latest == 0 && isTerminalDecisionStatus(stageApprovalStatus)) {
+      latest = stageRevision > 0 ? stageRevision : 1;
+    }
+    return latest;
   }
 
   /// null이면 통과, 문자열이면 거부 사유 (사용자용 문구).
@@ -927,6 +974,7 @@ class Sotong24RemoteApprovalGuard {
     required String stageId,
     required String requestId,
     required Iterable<Sotong24RemoteRequest> existingRequests,
+    int? reviewRevision,
   }) {
     if (project.projectId.trim().isEmpty) {
       return 'projectId가 없습니다.';
@@ -957,29 +1005,80 @@ class Sotong24RemoteApprovalGuard {
     if (!awaiting || !stage.approvalRequired || !stage.criteriaMet) {
       return '승인 대기 상태가 아닙니다. 잠시 후 상태를 새로 확인해 주세요.';
     }
-    if (isTerminalDecisionStatus(stage.approvalStatus)) {
-      return '승인·보완 요청을 Agent가 처리 중입니다. 잠시 후 상태를 새로 확인해 주세요.';
+
+    final package = EbookPackageReviewContract.tryParsePackage(
+      stage.ebookReviewPackage,
+    );
+    if (EbookPackageReviewContract.isPackageUserReviewStage(stageId) &&
+        package != null &&
+        package.schemaIsV2) {
+      if (!package.reviewActionsEnabledForAuthoritativePackage(stage.revision)) {
+        return package.packageReviewBlockReason(stage.revision) ??
+            '완성형 패키지가 아직 검토 준비가 되지 않았습니다.';
+      }
     }
 
+    final canonical =
+        reviewRevision ??
+        EbookPackageReviewContract.canonicalReviewRevision(
+          stageId: stage.stageId,
+          stageRevision: stage.revision,
+          package: package,
+        );
+    final latestTerminal = latestTerminalRequestRevision(
+      stageId: stageId,
+      stageRevision: stage.revision,
+      stageApprovalStatus: stage.approvalStatus,
+      existingRequests: existingRequests,
+    );
+    final newReviewCycle = EbookPackageReviewContract.isNewFrozenReviewCycle(
+      stageId: stage.stageId,
+      awaitingApproval: awaiting,
+      approvalRequired: stage.approvalRequired,
+      criteriaMet: stage.criteriaMet,
+      stageRevision: stage.revision,
+      package: package,
+      latestTerminalRequestRevision: latestTerminal,
+    );
+
     Sotong24RemoteRequest? activeReq;
+    var hasOpenPending = false;
     for (final r in existingRequests) {
       if (r.requestId == stage.activeRequestId) {
         activeReq = r;
       }
       if (r.stageId != stageId) continue;
+      if (r.status == ApprovalStatus.pending) {
+        hasOpenPending = true;
+      }
+    }
 
-      final stageRevision = stage.revision > 0 ? stage.revision : 1;
+    if (isTerminalDecisionStatus(stage.approvalStatus) && !newReviewCycle) {
+      if (hasOpenPending ||
+          (activeReq != null && activeReq.status == ApprovalStatus.pending)) {
+        return '승인·보완 요청을 Agent가 처리 중입니다. 잠시 후 상태를 새로 확인해 주세요.';
+      }
+      return '이 결과 버전에 대한 승인·보완 결정은 이미 반영되었습니다. '
+          '새 보완 결과가 준비되면 다시 시도해 주세요.';
+    }
+
+    for (final r in existingRequests) {
+      if (r.stageId != stageId) continue;
+
       final requestRevision = r.revision > 0 ? r.revision : 1;
       if (isTerminalDecisionStatus(r.status) &&
-          requestRevision == stageRevision) {
-        return '현재 결과 버전의 승인·보완 요청은 이미 Agent가 처리 중입니다. '
+          requestRevision == canonical) {
+        return '현재 결과 버전의 승인·보완 결정은 이미 처리되었습니다. '
             '다음 단계 또는 새 보완 결과를 기다려 주세요.';
       }
 
       // 동일 requestId 재전송(더블클릭/재시도) 차단
       if (r.requestId == requestId && isTerminalDecisionStatus(r.status)) {
-        return '이 승인·보완 요청은 이미 처리 중이거나 완료되었습니다. '
-            '잠시 후 상태를 새로 확인해 주세요.';
+        final sameCanonical = requestRevision == canonical;
+        if (sameCanonical || !newReviewCycle) {
+          return '이 승인·보완 요청은 이미 처리 중이거나 완료되었습니다. '
+              '잠시 후 상태를 새로 확인해 주세요.';
+        }
       }
 
       // 아직 미처리 pending 이 다른 id 로 열려 있으면 그 슬롯에만 응답
@@ -1249,7 +1348,27 @@ class Sotong24UserFacingStatus {
       return false;
     }
     if (Sotong24RemoteApprovalGuard.isTerminalDecisionStatus(stageApproval)) {
-      return false;
+      final package = EbookPackageReviewContract.tryParsePackage(
+        stage.ebookReviewPackage,
+      );
+      final latestTerminal =
+          Sotong24RemoteApprovalGuard.latestTerminalRequestRevision(
+            stageId: stage.stageId,
+            stageRevision: stage.revision,
+            stageApprovalStatus: stageApproval,
+            existingRequests: const <Sotong24RemoteRequest>[],
+          );
+      final newCycle = EbookPackageReviewContract.isNewFrozenReviewCycle(
+        stageId: stage.stageId,
+        awaitingApproval: true,
+        approvalRequired: stage.approvalRequired,
+        criteriaMet: stage.criteriaMet,
+        stageRevision: stage.revision,
+        package: package,
+        latestTerminalRequestRevision: latestTerminal,
+      );
+      // Without request history here, treat stage.revision as terminal floor.
+      if (!newCycle) return false;
     }
     // auto 모드에서는 일반 승인 버튼을 숨긴다. 확인 필요(userAttention)만 수동 개입.
     if (project.approvalMode == 'auto' && stage.userAttention.trim().isEmpty) {
