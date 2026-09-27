@@ -1310,6 +1310,71 @@ describe("remote agent contract V1", () => {
     assert.equal(awaiting.shouldNotify, false);
     assert.equal(awaiting.elapsedSeconds, 600);
     assert.equal(awaiting.approvalWaitSeconds, 3000);
+
+    const finalGate = evaluateStageHealth({
+      job: { ...job, status: "running", currentStage: "final_user_approval" },
+      stage: {
+        stageId: "final_user_approval",
+        stageNumber: 17,
+        status: "preparing",
+        startedAt: "2026-08-19T00:00:00.000Z",
+        lastActivityAt: "",
+        activityState: "",
+        revision: 1,
+      },
+      agent: { state: "idle", lastHeartbeatAt: "2026-08-19T01:00:00.000Z" },
+      policy,
+      nowMs,
+    });
+    assert.equal(finalGate.state, "awaiting_user");
+    assert.equal(finalGate.reason, "user_gate_not_stalled");
+    assert.equal(finalGate.shouldNotify, false);
+  });
+
+  it("B: final_user_approval is excluded from inactivity auto-recovery", async () => {
+    const env = await monitoringJob("wi_plan_final_gate_norecovery");
+    const started = await control(db, "/api/control/start-job", {
+      jobId: env.jobId,
+      payload: {
+        instructionId: env.instructionId,
+        environment: "production",
+        isTest: false,
+      },
+    });
+    assert.equal(started.statusCode, 200);
+    const nowMs = Date.parse("2026-08-19T01:00:00.000Z");
+    db.store.set(`${COL.MONITORING_CONFIG}/default`, {
+      offlineAfterSeconds: 600,
+      noActivityAfterSeconds: 300,
+      defaultExpectedMaxSeconds: 120,
+    });
+    db.store.set(`${COL.AGENTS}/${env.agentId}`, {
+      state: "running",
+      lastHeartbeatAt: "2026-08-19T00:59:30.000Z",
+    });
+    db.store.set(`${COL.JOBS}/${env.jobId}`, {
+      ...db.store.get(`${COL.JOBS}/${env.jobId}`),
+      jobId: env.jobId,
+      instructionId: env.instructionId,
+      assignedAgentId: env.agentId,
+      currentStage: "final_user_approval",
+      status: "running",
+    });
+    db.store.set(`${COL.JOBS}/${env.jobId}/stages/final_user_approval`, {
+      stageId: "final_user_approval",
+      stageNumber: 17,
+      stageName: "최종 사용자 승인",
+      status: "running",
+      startedAt: "2026-08-19T00:00:00.000Z",
+      lastActivityAt: "2026-08-19T00:20:00.000Z",
+      recoveryAttempt: 0,
+    });
+
+    await evaluateActiveJobs(db, nowMs);
+    const stage = db.store.get(`${COL.JOBS}/${env.jobId}/stages/final_user_approval`);
+    assert.equal(stage.status, "running");
+    assert.equal(stage.recoveryAttempt || 0, 0);
+    assert.notEqual(stage.recoveryState, "requested");
   });
 
   it("active monitor marks inactivity stalled and exhausts bounded recovery", async () => {
