@@ -610,10 +610,15 @@ class _Sotong24RemoteDetailScreenState
                 })()
               : ebookReviewStage != null
               ? (() {
-                  final name = ebookReviewStage.stageName.trim();
-                  return name.isEmpty
-                      ? '${ebookReviewStage.stageNumber}단계'
-                      : '${ebookReviewStage.stageNumber}단계 · $name';
+                  final pkgRev = _ebookReviewArtifactRevision(ebookReviewStage);
+                  final rawName = ebookReviewStage.stageName.trim();
+                  // Avoid stale "완성형 r1 …" when frozen package is rN.
+                  final name = rawName.contains('완성형')
+                      ? '완성형 사용자 검토 · r$pkgRev'
+                      : (rawName.isEmpty
+                            ? '완성형 사용자 검토 · r$pkgRev'
+                            : '$rawName · r$pkgRev');
+                  return '${ebookReviewStage.stageNumber}단계 · $name';
                 })()
               : Sotong24WorkshopPresentation.currentStageLine(project);
           final displayStatusLabel =
@@ -1231,11 +1236,19 @@ class _Sotong24RemoteDetailScreenState
     Sotong24RemoteProject project,
     Sotong24RemoteStage stage,
   ) async {
+    final isEbookPackageGate =
+        project.productType == ArtifactType.ebook &&
+        (stage.stageId == 'package_user_review' ||
+            stage.stageId == 'sales_metadata');
+    final reviewedRevision = isEbookPackageGate
+        ? 'r${_ebookReviewArtifactRevision(stage)}'
+        : 'r${stage.revision > 0 ? stage.revision : 1}';
     setState(() => _busy = true);
     final err = await widget.repository.approveStage(
       projectId: project.projectId,
       stageId: stage.stageId,
       requestId: _resolveRequestId(stage),
+      reviewedRevision: reviewedRevision,
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -1277,10 +1290,11 @@ class _Sotong24RemoteDetailScreenState
     EbookR1PackageManifest? manifest,
   }) {
     final m = manifest ?? _tryParseEbookManifest(stage);
-    if (m != null && m.schemaIsV2 && m.revisionNumber > 0) {
-      return m.revisionNumber;
-    }
-    return stage.revision > 0 ? stage.revision : 1;
+    return EbookPackageReviewContract.canonicalReviewRevision(
+      stageId: stage.stageId,
+      stageRevision: stage.revision,
+      package: m,
+    );
   }
 
   Future<void> _openEbookManifest(

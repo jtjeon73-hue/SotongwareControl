@@ -5,7 +5,7 @@ import '../models/sotong24_remote_models.dart';
 import '../services/remote_control_api.dart';
 import '../theme/control_theme.dart';
 
-/// 완성형 r1(package_user_review) 결과 요약 + 승인/보완/보류 액션.
+/// 완성형(package_user_review) 결과 요약 + 승인/보완/보류 액션.
 class EbookPackageUserReviewPanel extends StatelessWidget {
   const EbookPackageUserReviewPanel({
     super.key,
@@ -89,7 +89,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '완성형 전자책 $revision · 사용자 승인 필수',
+              '완성형 사용자 검토 · $revision · 사용자 승인 필수',
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
