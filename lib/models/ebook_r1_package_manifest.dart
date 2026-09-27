@@ -178,6 +178,21 @@ class EbookR1PackageManifest {
     return gaps;
   }
 
+  /// commercial-v2 package review: package revision is authoritative.
+  /// Stale stage behind package is not a gap; stage ahead or path mismatch is.
+  List<String> reviewReadinessGapsForAuthoritativePackage(int stageRevision) {
+    final gaps = List<String>.from(reviewReadinessGaps);
+    if (schemaIsV2 && !frozenPathsMatchPackageRevision) {
+      gaps.add('revision 불일치(패키지 경로와 package.revision)');
+    }
+    final pkg = revisionNumber > 0 ? revisionNumber : 1;
+    final stage = stageRevision > 0 ? stageRevision : 1;
+    if (stage > pkg) {
+      gaps.add('revision 불일치(패키지-r$pkg, 단계-r$stage)');
+    }
+    return gaps;
+  }
+
   static String normalizeRevisionLabel(String raw) {
     final s = raw.trim().toLowerCase();
     if (s.isEmpty) return '';
@@ -185,6 +200,48 @@ class EbookR1PackageManifest {
     final n = int.tryParse(s);
     if (n != null && n > 0) return 'r$n';
     return s;
+  }
+
+  /// Numeric revision from frozen package label (`r2` → 2). 0 when unknown.
+  int get revisionNumber {
+    final label = normalizeRevisionLabel(revision);
+    if (label.startsWith('r') && label.length > 1) {
+      return int.tryParse(label.substring(1)) ?? 0;
+    }
+    return int.tryParse(label) ?? 0;
+  }
+
+  /// Download attachment base name for the frozen package EPUB (not Storage object name).
+  String downloadEpubAttachmentName() {
+    final n = revisionNumber > 0 ? revisionNumber : 1;
+    return 'ebook_r$n.epub';
+  }
+
+  /// First `revisions/rN` segment found in publish paths, else null.
+  static int? revisionNumberFromPublishPath(String path) {
+    final m = RegExp(
+      r'(?:^|[/\\])revisions[/\\]r(\d+)(?:[/\\]|$)',
+      caseSensitive: false,
+    ).firstMatch(path.trim());
+    if (m == null) return null;
+    return int.tryParse(m.group(1) ?? '');
+  }
+
+  /// Fail-closed: every revisions/rN path in the package must match package.revision.
+  bool get frozenPathsMatchPackageRevision {
+    final pkg = revisionNumber > 0 ? revisionNumber : 1;
+    for (final path in <String>[
+      epubPath,
+      pdfPath,
+      coverPath,
+      qualityReportPath,
+      manifestPath,
+      immutablePath,
+    ]) {
+      final fromPath = revisionNumberFromPublishPath(path);
+      if (fromPath != null && fromPath != pkg) return false;
+    }
+    return true;
   }
 
   bool matchesStageRevision(int stageRevision) {
@@ -211,6 +268,38 @@ class EbookR1PackageManifest {
   bool reviewActionsEnabledForStage(int stageRevision) {
     if (!reviewActionsEnabled) return false;
     return matchesStageRevision(stageRevision);
+  }
+
+  /// commercial-v2 `package_user_review`: frozen package revision is authoritative.
+  ///
+  /// - Allows stale stage.revision behind the package (Work sync lag).
+  /// - Still fail-closed when stage is ahead of package (stale package / wrong rN).
+  /// - Still fail-closed when package paths disagree with package.revision.
+  bool reviewActionsEnabledForAuthoritativePackage(int stageRevision) {
+    if (!reviewActionsEnabled) return false;
+    if (schemaIsV2 && !frozenPathsMatchPackageRevision) return false;
+    final pkg = revisionNumber > 0 ? revisionNumber : 1;
+    final stage = stageRevision > 0 ? stageRevision : 1;
+    if (stage > pkg) return false;
+    return true;
+  }
+
+  /// User-facing gate reason when review actions are blocked for package review.
+  String? packageReviewBlockReason(int stageRevision) {
+    if (reviewActionsEnabledForAuthoritativePackage(stageRevision)) {
+      return null;
+    }
+    if (schemaIsV2 && !frozenPathsMatchPackageRevision) {
+      return 'revision 불일치(패키지 경로와 package.revision)';
+    }
+    if (reviewActionsEnabled) {
+      final pkg = revisionNumber > 0 ? revisionNumber : 1;
+      final stage = stageRevision > 0 ? stageRevision : 1;
+      if (stage > pkg) {
+        return 'revision 불일치(패키지-r$pkg, 단계-r$stage)';
+      }
+    }
+    return null;
   }
 
   static String _artifactPath(dynamic raw, String fallback) {
@@ -512,9 +601,7 @@ class EbookR1PackageManifest {
       pdfRemoteUrl: _artifactUrl(pdfRaw),
       epubRemoteUrl: _artifactUrl(epubRaw),
       manifestRemoteUrl: _artifactUrl(manifestRaw),
-      coverGrantReady: isV2
-          ? _artifactReadyFlag(coverRaw, 'grantReady')
-          : true,
+      coverGrantReady: isV2 ? _artifactReadyFlag(coverRaw, 'grantReady') : true,
       pdfGrantReady: isV2 ? _artifactReadyFlag(pdfRaw, 'grantReady') : true,
       epubGrantReady: isV2 ? _artifactReadyFlag(epubRaw, 'grantReady') : true,
       qualityGrantReady: isV2

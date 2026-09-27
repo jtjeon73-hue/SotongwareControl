@@ -46,9 +46,13 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final title = (m?.title.trim().isNotEmpty ?? false)
         ? m!.title
         : project.title;
+    // commercial-v2: frozen package revision is authoritative over stale stage.revision.
+    final packageRevNum = (m != null && m.schemaIsV2 && m.revisionNumber > 0)
+        ? m.revisionNumber
+        : (stage.revision > 0 ? stage.revision : 1);
     final revision = (m?.revision.trim().isNotEmpty ?? false)
-        ? m!.revision
-        : (stage.revision > 0 ? 'r${stage.revision}' : 'r1');
+        ? EbookR1PackageManifest.normalizeRevisionLabel(m!.revision)
+        : 'r$packageRevNum';
     final hasPdf = m?.hasDownloadablePdf == true || stage.hasOpenableResult;
     final hasEpub = m?.hasDownloadableEpub == true;
     final score = m?.score;
@@ -56,11 +60,16 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
     final major = m?.majorCount ?? 0;
     final refine = m?.refineCount;
     final author = (m?.author ?? '').trim();
-    final reviewEnabled =
-        m?.reviewActionsEnabledForStage(stage.revision) == true;
-    final readinessGaps =
-        m?.reviewReadinessGapsForStage(stage.revision) ??
-        const <String>['ebookReviewPackage 없음 — 결과물 등록 상태를 확인할 수 없습니다.'];
+    final reviewEnabled = m == null
+        ? false
+        : (m.schemaIsV2
+              ? m.reviewActionsEnabledForAuthoritativePackage(stage.revision)
+              : m.reviewActionsEnabledForStage(stage.revision));
+    final readinessGaps = m == null
+        ? const <String>['ebookReviewPackage 없음 — 결과물 등록 상태를 확인할 수 없습니다.']
+        : (m.schemaIsV2
+              ? m.reviewReadinessGapsForAuthoritativePackage(stage.revision)
+              : m.reviewReadinessGapsForStage(stage.revision));
     final deliveryMsg = (m?.deliveryStatusMessage ?? '').trim();
     final coverFileName = m?.resolveCoverFileName() ?? '';
     final autoCheck = m?.autoCheckLabel ?? '자동 검사 결과 없음';
@@ -142,7 +151,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
               _EbookCoverGrantPreview(
                 projectId: project.projectId,
                 stageId: stage.stageId,
-                revision: stage.revision > 0 ? stage.revision : 1,
+                revision: packageRevNum,
                 directUrl: (coverUrl ?? m?.coverUrl ?? '').trim(),
                 coverFileName: coverFileName.isNotEmpty
                     ? coverFileName

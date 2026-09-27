@@ -352,9 +352,7 @@ class _ProductWorkshopScreenState extends State<ProductWorkshopScreen> {
                             OperationalCollapsibleSection(
                               title: '이전 작업/진단 이력',
                               subtitle: '실패·취소·stale·테스트·오래된 작업',
-                              sectionKey: const Key(
-                                'workshop_history_section',
-                              ),
+                              sectionKey: const Key('workshop_history_section'),
                               child: Column(
                                 children: [
                                   for (final p in history) ...[
@@ -691,7 +689,9 @@ class _Sotong24RemoteDetailScreenState
                 '승인 방식',
                 showEbookPackageReview
                     ? '사용자 승인 필수 (이 단계)'
-                    : (project.approvalMode == 'auto' ? '자동 승인(기본 정책)' : '수동 승인'),
+                    : (project.approvalMode == 'auto'
+                          ? '자동 승인(기본 정책)'
+                          : '수동 승인'),
               ),
               if (showEbookPackageReview) ...[
                 const SizedBox(height: 8),
@@ -785,12 +785,16 @@ class _Sotong24RemoteDetailScreenState
                       onHold: () async {
                         setState(() => _busy = true);
                         final messenger = ScaffoldMessenger.of(context);
+                        final holdRev = _ebookReviewArtifactRevision(
+                          ebookReviewStage,
+                          manifest: ebookManifest,
+                        );
                         final err = await widget.repository.requestRevision(
                           projectId: project.projectId,
                           stageId: ebookReviewStage.stageId,
                           requestId: _resolveRequestId(ebookReviewStage),
                           message:
-                              '[reviewDecision=on_hold]\n[reviewedRevision=r${ebookReviewStage.revision > 0 ? ebookReviewStage.revision : 1}]\n전자책 완성형 패키지 보류',
+                              '[reviewDecision=on_hold]\n[reviewedRevision=r$holdRev]\n전자책 완성형 패키지 보류',
                           reviewDecision: 'on_hold',
                         );
                         if (!mounted) return;
@@ -827,12 +831,18 @@ class _Sotong24RemoteDetailScreenState
                   },
                 ),
               ],
-              if (Sotong24WorkshopPresentation.revisionLine(project).isNotEmpty)
+              if (Sotong24WorkshopPresentation.revisionLine(
+                    project,
+                  ).isNotEmpty ||
+                  (ebookReviewStage != null &&
+                      _ebookReviewArtifactRevision(ebookReviewStage) > 0))
                 _Kv(
                   '결과 버전',
-                  Sotong24WorkshopPresentation.revisionLine(
-                    project,
-                  ).replaceFirst('결과 버전 ', ''),
+                  ebookReviewStage != null
+                      ? 'r${_ebookReviewArtifactRevision(ebookReviewStage)}'
+                      : Sotong24WorkshopPresentation.revisionLine(
+                          project,
+                        ).replaceFirst('결과 버전 ', ''),
                 ),
               _Kv(
                 '전체 진행률',
@@ -1261,6 +1271,18 @@ class _Sotong24RemoteDetailScreenState
     return null;
   }
 
+  /// commercial-v2 package_user_review: frozen package revision wins over stage.revision.
+  int _ebookReviewArtifactRevision(
+    Sotong24RemoteStage stage, {
+    EbookR1PackageManifest? manifest,
+  }) {
+    final m = manifest ?? _tryParseEbookManifest(stage);
+    if (m != null && m.schemaIsV2 && m.revisionNumber > 0) {
+      return m.revisionNumber;
+    }
+    return stage.revision > 0 ? stage.revision : 1;
+  }
+
   Future<void> _openEbookManifest(
     Sotong24RemoteProject project,
     Sotong24RemoteStage stage,
@@ -1274,7 +1296,7 @@ class _Sotong24RemoteDetailScreenState
       final grant = await RemoteControlApi().createArtifactDownloadGrant(
         projectId: project.projectId,
         stageId: stage.stageId,
-        revision: stage.revision > 0 ? stage.revision : 1,
+        revision: _ebookReviewArtifactRevision(stage, manifest: manifest),
         fileName: fileName,
         artifactFileName: fileName,
       );
@@ -1319,7 +1341,7 @@ class _Sotong24RemoteDetailScreenState
       final grant = await RemoteControlApi().createArtifactDownloadGrant(
         projectId: project.projectId,
         stageId: stage.stageId,
-        revision: stage.revision > 0 ? stage.revision : 1,
+        revision: _ebookReviewArtifactRevision(stage, manifest: manifest),
         fileName: fileName,
         artifactFileName: fileName,
       );
@@ -1344,17 +1366,19 @@ class _Sotong24RemoteDetailScreenState
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     final manifest = _tryParseEbookManifest(stage);
-    final revision = stage.revision > 0 ? stage.revision : 1;
+    final revision = _ebookReviewArtifactRevision(stage, manifest: manifest);
     try {
       if (kind == 'epub') {
         final artifactName = manifest?.resolveEpubFileName() ?? 'book.epub';
+        final attachmentName =
+            manifest?.downloadEpubAttachmentName() ?? 'ebook_r$revision.epub';
         final direct = (manifest?.epubRemoteUrl ?? '').trim();
         try {
           final grant = await RemoteControlApi().createArtifactDownloadGrant(
             projectId: project.projectId,
             stageId: stage.stageId,
             revision: revision,
-            fileName: 'ebook_r$revision.epub',
+            fileName: attachmentName,
             artifactFileName: artifactName,
           );
           if (!mounted) return;
@@ -1396,9 +1420,7 @@ class _Sotong24RemoteDetailScreenState
           if (!result.ok && Sotong24RemoteStage.isOpenableHttpUrl(direct)) {
             await pdf_platform.openAttachmentUrl(direct);
             messenger.showSnackBar(
-              SnackBar(
-                content: Text('$artifactName 직접 링크로 다시 시도했습니다.'),
-              ),
+              SnackBar(content: Text('$artifactName 직접 링크로 다시 시도했습니다.')),
             );
           }
         } catch (e) {
@@ -1421,9 +1443,7 @@ class _Sotong24RemoteDetailScreenState
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text(
-            '다운로드 실패: $e · 네트워크·로그인·팝업 차단을 확인한 뒤 다시 시도하세요.',
-          ),
+          content: Text('다운로드 실패: $e · 네트워크·로그인·팝업 차단을 확인한 뒤 다시 시도하세요.'),
         ),
       );
     } finally {
@@ -1449,7 +1469,7 @@ class _Sotong24RemoteDetailScreenState
       final grant = await RemoteControlApi().createArtifactDownloadGrant(
         projectId: project.projectId,
         stageId: stage.stageId,
-        revision: stage.revision > 0 ? stage.revision : 1,
+        revision: _ebookReviewArtifactRevision(stage, manifest: manifest),
         fileName: fileName,
         artifactFileName: fileName,
       );
@@ -1472,13 +1492,14 @@ class _Sotong24RemoteDetailScreenState
     Sotong24RemoteProject project,
     Sotong24RemoteStage stage,
   ) async {
+    final revision = _ebookReviewArtifactRevision(stage);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PdfPreviewScreen(
           projectId: project.projectId,
           stageId: stage.stageId,
           title: project.title,
-          revision: stage.revision > 0 ? stage.revision : 1,
+          revision: revision,
         ),
       ),
     );
@@ -1497,11 +1518,13 @@ class _Sotong24RemoteDetailScreenState
       return;
     }
 
-    final revLabel = 'r${stage.revision > 0 ? stage.revision : 1}';
     final isEbookPackageGate =
         project.productType == ArtifactType.ebook &&
         (stage.stageId == 'package_user_review' ||
             stage.stageId == 'sales_metadata');
+    final revLabel = isEbookPackageGate
+        ? 'r${_ebookReviewArtifactRevision(stage)}'
+        : 'r${stage.revision > 0 ? stage.revision : 1}';
     final payload =
         project.productType == ArtifactType.site &&
             stage.stageId == 'site_user_review'
@@ -2444,15 +2467,15 @@ class _StageMonitoringPanel extends StatelessWidget {
               ),
             ),
           ],
-            if (stage.startedAt.isNotEmpty)
-              Text(
-                '시작 ${_formatTime(stage.startedAt)}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: ControlColors.textMuted,
-                ),
+          if (stage.startedAt.isNotEmpty)
+            Text(
+              '시작 ${_formatTime(stage.startedAt)}',
+              style: const TextStyle(
+                fontSize: 12,
+                color: ControlColors.textMuted,
               ),
-            if (expected != null)
+            ),
+          if (expected != null)
             Text(
               '최근 통계 ${Sotong24StageMonitoring.compactDuration(expected.min)}~${Sotong24StageMonitoring.compactDuration(expected.max)} · 표본 ${expected.sampleCount}건',
               style: const TextStyle(
@@ -2673,8 +2696,26 @@ class _ResultPanel extends StatelessWidget {
   final Sotong24RemoteStage stage;
   final Sotong24RemoteProject project;
 
+  int _displayRevision() {
+    final isEbookPackage =
+        project.productType == ArtifactType.ebook &&
+        (stage.stageId == 'package_user_review' ||
+            stage.stageId == 'sales_metadata');
+    if (isEbookPackage) {
+      final pkg = stage.ebookReviewPackage;
+      if (pkg != null && pkg.isNotEmpty) {
+        try {
+          final m = EbookR1PackageManifest.fromEbookReviewPackage(pkg);
+          if (m.schemaIsV2 && m.revisionNumber > 0) return m.revisionNumber;
+        } catch (_) {}
+      }
+    }
+    return stage.revision;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayRevision = _displayRevision();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -2686,9 +2727,9 @@ class _ResultPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (stage.revision > 0) ...[
+          if (displayRevision > 0) ...[
             Text(
-              '최신 결과 r${stage.revision}',
+              '최신 결과 r$displayRevision',
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             ),
             const SizedBox(height: 8),

@@ -359,6 +359,113 @@ void main() {
     expect(hold.deliveryStatusMessage, contains('전달'));
   });
 
+  test(
+    'commercial-v2: package revision is authoritative over stale stage r1',
+    () {
+      Map<String, dynamic> art(String path, {bool ready = true}) => {
+        'path': path,
+        'fileName': path.split('/').last,
+        'size': 10,
+        'sha256': 'abc',
+        'remoteStatus': ready ? 'grantReady' : 'error',
+        'remoteReady': ready,
+        'grantReady': ready,
+        'remoteUrl': ready ? 'https://example.com/$path' : '',
+      };
+      final r2 = EbookR1PackageManifest.fromEbookReviewPackage({
+        'schemaVersion': 'ebookReviewPackage/v2',
+        'contractVersion': 2,
+        'revision': 'r2',
+        'title': 'frozen r2',
+        'reviewReady': true,
+        'deliveryStatus': 'ready',
+        'manifestSHA256': 'abc',
+        'cover': art('publish/revisions/r2/cover/cover.png'),
+        'pdf': art('publish/revisions/r2/book.pdf'),
+        'epub': {
+          ...art('publish/revisions/r2/book.epub'),
+          'sha256':
+              '147d9ccc15bea8c5917296498a5dc8cbc30f85c9df9210f3730abe09c5fde3e6',
+        },
+        'qualityReport': art(
+          'publish/revisions/r2/pre_review_quality_report.json',
+        ),
+        'manifest': art('publish/revisions/r2/package_manifest.json'),
+        'quality': {'score': 95, 'criticalCount': 0, 'majorCount': 0},
+        'toc': ['1'],
+        'frozen': true,
+        'immutablePath': 'publish/revisions/r2',
+      });
+
+      expect(r2.revisionNumber, 2);
+      expect(r2.downloadEpubAttachmentName(), 'ebook_r2.epub');
+      expect(
+        r2.epubSha256,
+        '147d9ccc15bea8c5917296498a5dc8cbc30f85c9df9210f3730abe09c5fde3e6',
+      );
+      expect(r2.frozenPathsMatchPackageRevision, isTrue);
+      // Stale stage.revision=1 must not block r2 package review.
+      expect(r2.reviewActionsEnabledForAuthoritativePackage(1), isTrue);
+      expect(
+        r2.reviewActionsEnabledForStage(1),
+        isFalse,
+      ); // legacy gate still strict
+      expect(r2.reviewReadinessGapsForAuthoritativePackage(1), isEmpty);
+      expect(r2.packageReviewBlockReason(1), isNull);
+
+      // Stale r1 package while stage advanced to r2 remains fail-closed.
+      final staleR1 = EbookR1PackageManifest.fromEbookReviewPackage({
+        'schemaVersion': 'ebookReviewPackage/v2',
+        'contractVersion': 2,
+        'revision': 'r1',
+        'title': 'stale r1',
+        'reviewReady': true,
+        'deliveryStatus': 'ready',
+        'manifestSHA256': 'abc',
+        'cover': art('publish/revisions/r1/cover/cover.png'),
+        'pdf': art('publish/revisions/r1/book.pdf'),
+        'epub': art('publish/revisions/r1/book.epub'),
+        'qualityReport': art(
+          'publish/revisions/r1/pre_review_quality_report.json',
+        ),
+        'manifest': art('publish/revisions/r1/package_manifest.json'),
+        'quality': {'score': 95},
+      });
+      expect(staleR1.reviewActionsEnabledForAuthoritativePackage(2), isFalse);
+      expect(staleR1.packageReviewBlockReason(2), contains('패키지-r1'));
+      expect(staleR1.packageReviewBlockReason(2), contains('단계-r2'));
+      expect(
+        staleR1.reviewReadinessGapsForAuthoritativePackage(2).join(','),
+        contains('패키지-r1'),
+      );
+
+      // Package label r2 but paths still on r1 → fail-closed.
+      final pathMismatch = EbookR1PackageManifest.fromEbookReviewPackage({
+        'schemaVersion': 'ebookReviewPackage/v2',
+        'contractVersion': 2,
+        'revision': 'r2',
+        'title': 'path mismatch',
+        'reviewReady': true,
+        'deliveryStatus': 'ready',
+        'manifestSHA256': 'abc',
+        'cover': art('publish/revisions/r1/cover/cover.png'),
+        'pdf': art('publish/revisions/r1/book.pdf'),
+        'epub': art('publish/revisions/r1/book.epub'),
+        'qualityReport': art(
+          'publish/revisions/r1/pre_review_quality_report.json',
+        ),
+        'manifest': art('publish/revisions/r1/package_manifest.json'),
+        'quality': {'score': 95},
+      });
+      expect(pathMismatch.frozenPathsMatchPackageRevision, isFalse);
+      expect(
+        pathMismatch.reviewActionsEnabledForAuthoritativePackage(2),
+        isFalse,
+      );
+      expect(pathMismatch.packageReviewBlockReason(2), contains('패키지 경로'));
+    },
+  );
+
   test('Work exported fixture parses as Control ebookReviewPackage v2', () {
     final fixture = File('test/fixtures/ebook_complete_r1_work_payload.json');
     // Fixture is produced by Work --ebook-r1-selftest case W.
