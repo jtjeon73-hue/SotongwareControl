@@ -575,6 +575,8 @@ class _Sotong24RemoteDetailScreenState
               stage.activityState != 'validation_retry_waiting' &&
               stage.activityState != 'approval_preparing' &&
               stage.status != Sotong24WorkStatus.resultValidationRetrying &&
+              !Sotong24StageMonitoring.isHumanApprovalGateStage(stage.stageId) &&
+              monitoringSnapshot.health != Sotong24StageHealth.awaitingUser &&
               (monitoringSnapshot.health == Sotong24StageHealth.inactive ||
                   monitoringSnapshot.health == Sotong24StageHealth.stalled);
           final showSiteUserReview =
@@ -597,9 +599,35 @@ class _Sotong24RemoteDetailScreenState
                   stage.hasOpenableResult ||
                   showApprovalActions);
           final ebookReviewStage = showEbookPackageReview ? stage : null;
+          final finalGateStage =
+              (stage != null &&
+                  project.productType == ArtifactType.ebook &&
+                  stage.stageId == 'final_user_approval')
+              ? stage
+              : null;
+          final showEbookFinalUserApproval = finalGateStage != null;
+          final finalPackageCarrier = finalGateStage == null
+              ? null
+              : _ebookPackageCarrierStage(project, finalGateStage);
+          final finalApprovalManifest = finalPackageCarrier == null
+              ? null
+              : _tryParseEbookManifest(finalPackageCarrier);
+          final finalAuthoritativeRevision = finalGateStage == null
+              ? null
+              : EbookPackageReviewContract.authoritativeFinalApprovalRevision(
+                  stageId: finalGateStage.stageId,
+                  stageRevision: finalGateStage.revision,
+                  package: finalApprovalManifest,
+                );
+          final showFinalApprovalPanel =
+              finalGateStage != null &&
+              (finalAuthoritativeRevision != null ||
+                  finalGateStage.status == Sotong24WorkStatus.awaitingApproval ||
+                  showApprovalActions);
           final displayCurrentNumber =
               siteReviewStage?.stageNumber ??
               ebookReviewStage?.stageNumber ??
+              finalGateStage?.stageNumber ??
               project.currentStage;
           final displayCurrentLine = siteReviewStage != null
               ? (() {
@@ -620,6 +648,13 @@ class _Sotong24RemoteDetailScreenState
                             : '$rawName · r$pkgRev');
                   return '${ebookReviewStage.stageNumber}단계 · $name';
                 })()
+              : finalGateStage != null
+              ? (() {
+                  final rev = finalAuthoritativeRevision;
+                  return rev == null
+                      ? '${finalGateStage.stageNumber}단계 · 최종 사용자 승인'
+                      : '${finalGateStage.stageNumber}단계 · 최종 사용자 승인 · r$rev';
+                })()
               : Sotong24WorkshopPresentation.currentStageLine(project);
           final displayStatusLabel =
               ((siteReviewStage != null &&
@@ -629,7 +664,8 @@ class _Sotong24RemoteDetailScreenState
                   (ebookReviewStage != null &&
                       (ebookReviewStage.status ==
                               Sotong24WorkStatus.awaitingApproval ||
-                          project.approvalStatus == ApprovalStatus.pending)))
+                          project.approvalStatus == ApprovalStatus.pending)) ||
+                  showEbookFinalUserApproval)
               ? '사용자 검토 대기'
               : project.userFacingStatusLabel;
           _scrollToApkIfNeeded(project);
@@ -745,7 +781,8 @@ class _Sotong24RemoteDetailScreenState
                 ),
                 if (showStallFollowUp &&
                     !showSiteUserReview &&
-                    !showEbookPackageReview) ...[
+                    !showEbookPackageReview &&
+                    !showEbookFinalUserApproval) ...[
                   const SizedBox(height: 10),
                   StallFollowUpActionBar(
                     project: project,
@@ -836,7 +873,143 @@ class _Sotong24RemoteDetailScreenState
                   },
                 ),
               ],
-              if (Sotong24WorkshopPresentation.revisionLine(
+              if (showFinalApprovalPanel) ...[
+                const SizedBox(height: 12),
+                Builder(
+                  builder: (context) {
+                    final gateStage = finalGateStage;
+                    final carrier = finalPackageCarrier ?? gateStage;
+                    final coverPreview =
+                        (finalApprovalManifest?.coverUrl ?? '').trim();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '${gateStage.stageNumber}단계 · 최종 사용자 승인',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '최종 결과를 확인한 뒤 승인 또는 보완 요청을 선택하세요.',
+                          style: TextStyle(
+                            color: ControlColors.textSecondary,
+                            fontSize: 13,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (finalAuthoritativeRevision == null)
+                          const _InfoBanner(
+                            text:
+                                '검증된 최종 전자책 패키지(revision)를 확정할 수 없습니다. '
+                                'stale stage revision을 최종 결과로 표시하지 않습니다.',
+                          )
+                        else ...[
+                          EbookPackageUserReviewPanel(
+                            project: project,
+                            stage: carrier,
+                            busy: _busy,
+                            manifest: finalApprovalManifest,
+                            coverUrl: coverPreview.isNotEmpty
+                                ? coverPreview
+                                : null,
+                            onApprove: showApprovalActions
+                                ? () => _onApprove(project, gateStage)
+                                : () {},
+                            onChangesRequested: showApprovalActions
+                                ? () => _onRevision(project, gateStage)
+                                : () {},
+                            onHold: showApprovalActions
+                                ? () async {
+                                    setState(() => _busy = true);
+                                    final messenger = ScaffoldMessenger.of(
+                                      context,
+                                    );
+                                    final holdRev = finalAuthoritativeRevision;
+                                    final err = await widget.repository
+                                        .requestRevision(
+                                          projectId: project.projectId,
+                                          stageId: gateStage.stageId,
+                                          requestId: _resolveRequestId(
+                                            gateStage,
+                                          ),
+                                          message:
+                                              '[reviewDecision=on_hold]\n[reviewedRevision=r$holdRev]\n최종 사용자 승인 보류',
+                                          reviewDecision: 'on_hold',
+                                        );
+                                    if (!mounted) return;
+                                    setState(() => _busy = false);
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          err ?? '보류했습니다. 패키지는 보존됩니다.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                : () {},
+                            onDownloadPdf: () => _downloadEbookArtifact(
+                              project,
+                              carrier,
+                              kind: 'pdf',
+                              revisionOverride: finalAuthoritativeRevision,
+                            ),
+                            onDownloadEpub: () => _downloadEbookArtifact(
+                              project,
+                              carrier,
+                              kind: 'epub',
+                              revisionOverride: finalAuthoritativeRevision,
+                            ),
+                            onPreviewPdf: () => _previewEbookPdf(
+                              project,
+                              carrier,
+                              revisionOverride: finalAuthoritativeRevision,
+                            ),
+                            onOpenCover: () => _openEbookCover(
+                              project,
+                              carrier,
+                              revisionOverride: finalAuthoritativeRevision,
+                            ),
+                            onOpenQualityReport:
+                                finalApprovalManifest?.hasQualityReport == true
+                                ? () => _openEbookQualityReport(
+                                    project,
+                                    carrier,
+                                    revisionOverride:
+                                        finalAuthoritativeRevision,
+                                  )
+                                : null,
+                            onOpenManifest:
+                                finalApprovalManifest?.hasManifest == true
+                                ? () => _openEbookManifest(
+                                    project,
+                                    carrier,
+                                    revisionOverride:
+                                        finalAuthoritativeRevision,
+                                  )
+                                : null,
+                          ),
+                          if (!showApprovalActions) ...[
+                            const SizedBox(height: 8),
+                            const _InfoBanner(
+                              text:
+                                  '승인·보완은 Agent가 final_user_approval을 승인 대기'
+                                  '(awaiting_approval·criteriaMet)로 동기화한 뒤 활성화됩니다. '
+                                  '지금은 최종 결과 확인만 가능합니다.',
+                            ),
+                          ],
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ],
+              if (showEbookFinalUserApproval)
+                (finalAuthoritativeRevision != null
+                    ? _Kv('결과 버전', 'r$finalAuthoritativeRevision')
+                    : const _Kv('결과 버전', '확인 불가'))
+              else if (Sotong24WorkshopPresentation.revisionLine(
                     project,
                   ).isNotEmpty ||
                   (ebookReviewStage != null &&
@@ -1147,7 +1320,8 @@ class _Sotong24RemoteDetailScreenState
               if (showApprovalActions &&
                   stage != null &&
                   !showSiteUserReview &&
-                  !showEbookPackageReview) ...[
+                  !showEbookPackageReview &&
+                  !showEbookFinalUserApproval) ...[
                 const SizedBox(height: 16),
                 Text(
                   '승인',
@@ -1240,9 +1414,35 @@ class _Sotong24RemoteDetailScreenState
         project.productType == ArtifactType.ebook &&
         (stage.stageId == 'package_user_review' ||
             stage.stageId == 'sales_metadata');
-    final reviewedRevision = isEbookPackageGate
-        ? 'r${_ebookReviewArtifactRevision(stage)}'
-        : 'r${stage.revision > 0 ? stage.revision : 1}';
+    final isFinalGate =
+        project.productType == ArtifactType.ebook &&
+        stage.stageId == 'final_user_approval';
+    String reviewedRevision;
+    if (isEbookPackageGate) {
+      reviewedRevision = 'r${_ebookReviewArtifactRevision(stage)}';
+    } else if (isFinalGate) {
+      final carrier = _ebookPackageCarrierStage(project, stage);
+      final manifest = _tryParseEbookManifest(carrier);
+      final auth = EbookPackageReviewContract.authoritativeFinalApprovalRevision(
+        stageId: stage.stageId,
+        stageRevision: stage.revision,
+        package: manifest,
+      );
+      if (auth == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '검증된 최종 패키지 revision을 확정할 수 없어 승인을 보내지 않았습니다.',
+            ),
+          ),
+        );
+        return;
+      }
+      reviewedRevision = 'r$auth';
+    } else {
+      reviewedRevision = 'r${stage.revision > 0 ? stage.revision : 1}';
+    }
     setState(() => _busy = true);
     final err = await widget.repository.approveStage(
       projectId: project.projectId,
@@ -1257,6 +1457,28 @@ class _Sotong24RemoteDetailScreenState
         content: Text(err ?? '승인 요청을 전송했습니다. Agent가 확인하면 다음 단계로 진행합니다.'),
       ),
     );
+  }
+
+  Sotong24RemoteStage _ebookPackageCarrierStage(
+    Sotong24RemoteProject project,
+    Sotong24RemoteStage stage,
+  ) {
+    if (stage.ebookReviewPackage != null &&
+        stage.ebookReviewPackage!.isNotEmpty) {
+      return stage;
+    }
+    for (final candidate in project.stages) {
+      if (!EbookPackageReviewContract.isPackageUserReviewStage(
+        candidate.stageId,
+      )) {
+        continue;
+      }
+      if (candidate.ebookReviewPackage != null &&
+          candidate.ebookReviewPackage!.isNotEmpty) {
+        return candidate;
+      }
+    }
+    return stage;
   }
 
   EbookR1PackageManifest? _tryParseEbookManifest(Sotong24RemoteStage stage) {
@@ -1299,18 +1521,22 @@ class _Sotong24RemoteDetailScreenState
 
   Future<void> _openEbookManifest(
     Sotong24RemoteProject project,
-    Sotong24RemoteStage stage,
-  ) async {
+    Sotong24RemoteStage stage, {
+    int? revisionOverride,
+  }) async {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
       final manifest = _tryParseEbookManifest(stage);
       final fileName =
           manifest?.resolveManifestFileName() ?? 'package_manifest.json';
+      final revision =
+          revisionOverride ??
+          _ebookReviewArtifactRevision(stage, manifest: manifest);
       final grant = await RemoteControlApi().createArtifactDownloadGrant(
         projectId: project.projectId,
         stageId: stage.stageId,
-        revision: _ebookReviewArtifactRevision(stage, manifest: manifest),
+        revision: revision,
         fileName: fileName,
         artifactFileName: fileName,
       );
@@ -1329,8 +1555,9 @@ class _Sotong24RemoteDetailScreenState
 
   Future<void> _openEbookQualityReport(
     Sotong24RemoteProject project,
-    Sotong24RemoteStage stage,
-  ) async {
+    Sotong24RemoteStage stage, {
+    int? revisionOverride,
+  }) async {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -1352,10 +1579,13 @@ class _Sotong24RemoteDetailScreenState
       final fileName =
           manifest?.resolveQualityReportFileName() ??
           'pre_review_quality_report.json';
+      final revision =
+          revisionOverride ??
+          _ebookReviewArtifactRevision(stage, manifest: manifest);
       final grant = await RemoteControlApi().createArtifactDownloadGrant(
         projectId: project.projectId,
         stageId: stage.stageId,
-        revision: _ebookReviewArtifactRevision(stage, manifest: manifest),
+        revision: revision,
         fileName: fileName,
         artifactFileName: fileName,
       );
@@ -1376,11 +1606,14 @@ class _Sotong24RemoteDetailScreenState
     Sotong24RemoteProject project,
     Sotong24RemoteStage stage, {
     required String kind,
+    int? revisionOverride,
   }) async {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     final manifest = _tryParseEbookManifest(stage);
-    final revision = _ebookReviewArtifactRevision(stage, manifest: manifest);
+    final revision =
+        revisionOverride ??
+        _ebookReviewArtifactRevision(stage, manifest: manifest);
     try {
       if (kind == 'epub') {
         final artifactName = manifest?.resolveEpubFileName() ?? 'book.epub';
@@ -1467,8 +1700,9 @@ class _Sotong24RemoteDetailScreenState
 
   Future<void> _openEbookCover(
     Sotong24RemoteProject project,
-    Sotong24RemoteStage stage,
-  ) async {
+    Sotong24RemoteStage stage, {
+    int? revisionOverride,
+  }) async {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -1480,10 +1714,13 @@ class _Sotong24RemoteDetailScreenState
         return;
       }
       final fileName = manifest?.resolveCoverFileName() ?? 'cover.png';
+      final revision =
+          revisionOverride ??
+          _ebookReviewArtifactRevision(stage, manifest: manifest);
       final grant = await RemoteControlApi().createArtifactDownloadGrant(
         projectId: project.projectId,
         stageId: stage.stageId,
-        revision: _ebookReviewArtifactRevision(stage, manifest: manifest),
+        revision: revision,
         fileName: fileName,
         artifactFileName: fileName,
       );
@@ -1504,9 +1741,11 @@ class _Sotong24RemoteDetailScreenState
 
   Future<void> _previewEbookPdf(
     Sotong24RemoteProject project,
-    Sotong24RemoteStage stage,
-  ) async {
-    final revision = _ebookReviewArtifactRevision(stage);
+    Sotong24RemoteStage stage, {
+    int? revisionOverride,
+  }) async {
+    final revision =
+        revisionOverride ?? _ebookReviewArtifactRevision(stage);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PdfPreviewScreen(
@@ -1536,9 +1775,34 @@ class _Sotong24RemoteDetailScreenState
         project.productType == ArtifactType.ebook &&
         (stage.stageId == 'package_user_review' ||
             stage.stageId == 'sales_metadata');
-    final revLabel = isEbookPackageGate
-        ? 'r${_ebookReviewArtifactRevision(stage)}'
-        : 'r${stage.revision > 0 ? stage.revision : 1}';
+    final isFinalGate =
+        project.productType == ArtifactType.ebook &&
+        stage.stageId == 'final_user_approval';
+    String revLabel;
+    if (isEbookPackageGate) {
+      revLabel = 'r${_ebookReviewArtifactRevision(stage)}';
+    } else if (isFinalGate) {
+      final carrier = _ebookPackageCarrierStage(project, stage);
+      final manifest = _tryParseEbookManifest(carrier);
+      final auth = EbookPackageReviewContract.authoritativeFinalApprovalRevision(
+        stageId: stage.stageId,
+        stageRevision: stage.revision,
+        package: manifest,
+      );
+      if (auth == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '검증된 최종 패키지 revision을 확정할 수 없어 보완 요청을 보내지 않았습니다.',
+            ),
+          ),
+        );
+        return;
+      }
+      revLabel = 'r$auth';
+    } else {
+      revLabel = 'r${stage.revision > 0 ? stage.revision : 1}';
+    }
     final payload =
         project.productType == ArtifactType.site &&
             stage.stageId == 'site_user_review'
@@ -1547,7 +1811,7 @@ class _Sotong24RemoteDetailScreenState
             reviewedRevision: revLabel,
             reviewComment: message,
           ).toRevisionMessage()
-        : isEbookPackageGate
+        : (isEbookPackageGate || isFinalGate)
         ? '[reviewDecision=changes_requested]\n'
               '[reviewedRevision=$revLabel]\n'
               '[ebookRevisionContract=1]\n'
@@ -1563,7 +1827,8 @@ class _Sotong24RemoteDetailScreenState
       reviewDecision:
           (project.productType == ArtifactType.site &&
                   stage.stageId == 'site_user_review') ||
-              isEbookPackageGate
+              isEbookPackageGate ||
+              isFinalGate
           ? 'changes_requested'
           : '',
     );
@@ -2348,15 +2613,30 @@ class _StageMonitoringPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${stage.stageNumber}단계 · ${stage.stageName}',
+            stage.stageId == 'final_user_approval'
+                ? '${stage.stageNumber}단계 · 최종 사용자 승인'
+                : '${stage.stageNumber}단계 · ${stage.stageName}',
             style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
           ),
+          if (stage.stageId == 'final_user_approval') ...[
+            const SizedBox(height: 3),
+            const Text(
+              '최종 결과를 확인한 뒤 승인 또는 보완 요청을 선택하세요.',
+              style: TextStyle(
+                fontSize: 13,
+                color: ControlColors.textSecondary,
+                height: 1.35,
+              ),
+            ),
+          ],
           const SizedBox(height: 3),
           Text(
             productionComplete
                 ? '작업 완료 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
                 : snapshot.health == Sotong24StageHealth.awaitingUser
-                ? '제작 완료 · 사용자 검토 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
+                ? (stage.stageId == 'final_user_approval'
+                      ? '사용자 최종 검토 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}'
+                      : '제작 완료 · 사용자 검토 대기 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)}')
                 : stage.status == Sotong24WorkStatus.resultValidationRetrying ||
                       stage.activityState == 'validation_retry_waiting'
                 ? '단계 경과 · ${Sotong24StageMonitoring.compactDuration(snapshot.elapsed)} · 재시도 대기 중'
@@ -2489,7 +2769,8 @@ class _StageMonitoringPanel extends StatelessWidget {
                 color: ControlColors.textMuted,
               ),
             ),
-          if (expected != null)
+          if (expected != null &&
+              snapshot.health != Sotong24StageHealth.awaitingUser)
             Text(
               '최근 통계 ${Sotong24StageMonitoring.compactDuration(expected.min)}~${Sotong24StageMonitoring.compactDuration(expected.max)} · 표본 ${expected.sampleCount}건',
               style: const TextStyle(
@@ -2497,7 +2778,8 @@ class _StageMonitoringPanel extends StatelessWidget {
                 color: ControlColors.textMuted,
               ),
             ),
-          if (expected == null)
+          if (expected == null &&
+              snapshot.health != Sotong24StageHealth.awaitingUser)
             Text(
               '예상 최대 ${Sotong24StageMonitoring.compactDuration(policy.defaultExpectedMax)} · inactivity 기준 ${Sotong24StageMonitoring.compactDuration(policy.noActivityAfter)}',
               style: const TextStyle(

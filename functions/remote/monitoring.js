@@ -74,14 +74,44 @@ function stageExpectedRange(policy, stageId) {
   return { minSeconds, maxSeconds, sampleCount };
 }
 
+function isHumanApprovalGateStage(stageId) {
+  const id = String(stageId || "").trim().toLowerCase();
+  return id === "final_user_approval"
+    || id === "package_user_review"
+    || id === "sales_metadata"
+    || id === "site_user_review"
+    || id === "site_publish";
+}
+
 function evaluateStageHealth({ job, stage, agent, policy: rawPolicy, nowMs = Date.now() }) {
   const policy = normalizePolicy(rawPolicy);
   const status = String(stage.status || job.status || "");
+  const stageId = String(stage.stageId || job.currentStage || "").toLowerCase();
+  const activityState = String(stage.activityState || "").toLowerCase();
   if (status === WORK_STATUS.PAUSED_QUOTA || agent.state === "paused_quota") {
     return { state: "paused_quota", reason: "ai_quota_exhausted", shouldNotify: false };
   }
   if (status === WORK_STATUS.PAUSED_NETWORK || agent.state === "paused_network") {
     return { state: "paused_network", reason: "network_unavailable", shouldNotify: false };
+  }
+  // Human gates (esp. final_user_approval): never treat as worker stall/inactivity,
+  // even if a prior monitor wrongly wrote status=stalled.
+  if (
+    isHumanApprovalGateStage(stageId)
+    || activityState === "waiting_user_review"
+    || activityState === "approval_preparing"
+    || activityState === "on_hold"
+    || String(stage.reviewDecision || "").toLowerCase() === "on_hold"
+  ) {
+    const heartbeatAgeSeconds = ageSeconds(agent.lastHeartbeatAt, nowMs);
+    return {
+      state: "awaiting_user",
+      shouldNotify: false,
+      reason: "user_gate_not_stalled",
+      heartbeatAgeSeconds,
+      elapsedSeconds: durationSeconds(stage.startedAt || job.startedAt, stage.completedAt, nowMs),
+      approvalWaitSeconds: ageSeconds(stage.completedAt || stage.lastActivityAt, nowMs),
+    };
   }
   if (status === WORK_STATUS.STALLED || agent.state === "stalled") {
     return { state: "stalled", reason: "activity_timeout", shouldNotify: true };
@@ -101,23 +131,6 @@ function evaluateStageHealth({ job, stage, agent, policy: rawPolicy, nowMs = Dat
       heartbeatAgeSeconds,
       elapsedSeconds: durationSeconds(stage.startedAt || job.startedAt, stage.completedAt, nowMs),
       approvalWaitSeconds: ageSeconds(stage.completedAt || stage.lastActivityAt, nowMs),
-    };
-  }
-  const activityState = String(stage.activityState || "").toLowerCase();
-  const stageId = String(stage.stageId || job.currentStage || "").toLowerCase();
-  if (
-    activityState === "waiting_user_review" ||
-    activityState === "approval_preparing" ||
-    activityState === "on_hold" ||
-    stageId === "site_user_review" ||
-    stageId === "site_publish" ||
-    String(stage.reviewDecision || "").toLowerCase() === "on_hold"
-  ) {
-    return {
-      state: "awaiting_user",
-      shouldNotify: false,
-      reason: "user_gate_not_stalled",
-      heartbeatAgeSeconds,
     };
   }
   if (heartbeatAgeSeconds > policy.offlineAfterSeconds) {
@@ -468,6 +481,10 @@ async function evaluateActiveJobs(db, nowMs = Date.now()) {
     if (health.state === "paused_quota") eventType = "ai_quota_exhausted";
     if (!eventType) continue;
     if (health.state === "inactive" || health.state === "stalled") {
+      // Fail-closed: never auto-recover human approval gates (final_user_approval…).
+      if (isHumanApprovalGateStage(stage.stageId || job.currentStage)) {
+        continue;
+      }
       const heartbeatAgeSeconds = ageSeconds(agent.lastHeartbeatAt, nowMs);
       if (heartbeatAgeSeconds > policy.offlineAfterSeconds) {
         continue;
@@ -809,6 +826,7 @@ module.exports = {
   DEFAULT_POLICY,
   normalizePolicy,
   evaluateStageHealth,
+  isHumanApprovalGateStage,
   notificationKey,
   notificationContent,
   deepLink,

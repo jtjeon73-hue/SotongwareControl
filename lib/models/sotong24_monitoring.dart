@@ -144,6 +144,23 @@ class Sotong24StageMonitoringSnapshot {
 }
 
 class Sotong24StageMonitoring {
+  /// Human approval gates: worker absence is expected, never inactivity/stall.
+  static bool isHumanApprovalGateStage(String stageId) {
+    final id = stageId.trim();
+    return id == 'final_user_approval' ||
+        id == 'package_user_review' ||
+        id == 'sales_metadata' ||
+        id == 'site_user_review' ||
+        id == 'site_publish';
+  }
+
+  static bool isHumanApprovalGateActivity(String activityState) {
+    final state = activityState.trim().toLowerCase();
+    return state == 'approval_preparing' ||
+        state == 'waiting_user_review' ||
+        state == 'on_hold';
+  }
+
   static Sotong24StageMonitoringSnapshot evaluate({
     required Sotong24RemoteProject project,
     required Sotong24RemoteStage stage,
@@ -192,6 +209,9 @@ class Sotong24StageMonitoring {
     final status = Sotong24UserFacingStatus.normalize(stage.status);
     final productionComplete =
         project.isProductionComplete || status == Sotong24WorkStatus.completed;
+    final humanGate =
+        isHumanApprovalGateStage(stage.stageId) ||
+        isHumanApprovalGateActivity(stage.activityState);
     late final Sotong24StageHealth health;
     if (productionComplete) {
       health = Sotong24StageHealth.healthy;
@@ -207,7 +227,8 @@ class Sotong24StageMonitoring {
         stage.activityState == 'validation_retry_waiting') {
       // Retry backoff is expected work, not inactivity stall.
       health = Sotong24StageHealth.delayed;
-    } else if (status == Sotong24WorkStatus.awaitingApproval) {
+    } else if (status == Sotong24WorkStatus.awaitingApproval || humanGate) {
+      // final_user_approval / package / site gates: no worker is normal.
       health = Sotong24StageHealth.awaitingUser;
     } else if (!online) {
       health = Sotong24StageHealth.offline;
@@ -231,15 +252,19 @@ class Sotong24StageMonitoring {
           ? Sotong24StageHealth.delayed
           : Sotong24StageHealth.healthy;
     }
+    final gateLabel = stage.stageId.trim() == 'final_user_approval'
+        ? '최종 사용자 승인 대기'
+        : (humanGate ? '사용자 검토 대기' : activityLabel(stage.activityState));
     return Sotong24StageMonitoringSnapshot(
       health: health,
       elapsed: elapsed,
-      workerElapsed: workerElapsed,
+      workerElapsed: humanGate ? null : workerElapsed,
       lastActivityAge: activityAge,
       heartbeatAge: heartbeatAge,
       agentOnline: online,
-      activityLabel: activityLabel(stage.activityState),
-      approvalWaitAge: status == Sotong24WorkStatus.awaitingApproval
+      activityLabel: gateLabel,
+      approvalWaitAge:
+          (status == Sotong24WorkStatus.awaitingApproval || humanGate)
           ? approvalWaitAge
           : null,
       expectedRange: policy.expectedRangeFor(stage.stageId),

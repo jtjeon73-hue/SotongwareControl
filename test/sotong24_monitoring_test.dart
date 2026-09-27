@@ -295,4 +295,67 @@ void main() {
       expect(result.agentOnline, isTrue);
     },
   );
+
+  test('A: final_user_approval without worker is awaitingUser not inactive', () {
+    final s = Sotong24RemoteStage(
+      stageId: 'final_user_approval',
+      stageNumber: 17,
+      stageName: '최종 사용자 승인',
+      status: Sotong24WorkStatus.inProgress,
+      startedAt: '2026-08-19T00:00:00.000Z',
+      lastActivityAt: '',
+      activityState: '',
+      revision: 1,
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(heartbeat: '2026-08-19T00:09:55.000Z', stage: s),
+      stage: s,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T00:10:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.awaitingUser);
+    expect(result.health, isNot(Sotong24StageHealth.inactive));
+    expect(result.activityLabel, '최종 사용자 승인 대기');
+  });
+
+  test('B: final_user_approval with stale activity stays awaitingUser', () {
+    final s = Sotong24RemoteStage(
+      stageId: 'final_user_approval',
+      stageNumber: 17,
+      stageName: '최종 사용자 승인',
+      status: 'preparing',
+      startedAt: '2026-08-19T00:00:00.000Z',
+      lastActivityAt: '2026-08-19T00:00:00.000Z',
+      activityState: 'approval_preparing',
+      revision: 1,
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(heartbeat: '2026-08-19T00:59:00.000Z', stage: s),
+      stage: s,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T01:00:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.awaitingUser);
+    expect(result.health, isNot(Sotong24StageHealth.inactive));
+    expect(result.health, isNot(Sotong24StageHealth.stalled));
+  });
+
+  test('J: site_user_review human gate remains awaitingUser without activity', () {
+    final s = Sotong24RemoteStage(
+      stageId: 'site_user_review',
+      stageNumber: 15,
+      stageName: '사용자 검토',
+      status: Sotong24WorkStatus.inProgress,
+      startedAt: '2026-08-19T00:00:00.000Z',
+      lastActivityAt: '',
+      activityState: '',
+    );
+    final result = Sotong24StageMonitoring.evaluate(
+      project: project(heartbeat: '2026-08-19T00:09:55.000Z', stage: s),
+      stage: s,
+      policy: policy,
+      now: DateTime.parse('2026-08-19T00:10:00.000Z'),
+    );
+    expect(result.health, Sotong24StageHealth.awaitingUser);
+  });
 }

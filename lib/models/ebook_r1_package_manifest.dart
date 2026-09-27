@@ -666,7 +666,7 @@ class EbookR1PackageManifest {
   }
 }
 
-/// commercial-v2 `package_user_review` revision/cycle contract shared by UI + submit.
+/// commercial-v2 package / final approval revision contract shared by UI + submit.
 class EbookPackageReviewContract {
   EbookPackageReviewContract._();
 
@@ -674,6 +674,13 @@ class EbookPackageReviewContract {
     final id = stageId.trim();
     return id == 'package_user_review' || id == 'sales_metadata';
   }
+
+  static bool isFinalUserApprovalStage(String stageId) =>
+      stageId.trim() == 'final_user_approval';
+
+  /// Stages that review the frozen ebook package with authoritative revision.
+  static bool isEbookPackageReviewStage(String stageId) =>
+      isPackageUserReviewStage(stageId) || isFinalUserApprovalStage(stageId);
 
   static EbookR1PackageManifest? tryParsePackage(Map<String, dynamic>? raw) {
     if (raw == null || raw.isEmpty) return null;
@@ -711,6 +718,18 @@ class EbookPackageReviewContract {
     final pkg = package.revisionNumber;
     if (stageRev > pkg) return stageRev;
     return pkg;
+  }
+
+  /// STEP17 final approval: never fall back to stale stage.revision (e.g. r1).
+  /// Returns null when authoritative frozen package cannot be confirmed.
+  static int? authoritativeFinalApprovalRevision({
+    required String stageId,
+    required int stageRevision,
+    EbookR1PackageManifest? package,
+  }) {
+    if (!isFinalUserApprovalStage(stageId)) return null;
+    if (package == null || !isTrustedFrozenReviewPackage(package)) return null;
+    return package.revisionNumber;
   }
 
   /// True when a newer frozen package supersedes a prior terminal decision.
