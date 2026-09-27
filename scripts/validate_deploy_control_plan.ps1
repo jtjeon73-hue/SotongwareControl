@@ -38,6 +38,7 @@ $relayOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -I
 Assert-True ($LASTEXITCODE -eq 0) "IncludeRelay PlanOnly exit 0"
 Assert-True ($relayOut -match "PLAN_ONLY_TARGETS=hosting,functions:sotong24Relay") "IncludeRelay targets exact"
 Assert-True ($relayOut -notmatch "functions:api") "Must not include api"
+Assert-True ($relayOut -notmatch "functions:monitorStageHealth") "Must not include monitorStageHealth"
 Assert-True ($relayOut -notmatch "functions:study") "Must not include study*"
 Write-Host "IncludeRelay plan PASS"
 
@@ -46,8 +47,18 @@ $apiOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Inc
 Assert-True ($LASTEXITCODE -eq 0) "IncludeApi PlanOnly exit 0"
 Assert-True ($apiOut -match "PLAN_ONLY_TARGETS=hosting,functions:api") "IncludeApi targets exact"
 Assert-True ($apiOut -notmatch "functions:sotong24Relay") "IncludeApi must not include relay"
+Assert-True ($apiOut -notmatch "functions:monitorStageHealth") "IncludeApi must not include monitorStageHealth"
 Assert-True ($apiOut -notmatch "functions:study") "Must not include study*"
 Write-Host "IncludeApi plan PASS"
+
+Write-Host "== 3d) IncludeMonitorStageHealth PlanOnly =="
+$monitorOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -IncludeMonitorStageHealth -PlanOnly 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -eq 0) "IncludeMonitorStageHealth PlanOnly exit 0"
+Assert-True ($monitorOut -match "PLAN_ONLY_TARGETS=hosting,functions:monitorStageHealth") "IncludeMonitorStageHealth targets exact"
+Assert-True ($monitorOut -notmatch "functions:sotong24Relay") "Must not include relay"
+Assert-True ($monitorOut -notmatch "functions:api") "Must not include api"
+Assert-True ($monitorOut -notmatch "functions:study") "Must not include study*"
+Write-Host "IncludeMonitorStageHealth plan PASS"
 
 Write-Host "== 3c) IncludeRelay+IncludeApi fail-closed =="
 $bothOutPath = Join-Path $env:TEMP "sotong_both_flags_out.txt"
@@ -61,12 +72,58 @@ try {
     (Get-Content $bothErrPath -Raw -ErrorAction SilentlyContinue))
   Assert-True ($bothProc.ExitCode -ne 0) "Relay+Api together must non-zero exit"
   Assert-True (
+    ($bothOut -match "Refusing multiple -Include\* functions flags together") -or
     ($bothOut -match "Refusing -IncludeRelay and -IncludeApi together") -or
-    ($bothOut -match "IncludeRelay and -IncludeApi")
+    ($bothOut -match "IncludeRelay and -IncludeApi") -or
+    ($bothOut -match "one functions target per run")
   ) ("combined flags rejected; exit=$($bothProc.ExitCode); out=$bothOut")
   Write-Host "Relay+Api rejection PASS"
 } finally {
   foreach ($f in @($bothOutPath, $bothErrPath)) {
+    if (Test-Path $f) { Remove-Item $f -Force }
+  }
+}
+
+Write-Host "== 3e) IncludeApi+IncludeMonitorStageHealth fail-closed =="
+$apiMonOutPath = Join-Path $env:TEMP "sotong_api_mon_out.txt"
+$apiMonErrPath = Join-Path $env:TEMP "sotong_api_mon_err.txt"
+try {
+  $apiMonProc = Start-Process -FilePath "powershell" -ArgumentList @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath,
+    "-IncludeApi", "-IncludeMonitorStageHealth", "-PlanOnly"
+  ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $apiMonOutPath -RedirectStandardError $apiMonErrPath
+  $apiMonOut = ((Get-Content $apiMonOutPath -Raw -ErrorAction SilentlyContinue) + "`n" +
+    (Get-Content $apiMonErrPath -Raw -ErrorAction SilentlyContinue))
+  Assert-True ($apiMonProc.ExitCode -ne 0) "Api+Monitor together must non-zero exit"
+  Assert-True (
+    ($apiMonOut -match "Refusing multiple -Include\* functions flags together") -or
+    ($apiMonOut -match "one functions target per run")
+  ) ("Api+Monitor rejected; exit=$($apiMonProc.ExitCode); out=$apiMonOut")
+  Write-Host "Api+Monitor rejection PASS"
+} finally {
+  foreach ($f in @($apiMonOutPath, $apiMonErrPath)) {
+    if (Test-Path $f) { Remove-Item $f -Force }
+  }
+}
+
+Write-Host "== 3f) IncludeRelay+IncludeMonitorStageHealth fail-closed =="
+$relayMonOutPath = Join-Path $env:TEMP "sotong_relay_mon_out.txt"
+$relayMonErrPath = Join-Path $env:TEMP "sotong_relay_mon_err.txt"
+try {
+  $relayMonProc = Start-Process -FilePath "powershell" -ArgumentList @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath,
+    "-IncludeRelay", "-IncludeMonitorStageHealth", "-PlanOnly"
+  ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput $relayMonOutPath -RedirectStandardError $relayMonErrPath
+  $relayMonOut = ((Get-Content $relayMonOutPath -Raw -ErrorAction SilentlyContinue) + "`n" +
+    (Get-Content $relayMonErrPath -Raw -ErrorAction SilentlyContinue))
+  Assert-True ($relayMonProc.ExitCode -ne 0) "Relay+Monitor together must non-zero exit"
+  Assert-True (
+    ($relayMonOut -match "Refusing multiple -Include\* functions flags together") -or
+    ($relayMonOut -match "one functions target per run")
+  ) ("Relay+Monitor rejected; exit=$($relayMonProc.ExitCode); out=$relayMonOut")
+  Write-Host "Relay+Monitor rejection PASS"
+} finally {
+  foreach ($f in @($relayMonOutPath, $relayMonErrPath)) {
     if (Test-Path $f) { Remove-Item $f -Force }
   }
 }
@@ -78,12 +135,17 @@ Assert-True ($src -match 'RequiredFirebaseProject = "sotongware-control"') "proj
 Assert-True ($src -match 'ForbiddenFirebaseProject = "sotongware"') "forbidden homepage"
 Assert-True ($src -match 'RelayFunctionName = "sotong24Relay"') "relay name"
 Assert-True ($src -match 'ApiFunctionName = "api"') "api name"
+Assert-True ($src -match 'MonitorStageHealthFunctionName = "monitorStageHealth"') "monitor name"
 Assert-True ($src -match 'ExpectedApiOnlyTarget = "functions:api"') "api target constant"
+Assert-True ($src -match 'ExpectedMonitorStageHealthOnlyTarget = "functions:monitorStageHealth"') "monitor target constant"
 Assert-True ($src -match 'Assert-ApiFunctionContract') "api export preflight"
+Assert-True ($src -match 'Assert-MonitorStageHealthFunctionContract') "monitor export preflight"
 Assert-True ($src -match 'Assert-CleanWorktree') "dirty tree gate"
 Assert-True ($src -match 'hosting,functions:sotong24Relay') "allowlisted relay join"
 Assert-True ($src -match 'hosting,functions:api') "allowlisted api join"
+Assert-True ($src -match 'hosting,functions:monitorStageHealth') "allowlisted monitor join"
 Assert-True ($src -match 'Refusing non-allowlisted functions target') "unknown functions target fail-closed"
+Assert-True ($src -match 'Refusing multiple -Include\* functions flags together') "multi-include fail-closed"
 Assert-True ($src -notmatch 'firebase deploy --only functions\b(?!:)') "no bare functions deploy"
 Assert-True ($src -notmatch '(?m)^\s*dart format\b') "no dart format gate in release script"
 Assert-True ($src -match '(?m)^\s*flutter analyze\s*$') "analyze retained"

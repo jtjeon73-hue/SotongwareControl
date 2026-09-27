@@ -3,13 +3,17 @@
 #   .\scripts\deploy_control.ps1
 #   .\scripts\deploy_control.ps1 -IncludeRelay
 #   .\scripts\deploy_control.ps1 -IncludeApi
+#   .\scripts\deploy_control.ps1 -IncludeMonitorStageHealth
 #   .\scripts\deploy_control.ps1 -PlanOnly
 #   .\scripts\deploy_control.ps1 -IncludeRelay -PlanOnly
 #   .\scripts\deploy_control.ps1 -IncludeApi -PlanOnly
+#   .\scripts\deploy_control.ps1 -IncludeMonitorStageHealth -PlanOnly
 #
 # 기본: Hosting only (기존 안전 경로)
 # -IncludeRelay: Hosting + functions:sotong24Relay 만 (전체 functions 금지)
-# -IncludeApi: Hosting + functions:api 만 (전체 functions 금지; Relay와 동시 사용 금지)
+# -IncludeApi: Hosting + functions:api 만 (전체 functions 금지)
+# -IncludeMonitorStageHealth: Hosting + functions:monitorStageHealth 만 (전체 functions 금지)
+# Include* Functions 옵션은 한 번에 하나만 허용 (상호 배타 / fail-closed)
 # -PlanOnly: preflight + 배포 대상 계획만 출력 (실제 build/deploy 안 함)
 # formatting: repo-wide dart format는 운영 deploy 필수 gate가 아님 (CI/개발 품질 작업)
 # mutating `dart format .` 금지 — firebase 직전 Final clean check 필수 (dirty면 publish 금지)
@@ -27,6 +31,7 @@
 param(
   [switch]$IncludeRelay,
   [switch]$IncludeApi,
+  [switch]$IncludeMonitorStageHealth,
   [switch]$PlanOnly
 )
 
@@ -40,20 +45,28 @@ $RequiredFirebaseProject = "sotongware-control"
 $ForbiddenFirebaseProject = "sotongware"
 $RelayFunctionName = "sotong24Relay"
 $ApiFunctionName = "api"
+$MonitorStageHealthFunctionName = "monitorStageHealth"
 $ExpectedRelayOnlyTarget = "functions:sotong24Relay"
 $ExpectedApiOnlyTarget = "functions:api"
+$ExpectedMonitorStageHealthOnlyTarget = "functions:monitorStageHealth"
 $AllowedFunctionsTargets = @(
   $ExpectedRelayOnlyTarget,
-  $ExpectedApiOnlyTarget
+  $ExpectedApiOnlyTarget,
+  $ExpectedMonitorStageHealthOnlyTarget
 )
 
 function Get-DeployOnlyTargets {
   param(
     [switch]$WithRelay,
-    [switch]$WithApi
+    [switch]$WithApi,
+    [switch]$WithMonitorStageHealth
   )
-  if ($WithRelay -and $WithApi) {
-    Write-Host "Refusing -IncludeRelay and -IncludeApi together - deploy one functions target per run"
+  $includeCount = 0
+  if ($WithRelay) { $includeCount++ }
+  if ($WithApi) { $includeCount++ }
+  if ($WithMonitorStageHealth) { $includeCount++ }
+  if ($includeCount -gt 1) {
+    Write-Host "Refusing multiple -Include* functions flags together - deploy one functions target per run"
     exit 2
   }
   if ($WithRelay) {
@@ -61,6 +74,9 @@ function Get-DeployOnlyTargets {
   }
   if ($WithApi) {
     return @("hosting", $ExpectedApiOnlyTarget)
+  }
+  if ($WithMonitorStageHealth) {
+    return @("hosting", $ExpectedMonitorStageHealthOnlyTarget)
   }
   return @("hosting")
 }
@@ -156,6 +172,10 @@ function Assert-ApiFunctionContract {
   Assert-NamedFunctionExport -FunctionName $ApiFunctionName -ExpectedTarget $ExpectedApiOnlyTarget
 }
 
+function Assert-MonitorStageHealthFunctionContract {
+  Assert-NamedFunctionExport -FunctionName $MonitorStageHealthFunctionName -ExpectedTarget $ExpectedMonitorStageHealthOnlyTarget
+}
+
 function Build-FirebaseDeployArgs {
   param([string[]]$OnlyTargets)
   foreach ($t in $OnlyTargets) {
@@ -168,9 +188,10 @@ function Build-FirebaseDeployArgs {
   if (
     $only -ne "hosting" -and
     $only -ne "hosting,functions:sotong24Relay" -and
-    $only -ne "hosting,functions:api"
+    $only -ne "hosting,functions:api" -and
+    $only -ne "hosting,functions:monitorStageHealth"
   ) {
-    Write-Error "Deploy --only must be hosting, hosting,functions:sotong24Relay, or hosting,functions:api. Got: $only"
+    Write-Error "Deploy --only must be hosting, hosting,functions:sotong24Relay, hosting,functions:api, or hosting,functions:monitorStageHealth. Got: $only"
   }
   return @(
     "deploy",
@@ -190,12 +211,18 @@ Write-Host "== Firebase project check =="
 firebase use
 Assert-FirebaseProject
 
-$onlyTargets = Get-DeployOnlyTargets -WithRelay:$IncludeRelay -WithApi:$IncludeApi
+$onlyTargets = Get-DeployOnlyTargets `
+  -WithRelay:$IncludeRelay `
+  -WithApi:$IncludeApi `
+  -WithMonitorStageHealth:$IncludeMonitorStageHealth
 if ($IncludeRelay) {
   Assert-RelayFunctionContract
 }
 if ($IncludeApi) {
   Assert-ApiFunctionContract
+}
+if ($IncludeMonitorStageHealth) {
+  Assert-MonitorStageHealthFunctionContract
 }
 $deployArgs = Build-FirebaseDeployArgs -OnlyTargets $onlyTargets
 $onlyJoined = ($onlyTargets -join ",")
@@ -243,7 +270,7 @@ if (-not $HasFcmWebVapidKey) {
   Write-Warning "FCM Web VAPID 설정 없음 — Push 등록은 비활성화하고 outbox_only로 배포합니다."
 }
 
-if ($IncludeRelay -or $IncludeApi) {
+if ($IncludeRelay -or $IncludeApi -or $IncludeMonitorStageHealth) {
   Write-Host "== functions tests (deploy contract) =="
   Push-Location (Join-Path $Root "functions")
   try {
@@ -316,5 +343,8 @@ if ($IncludeRelay) {
 }
 if ($IncludeApi) {
   Write-Host "API function: $ApiFunctionName (only)"
+}
+if ($IncludeMonitorStageHealth) {
+  Write-Host "Monitor function: $MonitorStageHealthFunctionName (only)"
 }
 Write-Host "Verify login with display id 'sotongware' in a secret window."
