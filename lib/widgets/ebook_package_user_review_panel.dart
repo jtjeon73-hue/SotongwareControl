@@ -28,9 +28,12 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
   final Sotong24RemoteProject project;
   final Sotong24RemoteStage stage;
   final bool busy;
-  final VoidCallback onApprove;
-  final VoidCallback onChangesRequested;
-  final VoidCallback onHold;
+  /// Null disables the Approve button (never use a no-op `() {}`).
+  final VoidCallback? onApprove;
+  /// Null disables the Changes-requested button.
+  final VoidCallback? onChangesRequested;
+  /// Null disables the Hold button.
+  final VoidCallback? onHold;
   final EbookR1PackageManifest? manifest;
   final String? coverUrl;
   final VoidCallback? onDownloadPdf;
@@ -294,14 +297,17 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton(
-                    onPressed: (busy || !reviewEnabled) ? null : onApprove,
+                    onPressed: (busy || !reviewEnabled || onApprove == null)
+                        ? null
+                        : onApprove,
                     child: const Text('승인'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: (busy || !reviewEnabled)
+                    onPressed:
+                        (busy || !reviewEnabled || onChangesRequested == null)
                         ? null
                         : onChangesRequested,
                     child: const Text('보완 요청'),
@@ -310,7 +316,7 @@ class EbookPackageUserReviewPanel extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: busy ? null : onHold,
+                    onPressed: (busy || onHold == null) ? null : onHold,
                     child: const Text('보류'),
                   ),
                 ),

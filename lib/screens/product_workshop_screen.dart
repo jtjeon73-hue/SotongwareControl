@@ -656,6 +656,11 @@ class _Sotong24RemoteDetailScreenState
                       : '${finalGateStage.stageNumber}단계 · 최종 사용자 승인 · r$rev';
                 })()
               : Sotong24WorkshopPresentation.currentStageLine(project);
+          final finalGateAwaiting =
+              finalGateStage != null &&
+              (Sotong24UserFacingStatus.normalize(finalGateStage.status) ==
+                      Sotong24WorkStatus.awaitingApproval ||
+                  showApprovalActions);
           final displayStatusLabel =
               ((siteReviewStage != null &&
                       (siteReviewStage.status ==
@@ -665,7 +670,7 @@ class _Sotong24RemoteDetailScreenState
                       (ebookReviewStage.status ==
                               Sotong24WorkStatus.awaitingApproval ||
                           project.approvalStatus == ApprovalStatus.pending)) ||
-                  showEbookFinalUserApproval)
+                  finalGateAwaiting)
               ? '사용자 검토 대기'
               : project.userFacingStatusLabel;
           _scrollToApkIfNeeded(project);
@@ -881,6 +886,12 @@ class _Sotong24RemoteDetailScreenState
                     final carrier = finalPackageCarrier ?? gateStage;
                     final coverPreview =
                         (finalApprovalManifest?.coverUrl ?? '').trim();
+                    // Gate actions require remote awaiting+criteriaMet (via
+                    // showApprovalActions) AND a trusted authoritative package.
+                    // Never wire a no-op `() {}` — pass null so buttons disable.
+                    final finalGateActionsEnabled =
+                        showApprovalActions &&
+                        finalAuthoritativeRevision != null;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -890,9 +901,12 @@ class _Sotong24RemoteDetailScreenState
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          '최종 결과를 확인한 뒤 승인 또는 보완 요청을 선택하세요.',
-                          style: TextStyle(
+                        Text(
+                          finalGateActionsEnabled
+                              ? '최종 결과를 확인한 뒤 승인 또는 보완 요청을 선택하세요.'
+                              : '최종 결과 확인은 가능합니다. 승인·보완은 승인 대기'
+                                    '(awaiting_approval·criteriaMet) 동기화 후 활성화됩니다.',
+                          style: const TextStyle(
                             color: ControlColors.textSecondary,
                             fontSize: 13,
                             height: 1.35,
@@ -914,13 +928,13 @@ class _Sotong24RemoteDetailScreenState
                             coverUrl: coverPreview.isNotEmpty
                                 ? coverPreview
                                 : null,
-                            onApprove: showApprovalActions
+                            onApprove: finalGateActionsEnabled
                                 ? () => _onApprove(project, gateStage)
-                                : () {},
-                            onChangesRequested: showApprovalActions
+                                : null,
+                            onChangesRequested: finalGateActionsEnabled
                                 ? () => _onRevision(project, gateStage)
-                                : () {},
-                            onHold: showApprovalActions
+                                : null,
+                            onHold: finalGateActionsEnabled
                                 ? () async {
                                     setState(() => _busy = true);
                                     final messenger = ScaffoldMessenger.of(
@@ -948,7 +962,7 @@ class _Sotong24RemoteDetailScreenState
                                       ),
                                     );
                                   }
-                                : () {},
+                                : null,
                             onDownloadPdf: () => _downloadEbookArtifact(
                               project,
                               carrier,
@@ -990,7 +1004,7 @@ class _Sotong24RemoteDetailScreenState
                                   )
                                 : null,
                           ),
-                          if (!showApprovalActions) ...[
+                          if (!finalGateActionsEnabled) ...[
                             const SizedBox(height: 8),
                             const _InfoBanner(
                               text:
@@ -2648,7 +2662,7 @@ class _StageMonitoringPanel extends StatelessWidget {
             productionComplete
                 ? '완료 프로젝트 · 무활동 감시 제외'
                 : snapshot.health == Sotong24StageHealth.awaitingUser
-                ? '사용자 승인 필수 · 대기 ${Sotong24StageMonitoring.compactDuration(snapshot.approvalWaitAge)}'
+                ? '사용자 승인 필수 · 대기 ${Sotong24StageMonitoring.compactDuration(snapshot.approvalWaitAge ?? snapshot.elapsed)}'
                 : snapshot.agentOnline
                 ? 'PC/Agent 온라인 · Agent heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}'
                 : 'Agent 연결 복구 필요 · Agent heartbeat ${Sotong24StageMonitoring.relative(snapshot.heartbeatAge)}',
