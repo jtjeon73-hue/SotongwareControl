@@ -1,3 +1,4 @@
+import 'sotong24_human_approval_gate.dart';
 import 'sotong24_remote_models.dart';
 
 enum Sotong24StageHealth {
@@ -145,14 +146,8 @@ class Sotong24StageMonitoringSnapshot {
 
 class Sotong24StageMonitoring {
   /// Human approval gates: worker absence is expected, never inactivity/stall.
-  static bool isHumanApprovalGateStage(String stageId) {
-    final id = stageId.trim();
-    return id == 'final_user_approval' ||
-        id == 'package_user_review' ||
-        id == 'sales_metadata' ||
-        id == 'site_user_review' ||
-        id == 'site_publish';
-  }
+  static bool isHumanApprovalGateStage(String stageId) =>
+      Sotong24HumanApprovalGate.isMandatory(stageId);
 
   static bool isHumanApprovalGateActivity(String activityState) {
     final state = activityState.trim().toLowerCase();
