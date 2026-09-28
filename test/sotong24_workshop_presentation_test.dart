@@ -203,6 +203,7 @@ void main() {
     });
 
     test('auto 모드 awaiting → 승인 버튼 숨김 (확인 필요 없을 때)', () {
+      // Normal (non-mandatory) stage: idea_clarify keeps auto-hide policy.
       final p = project(
         id: 'wi_plan_auto_1',
         title: '자동 승인 앱',
@@ -211,6 +212,7 @@ void main() {
         stageApproval: ApprovalStatus.pending,
         approvalMode: 'auto',
       );
+      expect(p.currentStageDoc!.stageId, 'idea_clarify');
       expect(p.userFacingStatus, Sotong24WorkStatus.awaitingApproval);
       expect(p.showApprovalActions, isFalse);
     });

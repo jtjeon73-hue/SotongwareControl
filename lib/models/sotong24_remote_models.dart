@@ -2,6 +2,7 @@ import 'artifact_type.dart';
 import 'commercial/production_review_status_envelope.dart';
 import 'ebook_r1_package_manifest.dart';
 import 'instruction_contract.dart';
+import 'sotong24_human_approval_gate.dart';
 import '../services/site_subtype_contract.dart';
 
 /// PC Sotong24Work ↔ 소통총관제 원격 관제 상태.
@@ -1371,7 +1372,11 @@ class Sotong24UserFacingStatus {
       if (!newCycle) return false;
     }
     // auto 모드에서는 일반 승인 버튼을 숨긴다. 확인 필요(userAttention)만 수동 개입.
-    if (project.approvalMode == 'auto' && stage.userAttention.trim().isEmpty) {
+    // Mandatory human gates (STEP15/17, site review) still require explicit
+    // user approve/revise even when the project runs approvalMode=auto.
+    if (project.approvalMode == 'auto' &&
+        stage.userAttention.trim().isEmpty &&
+        !Sotong24HumanApprovalGate.isMandatory(stage.stageId)) {
       return false;
     }
     return status == Sotong24WorkStatus.awaitingApproval;
