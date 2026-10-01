@@ -1,0 +1,352 @@
+{
+  "type": "START_JOB",
+  "commandId": "cmd_ebsdisp_8654d9ee624d5e9d4648cc67",
+  "idempotencyKey": "idem_ebsdisp_8654d9ee624d5e9d4648cc67",
+  "agentId": "agent_9830758291f9c64e",
+  "jobId": "job_wi_plan_ebook_batch_real-30-gatea-20261001_o01_real-plan-01_g1",
+  "createdAt": "2026-10-01T04:27:45.547Z",
+  "status": "queued",
+  "payload": {
+    "workInstruction": {
+      "schemaVersion": "1.1",
+      "instructionId": "wi_plan_ebook_batch_real-30-gatea-20261001_o01_real-plan-01",
+      "projectId": "plan_real-plan-01",
+      "artifactType": "ebook",
+      "businessIdea": "50대를 위한 AI 생활비서 첫걸음",
+      "customerProblem": "일상에서 AI를 어디에 쓰면 좋을지 모른다",
+      "targetCustomer": "50대 AI 초보 생활자",
+      "deliverableTypes": [
+        "ebook"
+      ],
+      "ebookQualityContractVersion": 1,
+      "briefContractVersion": 1,
+      "ebookProductionContractVersion": 2,
+      "workInstructionBrief": {
+        "schemaVersion": 1,
+        "displayTitle": "50대를 위한 AI 생활비서 첫걸음",
+        "workingTitle": "50대를 위한 AI 생활비서 첫걸음",
+        "suggestedTitles": [
+          "50대를 위한 AI 생활비서 첫걸음"
+        ],
+        "internalProjectId": "plan_real-plan-01",
+        "repositorySlug": "ai-life-assistant-50s-beginner",
+        "originalUserBrief": "제목: 50대를 위한 AI 생활비서 첫걸음\n대상: 50대 AI 초보 생활자\n문제: 일상에서 AI를 어디에 쓰면 좋을지 모른다\n성과: 생활 비서 루틴으로 AI를 안전하게 쓰기 시작\n차별점: 업무/사업이 아닌 생활 비서 중심의 초보 진입\n개요: 설치·프롬프트 기본·생활 시나리오·주의사항",
+        "structuredUserInputs": {
+          "audience": "50대 AI 초보 생활자",
+          "problem": "일상에서 AI를 어디에 쓰면 좋을지 모른다",
+          "outcome": "생활 비서 루틴으로 AI를 안전하게 쓰기 시작",
+          "topicKey": "ai-life-assistant-50s-beginner",
+          "batchId": "ebook-batch-real-30-gatea-20261001",
+          "ordinal": 1,
+          "planItemId": "real-plan-01"
+        },
+        "aiAugmentedBrief": "설치·프롬프트 기본·생활 시나리오·주의사항",
+        "aiAssumptions": [],
+        "unansweredQuestions": [],
+        "acceptedAiSuggestions": [],
+        "rejectedAiSuggestions": [],
+        "manualOnlyMode": false,
+        "titleSource": "user_confirmed",
+        "briefVersion": 1,
+        "creationMode": "new_product"
+      },
+      "commercialEbookQualityProfile": {
+        "schemaVersion": 1,
+        "standard": {
+          "schemaVersion": 1,
+          "targetAudience": "50대 AI 초보 생활자",
+          "customerProblem": "일상에서 AI를 어디에 쓰면 좋을지 모른다",
+          "promisedOutcome": "생활 비서 루틴으로 AI를 안전하게 쓰기 시작",
+          "uniqueValue": "업무/사업이 아닌 생활 비서 중심의 초보 진입",
+          "reasonsToPay": [
+            "실습 템플릿",
+            "검증된 단계",
+            "검수 체크리스트"
+          ],
+          "commercialGoal": "유료 전자책 상품",
+          "monetizationModel": "one_time_or_subscription",
+          "brandDirection": "sotongware_brand_direction",
+          "referenceLevel": "상용 후보 수준",
+          "localizationTarget": "ko_primary",
+          "accessibilityTarget": "readable_mobile",
+          "requiredDeliverables": [
+            "PDF",
+            "EPUB",
+            "preview"
+          ],
+          "evidenceRequirements": [
+            "page_render",
+            "toc_links",
+            "metadata"
+          ],
+          "humanReviewRequirements": [
+            "owner_review"
+          ],
+          "revisionPolicy": "R_n_preserves_prior",
+          "releaseReadinessCriteria": [
+            "human_ok",
+            "blocker0"
+          ],
+          "explicitlyOutOfScope": [
+            "external_publish_without_ok",
+            "fabricated_product_facts"
+          ],
+          "legalPrivacyCopyrightRisks": [
+            "copyright_review",
+            "trademark_review"
+          ]
+        },
+        "readerLevel": "beginner_friendly",
+        "readerOutcome": "생활 비서 루틴으로 AI를 안전하게 쓰기 시작",
+        "paidValueVsFree": "생활 비서 루틴으로 AI를 안전하게 쓰기 시작을(를) 더 빠르고 확실하게 얻는 데 도움이 됩니다",
+        "chapterOutline": [
+          "설치",
+          "프롬프트 기본",
+          "생활 시나리오",
+          "주의사항"
+        ],
+        "targetLengthBasis": "주제 맞춤 80~120페이지",
+        "practiceAssets": [
+          "checklist",
+          "template"
+        ],
+        "factCheckPolicy": "숫자·사실은 출처 필수; AI 제품 기능/가격/모델은 집필 시점 공식 문서 확인",
+        "plagiarismCopyrightPolicy": "표절·무단전재 금지; AI 생성물 provenance 기록",
+        "editorialStyle": "친근한 구어체",
+        "coverInteriorDesign": "모바일 가독 표지·내지",
+        "requiredFormats": [
+          "pdf",
+          "epub"
+        ],
+        "readabilityTargets": [
+          "phone",
+          "tablet"
+        ],
+        "previewSampleRequirements": [
+          "sample_chapter"
+        ],
+        "salesCopyRequirements": "독자 혜택·판매 문구",
+        "renderEvidenceRequirements": [
+          "page_render",
+          "toc",
+          "fonts",
+          "links",
+          "overflow",
+          "metadata"
+        ],
+        "rejectCriteria": [
+          "placeholder",
+          "unsourced_claims",
+          "no_render_evidence",
+          "fabricated_citations"
+        ],
+        "qualityProfileTemplateId": "commercial-ebook-quality-profile-v1"
+      },
+      "workflowSteps": [
+        {
+          "order": 1,
+          "id": "idea_clarify",
+          "title": "아이디어 정리",
+          "applicable": true
+        },
+        {
+          "order": 2,
+          "id": "problem_validate",
+          "title": "문제 검증",
+          "applicable": true
+        },
+        {
+          "order": 3,
+          "id": "materials_prep",
+          "title": "자료 준비",
+          "applicable": true
+        },
+        {
+          "order": 4,
+          "id": "planning",
+          "title": "기획",
+          "applicable": true
+        },
+        {
+          "order": 5,
+          "id": "project_setup",
+          "title": "프로젝트 설정",
+          "applicable": true
+        },
+        {
+          "order": 6,
+          "id": "prompt_generate",
+          "title": "프롬프트 생성",
+          "applicable": true
+        },
+        {
+          "order": 7,
+          "id": "draft",
+          "title": "초고",
+          "applicable": true
+        },
+        {
+          "order": 8,
+          "id": "editorial_structure_review",
+          "title": "편집 구조 검토",
+          "applicable": true
+        },
+        {
+          "order": 9,
+          "id": "user_review",
+          "title": "편집 체크포인트",
+          "applicable": true
+        },
+        {
+          "order": 10,
+          "id": "revise",
+          "title": "개정",
+          "applicable": true
+        },
+        {
+          "order": 11,
+          "id": "quality",
+          "title": "품질",
+          "applicable": true
+        },
+        {
+          "order": 12,
+          "id": "cover_layout_design",
+          "title": "표지·레이아웃",
+          "applicable": true
+        },
+        {
+          "order": 13,
+          "id": "format_build",
+          "title": "포맷 빌드",
+          "applicable": true
+        },
+        {
+          "order": 14,
+          "id": "reader_accessibility_test",
+          "title": "가독·접근성",
+          "applicable": true
+        },
+        {
+          "order": 15,
+          "id": "package_user_review",
+          "title": "패키지 사용자 검토",
+          "applicable": true
+        },
+        {
+          "order": 16,
+          "id": "final_polish",
+          "title": "최종 다듬기",
+          "applicable": true
+        },
+        {
+          "order": 17,
+          "id": "final_user_approval",
+          "title": "최종 사용자 승인",
+          "applicable": true
+        },
+        {
+          "order": 18,
+          "id": "publication_package",
+          "title": "출간 패키지",
+          "applicable": true
+        }
+      ],
+      "aiExecution": {
+        "enabled": true,
+        "approvalMode": "auto",
+        "executionMode": "continuous",
+        "approvalRequired": false,
+        "autoAdvance": true,
+        "maxAutoStageOrder": 14,
+        "worker": "cursor",
+        "deploymentAllowed": false,
+        "artifactUploadEnabled": true
+      },
+      "batchId": "ebook-batch-real-30-gatea-20261001",
+      "parentBatchId": "ebook-batch-real-30-gatea-20261001",
+      "planItemId": "real-plan-01",
+      "ordinal": 1,
+      "revision": 1,
+      "topicKey": "ai-life-assistant-50s-beginner",
+      "title": "50대를 위한 AI 생활비서 첫걸음",
+      "qualityProfileRef": {
+        "mode": "template",
+        "profileId": "commercial-ebook-quality-profile-v1",
+        "profileSchemaVersion": 1
+      },
+      "productionConditions": {
+        "sourceVerificationRequired": true,
+        "freshnessVerificationRequired": true,
+        "rightsReviewRequired": true,
+        "medicalBoundaryRequired": false,
+        "financialBoundaryRequired": false,
+        "legalPolicyCheckRequired": false,
+        "phase13Readiness": "REVIEW_REQUIRED",
+        "phase13Reasons": [
+          "freshness_required_medium_risk",
+          "rights_safety_review_required"
+        ],
+        "humanGateA": {
+          "decision": "conditionally_approved_with_production_obligations",
+          "approvalSource": "human",
+          "note": "REVIEW_REQUIRED preserved as production obligations; not rewritten to READY"
+        },
+        "aiProductFactLockForbidden": true,
+        "notes": [
+          "Verify model/feature/price/policy against official docs at writing time"
+        ]
+      },
+      "sourcePlan": {
+        "sourceType": "official_product_docs",
+        "authorityLevel": "vendor_official",
+        "freshnessRequirement": "quarterly",
+        "verificationRequired": true,
+        "citationRequired": true,
+        "note": "No fabricated URLs/institutions. Live verification required at production time."
+      },
+      "gateAEvidence": {
+        "approvalSource": "human",
+        "approvalGate": "gate_a",
+        "planningRevision": 2,
+        "boundPlanningRevision": 2,
+        "batchId": "ebook-batch-real-30-gatea-20261001"
+      },
+      "goldenExclusion": {
+        "forbiddenInstructionIds": [
+          "wi_plan_1785905165067",
+          "wi_plan_1788707699582"
+        ],
+        "forbiddenTitle": "50대 초보자가 AI로 첫 전자책을 만드는 방법",
+        "reuseForbidden": true
+      },
+      "sandboxOnly": false,
+      "productionStartJobAllowed": true,
+      "externalPublicationAllowed": false,
+      "productionBridgeVersion": 1,
+      "controlHandoffOnly": true,
+      "createdAt": "2026-10-01T04:27:45.546Z",
+      "updatedAt": "2026-10-01T04:27:45.546Z",
+      "executionStatus": "ready",
+      "status": "ready"
+    }
+  },
+  "batchMeta": {
+    "batchId": "ebook-batch-real-30-gatea-20261001",
+    "parentBatchId": "ebook-batch-real-30-gatea-20261001",
+    "planItemId": "real-plan-01",
+    "ordinal": 1,
+    "revision": 1,
+    "stageId": "idea_clarify",
+    "dispatchToken": "ebsdisp_8654d9ee624d5e9d4648cc67",
+    "dispatchGeneration": 1,
+    "approvalMode": "auto",
+    "executionMode": "continuous",
+    "ebookProductionContractVersion": 2
+  },
+  "sandboxOnly": false,
+  "productionSendBlocked": true,
+  "relaySend": false,
+  "controlHandoff": true,
+  "controlRelayContract": "remote_agent_protocol_v1"
+}

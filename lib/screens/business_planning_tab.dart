@@ -42,6 +42,7 @@ import '../theme/control_theme.dart';
 import '../widgets/ops_ui.dart';
 import '../widgets/project_design/instruction_preview_panel.dart';
 import '../widgets/operational_collapsible_section.dart';
+import '../widgets/project_design/external_wi_import_panel.dart';
 import '../widgets/project_design/step7_delivery_panel.dart';
 import '../widgets/project_design/project_design_wizard.dart';
 import '../widgets/project_design/studio_preflight_panel.dart';
@@ -2232,6 +2233,20 @@ class _BusinessPlanningTabState extends State<BusinessPlanningTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildBanner(),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('planning_external_wi_import'),
+              onPressed: () => ExternalWiImportPanel.show(
+                context,
+                delivery: _delivery,
+                agentRepo: _agentRepo,
+              ),
+              icon: const Icon(Icons.file_open, size: 18),
+              label: const Text('외부 작업지시 불러오기 (운영)'),
+            ),
+          ),
           if (_showWorkshopEmptyPrep) ...[
             const SizedBox(height: 10),
             _buildEmptyWorkshopPrepBanner(),
