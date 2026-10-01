@@ -173,7 +173,8 @@ class ExternalWorkInstructionImport {
     String topLevelInstructionId = '',
   }) {
     final issues = <ExternalWiImportIssue>[];
-    // Deep copy for lossless authoritative payload (no WorkInstruction round-trip).
+    // Deep copy for authoritative payload isolation (preserve fields; no WI model
+    // round-trip). Dart JSON maps keep insertion order from the source object.
     final wi = Map<String, dynamic>.from(
       jsonDecode(jsonEncode(wiIn)) as Map,
     );
@@ -267,16 +268,9 @@ class ExternalWorkInstructionImport {
       ));
     }
 
-    // Safe enum normalize for Control brief contract (does not rewrite title).
-    final briefNode = wi['workInstructionBrief'];
-    if (briefNode is Map) {
-      final brief = Map<String, dynamic>.from(briefNode);
-      final ts = '${brief['titleSource'] ?? ''}'.trim();
-      if (ts == 'user_confirmed' || ts == 'user') {
-        brief['titleSource'] = 'manual';
-        wi['workInstructionBrief'] = brief;
-      }
-    }
+    // Authoritative external WI fields are preserved as-is (including
+    // workInstructionBrief.titleSource=user_confirmed from Batch mint).
+    // Do not rewrite brief metadata to satisfy a narrower Control-only enum.
 
     // Reuse Control commercial preflight (same gate as normal deliver).
     if (issues.isEmpty && CommercialWorkInstructionPreflight.isSchema11(wi)) {
@@ -353,5 +347,51 @@ class ExternalWorkInstructionImport {
     final rev = '${r.payload['revision'] ?? ''}';
     final batch = '${r.payload['batchId'] ?? ''}';
     return '${r.instructionId}|r=$rev|b=$batch';
+  }
+
+  /// Canonical JSON for semantic field equality (key-order / formatting independent).
+  static String semanticCanonicalJson(Object? value) =>
+      jsonEncode(_canonicalize(value));
+
+  static Object? _canonicalize(Object? value) {
+    if (value is Map) {
+      final keys = value.keys.map((k) => '$k').toList()..sort();
+      return {
+        for (final k in keys) k: _canonicalize(value[k]),
+      };
+    }
+    if (value is List) {
+      return [for (final e in value) _canonicalize(e)];
+    }
+    return value;
+  }
+
+  /// Recursive semantic diff paths between two JSON-like trees.
+  static List<String> semanticDiffPaths(Object? a, Object? b, [String path = r'$']) {
+    if (a is Map && b is Map) {
+      final keys = <String>{
+        ...a.keys.map((k) => '$k'),
+        ...b.keys.map((k) => '$k'),
+      };
+      final out = <String>[];
+      for (final k in keys.toList()..sort()) {
+        out.addAll(semanticDiffPaths(a[k], b[k], '$path.$k'));
+      }
+      return out;
+    }
+    if (a is List && b is List) {
+      final out = <String>[];
+      final n = a.length > b.length ? a.length : b.length;
+      for (var i = 0; i < n; i++) {
+        out.addAll(semanticDiffPaths(
+          i < a.length ? a[i] : null,
+          i < b.length ? b[i] : null,
+          '$path[$i]',
+        ));
+      }
+      return out;
+    }
+    if (semanticCanonicalJson(a) == semanticCanonicalJson(b)) return const [];
+    return [path];
   }
 }

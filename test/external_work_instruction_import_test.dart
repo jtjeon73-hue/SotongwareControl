@@ -175,4 +175,68 @@ void main() {
       );
     });
   });
+
+  group('Phase18F lossless titleSource', () {
+    Map<String, dynamic> authoritativeWi() {
+      final handoffRoot = jsonDecode(handoffText) as Map<String, dynamic>;
+      return Map<String, dynamic>.from(
+        (handoffRoot['payload'] as Map)['workInstruction'] as Map,
+      );
+    }
+
+    test('A authoritative WI titleSource=user_confirmed', () {
+      final wi = authoritativeWi();
+      expect(wi['workInstructionBrief'], isA<Map>());
+      expect(
+        (wi['workInstructionBrief'] as Map)['titleSource'],
+        'user_confirmed',
+      );
+    });
+
+    test('B import handoff PASS with user_confirmed', () {
+      final r = ExternalWorkInstructionImport.parseText(handoffText);
+      expect(r.ok, isTrue, reason: r.issues.map((e) => e.code).join(','));
+    });
+
+    test('C deliver payload titleSource remains user_confirmed', () {
+      final r = ExternalWorkInstructionImport.parseText(handoffText);
+      expect(r.ok, isTrue);
+      final brief = r.payload['workInstructionBrief'] as Map;
+      expect(brief['titleSource'], 'user_confirmed');
+      expect(brief['titleSource'], isNot(equals('manual')));
+    });
+
+    test('D recursive semantic compare authoritative WI vs deliver payload = 0', () {
+      final authoritative = authoritativeWi();
+      final r = ExternalWorkInstructionImport.parseText(handoffText);
+      expect(r.ok, isTrue);
+      final diffs = ExternalWorkInstructionImport.semanticDiffPaths(
+        authoritative,
+        r.payload,
+      );
+      expect(diffs, isEmpty, reason: 'semantic diffs: $diffs');
+    });
+
+    test('E raw WI import same lossless titleSource', () {
+      final r = ExternalWorkInstructionImport.parseText(rawText);
+      expect(r.ok, isTrue);
+      expect(
+        (r.payload['workInstructionBrief'] as Map)['titleSource'],
+        'user_confirmed',
+      );
+      final authoritative = jsonDecode(rawText);
+      final diffs = ExternalWorkInstructionImport.semanticDiffPaths(
+        authoritative,
+        r.payload,
+      );
+      expect(diffs, isEmpty, reason: 'raw diffs: $diffs');
+    });
+
+    test('H import alone still does not deliver', () {
+      final r = ExternalWorkInstructionImport.parseText(handoffText);
+      expect(r.ok, isTrue);
+      expect(r.payload.containsKey('jobId'), isFalse);
+      expect(r.payload.containsKey('commandId'), isFalse);
+    });
+  });
 }

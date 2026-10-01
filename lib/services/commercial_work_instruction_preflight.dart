@@ -383,14 +383,17 @@ class CommercialWorkInstructionPreflight {
     if (brief.titleSource.isNotEmpty &&
         brief.titleSource != 'manual' &&
         brief.titleSource != 'ai_suggested' &&
-        brief.titleSource != 'ai_refined') {
+        brief.titleSource != 'ai_refined' &&
+        brief.titleSource != 'user_confirmed' &&
+        brief.titleSource != 'user') {
       issues.add(
         const CommercialPreflightIssue(
           code: 'WIBC_BAD_TITLE_SOURCE',
           fieldPath: 'workInstructionBrief.titleSource',
           severity: CommercialIssueSeverity.error,
           userMessageKo: 'titleSource가 올바르지 않습니다.',
-          developerDetail: 'manual|ai_suggested|ai_refined',
+          developerDetail:
+              'manual|ai_suggested|ai_refined|user_confirmed|user',
         ),
       );
     }

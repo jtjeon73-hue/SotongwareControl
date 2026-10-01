@@ -55,7 +55,7 @@ class WorkInstructionBrief {
   final List<String> acceptedAiSuggestions;
   final List<String> rejectedAiSuggestions;
   final bool manualOnlyMode;
-  final String titleSource; // manual | ai_suggested | ai_refined
+  final String titleSource; // manual | ai_suggested | ai_refined | user_confirmed | user
   final String userConfirmedAt;
   final int briefVersion;
   final String creationMode; // new_product | revise_existing
